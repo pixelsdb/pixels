@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.index.IndexServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -50,24 +51,20 @@ public class RPCIndexService implements IndexService
         String indexHost = ConfigFactory.Instance().getProperty("index.server.host");
         int indexPort = Integer.parseInt(ConfigFactory.Instance().getProperty("index.server.port"));
         defaultInstance = new RPCIndexService(indexHost, indexPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run() {
-                try
+        ShutdownHookManager.Instance().registerShutdownHook(RPCIndexService.class, false, () -> {
+            try
+            {
+                defaultInstance.shutdown();
+                for (RPCIndexService otherTransService : otherInstances.values())
                 {
-                    defaultInstance.shutdown();
-                    for (RPCIndexService otherTransService : otherInstances.values())
-                    {
-                        otherTransService.shutdown();
-                    }
-                    otherInstances.clear();
-                } catch (InterruptedException e)
-                {
-                    logger.error("failed to shut down index service", e);
+                    otherTransService.shutdown();
                 }
+                otherInstances.clear();
+            } catch (InterruptedException e)
+            {
+                logger.error("failed to shut down index service", e);
             }
-        }));
+        });
     }
 
     /**

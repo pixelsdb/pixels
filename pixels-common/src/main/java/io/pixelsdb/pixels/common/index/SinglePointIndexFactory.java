@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -98,8 +99,7 @@ public class SinglePointIndexFactory
                 if (instance == null)
                 {
                     instance = new SinglePointIndexFactory();
-                    Runtime.getRuntime().addShutdownHook(new Thread(()->
-                    {
+                    ShutdownHookManager.Instance().registerShutdownHook(SinglePointIndexFactory.class, false, () -> {
                         try
                         {
                             instance.closeAll();
@@ -109,7 +109,7 @@ public class SinglePointIndexFactory
                             logger.error("Failed to close all single point index instances.", e);
                             e.printStackTrace();
                         }
-                    }));
+                    });
                 }
             }
         }

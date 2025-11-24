@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.planner.plan.physical;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 
 import java.util.concurrent.ExecutorService;
@@ -38,8 +39,7 @@ public abstract class Operator implements OperatorExecutor
     {
         StageCompletionRatio = Double.parseDouble(
                 ConfigFactory.Instance().getProperty("executor.stage.completion.ratio"));
-
-        Runtime.getRuntime().addShutdownHook(new Thread(operatorService::shutdownNow));
+        ShutdownHookManager.Instance().registerShutdownHook(Operator.class, false, operatorService::shutdownNow);
     }
 
     private final String name;

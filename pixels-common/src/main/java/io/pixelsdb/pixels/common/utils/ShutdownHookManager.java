@@ -1,0 +1,131 @@
+/*
+ * Copyright 2025 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+package io.pixelsdb.pixels.common.utils;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * This class is to manage and execute the shutdown hooks in a managed order.
+ * {@link ShutdownHook} is a handler to be invoked for a class when the process is shutting down.
+ * @author hank
+ * @create 2025-11-07
+ */
+public class ShutdownHookManager
+{
+    private static final Logger logger = LogManager.getLogger(ShutdownHookManager.class);
+
+    private static final ShutdownHookManager instance = new ShutdownHookManager();
+
+    public static ShutdownHookManager Instance()
+    {
+        return instance;
+    }
+
+    static
+    {
+        ExecutorService serialHookRunner = Executors.newSingleThreadExecutor();
+        ExecutorService concurrentHookRunner = Executors.newCachedThreadPool();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            ShutdownHook hook;
+            // Execute the hooks in the reverse order of registration.
+            while ((hook = instance.shutdownHooks.pollLast()) != null)
+            {
+                if (hook.serial)
+                {
+                    serialHookRunner.submit(hook);
+                    logger.info("Invoke serial shutdown hook from {}", hook.clazz.getName());
+                }
+                else
+                {
+                    concurrentHookRunner.submit(hook);
+                    logger.info("Invoke parallel shutdown hook from {}", hook.clazz.getName());
+                }
+            }
+            serialHookRunner.shutdown();
+            concurrentHookRunner.shutdown();
+            try
+            {
+                // All shutdown hooks should terminate within 60 seconds.
+                if (!concurrentHookRunner.awaitTermination(59, TimeUnit.SECONDS))
+                {
+                    concurrentHookRunner.shutdownNow();
+                }
+                if (!serialHookRunner.awaitTermination(1, TimeUnit.SECONDS))
+                {
+                    serialHookRunner.shutdownNow();
+                }
+            }
+            catch (InterruptedException e)
+            {
+                logger.error("interrupted while waiting for shutdown hooks to terminate", e);
+            }
+        }));
+    }
+
+    private ShutdownHookManager() { }
+
+    /**
+     * The queue of shutdown hooks that are invoked when the process is shutting down.
+     */
+    private final Deque<ShutdownHook> shutdownHooks = new ConcurrentLinkedDeque<>();
+
+    /**
+     * @param clazz the class that registers this shutdown hook
+     * @param serial true if this shutdown hook should be called serially with other shutdown hooks marked serial
+     * @param runnable the handler of the shutdown hook
+     */
+    public void registerShutdownHook(Class<?> clazz, boolean serial, Runnable runnable)
+    {
+        this.shutdownHooks.offer(new ShutdownHook(clazz, serial, runnable));
+    }
+
+    /**
+     * The shutdown hook that denotes which class registered which shutdown handler.
+     */
+    public static class ShutdownHook implements Runnable
+    {
+        private final Class<?> clazz;
+        /**
+         * All the shutdown hook marked serial will be invoked serially.
+         */
+        private final boolean serial;
+        private final Runnable handler;
+
+        public ShutdownHook(Class<?> clazz, boolean serial, Runnable handler)
+        {
+            this.clazz = clazz;
+            this.serial = serial;
+            this.handler = handler;
+        }
+
+        @Override
+        public void run()
+        {
+            this.handler.run();
+        }
+    }
+}

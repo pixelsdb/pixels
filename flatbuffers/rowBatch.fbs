@@ -42,12 +42,13 @@ table ColumnVectorBaseFlat {
 
 table BinaryColumnVectorFlat {
     base : ColumnVectorBaseFlat;
-    vector : [ByteArray];
+    physicalBuffer: [ByteArray];
+    vector : [int];
     start : [int];
     lens : [int];
-    buffer : [byte];
+    buffer : int;
     nextFree : int;
-    smallBuffer : [byte];
+    smallBuffer : int;
     smallBufferNextFree : int;
     bufferAllocationCount : int;
 }

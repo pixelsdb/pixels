@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.storage.s3.io;
 import io.pixelsdb.pixels.common.physical.FixSizedBuffers;
 import io.pixelsdb.pixels.common.physical.scheduler.RetryPolicy;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -118,7 +119,6 @@ public class S3OutputStream extends OutputStream
     {
         maxConcurrency = Integer.parseInt(ConfigFactory.Instance().getProperty("s3.client.service.threads"));
         uploadService = Executors.newFixedThreadPool(maxConcurrency);
-        Runtime.getRuntime().addShutdownHook(new Thread(uploadService::shutdownNow));
 
         enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
         if (enableRetry)
@@ -132,7 +132,11 @@ public class S3OutputStream extends OutputStream
         }
 
         fixSizedBuffers = new FixSizedBuffers(S3_BUFFER_SIZE);
-        Runtime.getRuntime().addShutdownHook(new Thread(fixSizedBuffers::clear));
+
+        ShutdownHookManager.Instance().registerShutdownHook(S3OutputStream.class, true, () -> {
+            uploadService.shutdownNow();
+            fixSizedBuffers.clear();
+        });
     }
 
     /**

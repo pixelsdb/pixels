@@ -22,6 +22,8 @@
 
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 option java_multiple_files = false;
 option java_package = "io.pixelsdb.pixels.daemon";
 option java_outer_classname = "TransProto";
@@ -41,6 +43,7 @@ service TransService {
     rpc GetTransConcurrency (GetTransConcurrencyRequest) returns (GetTransConcurrencyResponse);
     rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
     rpc DumpTrans (DumpTransRequest) returns (DumpTransResponse);
+    rpc GetSafeGcTimestamp(google.protobuf.Empty) returns (GetSafeGcTimestampResponse);
 }
 
 // begin request/response definition for rpc services
@@ -182,6 +185,11 @@ message DumpTransRequest {
 
 message DumpTransResponse {
     int32 errorCode = 1;
+}
+
+message GetSafeGcTimestampResponse {
+    int32 errorCode = 1;
+    uint64 timestamp = 2;
 }
 
 // end request/response definition for rpc services

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.worker.vhive;
 
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.apache.commons.cli.*;
 
 public class Main
@@ -44,7 +45,7 @@ public class Main
             cmd = parser.parse(options, args);
             String port = cmd.getOptionValue("port", Integer.toString(PORT));
             final WorkerServer server = new WorkerServer(Integer.parseInt(port));
-            Runtime.getRuntime().addShutdownHook(new Thread(server::shutdown));
+            ShutdownHookManager.Instance().registerShutdownHook(Main.class, false, server::shutdown);
             server.run();
         } catch (ParseException pe)
         {

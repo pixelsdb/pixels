@@ -17,6 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Remove old assets from daily-latest
+        continue-on-error: true
         run: |
           assets=$(gh release view daily-latest --json assets --jq '.assets[].name')
           for a in $assets; do
