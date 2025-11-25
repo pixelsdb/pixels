@@ -152,4 +152,10 @@ public class ErrorCode
     public static final int INDEX_UPDATE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 17;
     public static final int INDEX_PURGE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 18;
     public static final int INDEX_PURGE_SINGLE_POINT_FAIL = ERROR_INDEX_SERVER + 19;
+
+    // error code for node service
+    private static final int ERROR_NODE_SERVER = ERROR_BASE + 700;
+    public static final int NODE_RETINA_INFO_FAIL = ERROR_NODE_SERVER + 1;
+    public static final int NODE_NO_AVAILABLE = ERROR_NODE_SERVER + 2;
+    public static final int NODE_INVALID_BUCKET = ERROR_NODE_SERVER + 3;
 }
