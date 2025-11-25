@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.mapdb;
 
+import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
 import net.jpountz.xxhash.XXHash32;
 import org.mapdb.CC;
 import org.mapdb.DataInput2;
@@ -28,8 +29,11 @@ import org.mapdb.serializer.GroupSerializer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Comparator;
 
 /**
+ * This serializer is only used to serialize and deserialize the byte buffer backed by a byte array on heap.
+ * We assume the byte buffer starts from the first byte of the backing array.
  * @author hank
  * @create 2025-11-25
  */
@@ -41,97 +45,120 @@ public class ByteBufferSerializer implements GroupSerializer<ByteBuffer>
     @Override
     public void serialize(DataOutput2 out, ByteBuffer value) throws IOException
     {
-        out.packInt(value.length);
-        out.write(value);
+        checkValidBuffer(value);
+        out.packInt(value.limit());
+        out.write(value.array(), 0, value.limit());
     }
 
     @Override
-    public ByteBuffer deserialize(DataInput2 in, int available) throws IOException {
+    public ByteBuffer deserialize(DataInput2 in, int available) throws IOException
+    {
         int size = in.unpackInt();
         byte[] ret = new byte[size];
         in.readFully(ret);
-        return ret;
+        return ByteBuffer.wrap(ret);
     }
 
-
     @Override
-    public boolean isTrusted() {
+    public boolean isTrusted()
+    {
         return true;
     }
 
     @Override
-    public boolean equals(byte[] a1, byte[] a2) {
-        return Arrays.equals(a1, a2);
+    public boolean equals(ByteBuffer a1, ByteBuffer a2)
+    {
+        checkValidBuffer(a1);
+        checkValidBuffer(a2);
+        a1.position(0);
+        a2.position(0);
+        return a1.equals(a2);
     }
 
-    public int hashCode(byte[] bytes, int seed) {
-        return HASHER.hash(bytes, 0, bytes.length, seed);
+    public int hashCode(ByteBuffer value, int seed)
+    {
+        return HASHER.hash(value, 0, value.limit(), seed);
     }
 
     @Override
-    public int compare(byte[] o1, byte[] o2) {
-        if (o1 == o2) return 0;
-        final int len = Math.min(o1.length, o2.length);
-        for (int i = 0; i < len; i++) {
-            int b1 = o1[i] & 0xFF;
-            int b2 = o2[i] & 0xFF;
-            if (b1 != b2)
-                return b1 - b2;
+    public int compare(ByteBuffer o1, ByteBuffer o2)
+    {
+        checkValidBuffer(o1);
+        checkValidBuffer(o2);
+        if (o1 == o2)
+        {
+            return 0;
         }
-        return o1.length - o2.length;
+        o1.position(0);
+        o2.position(0);
+        return o1.compareTo(o2);
     }
 
     @Override
-    public int valueArraySearch(Object keys, byte[] key) {
-        return Arrays.binarySearch((byte[][])keys, key, Serializer.BYTE_ARRAY);
+    public int valueArraySearch(Object keys, ByteBuffer key)
+    {
+        checkValidBuffer(key);
+        key.position(0);
+        return Arrays.binarySearch((ByteBuffer[])keys, key);
     }
 
     @Override
-    public int valueArraySearch(Object keys, byte[] key, Comparator comparator) {
-        //TODO PERF optimize search
-        Object[] v = valueArrayToArray(keys);
-        return Arrays.binarySearch(v, key, comparator);
+    public int valueArraySearch(Object keys, ByteBuffer key, Comparator comparator)
+    {
+        checkValidBuffer(key);
+        key.position(0);
+        return Arrays.binarySearch((ByteBuffer[])keys, key, comparator);
     }
 
     @Override
-    public void valueArraySerialize(DataOutput2 out, Object vals) throws IOException {
-        byte[][] vals2 = (byte[][]) vals;
+    public void valueArraySerialize(DataOutput2 out, Object vals) throws IOException
+    {
+        ByteBuffer[] vals2 = (ByteBuffer[]) vals;
         out.packInt(vals2.length);
-        for(byte[]b:vals2){
-            Serializer.BYTE_ARRAY.serialize(out, b);
+        for(ByteBuffer b : vals2)
+        {
+            serialize(out, b);
         }
     }
 
     @Override
-    public byte[][] valueArrayDeserialize(DataInput2 in, int size) throws IOException {
+    public ByteBuffer[] valueArrayDeserialize(DataInput2 in, int size) throws IOException
+    {
         int s = in.unpackInt();
-        byte[][] ret = new byte[s][];
-        for(int i=0;i<s;i++) {
-            ret[i] = Serializer.BYTE_ARRAY.deserialize(in, -1);
+        ByteBuffer[] ret = new ByteBuffer[s];
+        for(int i = 0; i < s; ++i)
+        {
+            ret[i] = deserialize(in, -1);
         }
         return ret;
     }
 
     @Override
-    public byte[] valueArrayGet(Object vals, int pos) {
-        return ((byte[][])vals)[pos];
+    public ByteBuffer valueArrayGet(Object vals, int pos)
+    {
+        return ((ByteBuffer[]) vals)[pos];
     }
 
     @Override
-    public int valueArraySize(Object vals) {
-        return ((byte[][])vals).length;
+    public int valueArraySize(Object vals)
+    {
+        return ((ByteBuffer[]) vals).length;
     }
 
     @Override
-    public byte[][] valueArrayEmpty() {
-        return new byte[0][];
+    public ByteBuffer[] valueArrayEmpty()
+    {
+        return new ByteBuffer[0];
     }
 
     @Override
-    public byte[][] valueArrayPut(Object vals, int pos, byte[] newValue) {
-        byte[][] array = (byte[][])vals;
-        final byte[][] ret = Arrays.copyOf(array, array.length+1);
-        if(pos<array.length){
+    public ByteBuffer[] valueArrayPut(Object vals, int pos, ByteBuffer newValue)
+    {
+        checkValidBuffer(newValue);
+        ByteBuffer[] array = (ByteBuffer[])vals;
+        final ByteBuffer[] ret = Arrays.copyOf(array, array.length+1);
+        if(pos < array.length)
+        {
             System.arraycopy(array, pos, ret, pos+1, array.length-pos);
         }
         ret[pos] = newValue;
@@ -139,49 +166,72 @@ public class ByteBufferSerializer implements GroupSerializer<ByteBuffer>
     }
 
     @Override
-    public byte[][] valueArrayUpdateVal(Object vals, int pos, byte[] newValue) {
-        byte[][] vals2 = (byte[][]) vals;
+    public ByteBuffer[] valueArrayUpdateVal(Object vals, int pos, ByteBuffer newValue)
+    {
+        checkValidBuffer(newValue);
+        ByteBuffer[] vals2 = (ByteBuffer[]) vals;
         vals2 = vals2.clone();
         vals2[pos] = newValue;
         return vals2;
     }
 
     @Override
-    public byte[][] valueArrayFromArray(Object[] objects) {
-        byte[][] ret = new byte[objects.length][];
-        for(int i=0;i<ret.length;i++){
-            ret[i] = (byte[])objects[i];
+    public ByteBuffer[] valueArrayFromArray(Object[] objects)
+    {
+        ByteBuffer[] ret = new ByteBuffer[objects.length];
+        for(int i = 0; i < ret.length; ++i)
+        {
+            ret[i] = (ByteBuffer) objects[i];
         }
         return ret;
     }
 
     @Override
-    public byte[][] valueArrayCopyOfRange(Object vals, int from, int to) {
-        return Arrays.copyOfRange((byte[][])vals, from, to);
+    public ByteBuffer[] valueArrayCopyOfRange(Object vals, int from, int to)
+    {
+        return Arrays.copyOfRange((ByteBuffer[])vals, from, to);
     }
 
     @Override
-    public byte[][] valueArrayDeleteValue(Object vals, int pos) {
-        byte[][] vals2 = new byte[((byte[][])vals).length-1][];
-        System.arraycopy(vals,0,vals2, 0, pos-1);
+    public ByteBuffer[] valueArrayDeleteValue(Object vals, int pos)
+    {
+        ByteBuffer[] vals2 = new ByteBuffer[((ByteBuffer[])vals).length-1];
+        System.arraycopy(vals,0, vals2, 0, pos-1);
         System.arraycopy(vals, pos, vals2, pos-1, vals2.length-(pos-1));
         return vals2;
     }
 
     @Override
-    public byte[] nextValue(byte[] value) {
-        value = value.clone();
+    public ByteBuffer nextValue(ByteBuffer value)
+    {
+        //value = value.duplicate();
+        checkValidBuffer(value);
+        byte[] ret = Arrays.copyOf(value.array(), value.limit());
 
-        for (int i = value.length-1; ;i--) {
-            int b1 = value[i] & 0xFF;
-            if(b1==255){
-                if(i==0)
+        for (int i = ret.length-1; ; --i)
+        {
+            int b1 = ret[i] & 0xFF;
+            if(b1 == 255)
+            {
+                if(i == 0)
+                {
                     return null;
-                value[i]=0;
-                continue;
+                }
+                ret[i] = 0;
+                {
+                    continue;
+                }
             }
-            value[i] = (byte) ((b1+1)&0xFF);
-            return value;
+            ret[i] = (byte) ((b1 + 1) & 0xFF);
+            return ByteBuffer.wrap(ret);
+        }
+    }
+
+    private void checkValidBuffer(ByteBuffer buffer)
+    {
+        if (buffer == null || buffer.isDirect())
+        {
+            throw new InvalidArgumentException("buffer must be non-null and non-direct");
         }
     }
 }

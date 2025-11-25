@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.index.mapdb;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
@@ -26,14 +27,16 @@ import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.mapdb.*;
+import org.mapdb.BTreeMap;
+import org.mapdb.DB;
+import org.mapdb.DBMaker;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+
+import static io.pixelsdb.pixels.index.mapdb.MapDBThreadResources.EMPTY_VALUE_BUFFER;
 
 /**
  * MapDB-based implementation of SinglePointIndex
@@ -45,12 +48,13 @@ public class MapDBIndex implements SinglePointIndex
 {
     private static final Logger logger = LogManager.getLogger(MapDBIndex.class);
 
+    private static final ByteBufferSerializer BYTE_BUFFER_SERIALIZER = new ByteBufferSerializer();
     private final long tableId;
     private final long indexId;
     private final boolean unique;
     private final String dbFilePath;
     private final DB db;
-    private final BTreeMap<byte[], byte[]> indexMap;
+    private final BTreeMap<ByteBuffer, ByteBuffer> indexMap;
 
     /**
      * Constructor for persistent MapDB index
@@ -80,8 +84,8 @@ public class MapDBIndex implements SinglePointIndex
 
         String mapName = "index_" + indexId;
         this.indexMap = db.treeMap(mapName)
-                .keySerializer(Serializer.BYTE_ARRAY)
-                .valueSerializer(Serializer.BYTE_ARRAY)
+                .keySerializer(BYTE_BUFFER_SERIALIZER)
+                .valueSerializer(BYTE_BUFFER_SERIALIZER)
                 .createOrOpen();
     }
 
@@ -106,126 +110,86 @@ public class MapDBIndex implements SinglePointIndex
     @Override
     public long getUniqueRowId(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        checkClosed();
         if (!unique)
         {
             throw new SinglePointIndexException("getUniqueRowId should only be called on unique index");
         }
 
-        byte[] keyBytes = serializeIndexKey(key);
-        byte[] valueBytes = indexMap.get(keyBytes);
+        ByteBuffer keyBuffer = toKeyBuffer(key);
+        Map.Entry<ByteBuffer, ByteBuffer> entry = indexMap.ceilingEntry(keyBuffer);
 
-        if (valueBytes == null)
+        if (entry == null)
         {
             return -1L;
         }
 
-        try
-        {
-            IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.parseFrom(valueBytes);
-            return entry.getRowId();
-        }
-        catch (Exception e)
-        {
-            throw new SinglePointIndexException("Failed to parse primary index entry", e);
-        }
+        return entry.getValue().getLong();
     }
 
     @Override
     public List<Long> getRowIds(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        byte[] keyBytes = serializeIndexKey(key);
-        byte[] valueBytes = indexMap.get(keyBytes);
-
-        if (valueBytes == null)
+        if (unique)
         {
-            return Collections.emptyList();
+            return ImmutableList.of(getUniqueRowId(key));
         }
-
-        try
+        else
         {
-            List<Long> rowIds = new ArrayList<>();
-            if (unique)
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            ByteBuffer lowerBound = toKeyBuffer(key);
+            ByteBuffer upperBound = BYTE_BUFFER_SERIALIZER.nextValue(lowerBound);
+            Iterator<ByteBuffer> iterator = indexMap.keyIterator(lowerBound, true, upperBound, false);
+            while (iterator.hasNext())
             {
-                // For unique index, parse as PrimaryIndexEntry
-                IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.parseFrom(valueBytes);
-                rowIds.add(entry.getRowId());
+                builder.add(extractRowIdFromKey(iterator.next()));
             }
-            else
-            {
-                // For non-unique index, parse as SecondaryIndexEntry
-                IndexProto.SecondaryIndexEntry entry = IndexProto.SecondaryIndexEntry.parseFrom(valueBytes);
-                rowIds.add(entry.getRowId());
-                // Note: For multiple row IDs with same key in non-unique index,
-                // we need to handle this differently - see implementation notes below
-            }
-            return rowIds;
-        }
-        catch (Exception e)
-        {
-            throw new SinglePointIndexException("Failed to parse index entry", e);
+            return builder.build();
         }
     }
 
     @Override
     public boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        byte[] keyBytes = serializeIndexKey(key);
-
         try
         {
-            byte[] valueBytes;
             if (unique)
             {
-                // For unique index, store PrimaryIndexEntry
-                IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
-                        .setIndexKey(key)
-                        .setRowId(rowId)
-                        // RowLocation is not available at this level, will be set by higher level
-                        .build();
-                valueBytes = entry.toByteArray();
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                valueBuffer.putLong(rowId).position(0);
+                indexMap.put(keyBuffer, valueBuffer);
             }
             else
             {
-                // For non-unique index, store SecondaryIndexEntry
-                IndexProto.SecondaryIndexEntry entry = IndexProto.SecondaryIndexEntry.newBuilder()
-                        .setIndexKey(key)
-                        .setRowId(rowId)
-                        .build();
-                valueBytes = entry.toByteArray();
+                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
+                indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
-
-            indexMap.put(keyBytes, valueBytes);
-            db.commit();
             return true;
         }
-        catch (Exception e)
+        catch (Throwable e)
         {
-            db.rollback();
-            throw new SinglePointIndexException("Failed to put index entry", e);
+            throw new SinglePointIndexException("Failed to put mapdb index entry", e);
         }
     }
 
     @Override
-    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
-            throws MainIndexException, SinglePointIndexException
+    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         try
         {
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
-                byte[] keyBytes = serializeIndexKey(key);
-                byte[] valueBytes = entry.toByteArray();
-                indexMap.put(keyBytes, valueBytes);
+                long rowId = entry.getRowId();
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                valueBuffer.putLong(rowId).position(0);
+                indexMap.put(keyBuffer, valueBuffer);
             }
-
-            db.commit();
             return true;
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to put primary index entries", e);
         }
     }
@@ -239,17 +203,24 @@ public class MapDBIndex implements SinglePointIndex
             for (IndexProto.SecondaryIndexEntry entry : entries)
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
-                byte[] keyBytes = serializeIndexKey(key);
-                byte[] valueBytes = entry.toByteArray();
-                indexMap.put(keyBytes, valueBytes);
+                long rowId = entry.getRowId();
+                if(unique)
+                {
+                    ByteBuffer keyBuffer = toKeyBuffer(key);
+                    ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                    valueBuffer.putLong(rowId).position(0);
+                    indexMap.put(keyBuffer, valueBuffer);
+                }
+                else
+                {
+                    ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
+                    indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                }
             }
-
-            db.commit();
             return true;
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to put secondary index entries", e);
         }
     }
@@ -262,32 +233,19 @@ public class MapDBIndex implements SinglePointIndex
             throw new SinglePointIndexException("updatePrimaryEntry should only be called on unique index");
         }
 
-        byte[] keyBytes = serializeIndexKey(key);
-
         try
         {
-            byte[] existingValue = indexMap.get(keyBytes);
-            long previousRowId = -1L;
-
-            if (existingValue != null)
-            {
-                IndexProto.PrimaryIndexEntry existingEntry = IndexProto.PrimaryIndexEntry.parseFrom(existingValue);
-                previousRowId = existingEntry.getRowId();
-            }
-
-            IndexProto.PrimaryIndexEntry newEntry = IndexProto.PrimaryIndexEntry.newBuilder()
-                    .setIndexKey(key)
-                    .setRowId(rowId)
-                    .build();
-            byte[] valueBytes = newEntry.toByteArray();
-            indexMap.put(keyBytes, valueBytes);
-
-            db.commit();
-            return previousRowId;
+            long prevRowId = getUniqueRowId(key);
+            if (prevRowId < 0)
+                return prevRowId;
+            ByteBuffer keyBuffer = toKeyBuffer(key);
+            ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+            valueBuffer.putLong(rowId).position(0);
+            indexMap.put(keyBuffer, valueBuffer);
+            return prevRowId;
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to update primary index entry", e);
         }
     }
@@ -295,32 +253,37 @@ public class MapDBIndex implements SinglePointIndex
     @Override
     public List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        byte[] keyBytes = serializeIndexKey(key);
 
         try
         {
-            byte[] existingValue = indexMap.get(keyBytes);
-            List<Long> previousRowIds = new ArrayList<>();
-
-            if (existingValue != null)
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            if(unique)
             {
-                IndexProto.SecondaryIndexEntry existingEntry = IndexProto.SecondaryIndexEntry.parseFrom(existingValue);
-                previousRowIds.add(existingEntry.getRowId());
+                long prevRowId = getUniqueRowId(key);
+                if (prevRowId < 0)   // no previous row ids are found
+                {
+                    return ImmutableList.of();
+                }
+                builder.add(prevRowId);
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                valueBuffer.putLong(rowId).position(0);
+                indexMap.put(keyBuffer, valueBuffer);
             }
-
-            IndexProto.SecondaryIndexEntry newEntry = IndexProto.SecondaryIndexEntry.newBuilder()
-                    .setIndexKey(key)
-                    .setRowId(rowId)
-                    .build();
-            byte[] valueBytes = newEntry.toByteArray();
-            indexMap.put(keyBytes, valueBytes);
-
-            db.commit();
-            return previousRowIds;
+            else
+            {
+                builder.addAll(this.getRowIds(key));
+                if (builder.build().isEmpty())  // no previous row ids are found
+                {
+                    return ImmutableList.of();
+                }
+                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
+                indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+            }
+            return builder.build();
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to update secondary index entry", e);
         }
     }
@@ -329,151 +292,174 @@ public class MapDBIndex implements SinglePointIndex
     public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
             throws SinglePointIndexException
     {
-        List<Long> previousRowIds = new ArrayList<>();
-
         try
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-                long previousRowId = updatePrimaryEntry(key, rowId);
-                if (previousRowId >= 0)
+                long prevRowId = getUniqueRowId(key);
+                if (prevRowId < 0)  // indicates that this entry hasn't put or has been deleted
                 {
-                    previousRowIds.add(previousRowId);
+                    return ImmutableList.of();
                 }
+                builder.add(prevRowId);
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                valueBuffer.putLong(rowId).position(0);
+                indexMap.put(keyBuffer, valueBuffer);
             }
-
-            db.commit();
-            return previousRowIds;
-        }
-        catch (SinglePointIndexException e)
-        {
-            db.rollback();
-            throw e;
+            return builder.build();
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to update primary index entries", e);
         }
     }
 
     @Override
-    public List<Long> updateSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries)
-            throws SinglePointIndexException
+    public List<Long> updateSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
-        List<Long> previousRowIds = new ArrayList<>();
-
         try
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             for (IndexProto.SecondaryIndexEntry entry : entries)
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-                List<Long> entryPreviousRowIds = updateSecondaryEntry(key, rowId);
-                previousRowIds.addAll(entryPreviousRowIds);
-            }
 
-            db.commit();
-            return previousRowIds;
+                if(unique)
+                {
+                    long prevRowId = getUniqueRowId(key);
+                    if (prevRowId < 0)
+                    {
+                        return ImmutableList.of();
+                    }
+                    builder.add(prevRowId);
+                    ByteBuffer keyBuffer = toKeyBuffer(key);
+                    ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                    valueBuffer.putLong(rowId).position(0);
+                    indexMap.put(keyBuffer, valueBuffer);
+                }
+                else
+                {
+                    builder.addAll(this.getRowIds(key));
+                    if (builder.build().isEmpty())
+                    {
+                        return ImmutableList.of();
+                    }
+                    ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
+                    indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                }
+            }
+            return builder.build();
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to update secondary index entries", e);
         }
     }
 
     @Override
-    public long deleteUniqueEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException
+    public long deleteUniqueEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         if (!unique)
         {
             throw new SinglePointIndexException("deleteUniqueEntry should only be called on unique index");
         }
 
-        byte[] keyBytes = serializeIndexKey(indexKey);
+        long rowId = getUniqueRowId(key);
 
         try
         {
-            byte[] existingValue = indexMap.get(keyBytes);
-            long deletedRowId = -1L;
-
-            if (existingValue != null)
-            {
-                IndexProto.PrimaryIndexEntry existingEntry = IndexProto.PrimaryIndexEntry.parseFrom(existingValue);
-                deletedRowId = existingEntry.getRowId();
-                indexMap.remove(keyBytes);
-            }
-            db.commit();
-            return deletedRowId;
+            ByteBuffer keyBuffer = toKeyBuffer(key);
+            ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+            valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
+            indexMap.put(keyBuffer, valueBuffer);
+            return rowId;
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to delete unique index entry", e);
         }
     }
 
     @Override
-    public List<Long> deleteEntry(IndexProto.IndexKey indexKey) throws SinglePointIndexException
+    public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        byte[] keyBytes = serializeIndexKey(indexKey);
-
         try
         {
-            byte[] existingValue = indexMap.get(keyBytes);
-            List<Long> deletedRowIds = new ArrayList<>();
-
-            if (existingValue != null)
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            if(unique)
             {
-                if (unique)
+                long rowId = getUniqueRowId(key);
+                if(rowId < 0) // indicates there is a delete before put
                 {
-                    IndexProto.PrimaryIndexEntry existingEntry = IndexProto.PrimaryIndexEntry.parseFrom(existingValue);
-                    deletedRowIds.add(existingEntry.getRowId());
+                    return ImmutableList.of();
                 }
-                else
-                {
-                    IndexProto.SecondaryIndexEntry existingEntry = IndexProto.SecondaryIndexEntry.parseFrom(existingValue);
-                    deletedRowIds.add(existingEntry.getRowId());
-                }
-                indexMap.remove(keyBytes);
+                builder.add(rowId);
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
+                indexMap.put(keyBuffer, valueBuffer);
             }
-
-            db.commit();
-            return deletedRowIds;
+            else
+            {
+                List<Long> rowIds = getRowIds(key);
+                if(rowIds.isEmpty()) // indicates there is a delete before put
+                {
+                    return ImmutableList.of();
+                }
+                builder.addAll(rowIds);
+                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, -1L);
+                indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+            }
+            return builder.build();
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to delete index entry", e);
         }
     }
 
     @Override
-    public List<Long> deleteEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
+    public List<Long> deleteEntries(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
-        List<Long> deletedRowIds = new ArrayList<>();
-
         try
         {
-            for (IndexProto.IndexKey indexKey : indexKeys)
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            for (IndexProto.IndexKey key : keys)
             {
-                List<Long> entryDeletedRowIds = deleteEntry(indexKey);
-                deletedRowIds.addAll(entryDeletedRowIds);
+                if(unique)
+                {
+                    long rowId = getUniqueRowId(key);
+                    if(rowId < 0) // indicates there is a delete before put
+                    {
+                        return ImmutableList.of();
+                    }
+                    builder.add(rowId);
+                    ByteBuffer keyBuffer = toKeyBuffer(key);
+                    ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                    valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
+                    indexMap.put(keyBuffer, valueBuffer);
+                }
+                else
+                {
+                    List<Long> rowIds = getRowIds(key);
+                    if(rowIds.isEmpty()) // indicates there is a delete before put
+                    {
+                        return ImmutableList.of();
+                    }
+                    builder.addAll(rowIds);
+                    ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, -1L);
+                    indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
+                }
             }
-            db.commit();
-            return deletedRowIds;
-        }
-        catch (SinglePointIndexException e)
-        {
-            db.rollback();
-            throw e;
+            return builder.build();
         }
         catch (Exception e)
         {
-            db.rollback();
             throw new SinglePointIndexException("Failed to delete index entries", e);
         }
     }
@@ -481,8 +467,47 @@ public class MapDBIndex implements SinglePointIndex
     @Override
     public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
-        // For MapDB implementation, purge is the same as delete since we don't have a separate tombstone mechanism
-        return deleteEntries(indexKeys);
+        ImmutableList.Builder<Long> builder = ImmutableList.builder();
+        try ()
+        {
+            for (IndexProto.IndexKey key : indexKeys)
+            {
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+
+                try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
+                {
+                    iterator.seek(keyBuffer);
+                    while (iterator.isValid())
+                    {
+                        ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
+                        if (startsWith(keyFound, keyBuffer))
+                        {
+                            if(unique)
+                            {
+                                ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+                                iterator.value(valueBuffer);
+                                long rowId = valueBuffer.getLong();
+                                if(rowId > 0)
+                                    builder.add(rowId);
+                            }
+                            // keyFound is not direct, must use its backing array
+                            writeBatch.delete(columnFamilyHandle, keyFound.array());
+                            iterator.next();
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+            rocksDB.write(writeOptions, writeBatch);
+            return builder.build();
+        }
+        catch (RocksDBException e)
+        {
+            throw new SinglePointIndexException("Failed to purge entries by prefix", e);
+        }
     }
 
     @Override
@@ -636,7 +661,7 @@ public class MapDBIndex implements SinglePointIndex
         }
     }
 
-    protected static ByteBuffer toBuffer(long indexId, ByteString key, long postValue, int bufferNum)
+    protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues)
             throws SinglePointIndexException
     {
         int keySize = key.size();
@@ -662,8 +687,11 @@ public class MapDBIndex implements SinglePointIndex
         compositeKey.putLong(indexId);
         // Write key bytes (variable length)
         key.copyTo(compositeKey);
-        // Write post value (8 bytes, big endian)
-        compositeKey.putLong(postValue);
+        // Write post values (8 bytes each, big endian)
+        for (long postValue : postValues)
+        {
+            compositeKey.putLong(postValue);
+        }
         compositeKey.position(0);
         return compositeKey;
     }
@@ -671,14 +699,13 @@ public class MapDBIndex implements SinglePointIndex
     // convert IndexKey to byte array
     protected static ByteBuffer toKeyBuffer(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - key.getTimestamp(), 1);
-
+        return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp());
     }
 
     // create composite key with rowId
     protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - rowId, 1);
+        return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp(), rowId);
     }
 
     // check if byte array starts with specified prefix

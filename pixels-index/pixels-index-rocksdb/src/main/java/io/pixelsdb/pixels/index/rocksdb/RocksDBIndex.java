@@ -205,14 +205,14 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to put rocksdb index entries", e);
+            throw new SinglePointIndexException("Failed to put primary index entries", e);
         }
     }
 
     @Override
     public boolean putSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
-        try(WriteBatch writeBatch = new WriteBatch())
+        try (WriteBatch writeBatch = new WriteBatch())
         {
             for (IndexProto.SecondaryIndexEntry entry : entries)
             {
@@ -236,7 +236,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to put secondary entries", e);
+            throw new SinglePointIndexException("Failed to put secondary index entries", e);
         }
     }
 
@@ -330,7 +330,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public List<Long> updateSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
-        try(WriteBatch writeBatch = new WriteBatch())
+        try (WriteBatch writeBatch = new WriteBatch())
         {
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
             for (IndexProto.SecondaryIndexEntry entry : entries)
@@ -367,7 +367,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to put secondary entries", e);
+            throw new SinglePointIndexException("Failed to update secondary index entries", e);
         }
     }
 
@@ -385,16 +385,16 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to delete unique entry", e);
+            throw new SinglePointIndexException("Failed to delete unique index entry", e);
         }
     }
 
     @Override
     public List<Long> deleteEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             if(unique)
             {
                 long rowId = getUniqueRowId(key);
@@ -423,16 +423,16 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to delete entry", e);
+            throw new SinglePointIndexException("Failed to delete index entry", e);
         }
     }
 
     @Override
     public List<Long> deleteEntriesInternal(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
-        try(WriteBatch writeBatch = new WriteBatch())
+        try (WriteBatch writeBatch = new WriteBatch())
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             // delete single point index
             for(IndexProto.IndexKey key : keys)
             {
@@ -466,7 +466,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to delete entries", e);
+            throw new SinglePointIndexException("Failed to delete index entries", e);
         }
     }
 
@@ -556,11 +556,11 @@ public class RocksDBIndex extends CachingSinglePointIndex
         return true;
     }
 
-    protected static ByteBuffer toBuffer(long indexId, ByteString key, long postValue, int bufferNum)
+    protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues)
             throws SinglePointIndexException
     {
         int keySize = key.size();
-        int totalLength = Long.BYTES + keySize + Long.BYTES;
+        int totalLength = Long.BYTES + keySize + Long.BYTES * postValues.length;
         ByteBuffer compositeKey;
         if (bufferNum == 1)
         {
@@ -582,8 +582,11 @@ public class RocksDBIndex extends CachingSinglePointIndex
         compositeKey.putLong(indexId);
         // Write key bytes (variable length)
         key.copyTo(compositeKey);
-        // Write post value (8 bytes, big endian)
-        compositeKey.putLong(postValue);
+        // Write post values (8 bytes each, big endian)
+        for (long postValue : postValues)
+        {
+            compositeKey.putLong(postValue);
+        }
         compositeKey.position(0);
         return compositeKey;
     }
@@ -591,14 +594,13 @@ public class RocksDBIndex extends CachingSinglePointIndex
     // convert IndexKey to byte array
     protected static ByteBuffer toKeyBuffer(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - key.getTimestamp(), 1);
-
+        return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp());
     }
 
     // create composite key with rowId
     protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - rowId, 1);
+        return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp(), rowId);
     }
 
     // check if byte array starts with specified prefix

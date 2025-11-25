@@ -47,7 +47,7 @@ final class MapDBThreadResources
     private static final int DEFAULT_KEY_LENGTH = 32;
     private static final int VALUE_LENGTH = 8;
 
-    static final ByteBuffer EMPTY_VALUE_BUFFER = ByteBuffer.allocateDirect(0);
+    static final ByteBuffer EMPTY_VALUE_BUFFER = ByteBuffer.allocate(0);
 
     static
     {

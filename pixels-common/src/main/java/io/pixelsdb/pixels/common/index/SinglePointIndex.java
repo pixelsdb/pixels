@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.index.IndexProto;
 
@@ -126,13 +125,12 @@ public interface SinglePointIndex extends Closeable
     boolean putEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
 
     /**
-     * Put the index entries of a primary index.
+     * Put the index entries of a primary index. The main index entries are not maintained in this method.
      * @param entries the primary index entries
      * @return true if the index entries are put successfully
-     * @throws MainIndexException if failed to put entries into the main index of the table
      * @throws SinglePointIndexException if failed to put entries into the single point index
      */
-    boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws MainIndexException, SinglePointIndexException;
+    boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException;
 
     /**
      * Put the index entries of a secondary index. Only the index key ({@link io.pixelsdb.pixels.index.IndexProto.IndexKey})
@@ -144,7 +142,7 @@ public interface SinglePointIndex extends Closeable
     boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException;
 
     /**
-     * Update an entry of this primary index.
+     * Update an entry of this primary index. The main index entry is not maintained in this method.
      * <br/>
      * <b>Note: this method does not check the existence of the entry.<b/> For entries not found or deleted, update equals to put.
      * @param key the index key
@@ -166,7 +164,7 @@ public interface SinglePointIndex extends Closeable
     List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
 
     /**
-     * Update the index entries of a primary index.
+     * Update the index entries of a primary index. The main index entries are not maintained in this method.
      * <br/>
      * <b>Note: this method does not check the existence of the entry.<b/> For entries not found or deleted, update equals to put.
      * @param entries the primary index entries
