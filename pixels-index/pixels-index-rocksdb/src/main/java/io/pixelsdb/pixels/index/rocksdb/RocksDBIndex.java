@@ -247,7 +247,9 @@ public class RocksDBIndex extends CachingSinglePointIndex
         {
             long prevRowId = getUniqueRowId(key);
             if (prevRowId < 0)
+            {
                 return prevRowId;
+            }
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
             valueBuffer.putLong(rowId).position(0);

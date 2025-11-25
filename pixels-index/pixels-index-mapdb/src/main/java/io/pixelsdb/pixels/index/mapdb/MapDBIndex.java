@@ -120,15 +120,12 @@ public class MapDBIndex implements SinglePointIndex
         {
             throw new SinglePointIndexException("getUniqueRowId should only be called on unique index");
         }
-
         ByteBuffer keyBuffer = toKeyBuffer(key);
         Map.Entry<ByteBuffer, ByteBuffer> entry = indexMap.ceilingEntry(keyBuffer);
-
         if (entry == null)
         {
             return -1L;
         }
-
         return entry.getValue().getLong();
     }
 
@@ -201,8 +198,7 @@ public class MapDBIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries)
-            throws SinglePointIndexException
+    public boolean putSecondaryEntries(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
         try
         {
@@ -238,12 +234,13 @@ public class MapDBIndex implements SinglePointIndex
         {
             throw new SinglePointIndexException("updatePrimaryEntry should only be called on unique index");
         }
-
         try
         {
             long prevRowId = getUniqueRowId(key);
             if (prevRowId < 0)
+            {
                 return prevRowId;
+            }
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
             valueBuffer.putLong(rowId).position(0);
@@ -259,7 +256,6 @@ public class MapDBIndex implements SinglePointIndex
     @Override
     public List<Long> updateSecondaryEntry(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-
         try
         {
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
@@ -295,8 +291,7 @@ public class MapDBIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
-            throws SinglePointIndexException
+    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         try
         {
@@ -334,7 +329,6 @@ public class MapDBIndex implements SinglePointIndex
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-
                 if(unique)
                 {
                     long prevRowId = getUniqueRowId(key);
@@ -374,11 +368,9 @@ public class MapDBIndex implements SinglePointIndex
         {
             throw new SinglePointIndexException("deleteUniqueEntry should only be called on unique index");
         }
-
-        long rowId = getUniqueRowId(key);
-
         try
         {
+            long rowId = getUniqueRowId(key);
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
             valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
@@ -529,12 +521,10 @@ public class MapDBIndex implements SinglePointIndex
             {
                 db.close();
             }
-
             if (dbFileDir != null)
             {
                 FileUtils.deleteDirectory(new File(dbFileDir));
             }
-
             return true;
         }
         catch (Exception e)
@@ -543,8 +533,7 @@ public class MapDBIndex implements SinglePointIndex
         }
     }
 
-    protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues)
-            throws SinglePointIndexException
+    protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues) throws SinglePointIndexException
     {
         int keySize = key.size();
         int totalLength = Long.BYTES + keySize + Long.BYTES;
