@@ -85,7 +85,7 @@ public class MapDBIndex implements SinglePointIndex
         this.db = DBMaker.fileDB(dbFile)
                 .fileMmapEnableIfSupported()
                 .closeOnJvmShutdown()
-                .transactionEnable()
+                //.transactionEnable()
                 .make();
 
         String mapName = "index_" + indexId;
