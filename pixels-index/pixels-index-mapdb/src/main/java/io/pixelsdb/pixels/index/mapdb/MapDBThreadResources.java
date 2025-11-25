@@ -41,7 +41,6 @@ final class MapDBThreadResources
     private static final Map<ThreadId, ByteBuffer> threadKeyBuffers = new ConcurrentHashMap<>();
     private static final Map<ThreadId, ByteBuffer> threadKeyBuffers2 = new ConcurrentHashMap<>();
     private static final Map<ThreadId, ByteBuffer> threadKeyBuffers3 = new ConcurrentHashMap<>();
-    private static final Map<ThreadId, ByteBuffer> threadKeyBuffers4 = new ConcurrentHashMap<>();
     private static final Map<ThreadId, ByteBuffer> threadValueBuffers = new ConcurrentHashMap<>();
 
     private static final int DEFAULT_KEY_LENGTH = 32;
@@ -80,14 +79,6 @@ final class MapDBThreadResources
     static ByteBuffer getKeyBuffer3(int length)
     {
         return internalGetKeyBuffer(threadKeyBuffers3, length);
-    }
-
-    /**
-     * Get the current thread's fourth key buffer.
-     */
-    static ByteBuffer getKeyBuffer4(int length)
-    {
-        return internalGetKeyBuffer(threadKeyBuffers4, length);
     }
 
     static ByteBuffer internalGetKeyBuffer(Map<ThreadId, ByteBuffer> keyBuffers, int length)
@@ -130,6 +121,5 @@ final class MapDBThreadResources
         threadKeyBuffers.clear();
         threadKeyBuffers2.clear();
         threadKeyBuffers3.clear();
-        threadKeyBuffers4.clear();
     }
 }
