@@ -20,11 +20,15 @@
 
  package io.pixelsdb.pixels.common.node;
 
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.NodeProto;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestBucketCache
+import java.util.HashMap;
+import java.util.Map;
+
+ public class TestBucketCache
 {
     @Test
     public void testBucketCache()
@@ -37,4 +41,28 @@ public class TestBucketCache
         NodeProto.NodeInfo nodeInfo0_cache = bucketCache.getRetinaNodeInfoByBucketId(0);
         Assertions.assertEquals(nodeInfo0, nodeInfo0_cache);
     }
+
+    @Test
+    public void testBucketStats()
+    {
+        int bucketNum = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("node.bucket.num")
+        );
+
+        BucketCache bucketCache = BucketCache.getInstance();
+        Map<String, Integer> bucketStats = new HashMap<>();
+
+        for (int i = 0; i < bucketNum; ++i)
+        {
+            NodeProto.NodeInfo node = bucketCache.getRetinaNodeInfoByBucketId(i);
+            String addr = node.getAddress();
+
+            bucketStats.compute(addr, (k, v) -> v == null ? 1 : v + 1);
+        }
+
+        for (Map.Entry<String, Integer> entry : bucketStats.entrySet()) {
+            System.out.println(entry.getKey() + " => " + entry.getValue());
+        }
+    }
+
 }

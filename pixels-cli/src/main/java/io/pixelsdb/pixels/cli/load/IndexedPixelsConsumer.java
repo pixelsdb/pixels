@@ -178,7 +178,7 @@
          {
              targetDirPath += "/";
          }
-         String targetFileName = DateUtil.getCurTime() + "-" + bucketId + ".pxl";
+         String targetFileName = targetNode.getAddress() + "_" + DateUtil.getCurTime() + "_" + bucketId + ".pxl";
          String targetFilePath = targetDirPath + targetFileName;
 
          PixelsWriter pixelsWriter = getPixelsWriter(targetStorage, targetFilePath);

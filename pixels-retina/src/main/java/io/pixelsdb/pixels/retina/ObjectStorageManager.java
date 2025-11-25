@@ -34,6 +34,7 @@ public class ObjectStorageManager
     private static volatile ObjectStorageManager instance;
     private final Storage storage;
     private final String path;
+    private String idPrefix;
 
     private ObjectStorageManager() throws RetinaException
     {
@@ -82,7 +83,12 @@ public class ObjectStorageManager
 
     private String buildKey(long tableId, long entryId)
     {
-        return this.path + String.format("%d/%d", tableId, entryId);
+        return this.path + String.format("%d/%s%d", tableId, idPrefix, entryId);
+    }
+
+    public void setIdPrefix(String idPrefix)
+    {
+        this.idPrefix = idPrefix;
     }
 
     public void write(long tableId, long entryId, byte[] data) throws RetinaException

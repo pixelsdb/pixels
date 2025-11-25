@@ -111,9 +111,10 @@ public class PixelsWriterBuffer
     private final List<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
     private AtomicLong maxObjectKey;
+    private String retinaHostName;
 
     public PixelsWriterBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
-                              Path targetCompactDirPath) throws RetinaException
+                              Path targetCompactDirPath, String retinaHostName) throws RetinaException
     {
         this.tableId = tableId;
         this.schema = schema;
@@ -146,13 +147,15 @@ public class PixelsWriterBuffer
         this.fileWriterManagers = new ArrayList<>();
         this.maxObjectKey = new AtomicLong(-1);
 
+        this.retinaHostName = retinaHostName;
         this.objectStorageManager = ObjectStorageManager.Instance();
+        this.objectStorageManager.setIdPrefix(retinaHostName + "_");
 
         this.currentFileWriterManager = new FileWriterManager(
                 this.tableId, this.schema, this.targetOrderedDirPath,
                 this.targetOrderedStorage, this.memTableSize, this.blockSize,
                 this.replication, this.encodingLevel, this.nullsPadding,
-                idCounter, this.memTableSize * this.maxMemTableCount);
+                idCounter, this.memTableSize * this.maxMemTableCount, retinaHostName);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
                 TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
@@ -236,7 +239,7 @@ public class PixelsWriterBuffer
                         this.targetOrderedDirPath, this.targetOrderedStorage,
                         this.memTableSize, this.blockSize, this.replication,
                         this.encodingLevel, this.nullsPadding, this.idCounter,
-                        this.memTableSize * this.maxMemTableCount);
+                        this.memTableSize * this.maxMemTableCount, this.retinaHostName);
             }
 
             /*

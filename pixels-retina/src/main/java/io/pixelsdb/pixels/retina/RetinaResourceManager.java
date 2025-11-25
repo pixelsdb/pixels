@@ -38,6 +38,8 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.*;
@@ -56,6 +58,7 @@ public class RetinaResourceManager
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
     private final Map<String, PixelsWriterBuffer> pixelsWriterBufferMap;
+    private String retinaHostName;
 
     // GC related fields
     private final ScheduledExecutorService gcExecutor;
@@ -89,6 +92,19 @@ public class RetinaResourceManager
             logger.error("Failed to start retina background gc", e);
         }
         this.gcExecutor = executor;
+
+        this.retinaHostName = System.getenv("HOSTNAME");
+        if (retinaHostName == null)
+        {
+            try
+            {
+                this.retinaHostName = InetAddress.getLocalHost().getHostName();
+                logger.debug("HostName from InetAddress: {}", retinaHostName);
+            } catch (UnknownHostException e)
+            {
+                logger.error("Failed to get retina hostname", e);
+            }
+        }
     }
 
     private static final class InstanceHolder
@@ -184,7 +200,7 @@ public class RetinaResourceManager
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
 
             PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(latestLayout.getTableId(),
-                    schema, orderedPaths.get(0), compactPaths.get(0));
+                    schema, orderedPaths.get(0), compactPaths.get(0), retinaHostName);
             String writerBufferKey = schemaName + "_" + tableName;
             pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
         } catch (Exception e)
