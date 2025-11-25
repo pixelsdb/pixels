@@ -489,13 +489,20 @@ public class RocksDBIndex extends CachingSinglePointIndex
                         ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
                         if (startsWith(keyFound, keyBuffer))
                         {
+                            long rowId;
                             if(unique)
                             {
                                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                                 iterator.value(valueBuffer);
-                                long rowId = valueBuffer.getLong();
-                                if(rowId > 0)
-                                    builder.add(rowId);
+                                rowId = valueBuffer.getLong();
+                            }
+                            else
+                            {
+                                rowId = extractRowIdFromKey(keyFound);
+                            }
+                            if(rowId > 0)
+                            {
+                                builder.add(rowId);
                             }
                             // keyFound is not direct, must use its backing array
                             writeBatch.delete(columnFamilyHandle, keyFound.array());
@@ -513,7 +520,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to purge entries by prefix", e);
+            throw new SinglePointIndexException("Failed to purge index entries by prefix", e);
         }
     }
 
@@ -535,7 +542,8 @@ public class RocksDBIndex extends CachingSinglePointIndex
         try
         {
             this.close();
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             throw new SinglePointIndexException("Failed to close single point index", e);
         }
@@ -543,7 +551,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         if (!removed)
         {
             removed = true;
-            // clear RocksDB directory for main index
+            // clear RocksDB directory
             try
             {
                 FileUtils.deleteDirectory(new File(rocksDBPath));

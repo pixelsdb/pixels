@@ -21,12 +21,10 @@ package io.pixelsdb.pixels.index.mapdb;
 
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
-import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.apache.commons.io.FileUtils;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -34,25 +32,25 @@ import org.mapdb.DBMaker;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import static io.pixelsdb.pixels.index.mapdb.MapDBThreadResources.EMPTY_VALUE_BUFFER;
 
 /**
- * MapDB-based implementation of SinglePointIndex
+ * MapDB-based implementation of SinglePointIndex.
  *
  * @author hank
  * @create 2025-11-24
  */
 public class MapDBIndex implements SinglePointIndex
 {
-    private static final Logger logger = LogManager.getLogger(MapDBIndex.class);
-
     private static final ByteBufferSerializer BYTE_BUFFER_SERIALIZER = new ByteBufferSerializer();
     private final long tableId;
     private final long indexId;
     private final boolean unique;
-    private final String dbFilePath;
+    private final String dbFileDir;
     private final DB db;
     private final BTreeMap<ByteBuffer, ByteBuffer> indexMap;
 
@@ -72,9 +70,17 @@ public class MapDBIndex implements SinglePointIndex
         {
             mapdbPath += "/";
         }
-        this.dbFilePath = mapdbPath + indexId + ".db";
+        this.dbFileDir = mapdbPath + indexId + "/";
+        try
+        {
+            FileUtils.forceMkdir(new File(mapdbPath + indexId));
+        }
+        catch (IOException e)
+        {
+            throw new SinglePointIndexException("Failed to create data path for index " + indexId, e);
+        }
 
-        File dbFile = new File(dbFilePath);
+        File dbFile = new File(dbFileDir + "/index_" + indexId + ".db");
 
         this.db = DBMaker.fileDB(dbFile)
                 .fileMmapEnableIfSupported()
@@ -468,51 +474,45 @@ public class MapDBIndex implements SinglePointIndex
     public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
-        try ()
+        try
         {
             for (IndexProto.IndexKey key : indexKeys)
             {
-                ByteBuffer keyBuffer = toKeyBuffer(key);
-
-                try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
+                ByteBuffer lowerBound = toKeyBuffer(key);
+                ByteBuffer upperBound = BYTE_BUFFER_SERIALIZER.nextValue(lowerBound);
+                Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator =
+                        indexMap.entryIterator(lowerBound, true, upperBound, false);
+                while (iterator.hasNext())
                 {
-                    iterator.seek(keyBuffer);
-                    while (iterator.isValid())
+                    Map.Entry<ByteBuffer, ByteBuffer> entry = iterator.next();
+                    ByteBuffer keyFound = entry.getKey();
+                    long rowId;
+                    if(unique)
                     {
-                        ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
-                        if (startsWith(keyFound, keyBuffer))
-                        {
-                            if(unique)
-                            {
-                                ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
-                                iterator.value(valueBuffer);
-                                long rowId = valueBuffer.getLong();
-                                if(rowId > 0)
-                                    builder.add(rowId);
-                            }
-                            // keyFound is not direct, must use its backing array
-                            writeBatch.delete(columnFamilyHandle, keyFound.array());
-                            iterator.next();
-                        }
-                        else
-                        {
-                            break;
-                        }
+                        rowId = entry.getValue().getLong();
                     }
+                    else
+                    {
+                        rowId = extractRowIdFromKey(keyFound);
+                    }
+                    if(rowId > 0)
+                    {
+                        builder.add(rowId);
+                    }
+                    indexMap.remove(keyFound);
                 }
             }
-            rocksDB.write(writeOptions, writeBatch);
             return builder.build();
         }
-        catch (RocksDBException e)
+        catch (Exception e)
         {
-            throw new SinglePointIndexException("Failed to purge entries by prefix", e);
+            throw new SinglePointIndexException("Failed to purge index entries by prefix", e);
         }
     }
 
     @Override
     @Deprecated
-    public void close() throws IOException
+    public void close()
     {
         if (db != null && !db.isClosed())
         {
@@ -530,13 +530,9 @@ public class MapDBIndex implements SinglePointIndex
                 db.close();
             }
 
-            if (dbFilePath != null)
+            if (dbFileDir != null)
             {
-                File dbFile = new File(dbFilePath);
-                if (dbFile.exists())
-                {
-                    return dbFile.delete();
-                }
+                FileUtils.deleteDirectory(new File(dbFileDir));
             }
 
             return true;
@@ -544,120 +540,6 @@ public class MapDBIndex implements SinglePointIndex
         catch (Exception e)
         {
             throw new SinglePointIndexException("Failed to close and remove MapDB index", e);
-        }
-    }
-
-    /**
-     * Serialize IndexKey to byte array for use as MapDB key
-     */
-    private byte[] serializeIndexKey(IndexProto.IndexKey key)
-    {
-        return key.toByteArray();
-    }
-
-    /**
-     * Get the number of entries in this index
-     *
-     * @return the size of the index
-     */
-    public long size()
-    {
-        return indexMap.size();
-    }
-
-    /**
-     * Check if the index is empty
-     *
-     * @return true if the index is empty
-     */
-    public boolean isEmpty()
-    {
-        return indexMap.isEmpty();
-    }
-
-    /**
-     * Clear all entries from the index
-     *
-     * @throws SinglePointIndexException
-     */
-    public void clear() throws SinglePointIndexException
-    {
-        try
-        {
-            indexMap.clear();
-            db.commit();
-        }
-        catch (Exception e)
-        {
-            db.rollback();
-            throw new SinglePointIndexException("Failed to clear index", e);
-        }
-    }
-
-    /**
-     * Get primary index entry by key
-     */
-    public IndexProto.PrimaryIndexEntry getPrimaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException
-    {
-        if (!unique)
-        {
-            throw new SinglePointIndexException("getPrimaryEntry should only be called on unique index");
-        }
-
-        byte[] keyBytes = serializeIndexKey(key);
-        byte[] valueBytes = indexMap.get(keyBytes);
-
-        if (valueBytes == null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return IndexProto.PrimaryIndexEntry.parseFrom(valueBytes);
-        }
-        catch (Exception e)
-        {
-            throw new SinglePointIndexException("Failed to parse primary index entry", e);
-        }
-    }
-
-    /**
-     * Get secondary index entry by key
-     */
-    public IndexProto.SecondaryIndexEntry getSecondaryEntry(IndexProto.IndexKey key) throws SinglePointIndexException
-    {
-        if (unique)
-        {
-            throw new SinglePointIndexException("getSecondaryEntry should only be called on non-unique index");
-        }
-
-        byte[] keyBytes = serializeIndexKey(key);
-        byte[] valueBytes = indexMap.get(keyBytes);
-
-        if (valueBytes == null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return IndexProto.SecondaryIndexEntry.parseFrom(valueBytes);
-        }
-        catch (Exception e)
-        {
-            throw new SinglePointIndexException("Failed to parse secondary index entry", e);
-        }
-    }
-
-    /**
-     * Check if the index is closed and throw exception if it is.
-     */
-    private void checkClosed() throws SinglePointIndexException
-    {
-        if (db == null || db.isClosed())
-        {
-            throw new SinglePointIndexException("MapDBIndex is closed for table " + tableId + " index " + indexId);
         }
     }
 
