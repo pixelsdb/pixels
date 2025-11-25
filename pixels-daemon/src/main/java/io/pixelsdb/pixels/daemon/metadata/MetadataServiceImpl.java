@@ -24,12 +24,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ProtocolStringList;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.metadata.domain.*;
+import io.pixelsdb.pixels.common.node.NodeService;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
+import io.pixelsdb.pixels.daemon.NodeProto;
 import io.pixelsdb.pixels.daemon.metadata.dao.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -354,15 +356,22 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                                         if (allSuccess)
                                         {
                                             // Issue #930: corresponding writerBuffer was not created when creating table
-                                            RetinaService retinaService = RetinaService.Instance();
-                                            if (!retinaService.addWriterBuffer(request.getSchemaName(), request.getTableName()))
+                                            // Issue #1218: support multi-retina
+                                            NodeService nodeService = NodeService.Instance();
+                                            List<NodeProto.NodeInfo> retinaList = nodeService.getRetinaList();
+                                            int retinaPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
+                                            for(NodeProto.NodeInfo retinaNode : retinaList)
                                             {
-                                                headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
-                                                        .setErrorMsg("failed to add retina's writer buffer for table '" +
-                                                                request.getSchemaName() + "." + request.getTableName() + "'");
-                                            } else
-                                            {
-                                                headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                                RetinaService retinaService = RetinaService.CreateInstance(retinaNode.getAddress(), retinaPort);
+                                                if (!retinaService.addWriterBuffer(request.getSchemaName(), request.getTableName()))
+                                                {
+                                                    headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
+                                                            .setErrorMsg("failed to add retina's writer buffer for table '" +
+                                                                    request.getSchemaName() + "." + request.getTableName() + "'");
+                                                } else
+                                                {
+                                                    headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                                }
                                             }
                                         } else
                                         {

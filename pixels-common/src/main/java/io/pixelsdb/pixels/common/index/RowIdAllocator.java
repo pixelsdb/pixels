@@ -51,6 +51,17 @@ public class RowIdAllocator
         this.indexService = IndexServiceProvider.getService(mode);
     }
 
+    public RowIdAllocator(long tableId, int batchSize, IndexService indexService)
+    {
+        if (batchSize <= 0)
+        {
+            throw new IllegalArgumentException("batchSize must be positive.");
+        }
+        this.tableId = tableId;
+        this.batchSize = batchSize;
+        this.indexService = indexService;
+    }
+
     /**
      * Get a unique rowId.
      * @return

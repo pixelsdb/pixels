@@ -69,13 +69,13 @@ public class FileWriterManager
                              Path targetOrderedDirPath, Storage targetOrderedStorage,
                              int pixelsStride, long blockSize, short replication,
                              EncodingLevel encodingLevel, boolean nullsPadding,
-                             long firstBlockId, int recordNum) throws RetinaException
+                             long firstBlockId, int recordNum, String hostName) throws RetinaException
     {
         this.tableId = tableId;
         this.firstBlockId = firstBlockId;
 
         // Create pixels writer.
-        String targetFileName = DateUtil.getCurTime() + ".pxl";
+        String targetFileName = hostName + "_" + DateUtil.getCurTime() + ".pxl";
         String targetFilePath = targetOrderedDirPath.getUri() + "/" + targetFileName;
         try
         {
@@ -90,7 +90,8 @@ public class FileWriterManager
             this.file.setId(metadataService.getFileId(targetFilePath));
         } catch (MetadataException e)
         {
-            throw new RetinaException("Failed to add file information to the metadata", e);
+            throw new RetinaException("Failed to add file information to the metadata, " +
+                    "targetFilePath: " + targetFilePath, e);
         }
 
         // Add the corresponding visibility for the file.

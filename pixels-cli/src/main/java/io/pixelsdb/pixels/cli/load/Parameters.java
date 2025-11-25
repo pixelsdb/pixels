@@ -50,7 +50,6 @@ public class Parameters
     private final MetadataService metadataService;
     private final long transId;
     private final long timestamp;
-    private RowIdAllocator rowIdAllocator;
     private SinglePointIndex index;
 
     public List<Path> getLoadingPaths()
@@ -91,11 +90,6 @@ public class Parameters
     public long getTransId() { return transId; }
 
     public long getTimestamp() { return timestamp; }
-
-    public RowIdAllocator getRowIdAllocator()
-    {
-        return rowIdAllocator;
-    }
 
     public int[] getPkMapping()
     {
@@ -220,7 +214,6 @@ public class Parameters
 
         if(index != null)
         {
-            rowIdAllocator = new RowIdAllocator(table.getId(), 1000, IndexServiceProvider.ServiceMode.rpc);
             int[] orderKeyColIds = new int[index.getKeyColumns().getKeyColumnIds().size()];
             List<String> orderKeyColNames = new LinkedList<>();
             List<String> orderKeyColTypes = new LinkedList<>();
