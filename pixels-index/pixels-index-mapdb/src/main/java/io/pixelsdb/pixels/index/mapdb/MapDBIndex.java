@@ -533,6 +533,14 @@ public class MapDBIndex implements SinglePointIndex
         }
     }
 
+    /**
+     * @return the number of entries in this index
+     */
+    public long size()
+    {
+        return indexMap.size();
+    }
+
     protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues) throws SinglePointIndexException
     {
         int keySize = key.size();

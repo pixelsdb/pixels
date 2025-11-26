@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
  * @author hank
  * @create 2025-11-24
  */
-public class MapDBPerformanceTest
+public class TestMapDBPerformance
 {
     private final int testDataSize = 1000000;
     private DB db;
@@ -41,7 +41,7 @@ public class MapDBPerformanceTest
     @Test
     public void testMapDBPerformance()
     {
-        MapDBPerformanceTest test = new MapDBPerformanceTest();
+        TestMapDBPerformance test = new TestMapDBPerformance();
 
         try
         {
