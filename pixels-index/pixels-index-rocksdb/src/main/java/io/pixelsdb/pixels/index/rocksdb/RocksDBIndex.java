@@ -131,6 +131,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public List<Long> getRowIds(IndexProto.IndexKey key) throws SinglePointIndexException
     {
+        if (unique)
+        {
+            return ImmutableList.of(getUniqueRowId(key));
+        }
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
         readOptions.setPrefixSameAsStart(true);
@@ -486,6 +490,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
                 {
                     iterator.seek(keyBuffer);
+                    boolean foundTombstone = false;
                     while (iterator.isValid())
                     {
                         ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
@@ -502,13 +507,22 @@ public class RocksDBIndex extends CachingSinglePointIndex
                             {
                                 rowId = extractRowIdFromKey(keyFound);
                             }
-                            if(rowId > 0)
+                            iterator.next();
+                            if (rowId < 0)
+                            {
+                                foundTombstone = true;
+                            }
+                            else if(foundTombstone)
                             {
                                 builder.add(rowId);
                             }
+                            else
+                            {
+                                continue;
+                            }
                             // keyFound is not direct, must use its backing array
                             writeBatch.delete(columnFamilyHandle, keyFound.array());
-                            iterator.next();
+
                         }
                         else
                         {
@@ -601,13 +615,11 @@ public class RocksDBIndex extends CachingSinglePointIndex
         return compositeKey;
     }
 
-    // convert IndexKey to byte array
     protected static ByteBuffer toKeyBuffer(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp());
     }
 
-    // create composite key with rowId
     protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp(), rowId);
@@ -631,10 +643,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
         return keyFound1.compareTo(keyCurrent1) == 0;
     }
 
-    // extract rowId from key
+    // extract rowId from non-unique key
     protected static long extractRowIdFromKey(ByteBuffer keyBuffer)
     {
         // extract rowId portion (last 8 bytes of key)
-        return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
+        return keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
     }
 }

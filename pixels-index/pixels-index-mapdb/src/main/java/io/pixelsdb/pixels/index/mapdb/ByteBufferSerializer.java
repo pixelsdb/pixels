@@ -91,7 +91,18 @@ public class ByteBufferSerializer implements GroupSerializer<ByteBuffer>
         }
         o1.position(0);
         o2.position(0);
-        return o1.compareTo(o2);
+        // Issue #1214: should not use o1.compareTo(o2), as ByteBuffer.compareTo compares signed bytes.
+        final int len = Math.min(o1.limit(), o2.limit());
+        for (int i = 0; i < len; i++)
+        {
+            int b1 = o1.get(i) & 0xFF;
+            int b2 = o2.get(i) & 0xFF;
+            if (b1 != b2)
+            {
+                return b1 - b2;
+            }
+        }
+        return o1.limit() - o2.limit();
     }
 
     @Override

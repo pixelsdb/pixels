@@ -25,6 +25,8 @@ import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -35,6 +37,7 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.pixelsdb.pixels.index.mapdb.MapDBThreadResources.EMPTY_VALUE_BUFFER;
 
@@ -46,6 +49,8 @@ import static io.pixelsdb.pixels.index.mapdb.MapDBThreadResources.EMPTY_VALUE_BU
  */
 public class MapDBIndex implements SinglePointIndex
 {
+    public static final Logger LOGGER = LogManager.getLogger(MapDBIndex.class);
+
     private static final ByteBufferSerializer BYTE_BUFFER_SERIALIZER = new ByteBufferSerializer();
     private final long tableId;
     private final long indexId;
@@ -53,6 +58,8 @@ public class MapDBIndex implements SinglePointIndex
     private final String dbFileDir;
     private final DB db;
     private final BTreeMap<ByteBuffer, ByteBuffer> indexMap;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicBoolean removed = new AtomicBoolean(false);
 
     /**
      * Constructor for persistent MapDB index
@@ -136,18 +143,22 @@ public class MapDBIndex implements SinglePointIndex
         {
             return ImmutableList.of(getUniqueRowId(key));
         }
-        else
+        ImmutableList.Builder<Long> builder = ImmutableList.builder();
+        ByteBuffer lowerBound = toKeyBuffer(key);
+        ByteBuffer upperBound = toUpperBoundKeyBuffer(key);
+        Iterator<ByteBuffer> iterator = indexMap.keyIterator(lowerBound, true, upperBound, true);
+        while (iterator.hasNext())
         {
-            ImmutableList.Builder<Long> builder = ImmutableList.builder();
-            ByteBuffer lowerBound = toKeyBuffer(key);
-            ByteBuffer upperBound = BYTE_BUFFER_SERIALIZER.nextValue(lowerBound);
-            Iterator<ByteBuffer> iterator = indexMap.keyIterator(lowerBound, true, upperBound, false);
-            while (iterator.hasNext())
+            ByteBuffer keyBuffer = iterator.next();
+            long rowId = extractRowIdFromKey(keyBuffer);
+            long timestamp = extractTimestampFromKey(keyBuffer);
+            if (rowId < 0)
             {
-                builder.add(extractRowIdFromKey(iterator.next()));
+                break;
             }
-            return builder.build();
+            builder.add(rowId);
         }
+        return builder.build();
     }
 
     @Override
@@ -471,9 +482,10 @@ public class MapDBIndex implements SinglePointIndex
             for (IndexProto.IndexKey key : indexKeys)
             {
                 ByteBuffer lowerBound = toKeyBuffer(key);
-                ByteBuffer upperBound = BYTE_BUFFER_SERIALIZER.nextValue(lowerBound);
+                ByteBuffer upperBound = toUpperBoundKeyBuffer(key);
                 Iterator<Map.Entry<ByteBuffer, ByteBuffer>> iterator =
-                        indexMap.entryIterator(lowerBound, true, upperBound, false);
+                        indexMap.entryIterator(lowerBound, true, upperBound, true);
+                boolean foundTombstone = false;
                 while (iterator.hasNext())
                 {
                     Map.Entry<ByteBuffer, ByteBuffer> entry = iterator.next();
@@ -487,11 +499,19 @@ public class MapDBIndex implements SinglePointIndex
                     {
                         rowId = extractRowIdFromKey(keyFound);
                     }
-                    if(rowId > 0)
+                    if (rowId < 0)
+                    {
+                        foundTombstone = true;
+                    }
+                    else if(foundTombstone)
                     {
                         builder.add(rowId);
                     }
-                    indexMap.remove(keyFound);
+                    else
+                    {
+                        continue;
+                    }
+                    iterator.remove();
                 }
             }
             return builder.build();
@@ -506,31 +526,40 @@ public class MapDBIndex implements SinglePointIndex
     @Deprecated
     public void close()
     {
-        if (db != null && !db.isClosed())
+        if (closed.compareAndSet(false, true))
         {
-            db.close();
+            if (db != null && !db.isClosed())
+            {
+                db.close();
+            }
+            LOGGER.debug("MapDBIndex closed for table {} index {}", tableId, indexId);
         }
     }
 
     @Override
     public boolean closeAndRemove() throws SinglePointIndexException
     {
-        try
+        if (closed.compareAndSet(false, true) && removed.compareAndSet(false, true))
         {
-            if (db != null && !db.isClosed())
+            try
             {
-                db.close();
+                if (db != null && !db.isClosed())
+                {
+                    db.close();
+                }
+                if (dbFileDir != null)
+                {
+                    FileUtils.deleteDirectory(new File(dbFileDir));
+                }
+                LOGGER.debug("MapDBIndex closed and removed for table {} index {}", tableId, indexId);
+                return true;
             }
-            if (dbFileDir != null)
+            catch (Exception e)
             {
-                FileUtils.deleteDirectory(new File(dbFileDir));
+                throw new SinglePointIndexException("Failed to close and remove MapDB index", e);
             }
-            return true;
         }
-        catch (Exception e)
-        {
-            throw new SinglePointIndexException("Failed to close and remove MapDB index", e);
-        }
+        return false;
     }
 
     /**
@@ -541,10 +570,12 @@ public class MapDBIndex implements SinglePointIndex
         return indexMap.size();
     }
 
+
+
     protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues) throws SinglePointIndexException
     {
         int keySize = key.size();
-        int totalLength = Long.BYTES + keySize + Long.BYTES;
+        int totalLength = Long.BYTES + keySize + Long.BYTES * postValues.length;
         ByteBuffer compositeKey;
         if (bufferNum == 1)
         {
@@ -575,40 +606,40 @@ public class MapDBIndex implements SinglePointIndex
         return compositeKey;
     }
 
-    // convert IndexKey to byte array
     protected static ByteBuffer toKeyBuffer(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp());
     }
 
-    // create composite key with rowId
+    protected static ByteBuffer toUpperBoundKeyBuffer(IndexProto.IndexKey key) throws SinglePointIndexException
+    {
+        return toBuffer(key.getIndexId(), key.getKey(), 2, Long.MAX_VALUE);
+    }
+
     protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
         return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp(), rowId);
     }
 
-    // check if byte array starts with specified prefix
-    protected static boolean startsWith(ByteBuffer keyFound, ByteBuffer keyCurrent)
-    {
-        // prefix is indexId + key, without timestamp
-        int prefixLength = keyCurrent.limit() - Long.BYTES;
-        if (keyFound.limit() < prefixLength)
-        {
-            return false;
-        }
-        keyFound.position(0);
-        keyCurrent.position(0);
-        ByteBuffer keyFound1 = keyFound.slice();
-        keyFound1.limit(prefixLength);
-        ByteBuffer keyCurrent1 = keyCurrent.slice();
-        keyCurrent1.limit(prefixLength);
-        return keyFound1.compareTo(keyCurrent1) == 0;
-    }
-
-    // extract rowId from key
+    /**
+     * Extract rowId from non-unique key.
+     * @param keyBuffer the key buffer of the non-unique key
+     * @return the extracted row id
+     */
     protected static long extractRowIdFromKey(ByteBuffer keyBuffer)
     {
         // extract rowId portion (last 8 bytes of key)
-        return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
+        return keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
+    }
+
+    /**
+     * Extract timestamp from non-unique key.
+     * @param keyBuffer the key buffer of the non-unique key
+     * @return the extracted row id
+     */
+    protected static long extractTimestampFromKey(ByteBuffer keyBuffer)
+    {
+        // extract rowId portion (last 8 bytes of key)
+        return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES * 2);
     }
 }

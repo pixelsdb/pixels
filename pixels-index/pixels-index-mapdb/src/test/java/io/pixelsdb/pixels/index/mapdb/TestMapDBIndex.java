@@ -148,7 +148,7 @@ public class TestMapDBIndex
             uniqueIndex.deleteEntry(key);
         }
         System.out.println("delete 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
-        assertEquals(2000000L, uniqueIndex.size());
+        assertEquals(3000000L, uniqueIndex.size());
         uniqueIndex.purgeEntries(indexKeys);
         assertEquals(0L, uniqueIndex.size());
     }
