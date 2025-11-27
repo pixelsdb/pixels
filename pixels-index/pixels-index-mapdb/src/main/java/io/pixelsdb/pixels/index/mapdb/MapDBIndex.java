@@ -190,6 +190,10 @@ public class MapDBIndex implements SinglePointIndex
     @Override
     public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("putPrimaryEntries can only be called on unique indexes");
+        }
         try
         {
             for (IndexProto.PrimaryIndexEntry entry : entries)
@@ -296,6 +300,10 @@ public class MapDBIndex implements SinglePointIndex
     @Override
     public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("updatePrimaryEntries can only be called on unique indexes");
+        }
         try
         {
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
@@ -464,9 +472,9 @@ public class MapDBIndex implements SinglePointIndex
     @Override
     public List<Long> purgeEntries(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             for (IndexProto.IndexKey key : indexKeys)
             {
                 ByteBuffer lowerBound = toKeyBuffer(key);
@@ -617,16 +625,5 @@ public class MapDBIndex implements SinglePointIndex
     {
         // extract rowId portion (last 8 bytes of key)
         return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
-    }
-
-    /**
-     * Extract timestamp from non-unique key.
-     * @param keyBuffer the key buffer of the non-unique key
-     * @return the extracted row id
-     */
-    protected static long extractTimestampFromKey(ByteBuffer keyBuffer)
-    {
-        // extract rowId portion (last 8 bytes of key)
-        return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES * 2);
     }
 }

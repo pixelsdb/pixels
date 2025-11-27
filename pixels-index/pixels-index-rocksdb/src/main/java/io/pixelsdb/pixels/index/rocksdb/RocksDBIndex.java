@@ -195,6 +195,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public boolean putPrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("putPrimaryEntries can only be called on unique indexes");
+        }
         try (WriteBatch writeBatch = new WriteBatch())
         {
             for (IndexProto.PrimaryIndexEntry entry : entries)
@@ -249,6 +253,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public long updatePrimaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("updatePrimaryEntry can only be called on unique indexes");
+        }
         try
         {
             long prevRowId = getUniqueRowId(key);
@@ -299,6 +307,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public List<Long> updatePrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("updatePrimaryEntries can only be called on unique indexes");
+        }
         try (WriteBatch writeBatch = new WriteBatch())
         {
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
@@ -367,6 +379,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public long deleteUniqueEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("deleteUniqueEntry can only be called on unique indexes");
+        }
         try
         {
             long rowId = getUniqueRowId(key);
@@ -468,9 +484,9 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public List<Long> purgeEntriesInternal(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try (WriteBatch writeBatch = new WriteBatch())
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             for (IndexProto.IndexKey key : indexKeys)
             {
                 ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
@@ -511,7 +527,6 @@ public class RocksDBIndex extends CachingSinglePointIndex
                             }
                             // keyFound is not direct, must use its backing array
                             writeBatch.delete(columnFamilyHandle, keyFound.array());
-
                         }
                         else
                         {
@@ -552,7 +567,6 @@ public class RocksDBIndex extends CachingSinglePointIndex
         {
             throw new SinglePointIndexException("Failed to close single point index", e);
         }
-
         if (!removed)
         {
             removed = true;

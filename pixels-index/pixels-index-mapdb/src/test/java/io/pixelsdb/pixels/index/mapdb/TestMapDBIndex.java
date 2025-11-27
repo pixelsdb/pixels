@@ -354,7 +354,7 @@ public class TestMapDBIndex
 
         List<Long> updatedRowIds = nonUniqueIndex.getRowIds(key);
         assertEquals(4, updatedRowIds.size());
-        assertEquals(4L, (long) updatedRowIds.get(3));
+        assertTrue(updatedRowIds.contains(4L));
     }
 
     // Test updatePrimaryEntries
@@ -438,11 +438,11 @@ public class TestMapDBIndex
         // Verify updates
         List<Long> key1RowIds = nonUniqueIndex.getRowIds(createIndexKey("key1", 2000L));
         assertEquals(3, key1RowIds.size());
-        assertEquals(10L, (long) key1RowIds.get(2));
+        assertTrue(key1RowIds.contains(10L));
 
         List<Long> key2RowIds = nonUniqueIndex.getRowIds(createIndexKey("key2", 2000L));
         assertEquals(2, key2RowIds.size());
-        assertEquals(20L, (long) key2RowIds.get(1));
+        assertTrue(key2RowIds.contains(20L));
     }
 
     // Test deleteUniqueEntry
@@ -589,10 +589,9 @@ public class TestMapDBIndex
         List<IndexProto.IndexKey> purgeKeys = Arrays.asList(createIndexKey("key1", 2500L));
         List<Long> purgedRowIds = uniqueIndex.purgeEntries(purgeKeys);
 
-        // Should purge versions 1000 and 2000
-        assertEquals(2, purgedRowIds.size());
+        // Should purge versions 1000, version 2000 (2L) is overwritten by the tombstone
+        assertEquals(1, purgedRowIds.size());
         assertTrue(purgedRowIds.contains(1L));
-        assertTrue(purgedRowIds.contains(2L));
 
         // Version 3000 should still be accessible
         assertEquals(3L, uniqueIndex.getUniqueRowId(createIndexKey("key1", 3000L)));

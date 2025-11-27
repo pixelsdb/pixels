@@ -39,7 +39,6 @@ import java.util.Comparator;
  */
 public class ByteBufferSerializer implements GroupSerializer<ByteBuffer>
 {
-
     private static final XXHash32 HASHER = CC.HASH_FACTORY.hash32();
 
     @Override
@@ -215,7 +214,6 @@ public class ByteBufferSerializer implements GroupSerializer<ByteBuffer>
     @Override
     public ByteBuffer nextValue(ByteBuffer value)
     {
-        //value = value.duplicate();
         checkValidBuffer(value);
         byte[] ret = Arrays.copyOf(value.array(), value.limit());
 
