@@ -42,12 +42,12 @@ public class RocksDBFactory
 
     private static Cache blockCache;
     private static final long blockCacheCapacity = Long.parseLong(ConfigFactory.Instance().getProperty("index.rocksdb.block.cache.capacity"));
-    private static final int blockCacheshardBits = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.block.cache.shard.bits"));
+    private static final int blockCacheShardBits = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.block.cache.shard.bits"));
 
     /**
      * The reference counter.
      */
-    private static AtomicInteger reference = new AtomicInteger(0);
+    private static final AtomicInteger reference = new AtomicInteger(0);
     private static final Map<String, ColumnFamilyHandle> cfHandles = new ConcurrentHashMap<>();
     private static final String defaultColumnFamily = new String(RocksDB.DEFAULT_COLUMN_FAMILY, StandardCharsets.UTF_8);
 
@@ -74,7 +74,7 @@ public class RocksDBFactory
 
         if (blockCache == null)
         {
-            blockCache = new LRUCache(blockCacheCapacity, blockCacheshardBits);
+            blockCache = new LRUCache(blockCacheCapacity, blockCacheShardBits);
         }
 
         // 3. Prepare column family descriptors
@@ -185,17 +185,13 @@ public class RocksDBFactory
         return handle;
     }
 
-    public static synchronized ColumnFamilyHandle getDefaultColumnFamily()
-    {
-        return cfHandles.get(defaultColumnFamily);
-    }
-
     private static String getCFName(long tableId, long indexId)
     {
         if(multiCF)
         {
             return "t" + tableId + "_i" + indexId;
-        } else
+        }
+        else
         {
             return defaultColumnFamily;
         }
