@@ -52,6 +52,7 @@ public class MapDBIndex implements SinglePointIndex
     public static final Logger LOGGER = LogManager.getLogger(MapDBIndex.class);
 
     private static final ByteBufferSerializer BYTE_BUFFER_SERIALIZER = new ByteBufferSerializer();
+    private static final long TOMBSTONE_ROW_ID = Long.MAX_VALUE;
     private final long tableId;
     private final long indexId;
     private final boolean unique;
@@ -133,7 +134,8 @@ public class MapDBIndex implements SinglePointIndex
         {
             return -1L;
         }
-        return entry.getValue().getLong();
+        long rowId = entry.getValue().getLong();
+        return rowId == TOMBSTONE_ROW_ID ? -1L : rowId;
     }
 
     @Override
@@ -151,8 +153,7 @@ public class MapDBIndex implements SinglePointIndex
         {
             ByteBuffer keyBuffer = iterator.next();
             long rowId = extractRowIdFromKey(keyBuffer);
-            long timestamp = extractTimestampFromKey(keyBuffer);
-            if (rowId < 0)
+            if (rowId == TOMBSTONE_ROW_ID)
             {
                 break;
             }
@@ -248,10 +249,6 @@ public class MapDBIndex implements SinglePointIndex
         try
         {
             long prevRowId = getUniqueRowId(key);
-            if (prevRowId < 0)
-            {
-                return prevRowId;
-            }
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
             valueBuffer.putLong(rowId).position(0);
@@ -273,11 +270,10 @@ public class MapDBIndex implements SinglePointIndex
             if(unique)
             {
                 long prevRowId = getUniqueRowId(key);
-                if (prevRowId < 0)   // no previous row ids are found
+                if (prevRowId >= 0)
                 {
-                    return ImmutableList.of();
+                    builder.add(prevRowId);
                 }
-                builder.add(prevRowId);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
@@ -286,10 +282,6 @@ public class MapDBIndex implements SinglePointIndex
             else
             {
                 builder.addAll(this.getRowIds(key));
-                if (builder.build().isEmpty())  // no previous row ids are found
-                {
-                    return ImmutableList.of();
-                }
                 ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
                 indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
@@ -312,11 +304,10 @@ public class MapDBIndex implements SinglePointIndex
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
                 long prevRowId = getUniqueRowId(key);
-                if (prevRowId < 0)  // indicates that this entry hasn't put or has been deleted
+                if (prevRowId >= 0)
                 {
-                    return ImmutableList.of();
+                    builder.add(prevRowId);
                 }
-                builder.add(prevRowId);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
@@ -343,11 +334,10 @@ public class MapDBIndex implements SinglePointIndex
                 if(unique)
                 {
                     long prevRowId = getUniqueRowId(key);
-                    if (prevRowId < 0)
+                    if (prevRowId >= 0)
                     {
-                        return ImmutableList.of();
+                        builder.add(prevRowId);
                     }
-                    builder.add(prevRowId);
                     ByteBuffer keyBuffer = toKeyBuffer(key);
                     ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
                     valueBuffer.putLong(rowId).position(0);
@@ -356,10 +346,6 @@ public class MapDBIndex implements SinglePointIndex
                 else
                 {
                     builder.addAll(this.getRowIds(key));
-                    if (builder.build().isEmpty())
-                    {
-                        return ImmutableList.of();
-                    }
                     ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
                     indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
@@ -382,9 +368,13 @@ public class MapDBIndex implements SinglePointIndex
         try
         {
             long rowId = getUniqueRowId(key);
+            if (rowId < 0)
+            {
+                return rowId;
+            }
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
-            valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
+            valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
             indexMap.put(keyBuffer, valueBuffer);
             return rowId;
         }
@@ -403,25 +393,25 @@ public class MapDBIndex implements SinglePointIndex
             if(unique)
             {
                 long rowId = getUniqueRowId(key);
-                if(rowId < 0) // indicates there is a delete before put
+                if(rowId < 0)
                 {
                     return ImmutableList.of();
                 }
                 builder.add(rowId);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
-                valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
+                valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
                 indexMap.put(keyBuffer, valueBuffer);
             }
             else
             {
                 List<Long> rowIds = getRowIds(key);
-                if(rowIds.isEmpty()) // indicates there is a delete before put
+                if (rowIds.isEmpty())
                 {
-                    return ImmutableList.of();
+                    return rowIds;
                 }
                 builder.addAll(rowIds);
-                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, -1L);
+                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, TOMBSTONE_ROW_ID);
                 indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
             return builder.build();
@@ -443,26 +433,24 @@ public class MapDBIndex implements SinglePointIndex
                 if(unique)
                 {
                     long rowId = getUniqueRowId(key);
-                    if(rowId < 0) // indicates there is a delete before put
+                    if(rowId >= 0)
                     {
-                        return ImmutableList.of();
+                        builder.add(rowId);
+                        ByteBuffer keyBuffer = toKeyBuffer(key);
+                        ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
+                        valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
+                        indexMap.put(keyBuffer, valueBuffer);
                     }
-                    builder.add(rowId);
-                    ByteBuffer keyBuffer = toKeyBuffer(key);
-                    ByteBuffer valueBuffer = MapDBThreadResources.getValueBuffer();
-                    valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
-                    indexMap.put(keyBuffer, valueBuffer);
                 }
                 else
                 {
                     List<Long> rowIds = getRowIds(key);
-                    if(rowIds.isEmpty()) // indicates there is a delete before put
+                    if(!rowIds.isEmpty())
                     {
-                        return ImmutableList.of();
+                        builder.addAll(rowIds);
+                        ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, TOMBSTONE_ROW_ID);
+                        indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                     }
-                    builder.addAll(rowIds);
-                    ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, -1L);
-                    indexMap.put(nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
             }
             return builder.build();
@@ -499,7 +487,7 @@ public class MapDBIndex implements SinglePointIndex
                     {
                         rowId = extractRowIdFromKey(keyFound);
                     }
-                    if (rowId < 0)
+                    if (rowId == TOMBSTONE_ROW_ID)
                     {
                         foundTombstone = true;
                     }
@@ -570,8 +558,6 @@ public class MapDBIndex implements SinglePointIndex
         return indexMap.size();
     }
 
-
-
     protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues) throws SinglePointIndexException
     {
         int keySize = key.size();
@@ -618,7 +604,8 @@ public class MapDBIndex implements SinglePointIndex
 
     protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp(), rowId);
+        return toBuffer(key.getIndexId(), key.getKey(), 1,
+                Long.MAX_VALUE - key.getTimestamp(), Long.MAX_VALUE - rowId);
     }
 
     /**
@@ -629,7 +616,7 @@ public class MapDBIndex implements SinglePointIndex
     protected static long extractRowIdFromKey(ByteBuffer keyBuffer)
     {
         // extract rowId portion (last 8 bytes of key)
-        return keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
+        return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
     }
 
     /**
