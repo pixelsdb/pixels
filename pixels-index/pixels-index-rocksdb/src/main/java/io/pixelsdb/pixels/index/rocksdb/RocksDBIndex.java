@@ -40,6 +40,11 @@ import static io.pixelsdb.pixels.index.rocksdb.RocksDBThreadResources.EMPTY_VALU
  */
 public class RocksDBIndex extends CachingSinglePointIndex
 {
+    /**
+     * Issue #1214: We use Long.MAX_VALUE instead of -1 as the tombstone row id, hence we can ensure the tombstone record
+     * is always stored before the other versions of the same index entry.
+     */
+    private static final long TOMBSTONE_ROW_ID = Long.MAX_VALUE;
     private final RocksDB rocksDB;
     private final String rocksDBPath;
     private final WriteOptions writeOptions;
@@ -118,6 +123,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                     ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                     iterator.value(valueBuffer);
                     rowId = valueBuffer.getLong();
+                    rowId = rowId == TOMBSTONE_ROW_ID ? -1L : rowId;
                 }
             }
         } catch (Exception e)
@@ -131,6 +137,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public List<Long> getRowIds(IndexProto.IndexKey key) throws SinglePointIndexException
     {
+        if (unique)
+        {
+            return ImmutableList.of(getUniqueRowId(key));
+        }
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
         readOptions.setPrefixSameAsStart(true);
@@ -145,7 +155,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 if (startsWith(keyFound, keyBuffer))
                 {
                     long rowId = extractRowIdFromKey(keyFound);
-                    if (rowId < 0)
+                    if (rowId == TOMBSTONE_ROW_ID)
                     {
                         break;
                     }
@@ -189,6 +199,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public boolean putPrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("putPrimaryEntries can only be called on unique indexes");
+        }
         try (WriteBatch writeBatch = new WriteBatch())
         {
             for (IndexProto.PrimaryIndexEntry entry : entries)
@@ -205,14 +219,14 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to put rocksdb index entries", e);
+            throw new SinglePointIndexException("Failed to put primary index entries", e);
         }
     }
 
     @Override
     public boolean putSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
-        try(WriteBatch writeBatch = new WriteBatch())
+        try (WriteBatch writeBatch = new WriteBatch())
         {
             for (IndexProto.SecondaryIndexEntry entry : entries)
             {
@@ -236,18 +250,20 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to put secondary entries", e);
+            throw new SinglePointIndexException("Failed to put secondary index entries", e);
         }
     }
 
     @Override
     public long updatePrimaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("updatePrimaryEntry can only be called on unique indexes");
+        }
         try
         {
             long prevRowId = getUniqueRowId(key);
-            if (prevRowId < 0)
-                return prevRowId;
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
             valueBuffer.putLong(rowId).position(0);
@@ -269,11 +285,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
             if(unique)
             {
                 long prevRowId = getUniqueRowId(key);
-                if (prevRowId < 0)   // no previous row ids are found
+                if (prevRowId >= 0)
                 {
-                    return ImmutableList.of();
+                    builder.add(prevRowId);
                 }
-                builder.add(prevRowId);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
@@ -282,10 +297,6 @@ public class RocksDBIndex extends CachingSinglePointIndex
             else
             {
                 builder.addAll(this.getRowIds(key));
-                if (builder.build().isEmpty())  // no previous row ids are found
-                {
-                    return ImmutableList.of();
-                }
                 ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
                 rocksDB.put(columnFamilyHandle, writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
@@ -300,6 +311,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public List<Long> updatePrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("updatePrimaryEntries can only be called on unique indexes");
+        }
         try (WriteBatch writeBatch = new WriteBatch())
         {
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
@@ -308,11 +323,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
                 long prevRowId = getUniqueRowId(key);
-                if (prevRowId < 0)  // indicates that this entry hasn't put or has been deleted
+                if (prevRowId >= 0)
                 {
-                    return ImmutableList.of();
+                    builder.add(prevRowId);
                 }
-                builder.add(prevRowId);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                 valueBuffer.putLong(rowId).position(0);
@@ -330,7 +344,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public List<Long> updateSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
-        try(WriteBatch writeBatch = new WriteBatch())
+        try (WriteBatch writeBatch = new WriteBatch())
         {
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
             for (IndexProto.SecondaryIndexEntry entry : entries)
@@ -341,11 +355,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 if(unique)
                 {
                     long prevRowId = getUniqueRowId(key);
-                    if (prevRowId < 0)
+                    if (prevRowId >= 0)
                     {
-                        return ImmutableList.of();
+                        builder.add(prevRowId);
                     }
-                    builder.add(prevRowId);
                     ByteBuffer keyBuffer = toKeyBuffer(key);
                     ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                     valueBuffer.putLong(rowId).position(0);
@@ -354,10 +367,6 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 else
                 {
                     builder.addAll(this.getRowIds(key));
-                    if (builder.build().isEmpty())
-                    {
-                        return ImmutableList.of();
-                    }
                     ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
                     writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
@@ -367,98 +376,104 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to put secondary entries", e);
+            throw new SinglePointIndexException("Failed to update secondary index entries", e);
         }
     }
 
     @Override
     public long deleteUniqueEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        long rowId = getUniqueRowId(key);
+        if (!unique)
+        {
+            throw new SinglePointIndexException("deleteUniqueEntry can only be called on unique indexes");
+        }
         try
         {
+            long rowId = getUniqueRowId(key);
+            if (rowId < 0)
+            {
+                return rowId;
+            }
             ByteBuffer keyBuffer = toKeyBuffer(key);
             ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
-            valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
+            valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
             rocksDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             return rowId;
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to delete unique entry", e);
+            throw new SinglePointIndexException("Failed to delete unique index entry", e);
         }
     }
 
     @Override
     public List<Long> deleteEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             if(unique)
             {
                 long rowId = getUniqueRowId(key);
-                if(rowId < 0) // indicates there is a delete before put
+                if(rowId < 0)
                 {
                     return ImmutableList.of();
                 }
                 builder.add(rowId);
                 ByteBuffer keyBuffer = toKeyBuffer(key);
                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
-                valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
+                valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
                 rocksDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             }
             else
             {
                 List<Long> rowIds = getRowIds(key);
-                if(rowIds.isEmpty()) // indicates there is a delete before put
+                if (rowIds.isEmpty())
                 {
-                    return ImmutableList.of();
+                    return rowIds;
                 }
                 builder.addAll(rowIds);
-                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, -1L);
+                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, TOMBSTONE_ROW_ID);
                 rocksDB.put(columnFamilyHandle, writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
             return builder.build();
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to delete entry", e);
+            throw new SinglePointIndexException("Failed to delete index entry", e);
         }
     }
 
     @Override
     public List<Long> deleteEntriesInternal(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
-        try(WriteBatch writeBatch = new WriteBatch())
+        try (WriteBatch writeBatch = new WriteBatch())
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             // delete single point index
             for(IndexProto.IndexKey key : keys)
             {
                 if(unique)
                 {
                     long rowId = getUniqueRowId(key);
-                    if(rowId < 0) // indicates there is a delete before put
+                    if(rowId >= 0)
                     {
-                        return ImmutableList.of();
+                        builder.add(rowId);
+                        ByteBuffer keyBuffer = toKeyBuffer(key);
+                        ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
+                        valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
+                        writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
                     }
-                    builder.add(rowId);
-                    ByteBuffer keyBuffer = toKeyBuffer(key);
-                    ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
-                    valueBuffer.putLong(-1L).position(0); // -1 means a tombstone
-                    writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
                 }
                 else
                 {
                     List<Long> rowIds = getRowIds(key);
-                    if(rowIds.isEmpty()) // indicates there is a delete before put
+                    if(!rowIds.isEmpty())
                     {
-                        return ImmutableList.of();
+                        builder.addAll(rowIds);
+                        ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, TOMBSTONE_ROW_ID);
+                        writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                     }
-                    builder.addAll(rowIds);
-                    ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, -1L);
-                    writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
             }
             rocksDB.write(writeOptions, writeBatch);
@@ -466,16 +481,16 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to delete entries", e);
+            throw new SinglePointIndexException("Failed to delete index entries", e);
         }
     }
 
     @Override
     public List<Long> purgeEntriesInternal(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
         try (WriteBatch writeBatch = new WriteBatch())
         {
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
             for (IndexProto.IndexKey key : indexKeys)
             {
                 ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
@@ -484,22 +499,38 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
                 {
                     iterator.seek(keyBuffer);
+                    boolean foundTombstone = false;
                     while (iterator.isValid())
                     {
                         ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
                         if (startsWith(keyFound, keyBuffer))
                         {
+                            long rowId;
                             if(unique)
                             {
                                 ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
                                 iterator.value(valueBuffer);
-                                long rowId = valueBuffer.getLong();
-                                if(rowId > 0)
-                                    builder.add(rowId);
+                                rowId = valueBuffer.getLong();
+                            }
+                            else
+                            {
+                                rowId = extractRowIdFromKey(keyFound);
+                            }
+                            iterator.next();
+                            if (rowId == TOMBSTONE_ROW_ID)
+                            {
+                                foundTombstone = true;
+                            }
+                            else if(foundTombstone)
+                            {
+                                builder.add(rowId);
+                            }
+                            else
+                            {
+                                continue;
                             }
                             // keyFound is not direct, must use its backing array
                             writeBatch.delete(columnFamilyHandle, keyFound.array());
-                            iterator.next();
                         }
                         else
                         {
@@ -513,7 +544,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         }
         catch (RocksDBException e)
         {
-            throw new SinglePointIndexException("Failed to purge entries by prefix", e);
+            throw new SinglePointIndexException("Failed to purge index entries by prefix", e);
         }
     }
 
@@ -535,15 +566,15 @@ public class RocksDBIndex extends CachingSinglePointIndex
         try
         {
             this.close();
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             throw new SinglePointIndexException("Failed to close single point index", e);
         }
-
         if (!removed)
         {
             removed = true;
-            // clear RocksDB directory for main index
+            // clear RocksDB directory
             try
             {
                 FileUtils.deleteDirectory(new File(rocksDBPath));
@@ -556,11 +587,11 @@ public class RocksDBIndex extends CachingSinglePointIndex
         return true;
     }
 
-    protected static ByteBuffer toBuffer(long indexId, ByteString key, long postValue, int bufferNum)
+    protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues)
             throws SinglePointIndexException
     {
         int keySize = key.size();
-        int totalLength = Long.BYTES + keySize + Long.BYTES;
+        int totalLength = Long.BYTES + keySize + Long.BYTES * postValues.length;
         ByteBuffer compositeKey;
         if (bufferNum == 1)
         {
@@ -582,23 +613,24 @@ public class RocksDBIndex extends CachingSinglePointIndex
         compositeKey.putLong(indexId);
         // Write key bytes (variable length)
         key.copyTo(compositeKey);
-        // Write post value (8 bytes, big endian)
-        compositeKey.putLong(postValue);
+        // Write post values (8 bytes each, big endian)
+        for (long postValue : postValues)
+        {
+            compositeKey.putLong(postValue);
+        }
         compositeKey.position(0);
         return compositeKey;
     }
 
-    // convert IndexKey to byte array
     protected static ByteBuffer toKeyBuffer(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - key.getTimestamp(), 1);
-
+        return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp());
     }
 
-    // create composite key with rowId
     protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
-        return toBuffer(key.getIndexId(), key.getKey(), Long.MAX_VALUE - rowId, 1);
+        return toBuffer(key.getIndexId(), key.getKey(), 1,
+                Long.MAX_VALUE - key.getTimestamp(), Long.MAX_VALUE - rowId);
     }
 
     // check if byte array starts with specified prefix
@@ -619,7 +651,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         return keyFound1.compareTo(keyCurrent1) == 0;
     }
 
-    // extract rowId from key
+    // extract rowId from non-unique key
     protected static long extractRowIdFromKey(ByteBuffer keyBuffer)
     {
         // extract rowId portion (last 8 bytes of key)

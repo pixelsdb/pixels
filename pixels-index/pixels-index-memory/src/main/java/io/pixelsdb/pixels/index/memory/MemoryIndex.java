@@ -20,10 +20,7 @@
 package io.pixelsdb.pixels.index.memory;
 
 import com.google.common.collect.ImmutableList;
-import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
@@ -231,8 +228,7 @@ public class MemoryIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
-            throws SinglePointIndexException
+    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         checkClosed();
         if (!unique)
@@ -245,7 +241,10 @@ public class MemoryIndex implements SinglePointIndex
             CompositeKey baseKey = extractBaseKey(entry.getIndexKey());
             long timestamp = entry.getIndexKey().getTimestamp();
             long prevRowId = getUniqueRowId(entry.getIndexKey());
-            builder.add(prevRowId);
+            if (prevRowId >= 0)
+            {
+                builder.add(prevRowId);
+            }
             ConcurrentSkipListMap<Long, Long> versions =
                     this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
             versions.put(timestamp, entry.getRowId());
@@ -267,7 +266,10 @@ public class MemoryIndex implements SinglePointIndex
             if (unique)
             {
                 long prevRowId = getUniqueRowId(key);
-                builder.add(prevRowId);
+                if (prevRowId >= 0)
+                {
+                    builder.add(prevRowId);
+                }
                 ConcurrentSkipListMap<Long, Long> versions =
                         this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
                 versions.put(timestamp, rowId);
@@ -326,32 +328,30 @@ public class MemoryIndex implements SinglePointIndex
     public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         checkClosed();
-        try
+        if (unique)
         {
-            if (unique)
+            long rowId = getUniqueRowId(key);
+            if (rowId < 0)
             {
-                long rowId = getUniqueRowId(key);
-                if (rowId < 0)
-                {
-                    return ImmutableList.of();
-                }
-                return ImmutableList.of(rowId);
-            } else
-            {
-                List<Long> rowIds = getRowIds(key);
-                if (rowIds.isEmpty())
-                {
-                    return ImmutableList.of();
-                }
-                return rowIds;
+                return ImmutableList.of();
             }
-        }
-        finally
-        {
             CompositeKey baseKey = extractBaseKey(key);
             ConcurrentSkipListSet<Long> existingTombstones =
                     this.tombstones.computeIfAbsent(baseKey, k -> new ConcurrentSkipListSet<>());
             existingTombstones.add(key.getTimestamp());
+            return ImmutableList.of(rowId);
+        } else
+        {
+            List<Long> rowIds = getRowIds(key);
+            if (rowIds.isEmpty())
+            {
+                return ImmutableList.of();
+            }
+            CompositeKey baseKey = extractBaseKey(key);
+            ConcurrentSkipListSet<Long> existingTombstones =
+                    this.tombstones.computeIfAbsent(baseKey, k -> new ConcurrentSkipListSet<>());
+            existingTombstones.add(key.getTimestamp());
+            return rowIds;
         }
     }
 
@@ -363,10 +363,6 @@ public class MemoryIndex implements SinglePointIndex
         for (IndexProto.IndexKey key : keys)
         {
             List<Long> prevRowIds = deleteEntry(key);
-            if (prevRowIds.isEmpty())
-            {
-                return ImmutableList.of();
-            }
             builder.addAll(prevRowIds);
         }
         return builder.build();

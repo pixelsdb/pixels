@@ -67,6 +67,10 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-index-memory</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-index-mapdb</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>io.prometheus</groupId>
