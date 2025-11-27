@@ -40,6 +40,10 @@ import static io.pixelsdb.pixels.index.rocksdb.RocksDBThreadResources.EMPTY_VALU
  */
 public class RocksDBIndex extends CachingSinglePointIndex
 {
+    /**
+     * Issue #1214: We use Long.MAX_VALUE instead of -1 as the tombstone row id, hence we can ensure the tombstone record
+     * is always stored before the other versions of the same index entry.
+     */
     private static final long TOMBSTONE_ROW_ID = Long.MAX_VALUE;
     private final RocksDB rocksDB;
     private final String rocksDBPath;

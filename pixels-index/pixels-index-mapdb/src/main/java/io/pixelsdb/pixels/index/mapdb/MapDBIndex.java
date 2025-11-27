@@ -52,6 +52,10 @@ public class MapDBIndex implements SinglePointIndex
     public static final Logger LOGGER = LogManager.getLogger(MapDBIndex.class);
 
     private static final ByteBufferSerializer BYTE_BUFFER_SERIALIZER = new ByteBufferSerializer();
+    /**
+     * Issue #1214: We use Long.MAX_VALUE instead of -1 as the tombstone row id, hence we can ensure the tombstone record
+     * is always stored before the other versions of the same index entry.
+     */
     private static final long TOMBSTONE_ROW_ID = Long.MAX_VALUE;
     private final long tableId;
     private final long indexId;
@@ -63,7 +67,7 @@ public class MapDBIndex implements SinglePointIndex
     private final AtomicBoolean removed = new AtomicBoolean(false);
 
     /**
-     * Constructor for persistent MapDB index
+     * Constructor for persistent MapDB index.
      */
     public MapDBIndex(long tableId, long indexId, boolean unique, String mapdbPath) throws SinglePointIndexException
     {
