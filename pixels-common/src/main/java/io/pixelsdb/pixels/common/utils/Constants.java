@@ -89,4 +89,6 @@ public final class Constants
     public static final String AI_ROW_ID_PREFIX = "row_id_";
 
     public static final String CF_OUTPUT_STATE_KEY_PREFIX = "pixels_turbo_cf_output";
+
+    public static final String LOAD_DEFAULT_RETINA_PREFIX = "default_retina_";
 }

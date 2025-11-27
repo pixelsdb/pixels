@@ -154,18 +154,18 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
 
             // 2. Collect addresses currently on the ring
             Set<String> existingAddresses = new HashSet<>();
-            for (NodeProto.NodeInfo node : new TreeSet<>(hashRing.values()))
+            for (NodeProto.NodeInfo node : new HashSet<>(hashRing.values()))
             {
                 existingAddresses.add(node.getAddress());
             }
 
             // 3. Remove nodes not present anymore (existingAddresses - newAddresses)
-            for (NodeProto.NodeInfo node : new TreeSet<>(hashRing.values()))
+            for (String address : existingAddresses)
             {
-                if (!newAddresses.contains(node.getAddress()))
+                if (!newAddresses.contains(address))
                 {
-                    removeNodeInternal(node);
-                    logger.warn("Removed node from hash ring: " + node.getAddress());
+                    removeAddressInternal(address);
+                    logger.warn("Removed node from hash ring: " + address);
                 }
             }
 
@@ -201,18 +201,25 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
     }
 
     /**
-     * Remove a node from the hash ring internally.
+     * Remove address from the hash ring internally.
      */
-    private void removeNodeInternal(NodeProto.NodeInfo node)
+    private void removeAddressInternal(String address)
     {
         // Recalculate and remove all virtual nodes
         for (int i = 0; i < bucketNum; i++)
         {
-            int hashPoint = hash(node.getAddress() + "#" + i) % bucketNum;
+            int hashPoint = hash(address + "#" + i) % bucketNum;
             hashRing.remove(hashPoint);
         }
         // Note: The removal above is technically incomplete if multiple virtual nodes map to the same hashPoint,
         // but given the requirement, we assume hash() provides a reasonably uniform spread.
+    }
+    /**
+     * Remove a node from the hash ring internally.
+     */
+    private void removeNodeInternal(NodeProto.NodeInfo node)
+    {
+        removeAddressInternal(node.getAddress());
     }
 
     /**
