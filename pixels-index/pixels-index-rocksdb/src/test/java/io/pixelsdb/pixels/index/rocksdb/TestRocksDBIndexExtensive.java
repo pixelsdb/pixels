@@ -22,19 +22,12 @@ package io.pixelsdb.pixels.index.rocksdb;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.MainIndexFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
-import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.FixMethodOrder;
 import org.junit.Test;
-import org.junit.runners.MethodSorters;
 import org.rocksdb.RocksDBException;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -47,7 +40,6 @@ import static org.junit.Assert.*;
  * @author hank
  * @create 2025-11-27
  */
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class TestRocksDBIndexExtensive
 {
     private static final long TABLE_ID = 1L;
@@ -57,21 +49,10 @@ public class TestRocksDBIndexExtensive
     private RocksDBIndex nonUniqueIndex;
 
     @Before
-    public void setUp() throws SinglePointIndexException, RocksDBException
+    public void setUp() throws RocksDBException
     {
         uniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID, true);
         nonUniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID + 1, false);
-
-        // Create SQLite Directory
-        try
-        {
-            String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
-            FileUtils.forceMkdir(new File(sqlitePath));
-        }
-        catch (IOException e)
-        {
-            System.err.println("Failed to create SQLite test directory: " + e.getMessage());
-        }
     }
 
     @After
@@ -84,16 +65,6 @@ public class TestRocksDBIndexExtensive
         if (nonUniqueIndex != null)
         {
             nonUniqueIndex.closeAndRemove();
-        }
-
-        // Clear SQLite Directory
-        try
-        {
-            MainIndexFactory.Instance().getMainIndex(TABLE_ID).closeAndRemove();
-        }
-        catch (MainIndexException e)
-        {
-            System.err.println("Failed to clean up SQLite test directory: " + e.getMessage());
         }
     }
 

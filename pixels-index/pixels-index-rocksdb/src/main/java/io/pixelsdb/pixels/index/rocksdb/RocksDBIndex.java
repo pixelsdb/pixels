@@ -90,6 +90,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public long getUniqueRowIdInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("getUniqueRowId should only be called on unique index");
+        }
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
         readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
@@ -548,20 +552,14 @@ public class RocksDBIndex extends CachingSinglePointIndex
         {
             try
             {
-                this.close();
-            }
-            catch (IOException e)
-            {
-                throw new SinglePointIndexException("Failed to close single point index", e);
-            }
-            // clear RocksDB directory
-            try
-            {
+                // Issue #1158: do not directly close the rocksDB instance as it is shared by other indexes
+                RocksDBFactory.close();
+                writeOptions.close();
                 FileUtils.deleteDirectory(new File(rocksDBPath));
             }
             catch (IOException e)
             {
-                throw new SinglePointIndexException("Failed to clean up RocksDB directory: " + e);
+                throw new SinglePointIndexException("Failed to close and cleanup the RocksDB index", e);
             }
             return true;
         }

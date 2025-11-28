@@ -22,16 +22,11 @@ package io.pixelsdb.pixels.index.mapdb;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.MainIndexFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
-import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -58,17 +53,6 @@ public class TestMapDBIndex
     {
         uniqueIndex = new MapDBIndex(TABLE_ID, INDEX_ID, true, "/tmp/mapdb");
         nonUniqueIndex = new MapDBIndex(TABLE_ID, INDEX_ID + 1, false, "/tmp/mapdb");
-
-        // Create SQLite Directory
-        try
-        {
-            String sqlitePath = ConfigFactory.Instance().getProperty("index.sqlite.path");
-            FileUtils.forceMkdir(new File(sqlitePath));
-        }
-        catch (IOException e)
-        {
-            System.err.println("Failed to create SQLite test directory: " + e.getMessage());
-        }
     }
 
     @After
@@ -81,16 +65,6 @@ public class TestMapDBIndex
         if (nonUniqueIndex != null)
         {
             nonUniqueIndex.closeAndRemove();
-        }
-
-        // Clear SQLite Directory
-        try
-        {
-            MainIndexFactory.Instance().getMainIndex(TABLE_ID).closeAndRemove();
-        }
-        catch (MainIndexException e)
-        {
-            System.err.println("Failed to clean up SQLite test directory: " + e.getMessage());
         }
     }
 
