@@ -34,9 +34,7 @@ import org.mapdb.DBMaker;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.pixelsdb.pixels.index.mapdb.MapDBThreadResources.EMPTY_VALUE_BUFFER;
@@ -149,7 +147,7 @@ public class MapDBIndex implements SinglePointIndex
         {
             return ImmutableList.of(getUniqueRowId(key));
         }
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
+        Set<Long> rowIds = new HashSet<>();
         ByteBuffer lowerBound = toKeyBuffer(key);
         ByteBuffer upperBound = toUpperBoundKeyBuffer(key);
         Iterator<ByteBuffer> iterator = indexMap.keyIterator(lowerBound, true, upperBound, true);
@@ -161,9 +159,10 @@ public class MapDBIndex implements SinglePointIndex
             {
                 break;
             }
-            builder.add(rowId);
+            // Issue #1186: index keys with the same row id are considered as different versions of the same entry
+            rowIds.add(rowId);
         }
-        return builder.build();
+        return ImmutableList.copyOf(rowIds);
     }
 
     @Override

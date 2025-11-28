@@ -28,6 +28,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.rocksdb.RocksDBException;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -93,6 +94,35 @@ public class TestRocksDBIndexExtensive
                 .setIndexKey(createIndexKey(keyValue, timestamp))
                 .setRowId(rowId)
                 .build();
+    }
+
+    @Test
+    public void testPerformance() throws SinglePointIndexException
+    {
+        long startTime = System.currentTimeMillis();
+        for (long i = 0; i < 1000000L; ++i)
+        {
+            IndexProto.IndexKey key = createIndexKey("key" + i, 1000L);
+            uniqueIndex.putEntry(key, i);
+        }
+        System.out.println("put 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
+        startTime = System.currentTimeMillis();
+        for (long i = 0; i < 1000000L; ++i)
+        {
+            IndexProto.IndexKey key = createIndexKey("key" + i, 1001L);
+            uniqueIndex.updatePrimaryEntry(key, i+1);
+        }
+        System.out.println("update 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
+        List<IndexProto.IndexKey> indexKeys = new ArrayList<>(1000000);
+        startTime = System.currentTimeMillis();
+        for (long i = 0; i < 1000000L; ++i)
+        {
+            IndexProto.IndexKey key = createIndexKey("key" + i, 1002L);
+            indexKeys.add(key);
+            uniqueIndex.deleteEntry(key);
+        }
+        System.out.println("delete 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
+        uniqueIndex.purgeEntries(indexKeys);
     }
 
     // Test basic properties
