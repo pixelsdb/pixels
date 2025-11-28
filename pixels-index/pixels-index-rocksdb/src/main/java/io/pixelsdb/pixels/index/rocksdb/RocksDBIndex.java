@@ -30,7 +30,9 @@ import org.rocksdb.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.pixelsdb.pixels.index.rocksdb.RocksDBThreadResources.EMPTY_VALUE_BUFFER;
@@ -127,7 +129,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         {
             return ImmutableList.of(getUniqueRowId(key));
         }
-        ImmutableList.Builder<Long> builder = ImmutableList.builder();
+        Set<Long> rowIds = new HashSet<>();
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
         readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
@@ -145,7 +147,8 @@ public class RocksDBIndex extends CachingSinglePointIndex
                     {
                         break;
                     }
-                    builder.add(rowId);
+                    // Issue #1186: index keys with the same row id are considered as different versions of the same entry
+                    rowIds.add(rowId);
                     iterator.next();
                 }
                 else
@@ -154,7 +157,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
                 }
             }
         }
-        return builder.build();
+        return ImmutableList.copyOf(rowIds);
     }
 
     @Override
