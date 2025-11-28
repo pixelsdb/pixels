@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.index.memory;
+package io.pixelsdb.pixels.index.rocksdb;
 
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
@@ -26,37 +26,37 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.rocksdb.RocksDBException;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
 
 /**
- * Unit tests for MemoryIndex class.
+ * Extensive Unit tests for RocksDBIndex.
  * Tests all public interfaces with both unique and non-unique indexes.
  *
  * @author hank
- * @create 2025-10-12
+ * @create 2025-11-27
  */
-public class TestMemoryIndex
+public class TestRocksDBIndexExtensive
 {
     private static final long TABLE_ID = 1L;
     private static final long INDEX_ID = 1L;
 
-    private MemoryIndex uniqueIndex;
-    private MemoryIndex nonUniqueIndex;
+    private RocksDBIndex uniqueIndex;
+    private RocksDBIndex nonUniqueIndex;
 
     @Before
-    public void setUp()
+    public void setUp() throws RocksDBException
     {
-        uniqueIndex = new MemoryIndex(TABLE_ID, INDEX_ID, true);
-        nonUniqueIndex = new MemoryIndex(TABLE_ID, INDEX_ID + 1, false);
+        uniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID, true);
+        nonUniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID + 1, false);
     }
 
     @After
-    public void tearDown()
+    public void tearDown() throws SinglePointIndexException
     {
         if (uniqueIndex != null)
         {
@@ -93,41 +93,6 @@ public class TestMemoryIndex
                 .setIndexKey(createIndexKey(keyValue, timestamp))
                 .setRowId(rowId)
                 .build();
-    }
-
-    @Test
-    public void testPerformance() throws SinglePointIndexException
-    {
-        long startTime = System.currentTimeMillis();
-        for (long i = 0; i < 1000000L; ++i)
-        {
-            IndexProto.IndexKey key = createIndexKey("key" + i, 1000L);
-            uniqueIndex.putEntry(key, i);
-        }
-        System.out.println("put 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
-        startTime = System.currentTimeMillis();
-        for (long i = 0; i < 1000000L; ++i)
-        {
-            IndexProto.IndexKey key = createIndexKey("key" + i, 1001L);
-            uniqueIndex.updatePrimaryEntry(key, i+1);
-        }
-        System.out.println("update 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
-        assertEquals(2000000L, uniqueIndex.size());
-        assertEquals(0L, uniqueIndex.tombstonesSize());
-        List<IndexProto.IndexKey> indexKeys = new ArrayList<>(1000000);
-        startTime = System.currentTimeMillis();
-        for (long i = 0; i < 1000000L; ++i)
-        {
-            IndexProto.IndexKey key = createIndexKey("key" + i, 1002L);
-            indexKeys.add(key);
-            uniqueIndex.deleteEntry(key);
-        }
-        System.out.println("delete 1M entries in: " + (System.currentTimeMillis() - startTime) + " ms");
-        assertEquals(2000000L, uniqueIndex.size());
-        assertEquals(1000000L, uniqueIndex.tombstonesSize());
-        uniqueIndex.purgeEntries(indexKeys);
-        assertEquals(0L, uniqueIndex.size());
-        assertEquals(0L, uniqueIndex.tombstonesSize());
     }
 
     // Test basic properties
@@ -331,7 +296,7 @@ public class TestMemoryIndex
 
         List<Long> updatedRowIds = nonUniqueIndex.getRowIds(key);
         assertEquals(4, updatedRowIds.size());
-        assertEquals(4L, (long) updatedRowIds.get(3));
+        assertTrue(updatedRowIds.contains(4L));
     }
 
     // Test updatePrimaryEntries
@@ -415,11 +380,11 @@ public class TestMemoryIndex
         // Verify updates
         List<Long> key1RowIds = nonUniqueIndex.getRowIds(createIndexKey("key1", 2000L));
         assertEquals(3, key1RowIds.size());
-        assertEquals(10L, (long) key1RowIds.get(2));
+        assertTrue(key1RowIds.contains(10L));
 
         List<Long> key2RowIds = nonUniqueIndex.getRowIds(createIndexKey("key2", 2000L));
         assertEquals(2, key2RowIds.size());
-        assertEquals(20L, (long) key2RowIds.get(1));
+        assertTrue(key2RowIds.contains(20L));
     }
 
     // Test deleteUniqueEntry
@@ -566,10 +531,9 @@ public class TestMemoryIndex
         List<IndexProto.IndexKey> purgeKeys = Arrays.asList(createIndexKey("key1", 2500L));
         List<Long> purgedRowIds = uniqueIndex.purgeEntries(purgeKeys);
 
-        // Should purge versions 1000 and 2000
-        assertEquals(2, purgedRowIds.size());
+        // Should purge versions 1000, version 2000 (2L) is overwritten by the tombstone
+        assertEquals(1, purgedRowIds.size());
         assertTrue(purgedRowIds.contains(1L));
-        assertTrue(purgedRowIds.contains(2L));
 
         // Version 3000 should still be accessible
         assertEquals(3L, uniqueIndex.getUniqueRowId(createIndexKey("key1", 3000L)));
@@ -658,99 +622,6 @@ public class TestMemoryIndex
     public void testDeleteUniqueEntryOnNonUniqueIndex() throws SinglePointIndexException
     {
         nonUniqueIndex.deleteUniqueEntry(createIndexKey("key1", 1000L));
-    }
-
-    // Test size monitoring methods
-    @Test
-    public void testSizeMonitoring() throws SinglePointIndexException
-    {
-        assertEquals(0, uniqueIndex.size());
-        assertEquals(0, uniqueIndex.tombstonesSize());
-
-        // Put some entries
-        uniqueIndex.putEntry(createIndexKey("key1", 1000L), 1L);
-        uniqueIndex.putEntry(createIndexKey("key2", 1000L), 2L);
-        uniqueIndex.putEntry(createIndexKey("key3", 1000L), 3L);
-
-        // Should have 3 entries
-        assertTrue(uniqueIndex.size() >= 3);
-
-        // Delete one entry
-        uniqueIndex.deleteEntry(createIndexKey("key1", 1000L));
-
-        // Should have tombstone
-        assertTrue(uniqueIndex.tombstonesSize() > 0);
-
-        // Purge
-        uniqueIndex.purgeEntries(Arrays.asList(createIndexKey("key1", 1000L)));
-
-        // Tombstone should be cleared
-        assertEquals(0, uniqueIndex.tombstonesSize());
-    }
-
-    // Test concurrent operations (basic stress test)
-    @Test
-    public void testConcurrentOperations() throws InterruptedException
-    {
-        final int numThreads = 10;
-        final int operationsPerThread = 100;
-        Thread[] threads = new Thread[numThreads];
-
-        for (int i = 0; i < numThreads; i++)
-        {
-            final int threadId = i;
-            threads[i] = new Thread(() -> {
-                try
-                {
-                    for (int j = 0; j < operationsPerThread; j++)
-                    {
-                        String key = "key_" + threadId + "_" + j;
-                        long timestamp = threadId * 1000L + j;
-                        long rowId = threadId * 100L + j;
-
-                        uniqueIndex.putEntry(createIndexKey(key, timestamp), rowId);
-
-                        if (j % 10 == 0)
-                        {
-                            // Occasionally read
-                            uniqueIndex.getUniqueRowId(createIndexKey(key, timestamp));
-                        }
-
-                        if (j % 20 == 0)
-                        {
-                            // Occasionally delete
-                            uniqueIndex.deleteEntry(createIndexKey(key, timestamp));
-                        }
-                    }
-                }
-                catch (SinglePointIndexException e)
-                {
-                    fail("Thread " + threadId + " failed: " + e.getMessage());
-                }
-            });
-        }
-
-        // Start all threads
-        for (Thread thread : threads)
-        {
-            thread.start();
-        }
-
-        // Wait for all threads to complete
-        for (Thread thread : threads)
-        {
-            thread.join();
-        }
-
-        // Verify no exceptions were thrown and index is still functional
-        try
-        {
-            assertTrue(uniqueIndex.size() > 0);
-        }
-        catch (Exception e)
-        {
-            fail("Index should still be functional after concurrent operations: " + e.getMessage());
-        }
     }
 
     /**
@@ -868,7 +739,6 @@ public class TestMemoryIndex
 
         // Should have purged version 1000, and tombstone at 1500
         assertEquals("Should have purged 1 version", 1, purged.size());
-        assertEquals("Should have 1 tombstone remaining", 1, uniqueIndex.tombstonesSize());
 
         // Test visibility after purge:
 

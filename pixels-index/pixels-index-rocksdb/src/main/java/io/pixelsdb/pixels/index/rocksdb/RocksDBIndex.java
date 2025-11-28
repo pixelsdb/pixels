@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.pixelsdb.pixels.index.rocksdb.RocksDBThreadResources.EMPTY_VALUE_BUFFER;
 
@@ -52,8 +53,8 @@ public class RocksDBIndex extends CachingSinglePointIndex
     private final long tableId;
     private final long indexId;
     private final boolean unique;
-    private boolean closed = false;
-    private boolean removed = false;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicBoolean removed = new AtomicBoolean(false);
 
     public RocksDBIndex(long tableId, long indexId, boolean unique) throws RocksDBException
     {
@@ -66,25 +67,6 @@ public class RocksDBIndex extends CachingSinglePointIndex
         this.unique = unique;
         this.writeOptions = new WriteOptions();
         this.columnFamilyHandle = RocksDBFactory.getOrCreateColumnFamily(tableId, indexId);
-    }
-
-    /**
-     * The constructor only for testing (direct RocksDB injection).
-     * @param tableId the table id
-     * @param indexId the index id
-     * @param rocksDB the rocksdb instance
-     */
-    @Deprecated
-    protected RocksDBIndex(long tableId, long indexId, RocksDB rocksDB, String rocksDBPath, boolean unique)
-    {
-        super();
-        this.tableId = tableId;
-        this.indexId = indexId;
-        this.rocksDBPath = rocksDBPath;
-        this.rocksDB = rocksDB;  // use injected mock directly
-        this.unique = unique;
-        this.writeOptions = new WriteOptions();
-        this.columnFamilyHandle = RocksDBFactory.getDefaultColumnFamily();
     }
 
     @Override
@@ -108,6 +90,10 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public long getUniqueRowIdInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("getUniqueRowId should only be called on unique index");
+        }
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
         readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
@@ -551,9 +537,8 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public void close() throws IOException
     {
-        if (!closed)
+        if (closed.compareAndSet(false, true))
         {
-            closed = true;
             // Issue #1158: do not directly close the rocksDB instance as it is shared by other indexes
             RocksDBFactory.close();
             writeOptions.close();
@@ -563,28 +548,22 @@ public class RocksDBIndex extends CachingSinglePointIndex
     @Override
     public boolean closeAndRemove() throws SinglePointIndexException
     {
-        try
+        if (closed.compareAndSet(false, true) && removed.compareAndSet(false, true))
         {
-            this.close();
-        }
-        catch (IOException e)
-        {
-            throw new SinglePointIndexException("Failed to close single point index", e);
-        }
-        if (!removed)
-        {
-            removed = true;
-            // clear RocksDB directory
             try
             {
+                // Issue #1158: do not directly close the rocksDB instance as it is shared by other indexes
+                RocksDBFactory.close();
+                writeOptions.close();
                 FileUtils.deleteDirectory(new File(rocksDBPath));
             }
             catch (IOException e)
             {
-                throw new SinglePointIndexException("Failed to clean up RocksDB directory: " + e);
+                throw new SinglePointIndexException("Failed to close and cleanup the RocksDB index", e);
             }
+            return true;
         }
-        return true;
+        return false;
     }
 
     protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues)
