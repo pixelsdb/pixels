@@ -95,7 +95,7 @@ public class RetinaService
         HostAddress address = HostAddress.fromParts(host, port);
         // For other instances, we also follow the global configuration.
         String retinaEnable = ConfigFactory.Instance().getProperty("retina.enable");
-        boolean enabled = retinaEnable == null || Boolean.parseBoolean(retinaEnable);
+        boolean enabled = Boolean.parseBoolean(retinaEnable);
         return otherInstances.computeIfAbsent(
                 address, addr -> new RetinaService(addr.getHostText(), addr.getPort(), enabled)
         );
