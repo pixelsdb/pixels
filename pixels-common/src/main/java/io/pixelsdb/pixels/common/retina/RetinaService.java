@@ -49,9 +49,11 @@ public class RetinaService
 
     static
     {
-        String retinaHost = ConfigFactory.Instance().getProperty("retina.server.host");
-        int retinaPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
-        defaultInstance = new RetinaService(retinaHost, retinaPort);
+        ConfigFactory config = ConfigFactory.Instance();
+        String retinaHost = config.getProperty("retina.server.host");
+        int retinaPort = Integer.parseInt(config.getProperty("retina.server.port"));
+        boolean enabled = Boolean.parseBoolean(config.getProperty("retina.enable"));
+        defaultInstance = new RetinaService(retinaHost, retinaPort, enabled);
         ShutdownHookManager.Instance().registerShutdownHook(RetinaService.class, false, () -> {
             try
             {
@@ -91,8 +93,11 @@ public class RetinaService
     public static synchronized RetinaService CreateInstance(String host, int port)
     {
         HostAddress address = HostAddress.fromParts(host, port);
+        // For other instances, we also follow the global configuration.
+        String retinaEnable = ConfigFactory.Instance().getProperty("retina.enable");
+        boolean enabled = Boolean.parseBoolean(retinaEnable);
         return otherInstances.computeIfAbsent(
-                address, addr -> new RetinaService(addr.getHostText(), addr.getPort())
+                address, addr -> new RetinaService(addr.getHostText(), addr.getPort(), enabled)
         );
     }
 
@@ -100,27 +105,42 @@ public class RetinaService
     private final RetinaWorkerServiceGrpc.RetinaWorkerServiceBlockingStub stub;
     private final RetinaWorkerServiceGrpc.RetinaWorkerServiceStub asyncStub;
     private boolean isShutdown;
+    private final boolean enabled;
 
-    private RetinaService(String host, int port)
+    private RetinaService(String host, int port, boolean enabled)
     {
-        assert (host != null);
-        assert (port > 0 && port <= 65535);
-        this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext()
-//                .keepAliveTime(1, TimeUnit.SECONDS)
-//                .keepAliveTimeout(3, TimeUnit.SECONDS)
-//                .keepAliveWithoutCalls(true)
-                .build();
-        this.stub = RetinaWorkerServiceGrpc.newBlockingStub(this.channel);
-        this.asyncStub = RetinaWorkerServiceGrpc.newStub(this.channel);
+        this.enabled = enabled;
+        if (enabled)
+        {
+            assert (host != null);
+            assert (port > 0 && port <= 65535);
+            this.channel = ManagedChannelBuilder.forAddress(host, port).
+                    usePlaintext().build();
+            this.stub = RetinaWorkerServiceGrpc.newBlockingStub(this.channel);
+            this.asyncStub = RetinaWorkerServiceGrpc.newStub(this.channel);
+        } else
+        {
+            this.channel = null;
+            this.stub = null;
+            this.asyncStub = null;
+        }
         this.isShutdown = false;
+    }
+
+    public boolean isEnabled()
+    {
+        return enabled;
     }
 
     private synchronized void shutdown() throws InterruptedException
     {
         if (!this.isShutdown)
         {
-            // Wait for at most 5 seconds, this should be enough to shut down an RPC client.
-            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            if (this.channel != null)
+            {
+                // Wait for at most 5 seconds, this should be enough to shut down an RPC client.
+                this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            }
             this.isShutdown = true;
         }
     }
