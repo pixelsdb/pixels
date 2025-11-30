@@ -77,6 +77,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 
     private final long tableId;
     private final String retinaBufferStorageFolder;
+    private final boolean retinaEnabled;
 
     private final TypeDescription typeDescription;
     private final int colNum;
@@ -112,6 +113,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
         this.retinaBufferStorageFolder = configFactory.getProperty("retina.buffer.object.storage.folder");
+        this.retinaEnabled = Boolean.parseBoolean(configFactory.getProperty("retina.enable"));
 
         this.option = option;
         this.activeMemtableData = activeMemtableData;
@@ -158,7 +160,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         }
 
         // check retina
-        if (visibilityBitmap.size() != fileIds.size() + 1)
+        if (retinaEnabled && visibilityBitmap != null && visibilityBitmap.size() != fileIds.size() + 1)
         {
             checkValid = false;
             throw new IOException("visibilityBitmap.getSize is " + visibilityBitmap.size() +
@@ -266,7 +268,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         for (int i = 0; i < curBatchSize; i++)
         {
             if ((hiddenTimestampVector == null || hiddenTimestampVector.vector[i] <= this.option.getTransTimestamp())
-                    && (!checkBit(visibilityBitmap.get(fileIdIndex), i)))
+                    && (!retinaEnabled || visibilityBitmap == null || !checkBit(visibilityBitmap.get(fileIdIndex), i)))
             {
                 selectedRows.set(i);
                 addedRows++;
