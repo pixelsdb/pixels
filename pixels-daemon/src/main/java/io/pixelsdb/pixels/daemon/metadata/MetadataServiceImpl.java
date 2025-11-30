@@ -363,14 +363,17 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                                             for(NodeProto.NodeInfo retinaNode : retinaList)
                                             {
                                                 RetinaService retinaService = RetinaService.CreateInstance(retinaNode.getAddress(), retinaPort);
-                                                if (!retinaService.addWriterBuffer(request.getSchemaName(), request.getTableName()))
+                                                if (retinaService.isEnabled())
                                                 {
-                                                    headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
-                                                            .setErrorMsg("failed to add retina's writer buffer for table '" +
-                                                                    request.getSchemaName() + "." + request.getTableName() + "'");
-                                                } else
-                                                {
-                                                    headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                                    if (!retinaService.addWriterBuffer(request.getSchemaName(), request.getTableName()))
+                                                    {
+                                                        headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
+                                                                .setErrorMsg("failed to add retina's writer buffer for table '" +
+                                                                        request.getSchemaName() + "." + request.getTableName() + "'");
+                                                    } else
+                                                    {
+                                                        headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+                                                    }
                                                 }
                                             }
                                         } else

@@ -100,11 +100,17 @@ public class LoadExecutor implements CommandExecutor
                     NodeProto.NodeInfo nodeInfo = loadedInfo.loadedRetinaNode;
                     if(nodeInfo == null)
                     {
-                        defaultRetinaService.addVisibility(File.getFilePath(path, file));
+                        if (defaultRetinaService.isEnabled())
+                        {
+                            defaultRetinaService.addVisibility(File.getFilePath(path, file));
+                        }
                     } else
                     {
                         RetinaService retinaService = RetinaService.CreateInstance(nodeInfo.getAddress(), retinaServerPort);
-                        retinaService.addVisibility(File.getFilePath(path, file));
+                        if (retinaService.isEnabled())
+                        {
+                            retinaService.addVisibility(File.getFilePath(path, file));
+                        }
                     }
 
                 } catch (RetinaException e)
