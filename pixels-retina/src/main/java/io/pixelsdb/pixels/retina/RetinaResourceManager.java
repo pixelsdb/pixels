@@ -57,7 +57,7 @@ public class RetinaResourceManager
     private static final Logger logger = LogManager.getLogger(RetinaResourceManager.class);
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
-    private final Map<String, PixelsWriterBuffer> pixelsWriterBufferMap;
+    private final Map<String, PixelsWriteBuffer> pixelsWriteBufferMap;
     private String retinaHostName;
 
     // GC related fields
@@ -67,7 +67,7 @@ public class RetinaResourceManager
     {
         this.metadataService = MetadataService.Instance();
         this.rgVisibilityMap = new ConcurrentHashMap<>();
-        this.pixelsWriterBufferMap = new ConcurrentHashMap<>();
+        this.pixelsWriteBufferMap = new ConcurrentHashMap<>();
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
                     Thread t = new Thread(r, "retina-gc-thread");
@@ -199,10 +199,10 @@ public class RetinaResourceManager
             List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
 
-            PixelsWriterBuffer pixelsWriterBuffer = new PixelsWriterBuffer(latestLayout.getTableId(),
+            PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(latestLayout.getTableId(),
                     schema, orderedPaths.get(0), compactPaths.get(0), retinaHostName);
             String writerBufferKey = schemaName + "_" + tableName;
-            pixelsWriterBufferMap.put(writerBufferKey, pixelsWriterBuffer);
+            pixelsWriteBufferMap.put(writerBufferKey, pixelsWriteBuffer);
         } catch (Exception e)
         {
             throw new RetinaException(String.format("Failed to add writer buffer for schema %s, table %s", schemaName, tableName), e);
@@ -212,7 +212,7 @@ public class RetinaResourceManager
     public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
     {
         IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
-        PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
+        PixelsWriteBuffer writerBuffer = checkPixelsWriteBuffer(schemaName, tableName);
         builder.setRowId(writerBuffer.addRow(colValues, timestamp, builder.getRowLocationBuilder()));
         return builder;
     }
@@ -247,7 +247,7 @@ public class RetinaResourceManager
         RetinaProto.GetWriterBufferResponse.Builder responseBuilder = RetinaProto.GetWriterBufferResponse.newBuilder();
 
         // get super version
-        PixelsWriterBuffer writerBuffer = checkPixelsWriterBuffer(schemaName, tableName);
+        PixelsWriteBuffer writerBuffer = checkPixelsWriteBuffer(schemaName, tableName);
         SuperVersion superVersion = writerBuffer.getCurrentVersion();
         MemTable activeMemtable = superVersion.getActiveMemTable();
         List<MemTable> immutableMemTables = superVersion.getImmutableMemTables();
@@ -340,10 +340,10 @@ public class RetinaResourceManager
     /**
      * Check if the writer buffer exists for the given schema and table.
      */
-    private PixelsWriterBuffer checkPixelsWriterBuffer(String schema, String table) throws RetinaException
+    private PixelsWriteBuffer checkPixelsWriteBuffer(String schema, String table) throws RetinaException
     {
         String writerBufferKey = schema + "_" + table;
-        PixelsWriterBuffer writerBuffer = this.pixelsWriterBufferMap.get(writerBufferKey);
+        PixelsWriteBuffer writerBuffer = this.pixelsWriteBufferMap.get(writerBufferKey);
         if (writerBuffer == null)
         {
             throw new RetinaException(String.format("Writer buffer not found for schema: %s, table: %s", schema, table));
