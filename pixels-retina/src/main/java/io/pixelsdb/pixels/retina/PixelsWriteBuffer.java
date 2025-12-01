@@ -58,9 +58,9 @@ import static com.google.common.base.Preconditions.checkArgument;
  * | CDC | ===> | memTable -> immutable memTable | -> | shared storage | -> | disk file |
  *  -----        --------------------------------      ----------------      -----------
  */
-public class PixelsWriterBuffer
+public class PixelsWriteBuffer
 {
-    private static final Logger logger = LogManager.getLogger(PixelsWriterBuffer.class);
+    private static final Logger logger = LogManager.getLogger(PixelsWriteBuffer.class);
 
     private final long tableId;
 
@@ -113,7 +113,7 @@ public class PixelsWriterBuffer
     private AtomicLong maxObjectKey;
     private String retinaHostName;
 
-    public PixelsWriterBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
+    public PixelsWriteBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
                               Path targetCompactDirPath, String retinaHostName) throws RetinaException
     {
         this.tableId = tableId;

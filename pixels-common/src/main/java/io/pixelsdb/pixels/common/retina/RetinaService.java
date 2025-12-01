@@ -361,16 +361,16 @@ public class RetinaService
         return true;
     }
 
-    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName, long timeStamp) throws RetinaException
+    public RetinaProto.GetWriteBufferResponse getWriteBuffer(String schemaName, String tableName, long timeStamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
-        RetinaProto.GetWriterBufferRequest request = RetinaProto.GetWriterBufferRequest.newBuilder()
+        RetinaProto.GetWriteBufferRequest request = RetinaProto.GetWriteBufferRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
                 .setTimestamp(timeStamp)
                 .build();
-        RetinaProto.GetWriterBufferResponse response = this.stub.getWriterBuffer(request);
+        RetinaProto.GetWriteBufferResponse response = this.stub.getWriteBuffer(request);
         if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("Schema: " + schemaName + "\tTable: " + tableName + ", failed to get superversion: " + response.getHeader().getErrorCode()
@@ -383,19 +383,19 @@ public class RetinaService
         return response;
     }
 
-    public boolean addWriterBuffer(String schemaName, String tableName) throws RetinaException
+    public boolean addWriteBuffer(String schemaName, String tableName) throws RetinaException
     {
         /**
          * Since pixels-core was not introduced, TypeDescription cannot be used to represent the schema.
          * Ultimately, it is converted to a string and transmitted via bytes, so it does not matter.
          */
         String token = UUID.randomUUID().toString();
-        RetinaProto.AddWriterBufferRequest request = RetinaProto.AddWriterBufferRequest.newBuilder()
+        RetinaProto.AddWriteBufferRequest request = RetinaProto.AddWriteBufferRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
                 .build();
-        RetinaProto.AddWriterBufferResponse response = this.stub.addWriterBuffer(request);
+        RetinaProto.AddWriteBufferResponse response = this.stub.addWriteBuffer(request);
         if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("Failed to add writer: " + response.getHeader().getErrorCode()

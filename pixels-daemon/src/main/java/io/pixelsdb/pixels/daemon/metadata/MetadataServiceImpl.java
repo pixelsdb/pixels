@@ -355,7 +355,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                                         }
                                         if (allSuccess)
                                         {
-                                            // Issue #930: corresponding writerBuffer was not created when creating table
+                                            // Issue #930: corresponding writeBuffer was not created when creating table
                                             // Issue #1218: support multi-retina
                                             NodeService nodeService = NodeService.Instance();
                                             List<NodeProto.NodeInfo> retinaList = nodeService.getRetinaList();
@@ -365,7 +365,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                                                 RetinaService retinaService = RetinaService.CreateInstance(retinaNode.getAddress(), retinaPort);
                                                 if (retinaService.isEnabled())
                                                 {
-                                                    if (!retinaService.addWriterBuffer(request.getSchemaName(), request.getTableName()))
+                                                    if (!retinaService.addWriteBuffer(request.getSchemaName(), request.getTableName()))
                                                     {
                                                         headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
                                                                 .setErrorMsg("failed to add retina's writer buffer for table '" +
