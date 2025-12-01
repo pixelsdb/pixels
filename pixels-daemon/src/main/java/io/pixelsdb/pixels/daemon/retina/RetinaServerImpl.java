@@ -101,7 +101,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         this.retinaResourceManager.addVisibility(filePath);
                     }
 
-                    this.retinaResourceManager.addWriterBuffer(schema.getName(), table.getName());
+                    this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
                 }
             }
         } catch (Exception e)
@@ -587,23 +587,23 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     @Override
-    public void addWriterBuffer(RetinaProto.AddWriterBufferRequest request,
-                                StreamObserver<RetinaProto.AddWriterBufferResponse> responseObserver)
+    public void addWriteBuffer(RetinaProto.AddWriteBufferRequest request,
+                                StreamObserver<RetinaProto.AddWriteBufferResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
         try
         {
-            this.retinaResourceManager.addWriterBuffer(request.getSchemaName(), request.getTableName());
+            this.retinaResourceManager.addWriteBuffer(request.getSchemaName(), request.getTableName());
 
-            RetinaProto.AddWriterBufferResponse response = RetinaProto.AddWriterBufferResponse.newBuilder()
+            RetinaProto.AddWriteBufferResponse response = RetinaProto.AddWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.AddWriterBufferResponse.newBuilder()
+            responseObserver.onNext(RetinaProto.AddWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
             responseObserver.onCompleted();
@@ -611,15 +611,15 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     @Override
-    public void getWriterBuffer(RetinaProto.GetWriterBufferRequest request,
-                                StreamObserver<RetinaProto.GetWriterBufferResponse> responseObserver)
+    public void getWriteBuffer(RetinaProto.GetWriteBufferRequest request,
+                                StreamObserver<RetinaProto.GetWriteBufferResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
         try
         {
-            RetinaProto.GetWriterBufferResponse.Builder response = this.retinaResourceManager.getWriterBuffer(
+            RetinaProto.GetWriteBufferResponse.Builder response = this.retinaResourceManager.getWriteBuffer(
                     request.getSchemaName(), request.getTableName(), request.getTimestamp());
             response.setHeader(headerBuilder);
 
@@ -628,7 +628,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.GetWriterBufferResponse.newBuilder()
+            responseObserver.onNext(RetinaProto.GetWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
             responseObserver.onCompleted();
