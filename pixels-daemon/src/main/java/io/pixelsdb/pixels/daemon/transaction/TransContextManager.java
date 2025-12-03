@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.daemon.transaction;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
+import io.pixelsdb.pixels.retina.RetinaResourceManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -211,7 +212,25 @@ public class TransContextManager
         TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
-            context.setStatus(status);
+            /*
+             * Adding the same lock in {@link #offloadLongRunningQueries()}
+             * constitutes a mutually exclusive critical section.
+             */
+            synchronized (context)
+            {
+                context.setStatus(status);
+                if (context.isOffloaded())
+                {
+                    try
+                    {
+                        RetinaResourceManager.Instance().unregisterOffload(context.getTransId(), context.getTimestamp());
+                    } catch (Exception e)
+                    {
+                        log.error("Unregister failed", e);
+                    }
+                }
+            }
+
             if (context.isReadOnly())
             {
                 this.readOnlyConcurrency.decrementAndGet();
@@ -231,6 +250,54 @@ public class TransContextManager
             return true;
         }
         return false;
+    }
+
+    /**
+     * Offload long-running queries to disk.
+     */
+    public void offloadLongRunningQueries()
+    {
+        long threshold = Long.parseLong(ConfigFactory.Instance().getProperty("pixels.transaction.offload.threshold"));
+        long now = System.currentTimeMillis();
+        boolean pushed = false;
+
+        for (TransContext ctx : runningReadOnlyTrans)
+        {
+            if (ctx.isOffloaded())
+            {
+                continue;
+            }
+
+            if ((now - ctx.getStartTime()) > threshold)
+            {
+                try
+                {
+                    // 1. Register and generate snapshot
+                    RetinaResourceManager.Instance().registerOffload(ctx.getTransId(), ctx.getTimestamp());
+
+                    // 2. Double-checked locking
+                    synchronized (ctx)
+                    {
+                        if (ctx.getStatus() == TransProto.TransStatus.PENDING)
+                        {
+                            ctx.setOffloaded(true);
+                            pushed = true;
+                        } else
+                        {
+                            // Transaction has ended, rollback registration
+                            RetinaResourceManager.Instance().unregisterOffload(ctx.getTransId(), ctx.getTimestamp());
+                        }
+                    }
+                } catch (Exception e)
+                {
+                    log.error("Failed to offload transaction {}", ctx.getTransId(), e);
+                }
+            }
+        }
+        if (pushed)
+        {
+            TransServiceImpl.pushWatermarks(true);
+        }
     }
 
     /**
@@ -306,9 +373,16 @@ public class TransContextManager
         {
             iterator = this.runningWriteTrans.iterator();
         }
-        if (iterator.hasNext())
+        while (iterator.hasNext())
         {
-            return iterator.next().getTimestamp();
+            TransContext ctx = iterator.next();
+
+            // Only skip read-only transactions that have already been offloaded.
+            if (readOnly && ctx.isOffloaded())
+            {
+                continue;
+            }
+            return ctx.getTimestamp();
         }
         return 0;
     }
