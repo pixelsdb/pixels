@@ -59,8 +59,8 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         long workerId = CFWorkerManager.Instance().createWorkerId();
         Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, 0, workerInfo);
         CFWorkerManager.Instance().registerCFWorker(worker);
-        log.debug("register worker, local address: " + workerInfo.getIp() + ", transId: " + workerInfo.getTransId()
-                + ", stageId: " + workerInfo.getStageId() + ", workerId: " + workerId);
+        log.debug("register worker, local address: {}, transId: {}, stageId: {}, workerId: {}",
+                workerInfo.getIp(), workerInfo.getTransId(), workerInfo.getStageId(), workerId);
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         requireNonNull(planCoordinator, "plan coordinator is not found");
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
