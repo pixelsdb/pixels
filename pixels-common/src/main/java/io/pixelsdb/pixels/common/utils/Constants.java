@@ -91,4 +91,7 @@ public final class Constants
     public static final String CF_OUTPUT_STATE_KEY_PREFIX = "pixels_turbo_cf_output";
 
     public static final String LOAD_DEFAULT_RETINA_PREFIX = "default_retina_";
+
+    public static final long LEASE_TIME_SKEW_MS = 500;
+    public static final long LEASE_NETWORK_LATENCY_MS = 500;
 }

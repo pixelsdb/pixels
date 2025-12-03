@@ -167,12 +167,11 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
                     transId, stageId, event.getOperatorName(),
                     event.getJoinInfo().getHashValues()
             );
-            logger.debug("register worker, local address: " + workerInfo.getIp()
-                    + ", transId: " + workerInfo.getTransId() + ", stageId: " + workerInfo.getStageId());
+            logger.debug("register worker, local address: {}, transId: {}, stageId: {}",
+                    workerInfo.getIp(), workerInfo.getTransId(), workerInfo.getStageId());
             worker = workerCoordinateService.registerWorker(workerInfo);
 
-            logger.debug("getSchemaFromPaths, left input: " + leftPartitioned +
-                    ", right input: " + rightPartitioned);
+            logger.debug("getSchemaFromPaths, left input: {}, right input: {}", leftPartitioned, rightPartitioned);
             StreamWorkerCommon.getSchemaFromPaths(threadPool,
                     StreamWorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
                     StreamWorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
@@ -223,8 +222,8 @@ public class BasePartitionedJoinStreamWorker extends Worker<PartitionedJoinInput
             {
                 future.get();
             }
-            logger.info("hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
-                    (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
+            logger.info("hash table size: {}, duration (ns): {}", joiner.getSmallTableSize(),
+                    workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs());
 
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> result = new ArrayList<>();
             if (partitionOutput)

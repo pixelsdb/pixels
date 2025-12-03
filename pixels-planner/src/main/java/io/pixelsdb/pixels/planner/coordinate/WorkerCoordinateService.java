@@ -23,7 +23,7 @@ import com.google.common.collect.ImmutableList;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
-import io.pixelsdb.pixels.common.task.Lease;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import io.pixelsdb.pixels.turbo.WorkerCoordinateServiceGrpc;

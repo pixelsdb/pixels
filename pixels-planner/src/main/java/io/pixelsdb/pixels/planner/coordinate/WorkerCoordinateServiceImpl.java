@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.planner.coordinate;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
-import io.pixelsdb.pixels.common.task.Lease;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.common.task;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
+import io.pixelsdb.pixels.common.lease.Lease;
 
 import static java.util.Objects.requireNonNull;
 
@@ -63,6 +64,7 @@ public class Worker<WI extends WorkerInfo>
     }
 
     /**
+     * This method should only be called on the coordinator.
      * @return true if this worker has a valid lease
      */
     public boolean isAlive()
@@ -74,7 +76,7 @@ public class Worker<WI extends WorkerInfo>
                 return false;
             }
             long currentTimeMs = System.currentTimeMillis();
-            return !this.lease.hasExpired(currentTimeMs);
+            return !this.lease.hasExpired(currentTimeMs, Lease.Role.Assigner);
         }
     }
 
@@ -87,7 +89,7 @@ public class Worker<WI extends WorkerInfo>
     }
 
     /**
-     * Extent the lease of this worker if the worker is alive.
+     * Extent the lease of this worker if the worker is alive. This method should only be called on the coordinator.
      * @return the new start time (milliseconds since the Unix epoch) of the extended lease
      * @throws WorkerCoordinateException if the worker is terminated or the lease has already expired
      */
@@ -96,11 +98,14 @@ public class Worker<WI extends WorkerInfo>
         synchronized (this.lease)
         {
             long currentTimeMs = System.currentTimeMillis();
-            if (this.terminated || this.lease.hasExpired(currentTimeMs))
+            if (this.terminated || this.lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
             {
                 throw new WorkerCoordinateException("worker is not alive, can not extend the lease");
             }
-            this.lease.setStartTimeMs(currentTimeMs);
+            if (!this.lease.updateStartTimeMs(currentTimeMs))
+            {
+                throw new WorkerCoordinateException("the new start time must be later than the current lease start time");
+            }
             return currentTimeMs;
         }
     }
