@@ -102,7 +102,7 @@ public class Worker<WI extends WorkerInfo>
             {
                 throw new WorkerCoordinateException("worker is not alive, can not extend the lease");
             }
-            if (!this.lease.updateStartTimeMs(currentTimeMs))
+            if (!this.lease.updateStartMs(currentTimeMs))
             {
                 throw new WorkerCoordinateException("the new start time must be later than the current lease start time");
             }

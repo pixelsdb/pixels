@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.transaction;
 
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.daemon.TransProto;
 
 import java.util.Map;
@@ -39,6 +40,7 @@ public class TransContext implements Comparable<TransContext>
     private final boolean readOnly;
     private final AtomicReference<TransProto.TransStatus> status;
     private final Properties properties;
+    private final Lease lease = null;
 
     public TransContext(long transId, long timestamp, boolean readOnly)
     {

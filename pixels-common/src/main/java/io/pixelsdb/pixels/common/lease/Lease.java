@@ -27,16 +27,17 @@ import static io.pixelsdb.pixels.common.utils.Constants.LEASE_TIME_SKEW_MS;
 /**
  * @author hank
  * @create 2023-07-29
+ * @update 2025-12-03 make {@link #startMs} atomic and add {@link Role}.
  */
 public class Lease
 {
     private final long periodMs;
-    private final AtomicLong startTimeMs;
+    private final AtomicLong startMs;
 
-    public Lease(long periodMs, long startTimeMs)
+    public Lease(long periodMs, long startMs)
     {
         this.periodMs = periodMs;
-        this.startTimeMs = new AtomicLong(startTimeMs);
+        this.startMs = new AtomicLong(startMs);
     }
 
     public long getPeriodMs()
@@ -44,28 +45,28 @@ public class Lease
         return periodMs;
     }
 
-    public long getStartTimeMs()
+    public long getStartMs()
     {
-        return startTimeMs.get();
+        return startMs.get();
     }
 
     /**
      * Update the start times of the lease. The new start time must be larger than the current start time of the lease.
-     * @param newStartTimeMs the new start time
+     * @param newStartMs the new start time
      * @return true if the new start time is set successfully, false if it is not larger than the current start time
      */
-    public boolean updateStartTimeMs(long newStartTimeMs)
+    public boolean updateStartMs(long newStartMs)
     {
-        long currStartTimeMs;
+        long currStartMs;
         do
         {
-            currStartTimeMs = this.startTimeMs.get();
-            if (newStartTimeMs <= currStartTimeMs)
+            currStartMs = this.startMs.get();
+            if (newStartMs <= currStartMs)
             {
                 return false;
             }
         }
-        while (!this.startTimeMs.compareAndSet(currStartTimeMs, newStartTimeMs));
+        while (!this.startMs.compareAndSet(currStartMs, newStartMs));
         return true;
     }
 
@@ -73,11 +74,11 @@ public class Lease
     {
         if (role == Role.Assigner)
         {
-            return currentTimeMs - this.startTimeMs.get() > this.periodMs;
+            return currentTimeMs - this.startMs.get() > this.periodMs;
         }
         else
         {
-            return currentTimeMs - this.startTimeMs.get() - LEASE_TIME_SKEW_MS - LEASE_NETWORK_LATENCY_MS > this.periodMs;
+            return currentTimeMs - this.startMs.get() - LEASE_TIME_SKEW_MS - LEASE_NETWORK_LATENCY_MS > this.periodMs;
         }
     }
 
