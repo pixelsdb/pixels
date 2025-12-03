@@ -25,11 +25,38 @@
 RGVisibility::RGVisibility(uint64_t rgRecordNum)
     : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
     flag.store(0, std::memory_order_relaxed);
-    tileVisibilities = new TileVisibility[tileCount];
+    void* rawMemory = operator new[](tileCount * sizeof(TileVisibility));
+    tileVisibilities = static_cast<TileVisibility*>(rawMemory);
+    for (uint64_t i = 0; i < tileCount; ++i) {
+        new (&tileVisibilities[i]) TileVisibility();
+    }
+}
+
+RGVisibility::RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap)
+    : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
+    flag.store(0, std::memory_order_relaxed);
+    void* rawMemory = operator new[](tileCount * sizeof(TileVisibility));
+    tileVisibilities = static_cast<TileVisibility*>(rawMemory);
+    
+    // Ensure bitmap size matches
+    if (initialBitmap.size() < tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY) {
+        operator delete[](rawMemory);
+        throw std::runtime_error("Initial bitmap size is too small for the given record number.");
+    }
+
+    for (uint64_t i = 0; i < tileCount; ++i) {
+        // Each tile takes 4 uint64_t
+        const uint64_t* tileBitmap = &initialBitmap[i * BITMAP_SIZE_PER_TILE_VISIBILITY];
+        // We use timestamp 0 for restored checkpoints to serve as the base state
+        new (&tileVisibilities[i]) TileVisibility(timestamp, tileBitmap);
+    }
 }
 
 RGVisibility::~RGVisibility() {
-    delete[] tileVisibilities;
+    for (uint64_t i = 0; i < tileCount; ++i) {
+        tileVisibilities[i].~TileVisibility();
+    }
+    operator delete[](tileVisibilities);
 }
 
 void RGVisibility::beginRGAccess() {
