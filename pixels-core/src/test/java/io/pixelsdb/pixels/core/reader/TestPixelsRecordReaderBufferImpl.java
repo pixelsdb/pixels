@@ -49,8 +49,9 @@ public class TestPixelsRecordReaderBufferImpl
 
 
         RetinaService retinaService = RetinaService.Instance();
+        assert retinaService.isEnabled();
         long timeStamp = 100000;
-        RetinaProto.GetWriterBufferResponse superVersion = retinaService.getWriterBuffer(schemaName, tableName, timeStamp);
+        RetinaProto.GetWriteBufferResponse superVersion = retinaService.getWriteBuffer(schemaName, tableName, timeStamp);
         TypeDescription typeDescription = null;
 
 

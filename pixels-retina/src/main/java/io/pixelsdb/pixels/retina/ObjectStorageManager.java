@@ -46,10 +46,10 @@ public class ObjectStorageManager
         }
         this.path = folder;
 
-        String storageSchema = config.getProperty("retina.buffer.object.storage.scheme");
+        String storageScheme = config.getProperty("retina.buffer.object.storage.scheme");
         try
         {
-            switch(storageSchema)
+            switch(storageScheme)
             {
                 case "s3":
                     this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
@@ -58,7 +58,7 @@ public class ObjectStorageManager
                     this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                     break;
                 default:
-                    throw new RetinaException("Unsupported storage scheme: " + storageSchema);
+                    throw new RetinaException("Unsupported storage scheme: " + storageScheme);
             }
         } catch (IOException e)
         {

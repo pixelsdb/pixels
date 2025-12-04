@@ -39,9 +39,9 @@ service RetinaWorkerService {
     rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
     rpc ReclaimVisibility (ReclaimVisibilityRequest) returns (ReclaimVisibilityResponse);
     // Add writer buffer for new created table
-    rpc AddWriterBuffer (AddWriterBufferRequest) returns (AddWriterBufferResponse);
+    rpc AddWriteBuffer (AddWriteBufferRequest) returns (AddWriteBufferResponse);
     // Get a unified view of the data in the writer buffer
-    rpc GetWriterBuffer (GetWriterBufferRequest) returns (GetWriterBufferResponse);
+    rpc GetWriteBuffer (GetWriteBufferRequest) returns (GetWriteBufferResponse);
 }
 
 // header
@@ -142,25 +142,25 @@ message ReclaimVisibilityResponse {
 }
 
 // add writer buffer
-message AddWriterBufferRequest {
+message AddWriteBufferRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     string tableName = 3;
 }
 
-message AddWriterBufferResponse {
+message AddWriteBufferResponse {
     ResponseHeader header = 1;
 }
 
 // get writer buffer
-message GetWriterBufferRequest {
+message GetWriteBufferRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     string tableName = 3;
     uint64 timestamp = 4;
 }
 
-message GetWriterBufferResponse {
+message GetWriteBufferResponse {
     ResponseHeader header = 1;
     bytes data = 2;
     repeated int64 ids = 3;

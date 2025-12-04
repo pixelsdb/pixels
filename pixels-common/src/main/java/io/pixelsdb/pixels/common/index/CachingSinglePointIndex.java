@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.common.index;
 
-import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
@@ -81,7 +80,7 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
     }
 
     @Override
-    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws MainIndexException, SinglePointIndexException
+    public boolean putPrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         boolean success = putPrimaryEntriesInternal(entries);
         if (cache != null && success)
@@ -229,7 +228,7 @@ public abstract class CachingSinglePointIndex implements SinglePointIndex
 
     protected abstract long getUniqueRowIdInternal(IndexProto.IndexKey key) throws SinglePointIndexException;
     protected abstract boolean putEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
-    protected abstract boolean putPrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws MainIndexException, SinglePointIndexException;
+    protected abstract boolean putPrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException;
     protected abstract boolean putSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException;
     protected abstract long updatePrimaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;
     protected abstract List<Long> updateSecondaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException;

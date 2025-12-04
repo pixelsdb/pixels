@@ -503,7 +503,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         targetRGNum = targetRGIdx;
 
         // query visibility bitmap of target row groups
-        if (this.option.hasValidTransTimestamp())
+        if (this.option.hasValidTransTimestamp() && retinaService.isEnabled())
         {
             try
             {
@@ -1134,7 +1134,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 for (int i = 0; i < curBatchSize; i++)
                 {
                     if ((hiddenTimestampVector == null || hiddenTimestampVector.vector[i] <= this.transTimestamp)
-                        && (!checkBit(rgVisibilityBitmaps[curRGIdx], curRowInRG + i)))
+                        && (rgVisibilityBitmaps == null || !checkBit(rgVisibilityBitmaps[curRGIdx], curRowInRG + i)))
                     {
                         selectedRows.set(i);
                         addedRows++;

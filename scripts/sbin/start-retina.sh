@@ -5,7 +5,7 @@ if [ -z "$PIXELS_HOME" ]; then
   exit 1
 fi
 
-# Remember to set `hostnames` and `pixels_home[Optional]` in config file `$PIXELS_HOME/etc/retina`
+# Remember to set `hostnames` and `pixels_home[Optional]` in config file `$PIXELS_HOME/etc/workers`
 DEFAULT_PIXELS_HOME=$PIXELS_HOME
 
 while read -r retina home

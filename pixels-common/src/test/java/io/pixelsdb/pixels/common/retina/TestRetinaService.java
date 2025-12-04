@@ -65,6 +65,7 @@ public class TestRetinaService
     @BeforeAll
     public static void setUp() throws MetadataException, InterruptedException, JsonProcessingException
     {
+        Assertions.assertTrue(RetinaService.Instance().isEnabled(), "Retina service should be enabled for tests");
         MetadataService metadataService = MetadataService.Instance();
         Table table = metadataService.getTable(schemaName, tableName);
         List<Column> columns = metadataService.getColumns(schemaName, tableName, false);
