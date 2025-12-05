@@ -49,7 +49,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     private ByteBuffer data;
     private final byte[] activeMemtableData;
     private VectorizedRowBatch curRowBatch = null;
-
+    private final String retinaHost;
     /**
      * Columns included by reader option; if included, set true
      */
@@ -104,6 +104,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     }
 
     public PixelsRecordReaderBufferImpl(PixelsReaderOption option,
+                                        String retinaHost,
                                         byte[] activeMemtableData, List<Long> fileIds,  // read version
                                         List<RetinaProto.VisibilityBitmap> visibilityBitmap,
                                         Storage storage,
@@ -113,6 +114,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
         this.retinaBufferStorageFolder = configFactory.getProperty("retina.buffer.object.storage.folder");
+        this.retinaHost = retinaHost;
         this.retinaEnabled = Boolean.parseBoolean(configFactory.getProperty("retina.enable"));
 
         this.option = option;
@@ -349,7 +351,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 
     private String getRetinaBufferStoragePathFromId(long entryId)
     {
-        return this.retinaBufferStorageFolder + String.format("%d/%d", tableId, entryId);
+        return this.retinaBufferStorageFolder + String.format("%d/%s_%d", tableId, retinaHost, entryId);
     }
 
     private void getMemtableDataFromStorage(String path) throws IOException
