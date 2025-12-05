@@ -55,7 +55,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                                StreamObserver<TurboProto.RegisterWorkerResponse> responseObserver)
     {
         CFWorkerInfo workerInfo = new CFWorkerInfo(request.getWorkerInfo());
-        Lease lease = new Lease(WorkerLeasePeriodMs, System.currentTimeMillis());
+        Lease lease = new Lease(System.currentTimeMillis(), WorkerLeasePeriodMs);
         long workerId = CFWorkerManager.Instance().createWorkerId();
         Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, 0, workerInfo);
         CFWorkerManager.Instance().registerCFWorker(worker);

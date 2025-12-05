@@ -62,9 +62,11 @@ enum TransStatus {
 message TransContext {
     uint64 transId = 1;
     uint64 timestamp = 2;
-    bool readOnly = 3;
-    TransStatus status = 4;
-    map<string, string> properties = 5;
+    uint64 leaseStartMs = 3;
+    uint64 leasePeriodMs = 4;
+    bool readOnly = 5;
+    TransStatus status = 6;
+    map<string, string> properties = 7;
 }
 
 message BeginTransRequest {

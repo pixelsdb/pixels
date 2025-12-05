@@ -141,7 +141,8 @@ public class TransService
         {
             throw new TransException("failed to begin transaction, error code=" + response.getErrorCode());
         }
-        TransContext context = new TransContext(response.getTransId(), response.getTimestamp(), readOnly);
+        TransContext context = new TransContext(response.getTransId(), response.getTimestamp(),
+                response.getLeaseStartMs(), response.getLeasePeriodMs(), readOnly);
         if (readOnly)
         {
             // Issue #1099: only use trans context cache and metadata cache for read only queries.
@@ -172,7 +173,9 @@ public class TransService
         {
             long transId = response.getTransIds(i);
             long timestamp = response.getTimestamps(i);
-            TransContext context = new TransContext(transId, timestamp, readOnly);
+            long leaseStartMs = response.getLeaseStartMses(i);
+            long leasePeriodMs = response.getLeasePeriodMses(i);
+            TransContext context = new TransContext(transId, timestamp, leaseStartMs, leasePeriodMs, readOnly);
 
             if (readOnly)
             {

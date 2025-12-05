@@ -39,6 +39,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static io.pixelsdb.pixels.common.utils.Constants.TRANS_LEASE_PERIOD_MS;
+
 /**
  * @author hank, gengdy
  * @create 2022-02-20
@@ -118,10 +120,12 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         {
             long transId = TransServiceImpl.transId.getAndIncrement();
             long timestamp = request.getReadOnly() ? highWatermark.get() : transId;
+            long leaseStartMs = request.getReadOnly() ? 0L : System.currentTimeMillis();
+            long leasePeriodMs = request.getReadOnly() ? 0L : TRANS_LEASE_PERIOD_MS;
             response = TransProto.BeginTransResponse.newBuilder()
-                    .setErrorCode(ErrorCode.SUCCESS)
-                    .setTransId(transId).setTimestamp(timestamp).build();
-            TransContext context = new TransContext(transId, timestamp, request.getReadOnly());
+                    .setErrorCode(ErrorCode.SUCCESS).setTransId(transId).setTimestamp(timestamp)
+                    .setLeaseStartMs(leaseStartMs).setLeasePeriodMs(leasePeriodMs).build();
+            TransContext context = new TransContext(transId, timestamp, leaseStartMs, leasePeriodMs, request.getReadOnly());
             TransContextManager.Instance().addTransContext(context);
         } catch (EtcdException e)
         {
@@ -149,18 +153,20 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 long timestamp = highWatermark.get();
                 for (int i = 0; i < numTrans; i++, transId++)
                 {
-                    response.addTransIds(transId).addTimestamps(timestamp);
-                    TransContext context = new TransContext(transId, timestamp, true);
+                    response.addTransIds(transId).addTimestamps(timestamp).addLeaseStartMses(0L).addLeasePeriodMses(0L);
+                    TransContext context = new TransContext(transId, timestamp, 0L, 0L, true);
                     contexts[i] = context;
                 }
             }
             else
             {
                 long timestamp = transId;
+                long leaseStartMs = System.currentTimeMillis();
                 for (int i = 0; i < numTrans; i++, transId++, timestamp++)
                 {
-                    response.addTransIds(transId).addTimestamps(timestamp);
-                    TransContext context = new TransContext(transId, timestamp, false);
+                    response.addTransIds(transId).addTimestamps(timestamp)
+                            .addLeaseStartMses(leaseStartMs).addLeasePeriodMses(TRANS_LEASE_PERIOD_MS);
+                    TransContext context = new TransContext(transId, timestamp, leaseStartMs, TRANS_LEASE_PERIOD_MS, false);
                     contexts[i] = context;
                 }
             }

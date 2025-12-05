@@ -19,10 +19,11 @@
  */
 package io.pixelsdb.pixels.common.lease;
 
+import io.pixelsdb.pixels.common.exception.InvalidArgumentException;
+
 import java.util.concurrent.atomic.AtomicLong;
 
-import static io.pixelsdb.pixels.common.utils.Constants.LEASE_NETWORK_LATENCY_MS;
-import static io.pixelsdb.pixels.common.utils.Constants.LEASE_TIME_SKEW_MS;
+import static io.pixelsdb.pixels.common.utils.Constants.*;
 
 /**
  * @author hank
@@ -34,10 +35,10 @@ public class Lease
     private final long periodMs;
     private final AtomicLong startMs;
 
-    public Lease(long periodMs, long startMs)
+    public Lease(long startMs, long periodMs)
     {
-        this.periodMs = periodMs;
         this.startMs = new AtomicLong(startMs);
+        this.periodMs = periodMs;
     }
 
     public long getPeriodMs()
@@ -70,16 +71,42 @@ public class Lease
         return true;
     }
 
+    /**
+     * This method can be called by lease assigner and applier.
+     * @param currentTimeMs
+     * @param role
+     * @return
+     */
     public boolean hasExpired(long currentTimeMs, Role role)
     {
         if (role == Role.Assigner)
         {
             return currentTimeMs - this.startMs.get() > this.periodMs;
         }
+        else if (role == Role.Applier)
+        {
+            return currentTimeMs - this.startMs.get() > this.periodMs - LEASE_TIME_SKEW_MS - LEASE_NETWORK_LATENCY_MS;
+        }
         else
         {
-            return currentTimeMs - this.startMs.get() - LEASE_TIME_SKEW_MS - LEASE_NETWORK_LATENCY_MS > this.periodMs;
+            throw new InvalidArgumentException("invalid lease role " + role.name());
         }
+    }
+
+    /**
+     * This method can be only called by lease applier.
+     * @param currentTimeMs
+     * @param role
+     * @return
+     */
+    public boolean expiring(long currentTimeMs, Role role)
+    {
+        if (role == Role.Applier)
+        {
+            return currentTimeMs - this.startMs.get() >
+                    this.periodMs * LEASE_EXPIRING_THRESHOLD - LEASE_TIME_SKEW_MS - LEASE_NETWORK_LATENCY_MS;
+        }
+        throw new InvalidArgumentException("mayExpire should only be called by lease applier");
     }
 
     public enum Role
