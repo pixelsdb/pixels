@@ -26,6 +26,25 @@ option java_multiple_files = false;
 option java_package = "io.pixelsdb.pixels.sink";
 option java_outer_classname = "SinkProto";
 
+// RPC 服务定义 - 服务名称更清晰地反映了轮询模式
+service PixelsPollingService {
+  // 定义一个简单的一问一答式 RPC，用于轮询
+  // Flink Client 调用一次，Server 响应一次
+  rpc PollEvents(PollRequest) returns (PollResponse);
+}
+
+// Flink Source 发送的请求
+message PollRequest {
+  string schema_name = 1;
+  string table_name = 2;
+}
+
+// pixels-sink Server 返回的响应
+message PollResponse {
+  // 返回一个 CDC 事件列表。如果当前没有数据，这个列表可以为空。
+  repeated RowRecord records = 1;
+}
+
 enum TransactionStatus {
     BEGIN = 0;
     END = 1;
