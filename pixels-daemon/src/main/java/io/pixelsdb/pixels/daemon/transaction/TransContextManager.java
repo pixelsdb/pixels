@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.transaction;
 
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
@@ -199,6 +200,94 @@ public class TransContextManager
         try
         {
             return terminateTrans(transId, TransProto.TransStatus.ROLLBACK);
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Try to extend the lease of the transaction if it is not expired.
+     * @param transId the trans id
+     * @param currentTimeMs the current time in micro seconds
+     * @return true if the lease of the transaction is extended successfully; false if the transaction does not exist,
+     * is readonly, or has expired
+     */
+    public boolean extendTransLease(long transId, long currentTimeMs)
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            TransContext context = this.transIdToContext.get(transId);
+            if (context != null)
+            {
+                if (context.isReadOnly())
+                {
+                    return false;
+                }
+                else
+                {
+                    Lease lease = context.getLease();
+                    if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
+                    {
+                        return false;
+                    }
+                    lease.updateStartMs(currentTimeMs);
+                    return true;
+                }
+            }
+            return false;
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Try to extend the lease of the transactions if they are not expired.
+     * @param transIds the trans ids
+     * @param currentTimeMs the current time in micro seconds
+     * @return for each transaction, true if the lease of the transaction is extended successfully;
+     * false if the transaction does not exist, is readonly, or has expired
+     */
+    public List<Boolean> extendTransLeaseBatch(List<Long> transIds, long currentTimeMs)
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            List<Boolean> res = new ArrayList<>(transIds.size());
+            for (int i = 0; i < transIds.size(); i++)
+            {
+                long transId = transIds.get(i);
+                TransContext context = this.transIdToContext.get(transId);
+                if (context != null)
+                {
+                    if (context.isReadOnly())
+                    {
+                        res.set(i, false);
+                    }
+                    else
+                    {
+                        Lease lease = context.getLease();
+                        if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
+                        {
+                            res.set(i, false);
+                        }
+                        else
+                        {
+                            lease.updateStartMs(currentTimeMs);
+                            res.set(i, true);
+                        }
+                    }
+                }
+                else
+                {
+                    res.set(i, false);
+                }
+            }
+            return res;
         }
         finally
         {

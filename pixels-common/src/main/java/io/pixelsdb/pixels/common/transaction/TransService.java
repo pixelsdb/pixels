@@ -355,10 +355,10 @@ public class TransService
         {
             throw new TransException("failed to extend lease of transactions, error code=" + response.getErrorCode());
         }
-        for (int i = 0; i < extending.size(); i++)
+        long newLeaseStartMs = response.getNewLeaseStartMs();
+        for (long transId : extending)
         {
-            long transId = extending.get(i);
-            TransContextCache.Instance().getTransLease(transId).updateStartMs(response.getNewLeaseStartMses(i));
+            TransContextCache.Instance().getTransLease(transId).updateStartMs(newLeaseStartMs);
         }
         return res;
     }

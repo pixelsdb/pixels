@@ -284,7 +284,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         int error = ErrorCode.SUCCESS;
         if (TransContextManager.Instance().isTransExist(request.getTransId()))
         {
-            // must get transaction context before setTransCommit()
+            // must get transaction context before setTransRollback()
             boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
             boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
             if (!success)
@@ -306,15 +306,81 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     }
 
     @Override
-    public void extendTransLease(TransProto.ExtendTransLeaseRequest request, StreamObserver<TransProto.ExtendTransLeaseResponse> responseObserver)
+    public void extendTransLease(TransProto.ExtendTransLeaseRequest request,
+                                 StreamObserver<TransProto.ExtendTransLeaseResponse> responseObserver)
     {
-        super.extendTransLease(request, responseObserver);
+        int error = ErrorCode.SUCCESS;
+        long currentTimeMs = -1;
+        if (TransContextManager.Instance().isTransExist(request.getTransId()))
+        {
+            currentTimeMs = System.currentTimeMillis();
+            boolean success = TransContextManager.Instance().extendTransLease(request.getTransId(), currentTimeMs);
+            if (!success)
+            {
+                error = ErrorCode.TRANS_EXTEND_LEASE_FAILED;
+            }
+        }
+        else
+        {
+            logger.error("transaction id {} does not exist in the context manager", request.getTransId());
+            error = ErrorCode.TRANS_ID_NOT_EXIST;
+        }
+
+        TransProto.ExtendTransLeaseResponse response = TransProto.ExtendTransLeaseResponse.newBuilder()
+                .setErrorCode(error).setNewLeaseStartMs(currentTimeMs).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 
     @Override
-    public void extendTransLeaseBatch(TransProto.ExtendTransLeaseBatchRequest request, StreamObserver<TransProto.ExtendTransLeaseBatchResponse> responseObserver)
+    public void extendTransLeaseBatch(TransProto.ExtendTransLeaseBatchRequest request,
+                                      StreamObserver<TransProto.ExtendTransLeaseBatchResponse> responseObserver)
     {
-        super.extendTransLeaseBatch(request, responseObserver);
+        TransProto.ExtendTransLeaseBatchResponse.Builder responseBuilder =
+                TransProto.ExtendTransLeaseBatchResponse.newBuilder();
+
+        if (request.getTransIdsCount() == 0)
+        {
+            logger.error("the count of transaction ids is zero, no transactions to commit");
+            responseBuilder.setErrorCode(ErrorCode.TRANS_INVALID_ARGUMENT);
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+            return;
+        }
+
+        final int numTrans = request.getTransIdsCount();
+        int errorCode = ErrorCode.SUCCESS;
+        long currentTimeMs = System.currentTimeMillis();
+        for (int i = 0; i < numTrans; ++i)
+        {
+            long transId = request.getTransIds(i);
+            if (TransContextManager.Instance().isTransExist(transId))
+            {
+                boolean success = TransContextManager.Instance().extendTransLease(transId, currentTimeMs);
+                if (!success)
+                {
+                    errorCode = ErrorCode.TRANS_EXTEND_LEASE_FAILED;
+                    break;
+                }
+            }
+            else
+            {
+                logger.error("transaction id {} does not exist in the context manager", transId);
+                errorCode = ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST;
+                break;
+            }
+        }
+        responseBuilder.setErrorCode(errorCode);
+        if (errorCode == ErrorCode.SUCCESS)
+        {
+            responseBuilder.setNewLeaseStartMs(currentTimeMs);
+        }
+        else
+        {
+            responseBuilder.setNewLeaseStartMs(-1L);
+        }
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
     }
 
     private void pushWatermarks(boolean readOnly)

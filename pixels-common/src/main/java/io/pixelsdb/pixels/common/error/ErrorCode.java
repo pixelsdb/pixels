@@ -108,6 +108,8 @@ public class ErrorCode
     public static final int TRANS_INVALID_ARGUMENT = (ERROR_TRANS + 8);
     public static final int TRANS_BATCH_PARTIAL_ID_NOT_EXIST = (ERROR_TRANS + 9);
     public static final int TRANS_BATCH_PARTIAL_COMMIT_FAILED = (ERROR_TRANS + 10);
+    public static final int TRANS_EXTEND_LEASE_FAILED = (ERROR_TRANS + 11);
+    public static final int TRANS_BATCH_EXTEND_LEASE_FAILED = (ERROR_TRANS + 12);
 
     // begin error code for query schedule
     private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;
