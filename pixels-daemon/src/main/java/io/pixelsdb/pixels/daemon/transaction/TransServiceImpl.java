@@ -305,6 +305,18 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         responseObserver.onCompleted();
     }
 
+    @Override
+    public void extendTransLease(TransProto.ExtendTransLeaseRequest request, StreamObserver<TransProto.ExtendTransLeaseResponse> responseObserver)
+    {
+        super.extendTransLease(request, responseObserver);
+    }
+
+    @Override
+    public void extendTransLeaseBatch(TransProto.ExtendTransLeaseBatchRequest request, StreamObserver<TransProto.ExtendTransLeaseBatchResponse> responseObserver)
+    {
+        super.extendTransLeaseBatch(request, responseObserver);
+    }
+
     private void pushWatermarks(boolean readOnly)
     {
         long timestamp = TransContextManager.Instance().getMinRunningTransTimestamp(readOnly);
