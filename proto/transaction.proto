@@ -125,7 +125,8 @@ message ExtendTransLeaseRequest {
 }
 
 message ExtendTransLeaseResponse {
-    uint64 newLeaseStartMs = 1;
+    int32 errorCode = 1;
+    uint64 newLeaseStartMs = 2;
 }
 
 message ExtendTransLeaseBatchRequest {
@@ -133,7 +134,8 @@ message ExtendTransLeaseBatchRequest {
 }
 
 message ExtendTransLeaseBatchResponse {
-    repeated uint64 newLeaseStartMses = 1;
+    int32 errorCode = 1;
+    repeated uint64 newLeaseStartMses = 2;
 }
 
 message GetTransContextRequest {

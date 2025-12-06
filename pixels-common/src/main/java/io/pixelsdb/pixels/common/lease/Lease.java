@@ -72,10 +72,14 @@ public class Lease
     }
 
     /**
-     * This method can be called by lease assigner and applier.
-     * @param currentTimeMs
-     * @param role
-     * @return
+     * This method can be called by lease assigner and holder.
+     * Note that for leaseholder, even if this method returns false, the lease may be expired. Leaseholder can use
+     * {@link #expiring(long, Role)} to check if the lease is likely to be expiring.
+     * @param currentTimeMs the current time in microseconds
+     * @param role the role of the caller
+     * @return for lease assigner, true if the lease is expired;
+     * for leaseholder, true if the lease is certain to be expired
+     * @throws InvalidArgumentException if the role is not {@link Role#Holder} or {@link Role#Assigner}
      */
     public boolean hasExpired(long currentTimeMs, Role role)
     {
@@ -83,9 +87,9 @@ public class Lease
         {
             return currentTimeMs - this.startMs.get() > this.periodMs;
         }
-        else if (role == Role.Applier)
+        else if (role == Role.Holder)
         {
-            return currentTimeMs - this.startMs.get() > this.periodMs - LEASE_TIME_SKEW_MS - LEASE_NETWORK_LATENCY_MS;
+            return currentTimeMs - this.startMs.get() > this.periodMs + LEASE_TIME_SKEW_MS;
         }
         else
         {
@@ -94,24 +98,25 @@ public class Lease
     }
 
     /**
-     * This method can be only called by lease applier.
-     * @param currentTimeMs
-     * @param role
-     * @return
+     * This method can be only called by leaseholder to check if the lease is expiring.
+     * @param currentTimeMs the current time in microseconds
+     * @param role the role of the caller
+     * @return true if the lease is expiring
+     * @throws InvalidArgumentException if the role is not {@link Role#Holder}
      */
     public boolean expiring(long currentTimeMs, Role role)
     {
-        if (role == Role.Applier)
+        if (role == Role.Holder)
         {
             return currentTimeMs - this.startMs.get() >
                     this.periodMs * LEASE_EXPIRING_THRESHOLD - LEASE_TIME_SKEW_MS - LEASE_NETWORK_LATENCY_MS;
         }
-        throw new InvalidArgumentException("mayExpire should only be called by lease applier");
+        throw new InvalidArgumentException("mayExpire should only be called by leaseholder");
     }
 
     public enum Role
     {
         Assigner, // the role that assigns the lease
-        Applier // the role that applies and holds the lease
+        Holder // the role that applies and holds the lease
     }
 }

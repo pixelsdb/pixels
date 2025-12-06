@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.transaction;
 
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.daemon.TransProto;
 
 import java.util.Map;
@@ -92,9 +93,19 @@ public class TransContextCache
 
     public boolean isTerminated(long transId)
     {
-        TransContext info =  this.transIdToContext.get(transId);
-        return info == null || info.getStatus() == TransProto.TransStatus.COMMIT ||
-                info.getStatus() == TransProto.TransStatus.ROLLBACK;
+        TransContext context =  this.transIdToContext.get(transId);
+        return context == null || context.getStatus() == TransProto.TransStatus.COMMIT ||
+                context.getStatus() == TransProto.TransStatus.ROLLBACK;
+    }
+
+    /**
+     * @param transId the transaction id
+     * @return the lease of the transaction, or null if the transaction context does not exist in the cache
+     */
+    public Lease getTransLease(long transId)
+    {
+        TransContext context =  this.transIdToContext.get(transId);
+        return context == null ? null : context.getLease();
     }
 
     /**

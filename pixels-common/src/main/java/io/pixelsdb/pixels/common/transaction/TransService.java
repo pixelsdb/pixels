@@ -25,6 +25,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.TransException;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -34,6 +35,7 @@ import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -270,6 +272,95 @@ public class TransService
             MetadataCache.Instance().dropCache(transId);
         }
         return true;
+    }
+
+    /**
+     * Check and extend the lease of the transaction if it is expiring.
+     * <br/>
+     * <b>Note: this method is not thread-safe</b>, do not try to extend the lease of the same transaction
+     * from concurrent threads.
+     * @param transId the transaction id
+     * @return true if the lease is not expiring or has been successfully extended, false if the transaction lease
+     * has already expired
+     * @throws TransException if the transaction is not found in the {@link TransContextCache} or failed to extend the
+     * lease on the assigner side
+     */
+    public boolean extendTransLease(long transId) throws TransException
+    {
+        Lease lease = TransContextCache.Instance().getTransLease(transId);
+        long currentTimeMs = System.currentTimeMillis();
+        if (lease == null)
+        {
+            throw new TransException("transaction lease not found for transaction id=" + transId);
+        }
+        if (lease.hasExpired(currentTimeMs, Lease.Role.Holder))
+        {
+            return false;
+        }
+        if (!lease.expiring(currentTimeMs, Lease.Role.Holder))
+        {
+            return true;
+        }
+        TransProto.ExtendTransLeaseRequest request = TransProto.ExtendTransLeaseRequest.newBuilder()
+                .setTransId(transId).build();
+        TransProto.ExtendTransLeaseResponse response = this.stub.extendTransLease(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to extend lease for transaction " + transId +
+                    ", error code=" + response.getErrorCode());
+        }
+        lease.updateStartMs(response.getNewLeaseStartMs());
+        return true;
+    }
+
+    /**
+     * Check and extend the lease of the transactions if they are expiring.
+     * <br/>
+     * <b>Note: this method is not thread-safe</b>, do not try to extend the lease of the same transaction
+     * from concurrent threads.
+     * @param transIds the transaction ids
+     * @return for each transaction, true if the lease is not expiring or has been successfully extended,
+     * false if the transaction lease has already expired
+     * @throws TransException if any transaction is not found in the {@link TransContextCache} or the transaction does not
+     * have a valid lease
+     */
+    public List<Boolean> extendTransLeaseBatch(List<Long> transIds) throws TransException
+    {
+        List<Long> extending = new ArrayList<>();
+        List<Boolean> res = new ArrayList<>(transIds.size());
+        long currentTimeMs = System.currentTimeMillis();
+        for (int i = 0; i < transIds.size(); i++)
+        {
+            long transId = transIds.get(i);
+            Lease lease = TransContextCache.Instance().getTransLease(transId);
+            if (lease == null)
+            {
+                throw new TransException("transaction lease not found for transaction id=" + transId);
+            }
+            if (lease.hasExpired(currentTimeMs, Lease.Role.Holder))
+            {
+                res.set(i, false);
+                continue;
+            }
+            res.set(i, true);
+            if (lease.expiring(currentTimeMs, Lease.Role.Holder))
+            {
+                extending.add(transId);
+            }
+        }
+        TransProto.ExtendTransLeaseBatchRequest request = TransProto.ExtendTransLeaseBatchRequest.newBuilder()
+                .addAllTransIds(extending).build();
+        TransProto.ExtendTransLeaseBatchResponse response = this.stub.extendTransLeaseBatch(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to extend lease of transactions, error code=" + response.getErrorCode());
+        }
+        for (int i = 0; i < extending.size(); i++)
+        {
+            long transId = extending.get(i);
+            TransContextCache.Instance().getTransLease(transId).updateStartMs(response.getNewLeaseStartMses(i));
+        }
+        return res;
     }
 
     public TransContext getTransContext(long transId) throws TransException
