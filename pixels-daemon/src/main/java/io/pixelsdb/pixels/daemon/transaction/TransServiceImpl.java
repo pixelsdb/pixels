@@ -107,7 +107,22 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
     }
 
-    public TransServiceImpl() { }
+    public TransServiceImpl()
+    {
+        /*
+         * Initiate a background monitoring thread to periodically (every 5 minutes)
+         * trigger the detection and offloading process for long-running queries,
+         * thereby ensuring the persistent release of blockages on the Low Watermarks
+         * and guaranteeing the proper functioning of the garbage collection mechanism.
+         */
+        ScheduledExecutorService offloadScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "trans-offload-monitor");
+            t.setDaemon(true);
+            return t;
+        });
+        offloadScheduler.scheduleAtFixedRate(() ->
+                TransContextManager.Instance().offloadLongRunningQueries(), 5, 5, TimeUnit.MINUTES);
+    }
 
     @Override
     public void beginTrans(TransProto.BeginTransRequest request,
@@ -299,7 +314,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         responseObserver.onCompleted();
     }
 
-    private void pushWatermarks(boolean readOnly)
+    static void pushWatermarks(boolean readOnly)
     {
         long timestamp = TransContextManager.Instance().getMinRunningTransTimestamp(readOnly);
         if (readOnly)

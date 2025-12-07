@@ -123,6 +123,8 @@ message QueryVisibilityRequest {
     uint64 fileId = 2;
     repeated uint32 rgIds = 3;
     uint64 timestamp = 4;
+    // Optional transaction ID. Only set for long-running queries (offloaded).
+    optional int64 transId = 5;
 }
 
 message QueryVisibilityResponse {

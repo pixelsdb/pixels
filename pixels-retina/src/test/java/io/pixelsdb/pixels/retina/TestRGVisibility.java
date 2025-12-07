@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.retina;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 import java.util.*;
@@ -39,23 +40,46 @@ public class TestRGVisibility
     private RGVisibility rgVisibility;
 
     @Before
-    public void setUp() {
+    public void setUp()
+    {
         rgVisibility = new RGVisibility(ROW_COUNT);
     }
 
     @After
-    public void tearDown() {
+    public void tearDown()
+    {
         rgVisibility.close();
     }
 
     @Test
-    public void testBasicDeleteAndVisibility() {
+    public void testRGVisibilityInitialized()
+    {
+        long timestamp1 = 100;
+        long timestamp2 = 200;
+
+        long[] bitmap = {1, 0, 0, 0};
+        RGVisibility rgVisibilityInitialized = new RGVisibility(256, 0, bitmap);
+
+        rgVisibilityInitialized.deleteRecord(5, timestamp1);
+        rgVisibilityInitialized.deleteRecord(10, timestamp1);
+        rgVisibilityInitialized.deleteRecord(15, timestamp2);
+
+        long[] bitmap1 = rgVisibilityInitialized.getVisibilityBitmap(timestamp1);
+        assertEquals(0b0000010000100001L, bitmap1[0]);
+
+        long[] bitmap2 = rgVisibilityInitialized.getVisibilityBitmap(timestamp2);
+        assertEquals(0b1000010000100001L, bitmap2[0]);
+    }
+
+    @Test
+    public void testBasicDeleteAndVisibility()
+    {
         long timestamp1 = 100;
         long timestamp2 = 200;
 
         rgVisibility.deleteRecord(5, timestamp1);
         rgVisibility.deleteRecord(10, timestamp1);
-        rgVisibility.deleteRecord(15, timestamp2);
+         rgVisibility.deleteRecord(15, timestamp2);
         rgVisibility.garbageCollect(timestamp1);
 
         long[] bitmap1 = rgVisibility.getVisibilityBitmap(timestamp1);
@@ -66,12 +90,15 @@ public class TestRGVisibility
     }
 
     @Test
-    public void testMultiThread() throws InterruptedException {
-        class DeleteRecord {
+    public void testMultiThread() throws InterruptedException
+    {
+        class DeleteRecord
+        {
             final long timestamp;
             final int rowId;
 
-            DeleteRecord(long timestamp, int rowId) {
+            DeleteRecord(long timestamp, int rowId)
+            {
                 this.timestamp = timestamp;
                 this.rowId = rowId;
             }
@@ -84,12 +111,16 @@ public class TestRGVisibility
         AtomicLong minTimestamp = new AtomicLong(0);
         AtomicInteger verificationCount = new AtomicInteger(0);
 
-        BiConsumer<Long, long[]> verifyBitmap = (timestamp, bitmap) -> {
+        BiConsumer<Long, long[]> verifyBitmap = (timestamp, bitmap) ->
+        {
             long[] expectedBitmap = new long[bitmap.length];
 
-            synchronized (deleteHistory) {
-                for (DeleteRecord record : deleteHistory) {
-                    if (record.timestamp <= timestamp) {
+            synchronized (deleteHistory)
+            {
+                for (DeleteRecord record : deleteHistory)
+                {
+                    if (record.timestamp <= timestamp)
+                    {
                         int bitmapIndex = (int) (record.rowId / 64);
                         int bitOffset = (int) (record.rowId % 64);
                         expectedBitmap[bitmapIndex] |= (1L << bitOffset);
@@ -97,19 +128,24 @@ public class TestRGVisibility
                 }
             }
 
-            for (int i = 0; i < bitmap.length; i++) {
-                if (bitmap[i] != expectedBitmap[i]) {
-                    if (DEBUG) {
+            for (int i = 0; i < bitmap.length; i++)
+            {
+                if (bitmap[i] != expectedBitmap[i])
+                {
+                    if (DEBUG)
+                    {
                         printLock.lock();
-                        try {
+                        try
+                        {
                             System.err.printf("Bitmap verification failed at timestamp %d%n", timestamp);
                             System.err.printf("Bitmap segment %d (rows %d-%d):%n",
-                                    i, i*64, (i*64+63));
+                                    i, i * 64, (i * 64 + 63));
                             System.err.printf("Actual:   %s%n",
                                     String.format("%64s", Long.toBinaryString(bitmap[i])).replace(' ', '0'));
                             System.err.printf("Expected: %s%n",
                                     String.format("%64s", Long.toBinaryString(expectedBitmap[i])).replace(' ', '0'));
-                        } finally {
+                        } finally
+                        {
                             printLock.unlock();
                         }
                     }
@@ -119,15 +155,18 @@ public class TestRGVisibility
             verificationCount.incrementAndGet();
         };
 
-        Thread deleteThread = new Thread(() -> {
+        Thread deleteThread = new Thread(() ->
+        {
             long timestamp = 1;
             Random random = new Random();
             List<Integer> remainingRows = new ArrayList<>();
-            for (int i = 0; i < ROW_COUNT; i++) {
+            for (int i = 0; i < ROW_COUNT; i++)
+            {
                 remainingRows.add(i);
             }
 
-            while (!remainingRows.isEmpty() && running.get()) {
+            while (!remainingRows.isEmpty() && running.get())
+            {
                 int index = random.nextInt(remainingRows.size());
                 int rowId = remainingRows.get(index);
                 remainingRows.remove(index);
@@ -137,44 +176,57 @@ public class TestRGVisibility
                 maxTimestamp.set(timestamp);
                 timestamp++;
 
-                try {
+                try
+                {
                     Thread.sleep(1);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException e)
+                {
                     Thread.currentThread().interrupt();
                     break;
                 }
             }
 
-            if (DEBUG) {
+            if (DEBUG)
+            {
                 printLock.lock();
-                try {
+                try
+                {
                     System.out.printf("Delete thread completed: deleted %d rows with max timestamp %d%n",
-                            deleteHistory.size(), timestamp-1);
-                } finally {
+                            deleteHistory.size(), timestamp - 1);
+                } finally
+                {
                     printLock.unlock();
                 }
             }
             running.set(false);
         });
 
-        Thread gcThread = new Thread(() -> {
+        Thread gcThread = new Thread(() ->
+        {
             long gcTs = 0;
-            while (running.get()) {
+            while (running.get())
+            {
                 gcTs += 10;
-                if (gcTs <= minTimestamp.get()) {
+                if (gcTs <= minTimestamp.get())
+                {
                     rgVisibility.garbageCollect(gcTs);
-                    if (DEBUG) {
+                    if (DEBUG)
+                    {
                         printLock.lock();
-                        try {
+                        try
+                        {
                             System.out.printf("GC thread completed: GCed up to timestamp %d%n", gcTs);
-                        } finally {
+                        } finally
+                        {
                             printLock.unlock();
                         }
                     }
                 }
-                try {
+                try
+                {
                     Thread.sleep(5);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException e)
+                {
                     Thread.currentThread().interrupt();
                     break;
                 }
@@ -182,45 +234,56 @@ public class TestRGVisibility
         });
 
         List<Thread> getThreads = new ArrayList<>();
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 1000; i++)
+        {
             final int threadId = i;
-            Thread getThread = new Thread(() -> {
+            Thread getThread = new Thread(() ->
+            {
                 Random random = new Random();
                 int localVerificationCount = 0;
 
-                while (running.get()) {
+                while (running.get())
+                {
                     long maxTs = maxTimestamp.get();
                     long minTs = minTimestamp.get();
-                    if (maxTs == 0 || minTs > maxTs) {
-                        try {
+                    if (maxTs == 0 || minTs > maxTs)
+                    {
+                        try
+                        {
                             Thread.sleep(1);
-                        } catch (InterruptedException e) {
+                        } catch (InterruptedException e)
+                        {
                             Thread.currentThread().interrupt();
                             break;
                         }
                         continue;
                     }
 
-                    long queryTs = minTs + random.nextInt((int)(maxTs - minTs + 1));
+                    long queryTs = minTs + random.nextInt((int) (maxTs - minTs + 1));
                     long[] bitmap = rgVisibility.getVisibilityBitmap(queryTs);
                     verifyBitmap.accept(queryTs, bitmap);
                     localVerificationCount++;
                     minTimestamp.incrementAndGet();
 
-                    try {
+                    try
+                    {
                         Thread.sleep(5);
-                    } catch (InterruptedException e) {
+                    } catch (InterruptedException e)
+                    {
                         Thread.currentThread().interrupt();
                         break;
                     }
                 }
 
-                if (DEBUG) {
+                if (DEBUG)
+                {
                     printLock.lock();
-                    try {
+                    try
+                    {
                         System.out.printf("Get thread %d completed: performed %d verifications%n",
                                 threadId, localVerificationCount);
-                    } finally {
+                    } finally
+                    {
                         printLock.unlock();
                     }
                 }
@@ -234,7 +297,8 @@ public class TestRGVisibility
 
         deleteThread.join();
         gcThread.join();
-        for (Thread t : getThreads) {
+        for (Thread t : getThreads)
+        {
             t.join();
         }
 
@@ -243,8 +307,10 @@ public class TestRGVisibility
         Arrays.fill(expectedFinalBitmap, -1L);
 
         int invalidBitsCount = (int) (-ROW_COUNT & 255);
-        if (invalidBitsCount != 0) {
-            for (long i = ROW_COUNT; i < ROW_COUNT + invalidBitsCount; i++) {
+        if (invalidBitsCount != 0)
+        {
+            for (long i = ROW_COUNT; i < ROW_COUNT + invalidBitsCount; i++)
+            {
                 int bitmapIndex = (int) (i / 64);
                 int bitOffset = (int) (i % 64);
                 expectedFinalBitmap[bitmapIndex] &= ~(1L << bitOffset);

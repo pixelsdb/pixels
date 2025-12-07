@@ -23,10 +23,12 @@
 #include "TileVisibility.h"
 #include <memory>
 #include <atomic>
+#include <vector>
 
 class RGVisibility {
 public:
     explicit RGVisibility(uint64_t rgRecordNum);
+    explicit RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap);
     ~RGVisibility();
 
     void deleteRGRecord(uint32_t rowId, uint64_t timestamp);

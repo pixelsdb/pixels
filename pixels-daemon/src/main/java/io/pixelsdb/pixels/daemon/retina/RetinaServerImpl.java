@@ -64,6 +64,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         this.retinaResourceManager = RetinaResourceManager.Instance();
         try
         {
+            logger.info("Pre-loading checkpoints...");
+            this.retinaResourceManager.recoverCheckpoints();
+
             List<Schema> schemas = this.metadataService.getSchemas();
             for (Schema schema : schemas)
             {
@@ -104,6 +107,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
                 }
             }
+            this.retinaResourceManager.finishRecovery();
         } catch (Exception e)
         {
             logger.error("Error while initializing RetinaServerImpl", e);
@@ -530,6 +534,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             long fileId = request.getFileId();
             int[] rgIds = request.getRgIdsList().stream().mapToInt(Integer::intValue).toArray();
             long timestamp = request.getTimestamp();
+            long transId = request.hasTransId() ? request.getTransId() : -1;
 
             RetinaProto.QueryVisibilityResponse.Builder responseBuilder = RetinaProto.QueryVisibilityResponse
                     .newBuilder()
@@ -537,7 +542,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
             for (int rgId : rgIds)
             {
-                long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp);
+                long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp, transId);
                 RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
                         .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
                         .build();
