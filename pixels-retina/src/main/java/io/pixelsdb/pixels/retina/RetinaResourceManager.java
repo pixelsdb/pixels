@@ -180,16 +180,18 @@ public class RetinaResourceManager
                     try
                     {
                         Files.deleteIfExists(path);
-                    } catch (IOException ignored)
+                    } catch (IOException e)
                     {
+                        logger.error("Failed to delete checkpoint file {}", path, e);
                     }
                 } else if (filename.startsWith("vis_gc_"))
                 {
                     try
                     {
                         gcTimestamps.add(Long.parseLong(filename.replace("vis_gc_", "").replace(".bin", "")));
-                    } catch (Exception ignored)
+                    } catch (Exception e)
                     {
+                        logger.error("Failed to delete checkpoint file {}", path, e);
                     }
                 }
             }
