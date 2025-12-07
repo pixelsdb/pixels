@@ -75,6 +75,8 @@ public class TransContextManager
 
     private final ReadWriteLock contextLock = new ReentrantReadWriteLock();
 
+    private static final long OFFLOAD_THRESHOLD = Long.parseLong(ConfigFactory.Instance().getProperty("pixels.transaction.offload.threshold"));
+
     private TransContextManager() { }
 
     /**
@@ -257,7 +259,6 @@ public class TransContextManager
      */
     public void offloadLongRunningQueries()
     {
-        long threshold = Long.parseLong(ConfigFactory.Instance().getProperty("pixels.transaction.offload.threshold"));
         long now = System.currentTimeMillis();
         boolean pushed = false;
 
@@ -268,7 +269,7 @@ public class TransContextManager
                 continue;
             }
 
-            if ((now - ctx.getStartTime()) > threshold)
+            if ((now - ctx.getStartTime()) > OFFLOAD_THRESHOLD)
             {
                 try
                 {
