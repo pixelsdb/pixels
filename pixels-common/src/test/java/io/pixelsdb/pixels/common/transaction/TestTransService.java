@@ -29,10 +29,11 @@ import org.junit.Test;
 public class TestTransService
 {
     @Test
-    public void testExtendTransLease() throws TransException
+    public void testExtendTransLease() throws TransException, InterruptedException
     {
         TransService service = TransService.Instance();
         TransContext context = service.beginTrans(false);
+        Thread.sleep(3000);
         service.extendTransLease(context.getTransId());
     }
 }
