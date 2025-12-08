@@ -32,6 +32,7 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Lock;
@@ -72,6 +73,10 @@ public class S3Queue implements Closeable
 
     private final S3QS s3qs;
 
+    private final HashSet<Integer> producerSet;
+
+    private final HashSet<Integer> consumerSet;
+
     private final Lock lock = new ReentrantLock();
 
     private boolean closed = false;
@@ -81,7 +86,44 @@ public class S3Queue implements Closeable
         this.s3qs = s3qs;
         this.queueUrl = queueUrl;
         this.sqsClient = this.s3qs.getSqsClient();
+        this.producerSet = new HashSet<>();
+        this.consumerSet = new HashSet<>();
     }
+
+    public void addProducer(int workerId)
+    {
+        if(!this.producerSet.contains(workerId)){
+            this.producerSet.add(workerId);
+        }
+    }
+
+    public void removeProducer(int workerId)
+    {
+        this.producerSet.remove(workerId);
+        if(this.producerSet.isEmpty())
+        {
+            this.push("");
+        }
+    }
+
+    public void addConsumer(int workerId)
+    {
+        if(!this.consumerSet.contains(workerId))
+        {
+            this.consumerSet.add(workerId);
+        }
+    }
+
+    public void removeConsumer(int workerId)
+    {
+        this.consumerSet.remove(workerId);
+        if(consumerSet.isEmpty())
+        {
+            // TODO: close queue
+        }
+    }
+
+
 
     /**
      * Poll one object path from the SQS queue and create a physical reader for the object.
@@ -95,6 +137,7 @@ public class S3Queue implements Closeable
      * @throws IOException if fails to create the physical reader for the path
      */
     public PhysicalReader poll(int timeoutSec) throws IOException
+    //TODO: now we have clear terminated message, if timeout is still necessary?
     {
         String s3Path = this.s3PathQueue.poll();
         if (s3Path == null)
@@ -140,6 +183,13 @@ public class S3Queue implements Closeable
         return PhysicalReaderUtil.newPhysicalReader(this.s3qs, s3Path);
     }
 
+    private boolean assertPartition(String path , int HashPartition){
+        //TODO: if there are dynamic hash or multi-level hash?
+        String[] parts = path.split("/");
+        int pathPartition = Integer.parseInt(parts[parts.length-1]);
+        return HashPartition == pathPartition;
+    }
+
     protected void push(String objectPath)
     {
         SendMessageRequest request = SendMessageRequest.builder()
@@ -150,17 +200,26 @@ public class S3Queue implements Closeable
     /**
      * Create a physical writer for an object of the given path. When the object is written
      * and the physical writer is closed successfully, the object path is sent to SQS.
-     * @param objectPath the path of the object
+     * @param body the information from upstream worker
      * @return the physical writer of the object
      * @throws IOException if fails to create the physical writer for the path
      */
-    public PhysicalWriter offer(String objectPath) throws IOException
+    public PhysicalWriter offer(S3QueueMessage body) throws IOException
     {
+        String objectPath =  getMessageGroup(body);
+        addProducer(body.getWorkerNum());
+
         PhysicalS3QSWriter writer = (PhysicalS3QSWriter) PhysicalWriterUtil
                 .newPhysicalWriter(this.s3qs, objectPath, false);
         writer.setQueue(this);
         return writer;
     }
+
+    private String getMessageGroup(S3QueueMessage body) throws IOException
+    {
+        return body.getObjectPath()+body.getPartitionNum();
+    }
+
 
     public boolean isClosed()
     {

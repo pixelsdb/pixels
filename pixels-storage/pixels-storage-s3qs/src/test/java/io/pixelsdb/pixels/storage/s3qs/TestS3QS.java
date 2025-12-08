@@ -80,7 +80,10 @@ public class TestS3QS
             long startTime = System.currentTimeMillis();
             for (int i = 0; i < 2; i++)
             {
-                try (PhysicalWriter writer = queue.offer("pixels-turbo-intermediate/shuffle/" + i))
+                S3QueueMessage body = new S3QueueMessage()
+                        .setObjectPath("pixels-turbo-intermediate/shuffle/" + i + "/")
+                        .setPartitionNum(2);
+                try (PhysicalWriter writer = queue.offer(body))
                 {
                     writer.append(buffer);
                 }
