@@ -34,6 +34,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -351,34 +352,17 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         final int numTrans = request.getTransIdsCount();
         int errorCode = ErrorCode.SUCCESS;
         long currentTimeMs = System.currentTimeMillis();
-        for (int i = 0; i < numTrans; ++i)
+        List<Boolean> success = TransContextManager.Instance().extendTransLeaseBatch(request.getTransIdsList(), currentTimeMs);
+        if (success == null || numTrans == success.size())
         {
-            long transId = request.getTransIds(i);
-            if (TransContextManager.Instance().isTransExist(transId))
-            {
-                boolean success = TransContextManager.Instance().extendTransLease(transId, currentTimeMs);
-                if (!success)
-                {
-                    errorCode = ErrorCode.TRANS_EXTEND_LEASE_FAILED;
-                    break;
-                }
-            }
-            else
-            {
-                logger.error("transaction id {} does not exist in the context manager", transId);
-                errorCode = ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST;
-                break;
-            }
-        }
-        responseBuilder.setErrorCode(errorCode);
-        if (errorCode == ErrorCode.SUCCESS)
-        {
-            responseBuilder.setNewLeaseStartMs(currentTimeMs);
+            errorCode = ErrorCode.TRANS_EXTEND_LEASE_FAILED;
         }
         else
         {
-            responseBuilder.setNewLeaseStartMs(-1L);
+            responseBuilder.addAllSuccess(success);
+            responseBuilder.setNewLeaseStartMs(currentTimeMs);
         }
+        responseBuilder.setErrorCode(errorCode);
         responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();
     }

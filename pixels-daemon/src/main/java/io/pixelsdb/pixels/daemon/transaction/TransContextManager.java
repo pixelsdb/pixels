@@ -211,8 +211,8 @@ public class TransContextManager
      * Try to extend the lease of the transaction if it is not expired.
      * @param transId the trans id
      * @param currentTimeMs the current time in micro seconds
-     * @return true if the lease of the transaction is extended successfully; false if the transaction does not exist,
-     * is readonly, or has expired
+     * @return true if the lease of the transaction is readonly or extended successfully;
+     * false if the transaction does not exist or has expired
      */
     public boolean extendTransLease(long transId, long currentTimeMs)
     {
@@ -222,11 +222,7 @@ public class TransContextManager
             TransContext context = this.transIdToContext.get(transId);
             if (context != null)
             {
-                if (context.isReadOnly())
-                {
-                    return false;
-                }
-                else
+                if (!context.isReadOnly())
                 {
                     Lease lease = context.getLease();
                     if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
@@ -234,8 +230,8 @@ public class TransContextManager
                         return false;
                     }
                     lease.updateStartMs(currentTimeMs);
-                    return true;
                 }
+                return true;
             }
             return false;
         }
@@ -249,8 +245,8 @@ public class TransContextManager
      * Try to extend the lease of the transactions if they are not expired.
      * @param transIds the trans ids
      * @param currentTimeMs the current time in micro seconds
-     * @return for each transaction, true if the lease of the transaction is extended successfully;
-     * false if the transaction does not exist, is readonly, or has expired
+     * @return for each transaction, true if the lease of the transaction is readonly or extended successfully;
+     * false if the transaction does not exist or has expired
      */
     public List<Boolean> extendTransLeaseBatch(List<Long> transIds, long currentTimeMs)
     {
@@ -264,23 +260,17 @@ public class TransContextManager
                 TransContext context = this.transIdToContext.get(transId);
                 if (context != null)
                 {
-                    if (context.isReadOnly())
-                    {
-                        res.set(i, false);
-                    }
-                    else
+                    if (!context.isReadOnly())
                     {
                         Lease lease = context.getLease();
                         if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
                         {
                             res.set(i, false);
+                            continue;
                         }
-                        else
-                        {
-                            lease.updateStartMs(currentTimeMs);
-                            res.set(i, true);
-                        }
+                        lease.updateStartMs(currentTimeMs);
                     }
+                    res.set(i, true);
                 }
                 else
                 {

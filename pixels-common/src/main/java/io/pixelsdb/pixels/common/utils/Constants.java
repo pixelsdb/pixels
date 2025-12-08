@@ -100,8 +100,8 @@ public final class Constants
     public static final long LEASE_NETWORK_LATENCY_MS = 500;
     /**
      * The fraction of lease period upon which the lease is considered expiring.
-     * E.g., the lease period is 1000ms, a threshold 0.9 means if the remaining time is less than 1000*(1-0.9) ms,
+     * E.g., the lease period is 1000ms, a threshold 0.5 means if the remaining time is less than 1000*(1-0.5) ms,
      * then the lease is considered expiring.
      */
-    public static final double LEASE_EXPIRING_THRESHOLD = 0.9;
+    public static final double LEASE_EXPIRING_THRESHOLD = 0.5;
 }

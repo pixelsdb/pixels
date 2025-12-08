@@ -136,6 +136,7 @@ message ExtendTransLeaseBatchRequest {
 message ExtendTransLeaseBatchResponse {
     int32 errorCode = 1;
     uint64 newLeaseStartMs = 2;
+    repeated bool success = 3;
 }
 
 message GetTransContextRequest {
