@@ -313,7 +313,7 @@ public class RetinaResourceManager
             {
                 return loadBitmapFromDisk(timestamp, fileId, rgId);
             }
-            logger.warn("Offloaded checkpoint missing for TransID {}, falling back to memory.", transId);
+            logger.error("Offloaded checkpoint missing for TransID {}, falling back to memory.", transId);
         }
         // otherwise read from memory
         RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
