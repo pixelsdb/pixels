@@ -265,16 +265,16 @@ public class TransContextManager
                         Lease lease = context.getLease();
                         if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
                         {
-                            res.set(i, false);
+                            res.add(false);
                             continue;
                         }
                         lease.updateStartMs(currentTimeMs);
                     }
-                    res.set(i, true);
+                    res.add(true);
                 }
                 else
                 {
-                    res.set(i, false);
+                    res.add(false);
                 }
             }
             return res;

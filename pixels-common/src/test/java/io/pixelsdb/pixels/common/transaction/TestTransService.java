@@ -36,7 +36,7 @@ public class TestTransService
     {
         TransService service = TransService.Instance();
         TransContext context = service.beginTrans(false);
-        Thread.sleep(3000);
+        Thread.sleep(5000);
         service.extendTransLease(context);
         service.commitTrans(context.getTransId(), false);
     }
