@@ -37,7 +37,7 @@ public class TestTransService
         TransService service = TransService.Instance();
         TransContext context = service.beginTrans(false);
         Thread.sleep(3000);
-        service.extendTransLease(context.getTransId());
+        service.extendTransLease(context);
         service.commitTrans(context.getTransId(), false);
     }
 
@@ -52,7 +52,7 @@ public class TestTransService
         {
             transIds.add(context.getTransId());
         }
-        service.extendTransLeaseBatch(transIds);
+        service.extendTransLeaseBatch(contexts);
         service.commitTransBatch(transIds, false);
     }
 }

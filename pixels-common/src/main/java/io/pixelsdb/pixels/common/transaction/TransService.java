@@ -144,11 +144,10 @@ public class TransService
         }
         TransContext context = new TransContext(response.getTransId(), response.getTimestamp(),
                 response.getLeaseStartMs(), response.getLeasePeriodMs(), readOnly);
-        TransContextCache.Instance().addTransContext(context);
         if (readOnly)
         {
             // Issue #1099: only use trans context cache and metadata cache for read only queries.
-            // Issue #1163: use trans context cache for write transactions.
+            TransContextCache.Instance().addTransContext(context);
             MetadataCache.Instance().initCache(context.getTransId());
         }
         return context;
@@ -178,11 +177,10 @@ public class TransService
             long leaseStartMs = response.getLeaseStartMses(i);
             long leasePeriodMs = response.getLeasePeriodMses(i);
             TransContext context = new TransContext(transId, timestamp, leaseStartMs, leasePeriodMs, readOnly);
-            TransContextCache.Instance().addTransContext(context);
             if (readOnly)
             {
                 // Issue #1099: only use trans context cache and metadata cache for read only queries.
-                // Issue #1163: use trans context cache for write transactions.
+                TransContextCache.Instance().addTransContext(context);
                 MetadataCache.Instance().initCache(context.getTransId());
             }
             contexts.add(context);
@@ -206,11 +204,10 @@ public class TransService
         {
             throw new TransException("failed to commit transaction, error code=" + response.getErrorCode());
         }
-        TransContextCache.Instance().setTransCommit(transId);
         if (readOnly)
         {
             // Issue #1099: only use trans context cache and metadata cache for read only queries.
-            // Issue #1163: use trans context cache for write transactions.
+            TransContextCache.Instance().setTransCommit(transId);
             MetadataCache.Instance().dropCache(transId);
         }
         return true;
@@ -238,13 +235,12 @@ public class TransService
         {
             throw new TransException("transaction ids and timestamps size mismatch");
         }
-        for (long transId : transIds)
+        if (readOnly)
         {
-            TransContextCache.Instance().setTransCommit(transId);
-            if (readOnly)
+            // Issue #1099: only use trans context cache and metadata cache for read only queries.
+            for (long transId : transIds)
             {
-                // Issue #1099: only use trans context cache and metadata cache for read only queries.
-                // Issue #1163: use trans context cache for write transactions.
+                TransContextCache.Instance().setTransCommit(transId);
                 MetadataCache.Instance().dropCache(transId);
             }
         }
@@ -267,11 +263,10 @@ public class TransService
         {
             throw new TransException("failed to rollback transaction, error code=" + response.getErrorCode());
         }
-        TransContextCache.Instance().setTransRollback(transId);
         if (readOnly)
         {
             // Issue #1099: only use trans context cache and metadata cache for read only queries.
-            // Issue #1163: use trans context cache for write transactions.
+            TransContextCache.Instance().setTransRollback(transId);
             MetadataCache.Instance().dropCache(transId);
         }
         return true;
@@ -282,20 +277,15 @@ public class TransService
      * <br/>
      * <b>Note: this method is not thread-safe</b>, do not try to extend the lease of the same transaction
      * from concurrent threads.
-     * @param transId the transaction id
+     * @param transContext the transaction context with a lease
      * @return true if the lease is not expiring or has been successfully extended, false if the transaction lease
      * has already expired
-     * @throws TransException if the transaction is not found in the {@link TransContextCache} or failed to extend the
-     * lease on the assigner side
+     * @throws TransException if failed to extend the lease on the assigner (transaction server) side
      */
-    public boolean extendTransLease(long transId) throws TransException
+    public boolean extendTransLease(TransContext transContext) throws TransException
     {
-        Lease lease = TransContextCache.Instance().getTransLease(transId);
+        Lease lease = transContext.getLease();
         long currentTimeMs = System.currentTimeMillis();
-        if (lease == null)
-        {
-            throw new TransException("transaction lease not found for transaction id=" + transId);
-        }
         if (lease.hasExpired(currentTimeMs, Lease.Role.Holder))
         {
             return false;
@@ -305,11 +295,11 @@ public class TransService
             return true;
         }
         TransProto.ExtendTransLeaseRequest request = TransProto.ExtendTransLeaseRequest.newBuilder()
-                .setTransId(transId).build();
+                .setTransId(transContext.getTransId()).build();
         TransProto.ExtendTransLeaseResponse response = this.stub.extendTransLease(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new TransException("transaction " + transId +
+            throw new TransException("transaction " + transContext.getTransId() +
                     " not exist or its lease has expired, error code=" + response.getErrorCode());
         }
         lease.updateStartMs(response.getNewLeaseStartMs());
@@ -321,33 +311,27 @@ public class TransService
      * <br/>
      * <b>Note: this method is not thread-safe</b>, do not try to extend the lease of the same transaction
      * from concurrent threads.
-     * @param transIds the transaction ids
-     * @return for each transaction, true if the lease is not expiring or has been successfully extended,
+     * @param transContexts the transaction contexts with leases
+     * @return for each transaction, true if the lease is successfully extended,
      * false if the transaction lease has already expired
-     * @throws TransException if any transaction is not found in the {@link TransContextCache} or the transaction does not
-     * have a valid lease
+     * @throws TransException if failed to extend the leases on the assigner (transaction server) side
      */
-    public List<Boolean> extendTransLeaseBatch(List<Long> transIds) throws TransException
+    public List<Boolean> extendTransLeaseBatch(List<TransContext> transContexts) throws TransException
     {
-        for (long transId : transIds)
+        TransProto.ExtendTransLeaseBatchRequest.Builder requestBuilder = TransProto.ExtendTransLeaseBatchRequest.newBuilder();
+        for (TransContext transContext : transContexts)
         {
-            Lease lease = TransContextCache.Instance().getTransLease(transId);
-            if (lease == null)
-            {
-                throw new TransException("transaction lease not found for transaction id=" + transId);
-            }
+            requestBuilder.addTransIds(transContext.getTransId());
         }
-        TransProto.ExtendTransLeaseBatchRequest request = TransProto.ExtendTransLeaseBatchRequest.newBuilder()
-                .addAllTransIds(transIds).build();
-        TransProto.ExtendTransLeaseBatchResponse response = this.stub.extendTransLeaseBatch(request);
+        TransProto.ExtendTransLeaseBatchResponse response = this.stub.extendTransLeaseBatch(requestBuilder.build());
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new TransException("failed to extend lease of transactions, error code=" + response.getErrorCode());
         }
         long newLeaseStartMs = response.getNewLeaseStartMs();
-        for (long transId : transIds)
+        for (TransContext transContext : transContexts)
         {
-            TransContextCache.Instance().getTransLease(transId).updateStartMs(newLeaseStartMs);
+            transContext.getLease().updateStartMs(newLeaseStartMs);
         }
         return response.getSuccessList();
     }
