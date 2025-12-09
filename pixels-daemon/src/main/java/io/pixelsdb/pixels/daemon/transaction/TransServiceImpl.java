@@ -23,6 +23,7 @@ import io.etcd.jetcd.KeyValue;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.EtcdException;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.lock.PersistentAutoIncrement;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.Constants;
@@ -48,7 +49,9 @@ import static io.pixelsdb.pixels.common.utils.Constants.TRANS_LEASE_PERIOD_MS;
  * @update 2022-05-02 update protocol to support transaction context operations
  * @update 2025-06-07 support begin transactions in batch
  * @update 2025-09-30 support commit transactions in batch (gengdy)
- * @update 2025-10-04 remove transaction timestamp in commit and commit-batch
+ * @update 2025-10-04 use trans id as trans ts for non-readonly transactions,
+ * and remove transaction timestamp in commit and commit-batch
+ * @update 2025-11-09 support transaction lease for non-readonly transactions
  */
 public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 {
@@ -198,10 +201,25 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
              * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
              */
             pushWatermarks(context.isReadOnly());
-            boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
-            if (!success)
+            if (!context.isReadOnly() && context.getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Assigner))
             {
-                error = ErrorCode.TRANS_COMMIT_FAILED;
+                boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
+                if (!success)
+                {
+                    error = ErrorCode.TRANS_ROLLBACK_FAILED;
+                }
+                else
+                {
+                    error = ErrorCode.TRANS_LEASE_EXPIRED;
+                }
+            }
+            else
+            {
+                boolean success = TransContextManager.Instance().setTransCommit(request.getTransId());
+                if (!success)
+                {
+                    error = ErrorCode.TRANS_COMMIT_FAILED;
+                }
             }
         }
         else
@@ -233,12 +251,10 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
 
         final int numTrans = request.getTransIdsCount();
-        long[] transIds = new long[numTrans];
         int errorCode = ErrorCode.SUCCESS;
         for (int i = 0; i < numTrans; ++i)
         {
             long transId = request.getTransIds(i);
-            transIds[i] = transId;
             TransContext context = TransContextManager.Instance().getTransContext(transId);
             if (context != null)
             {
@@ -256,7 +272,8 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             }
         }
         Boolean[] success = new Boolean[numTrans];
-        boolean allSuccess = TransContextManager.Instance().setTransCommitBatch(transIds, success);
+        // Issue #1163: lease is checked inside setTransCommitBatch, we do not set dedicated error code for expired leases.
+        boolean allSuccess = TransContextManager.Instance().setTransCommitBatch(request.getTransIdsList(), success);
         responseBuilder.addAllResults(Arrays.asList(success));
         if (allSuccess)
         {
@@ -286,13 +303,22 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         if (TransContextManager.Instance().isTransExist(request.getTransId()))
         {
             // must get transaction context before setTransRollback()
-            boolean readOnly = TransContextManager.Instance().getTransContext(request.getTransId()).isReadOnly();
-            boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
-            if (!success)
+            TransContext context = TransContextManager.Instance().getTransContext(request.getTransId());
+            if (context != null)
             {
-                error = ErrorCode.TRANS_ROLLBACK_FAILED;
+                // Issue #1163: push the watermarks before setTransRollback as in commitTrans().
+                pushWatermarks(context.isReadOnly());
+                if (!context.isReadOnly() && context.getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Assigner))
+                {
+                    error = ErrorCode.TRANS_LEASE_EXPIRED;
+                }
+                // rollback the transaction no mater it is expired or not
+                boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
+                if (!success)
+                {
+                    error = ErrorCode.TRANS_ROLLBACK_FAILED;
+                }
             }
-            pushWatermarks(readOnly);
         }
         else
         {

@@ -110,6 +110,7 @@ public class ErrorCode
     public static final int TRANS_BATCH_PARTIAL_COMMIT_FAILED = (ERROR_TRANS + 10);
     public static final int TRANS_EXTEND_LEASE_FAILED = (ERROR_TRANS + 11);
     public static final int TRANS_BATCH_EXTEND_LEASE_FAILED = (ERROR_TRANS + 12);
+    public static final int TRANS_LEASE_EXPIRED = (ERROR_TRANS + 13);
 
     // begin error code for query schedule
     private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;

@@ -160,23 +160,22 @@ public class TransContextManager
      * @param success whether each transaction commits successfully
      * @return true if all transactions commit successfully
      */
-    public boolean setTransCommitBatch(long[] transIds, Boolean[] success)
+    public boolean setTransCommitBatch(List<Long> transIds, Boolean[] success)
     {
         requireNonNull(transIds, "transIds is null");
         requireNonNull(success, "success is null");
-        checkArgument(transIds.length == success.length,
+        checkArgument(transIds.size() == success.length,
                 "transIds and success have different length");
         this.contextLock.readLock().lock();
         try
         {
             boolean allSuccess = true;
-            for (int i = 0; i < transIds.length; i++)
+            for (int i = 0; i < transIds.size(); i++)
             {
-                success[i] = terminateTrans(transIds[i], TransProto.TransStatus.COMMIT);
+                success[i] = terminateTrans(transIds.get(i), TransProto.TransStatus.COMMIT);
                 if(!success[i])
                 {
                     allSuccess = false;
-                    log.error("failed to commit transaction id {}", transIds[i]);
                 }
             }
             return allSuccess;
@@ -290,14 +289,27 @@ public class TransContextManager
         TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
-            context.setStatus(status);
+            boolean res = true;
             if (context.isReadOnly())
             {
+                context.setStatus(status);
                 this.readOnlyConcurrency.decrementAndGet();
                 this.runningReadOnlyTrans.remove(context);
             }
             else
             {
+                if (status == TransProto.TransStatus.COMMIT &&
+                        context.getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Assigner))
+                {
+                    // Issue #1163: stop committing and rollback the transaction if its lease is expired
+                    context.setStatus(TransProto.TransStatus.ROLLBACK);
+                    log.error("failed to commit transaction id {} as its lease is expired", transId);
+                    res = false;
+                }
+                else
+                {
+                    context.setStatus(status);
+                }
                 // only clear the context of write transactions
                 this.transIdToContext.remove(context.getTransId());
                 this.runningWriteTrans.remove(context);
@@ -307,7 +319,7 @@ public class TransContextManager
                     this.traceIdToTransId.remove(traceId);
                 }
             }
-            return true;
+            return res;
         }
         return false;
     }
