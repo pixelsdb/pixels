@@ -20,16 +20,16 @@
 package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -44,7 +44,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TestRetinaCheckpoint
 {
     private RetinaResourceManager retinaManager;
-    private Path testCheckpointDir;
+    private String testCheckpointDir;
+    private Storage storage;
     private final long fileId = 1L;
     private final int rgId = 0;
     private final int numRows = 1024;
@@ -52,29 +53,36 @@ public class TestRetinaCheckpoint
     @Before
     public void setUp() throws IOException, RetinaException
     {
-        testCheckpointDir = Paths.get(ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir"));
-        if (!Files.exists(testCheckpointDir))
+        testCheckpointDir = ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir");
+        storage = StorageFactory.Instance().getStorage(testCheckpointDir);
+
+        if (!storage.exists(testCheckpointDir))
         {
-            Files.createDirectories(testCheckpointDir);
+            storage.mkdirs(testCheckpointDir);
         } else
         {
-            Files.list(testCheckpointDir).forEach(p -> {
+            for (String path : storage.listPaths(testCheckpointDir))
+            {
                 try
                 {
-                    Files.deleteIfExists(p);
+                    storage.delete(path, false);
                 } catch (IOException e)
                 {
                     e.printStackTrace();
                 }
-            });
+            }
         }
 
         retinaManager = RetinaResourceManager.Instance();
         retinaManager.addVisibility(fileId, rgId, numRows);
     }
 
+    private String resolve(String dir, String filename) {
+        return dir.endsWith("/") ? dir + filename : dir + "/" + filename;
+    }
+
     @Test
-    public void testRegisterOffload() throws RetinaException
+    public void testRegisterOffload() throws RetinaException, IOException
     {
         long transId = 12345L;
         long timestamp = 100L;
@@ -83,18 +91,18 @@ public class TestRetinaCheckpoint
         retinaManager.registerOffload(transId, timestamp);
 
         // Verify checkpoint file exists
-        Path expectedFile = testCheckpointDir.resolve("vis_offload_100.bin");
-        assertTrue("Offload checkpoint file should exist", Files.exists(expectedFile));
+        String expectedFile = resolve(testCheckpointDir, "vis_offload_100.bin");
+        assertTrue("Offload checkpoint file should exist", storage.exists(expectedFile));
 
         // Unregister
         retinaManager.unregisterOffload(transId, timestamp);
 
         // File should be removed
-        assertFalse("Offload checkpoint file should be removed", Files.exists(expectedFile));
+        assertFalse("Offload checkpoint file should be removed", storage.exists(expectedFile));
     }
 
     @Test
-    public void testMultipleOffloads() throws RetinaException
+    public void testMultipleOffloads() throws RetinaException, IOException
     {
         long transId1 = 12345L;
         long timestamp1 = 100L;
@@ -105,16 +113,16 @@ public class TestRetinaCheckpoint
         retinaManager.registerOffload(transId1, timestamp1);
         retinaManager.registerOffload(transId2, timestamp1_dup);
 
-        Path expectedFile = testCheckpointDir.resolve("vis_offload_100.bin");
-        assertTrue("Offload checkpoint file should exist", Files.exists(expectedFile));
+        String expectedFile = resolve(testCheckpointDir, "vis_offload_100.bin");
+        assertTrue("Offload checkpoint file should exist", storage.exists(expectedFile));
 
         // Unregister one - should not remove yet (ref count >1)
         retinaManager.unregisterOffload(transId1, timestamp1);
-        assertTrue("Offload checkpoint should still exist (ref count >1)", Files.exists(expectedFile));
+        assertTrue("Offload checkpoint should still exist (ref count >1)", storage.exists(expectedFile));
 
         // Unregister second
         retinaManager.unregisterOffload(transId2, timestamp1);
-        assertFalse("Offload checkpoint should be removed", Files.exists(expectedFile));
+        assertFalse("Offload checkpoint should be removed", storage.exists(expectedFile));
     }
 
     @Test
@@ -133,12 +141,23 @@ public class TestRetinaCheckpoint
 
         // 2. Register Offload to generate checkpoint file
         retinaManager.registerOffload(transId, timestamp);
-        Path offloadPath = testCheckpointDir.resolve("vis_offload_" + timestamp + ".bin");
-        assertTrue("Checkpoint file should exist", Files.exists(offloadPath));
+        String offloadPath = resolve(testCheckpointDir, "vis_offload_" + timestamp + ".bin");
+        assertTrue("Checkpoint file should exist", storage.exists(offloadPath));
 
         // 3. Rename offload file to GC file to simulate checkpoint generated by GC
-        Path gcPath = testCheckpointDir.resolve("vis_gc_" + timestamp + ".bin");
-        Files.move(offloadPath, gcPath, StandardCopyOption.REPLACE_EXISTING);
+        String gcPath = resolve(testCheckpointDir, "vis_gc_" + timestamp + ".bin");
+        // Storage interface doesn't have rename, using copy and delete
+        try (DataInputStream in = storage.open(offloadPath);
+             DataOutputStream out = storage.create(gcPath, true, 4096))
+        {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1)
+            {
+                out.write(buffer, 0, bytesRead);
+            }
+        }
+        storage.delete(offloadPath, false);
 
         // 4. Reset singleton state (Simulate Crash/Restart)
         resetSingletonState();
@@ -219,8 +238,8 @@ public class TestRetinaCheckpoint
                             // Register Offload
                             retinaManager.registerOffload(transId, timestamp);
                             // Verify file exists
-                            Path p = testCheckpointDir.resolve("vis_offload_" + timestamp + ".bin");
-                            if (!Files.exists(p)) {
+                            String p = resolve(testCheckpointDir, "vis_offload_" + timestamp + ".bin");
+                            if (!storage.exists(p)) {
                                 throw new RuntimeException("Checkpoint file missing after register: " + p);
                             }
                         }
