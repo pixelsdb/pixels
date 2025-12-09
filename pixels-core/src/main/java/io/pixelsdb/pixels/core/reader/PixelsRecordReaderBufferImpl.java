@@ -20,15 +20,6 @@
 
 package io.pixelsdb.pixels.core.reader;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -42,11 +33,41 @@ import io.pixelsdb.pixels.retina.RetinaProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PixelsRecordReaderBufferImpl.class);
+    private static final Long POLL_INTERVAL_MILLS = 200L;
+    private static final int DEFAULT_QUEUE_CAPACITY = 16;
     private final byte[] activeMemtableData;
     private final String retinaHost;
+    private final List<Long> fileIds;
+    private final PixelsReaderOption option;
+    private final Storage storage;
+    private final long tableId;
+    private final String retinaBufferStorageFolder;
+    private final boolean retinaEnabled;
+    private final TypeDescription typeDescription;
+    private final int colNum;
+    private final int typeMode = TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT;
+    private final ExecutorService prefetchExecutor; // Thread pool for I/O and deserialization
+    private final BlockingQueue<VectorizedRowBatch> prefetchQueue; // Queue for completed batches
+    private final AtomicInteger pendingTasks = new AtomicInteger(0); // Counter for submitted but unfinished tasks
+    private final AtomicBoolean initialMemtableSubmitted = new AtomicBoolean(false); // Flag for active memtable
+    private final int maxPrefetchTasks; // Max concurrent tasks
+    private final int prefetchQueueCapacity; // Queue capacity
+    private final boolean shouldReadHiddenColumn;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final List<RetinaProto.VisibilityBitmap> visibilityBitmap;
+    private final List<PixelsProto.Type> includedColumnTypes;
     /**
      * Columns included by reader option; if included, set true
      */
@@ -66,48 +87,16 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
      * but they are all the index of the columns in the file schema.
      */
     private int[] targetColumns;
-
-    private final List<Long> fileIds;
     private int fileIdIndex = 0;
-    private final PixelsReaderOption option;
-    private final Storage storage;
-
-    private final long tableId;
-    private final String retinaBufferStorageFolder;
-    private final boolean retinaEnabled;
-
-    private final TypeDescription typeDescription;
-    private final int colNum;
     private int includedColumnNum = 0;
     private long readTimeNanos = 0L;
     private boolean checkValid = false;
     private boolean activeMemtableDataEverRead = false;
     private boolean everRead;
     private boolean endOfFile = false;
-    private final int typeMode = TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT;
-    private static final Long POLL_INTERVAL_MILLS = 200L;
-
-    private final ExecutorService prefetchExecutor; // Thread pool for I/O and deserialization
-    private final BlockingQueue<VectorizedRowBatch> prefetchQueue; // Queue for completed batches
-    private final AtomicInteger pendingTasks = new AtomicInteger(0); // Counter for submitted but unfinished tasks
-    private final AtomicBoolean initialMemtableSubmitted = new AtomicBoolean(false); // Flag for active memtable
-    private final int maxPrefetchTasks; // Max concurrent tasks
-    private final int prefetchQueueCapacity; // Queue capacity
-    private static final int DEFAULT_QUEUE_CAPACITY = 16;
-
-    private final boolean shouldReadHiddenColumn;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private final List<RetinaProto.VisibilityBitmap> visibilityBitmap;
     private TypeDescription resultSchema = null;
-    private final List<PixelsProto.Type> includedColumnTypes;
     private long dataReadBytes = 0L;
     private long dataReadRow = 0L;
-
-    private static boolean checkBit(RetinaProto.VisibilityBitmap bitmap, int k)
-    {
-        long bitmap_ = bitmap.getBitmap(k / 64);
-        return (bitmap_ & (1L << (k % 64))) != 0;
-    }
 
     public PixelsRecordReaderBufferImpl(PixelsReaderOption option,
                                         String retinaHost,
@@ -138,7 +127,8 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         this.maxPrefetchTasks = Integer.parseInt(configFactory.getProperty("retina.reader.prefetch.threads"));
         this.prefetchQueueCapacity = DEFAULT_QUEUE_CAPACITY;
 
-        this.prefetchExecutor = Executors.newFixedThreadPool(maxPrefetchTasks, r -> {
+        this.prefetchExecutor = Executors.newFixedThreadPool(maxPrefetchTasks, r ->
+        {
             Thread t = Executors.defaultThreadFactory().newThread(r);
             t.setName("Pixels-Buffer-Reader-Prefetch");
             t.setDaemon(true);
@@ -148,20 +138,31 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 
         checkBeforeRead();
     }
+
+    private static boolean checkBit(RetinaProto.VisibilityBitmap bitmap, int k)
+    {
+        long bitmap_ = bitmap.getBitmap(k / 64);
+        return (bitmap_ & (1L << (k % 64))) != 0;
+    }
+
     private void startPrefetching()
     {
         // Submit Active Memtable Task (executed only once)
         if (activeMemtableData != null && activeMemtableData.length != 0 && initialMemtableSubmitted.compareAndSet(false, true))
         {
             pendingTasks.incrementAndGet();
-            prefetchExecutor.submit(() -> {
-                try {
+            prefetchExecutor.submit(() ->
+            {
+                try
+                {
                     ByteBuffer buffer = ByteBuffer.wrap(activeMemtableData);
                     VectorizedRowBatch batch = VectorizedRowBatch.deserialize(buffer);
                     prefetchQueue.put(batch);
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     LOGGER.error("Failed to deserialize active memtable data", e);
-                } finally {
+                } finally
+                {
                     pendingTasks.decrementAndGet();
                 }
             });
@@ -170,13 +171,18 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         // Submit File ID Tasks (while under max concurrency and not EOF)
         // This task will continue to run in the background, submitting more tasks
         // as the pendingTasks count drops.
-        prefetchExecutor.submit(() -> {
-            while (fileIdIndex < fileIds.size()) {
-                if (pendingTasks.get() >= maxPrefetchTasks) {
+        prefetchExecutor.submit(() ->
+        {
+            while (fileIdIndex < fileIds.size())
+            {
+                if (pendingTasks.get() >= maxPrefetchTasks)
+                {
                     // Backpressure: Wait if the thread pool is full
-                    try {
+                    try
+                    {
                         Thread.sleep(POLL_INTERVAL_MILLS);
-                    } catch (InterruptedException e) {
+                    } catch (InterruptedException e)
+                    {
                         Thread.currentThread().interrupt();
                         break;
                     }
@@ -187,9 +193,11 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
                 final int currentIndex = fileIdIndex++;
                 final long fileId = fileIds.get(currentIndex);
 
-                prefetchExecutor.submit(() -> {
+                prefetchExecutor.submit(() ->
+                {
                     ByteBuffer buffer = null;
-                    try {
+                    try
+                    {
                         // I/O Blocking Operation
                         String path = getRetinaBufferStoragePathFromId(fileId);
                         buffer = getMemtableDataFromStorage(path);
@@ -199,15 +207,18 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 
                         // Put result into the queue (blocks if queue is full)
                         prefetchQueue.put(batch);
-                    } catch (Exception e) {
+                    } catch (Exception e)
+                    {
                         LOGGER.error("Failed to prefetch and deserialize file ID: " + fileId, e);
-                    } finally {
+                    } finally
+                    {
                         pendingTasks.decrementAndGet();
                     }
                 });
             }
         });
     }
+
     private void checkBeforeRead() throws IOException
     {
         // filter included columns
@@ -274,7 +285,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
      */
     private boolean read() throws IOException
     {
-        if(!everRead)
+        if (!everRead)
         {
             startPrefetching();
             everRead = true;
@@ -451,8 +462,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
             try
             {
                 Thread.sleep(POLL_INTERVAL_MILLS);
-            }
-            catch (InterruptedException e)
+            } catch (InterruptedException e)
             {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while waiting for file existence: " + path, e);
