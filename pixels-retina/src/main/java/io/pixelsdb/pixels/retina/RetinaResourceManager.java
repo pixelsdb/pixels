@@ -42,10 +42,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -53,7 +50,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Use the singleton pattern to manage data resources in the retina service.
@@ -70,8 +66,8 @@ public class RetinaResourceManager
     private final ScheduledExecutorService gcExecutor;
 
     // Checkpoint related fields
-    private final Map<Long, Path> offloadedCheckpoints;
-    private final Path checkpointDir;
+    private final Map<Long, String> offloadedCheckpoints;
+    private final String checkpointDir;
     private long latestGcTimestamp = -1;
 
     private final Set<Long> offloadedTransIds; // identity routing whitelist
@@ -104,7 +100,7 @@ public class RetinaResourceManager
         this.offloadedCheckpoints = new ConcurrentHashMap<>();
         this.offloadedTransIds = ConcurrentHashMap.newKeySet();
         this.checkpointRefCounts = new ConcurrentHashMap<>();
-        this.checkpointDir = Paths.get(ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir"));
+        this.checkpointDir = ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir");
         this.recoveryCache = new ConcurrentHashMap<>();
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -159,27 +155,28 @@ public class RetinaResourceManager
     {
         try
         {
-            if (!Files.exists(checkpointDir))
+            Storage storage = StorageFactory.Instance().getStorage(checkpointDir);
+            if (!storage.exists(checkpointDir))
             {
-                Files.createDirectories(checkpointDir);
+                storage.mkdirs(checkpointDir);
                 return;
             }
-            List<Path> allFiles;
-            try (Stream<Path> stream = Files.list(checkpointDir))
-            {
-                allFiles = stream.filter(p -> p.toString().endsWith(".bin")).collect(Collectors.toList());
-            }
+
+            List<String> allFiles = storage.listPaths(checkpointDir);
+            // filter only .bin files
+            allFiles = allFiles.stream().filter(p -> p.endsWith(".bin")).collect(Collectors.toList());
 
             List<Long> gcTimestamps = new ArrayList<>();
-            for (Path path : allFiles)
+            for (String path : allFiles)
             {
-                String filename = path.getFileName().toString();
+                // use Paths.get().getFileName() to extract filename from path string
+                String filename = Paths.get(path).getFileName().toString();
                 if (filename.startsWith("vis_offload_"))
                 {
                     // delete offload checkpoint files when restarting
                     try
                     {
-                        Files.deleteIfExists(path);
+                        storage.delete(path, false);
                     } catch (IOException e)
                     {
                         logger.error("Failed to delete checkpoint file {}", path, e);
@@ -191,7 +188,7 @@ public class RetinaResourceManager
                         gcTimestamps.add(Long.parseLong(filename.replace("vis_gc_", "").replace(".bin", "")));
                     } catch (Exception e)
                     {
-                        logger.error("Failed to delete checkpoint file {}", path, e);
+                        logger.error("Failed to parse checkpoint timestamp from file {}", path, e);
                     }
                 }
             }
@@ -223,26 +220,32 @@ public class RetinaResourceManager
     private void loadCheckpointToCache(long timestamp)
     {
         String fileName = "vis_gc_" + timestamp + ".bin";
-        Path path = checkpointDir.resolve(fileName);
-        if (!Files.exists(path))
-        {
-            return;
-        }
+        // construct path. Storage expects '/' separator usually, but let's be safe
+        String path = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
 
-        try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(path))))
+        try
         {
-            int rgCount = in.readInt();
-            for (int i = 0; i < rgCount; i++)
+            Storage storage = StorageFactory.Instance().getStorage(path);
+            if (!storage.exists(path))
             {
-                long fileId = in.readLong();
-                int rgId = in.readInt();
-                int len = in.readInt();
-                long[] bitmap = new long[len];
-                for (int j = 0; j < len; j++)
+                return;
+            }
+
+            try (DataInputStream in = storage.open(path))
+            {
+                int rgCount = in.readInt();
+                for (int i = 0; i < rgCount; i++)
                 {
-                    bitmap[j] = in.readLong();
+                    long fileId = in.readLong();
+                    int rgId = in.readInt();
+                    int len = in.readInt();
+                    long[] bitmap = new long[len];
+                    for (int j = 0; j < len; j++)
+                    {
+                        bitmap[j] = in.readLong();
+                    }
+                    recoveryCache.put(fileId + "_" + rgId, new RecoveredState(timestamp, bitmap));
                 }
-                recoveryCache.put(fileId + "_" + rgId, new RecoveredState(timestamp, bitmap));
             }
         } catch (IOException e)
         {
@@ -407,47 +410,35 @@ public class RetinaResourceManager
     {
         String prefix = (type == CheckpointType.GC) ? "vis_gc_" : "vis_offload_";
         String fileName = prefix + timestamp + ".bin";
-        Path filePath = checkpointDir.resolve(fileName);
-        Path tempPath = checkpointDir.resolve(fileName + ".tmp");
-
-        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(tempPath))))
-        {
-            int rgCount = this.rgVisibilityMap.size();
-            out.writeInt(rgCount);
-            for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
-            {
-                String[] parts = entry.getKey().split("_");
-                long fileId = Long.parseLong(parts[0]);
-                int rgId = Integer.parseInt(parts[1]);
-                long[] bitmap = entry.getValue().getVisibilityBitmap(timestamp);
-
-                out.writeLong(fileId);
-                out.writeInt(rgId);
-                out.writeInt(bitmap.length);
-                for (long l : bitmap)
-                {
-                    out.writeLong(l);
-                }
-            }
-            out.flush();
-        } catch (IOException e)
-        {
-            try
-            {
-                Files.deleteIfExists(tempPath);
-            } catch (IOException ignored)
-            {
-            }
-            throw new RetinaException("Failed to write checkpoint file", e);
-        }
+        String filePath = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
 
         try
         {
-            StandardCopyOption[] options = new StandardCopyOption[]{
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING
-            };
-            Files.move(tempPath, filePath, options);
+            Storage storage = StorageFactory.Instance().getStorage(filePath);
+            // Write directly to the final file as atomic move is not supported by all storages (e.g. S3).
+            // Object stores typically guarantee atomicity of the put operation.
+            try (DataOutputStream out = storage.create(filePath, true, 4096))
+            {
+                int rgCount = this.rgVisibilityMap.size();
+                out.writeInt(rgCount);
+                for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
+                {
+                    String[] parts = entry.getKey().split("_");
+                    long fileId = Long.parseLong(parts[0]);
+                    int rgId = Integer.parseInt(parts[1]);
+                    long[] bitmap = entry.getValue().getVisibilityBitmap(timestamp);
+
+                    out.writeLong(fileId);
+                    out.writeInt(rgId);
+                    out.writeInt(bitmap.length);
+                    for (long l : bitmap)
+                    {
+                        out.writeLong(l);
+                    }
+                }
+                out.flush();
+            }
+
             if (type == CheckpointType.OFFLOAD)
             {
                 offloadedCheckpoints.put(timestamp, filePath);
@@ -462,40 +453,56 @@ public class RetinaResourceManager
             }
         } catch (IOException e)
         {
+            // Try to cleanup the potentially corrupted or partial file
+            try
+            {
+                StorageFactory.Instance().getStorage(filePath).delete(filePath, false);
+            } catch (IOException ignored)
+            {
+            }
             throw new RetinaException("Failed to commit checkpoint file", e);
         }
     }
 
     private long[] loadBitmapFromDisk(long timestamp, long targetFileId, int targetRgId) throws RetinaException
     {
-        Path path = offloadedCheckpoints.get(timestamp);
-        if (path == null || !Files.exists(path))
+        String path = offloadedCheckpoints.get(timestamp);
+        if (path == null)
         {
             throw new RetinaException("Checkpoint missing: " + timestamp);
         }
 
-        try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(path))))
+        try
         {
-            int rgCount = in.readInt();
-            for (int i = 0; i < rgCount; i++)
+            Storage storage = StorageFactory.Instance().getStorage(path);
+            if (!storage.exists(path))
             {
-                long fileId = in.readLong();
-                int rgId = in.readInt();
-                int len = in.readInt();
-                if (fileId == targetFileId && rgId == targetRgId)
+                 throw new RetinaException("Checkpoint file missing: " + path);
+            }
+
+            try (DataInputStream in = storage.open(path))
+            {
+                int rgCount = in.readInt();
+                for (int i = 0; i < rgCount; i++)
                 {
-                    long[] bitmap = new long[len];
-                    for (int j = 0; j < len; j++)
+                    long fileId = in.readLong();
+                    int rgId = in.readInt();
+                    int len = in.readInt();
+                    if (fileId == targetFileId && rgId == targetRgId)
                     {
-                        bitmap[j] = in.readLong();
-                    }
-                    return bitmap;
-                } else
-                {
-                    int skipped = in.skipBytes(len * 8);
-                    if (skipped != len * 8)
+                        long[] bitmap = new long[len];
+                        for (int j = 0; j < len; j++)
+                        {
+                            bitmap[j] = in.readLong();
+                        }
+                        return bitmap;
+                    } else
                     {
-                        throw new IOException("Unexpected EOF");
+                        int skipped = in.skipBytes(len * 8);
+                        if (skipped != len * 8)
+                        {
+                            throw new IOException("Unexpected EOF");
+                        }
                     }
                 }
             }
@@ -509,9 +516,12 @@ public class RetinaResourceManager
     private void removeCheckpointFile(long timestamp, CheckpointType type)
     {
         String prefix = (type == CheckpointType.GC) ? "vis_gc_" : "vis_offload_";
+        String fileName = prefix + timestamp + ".bin";
+        String path = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
+
         try
         {
-            Files.deleteIfExists(checkpointDir.resolve(prefix + timestamp + ".bin"));
+            StorageFactory.Instance().getStorage(path).delete(path, false);
         } catch (IOException e)
         {
             logger.warn("Failed to delete checkpoint file", e);
