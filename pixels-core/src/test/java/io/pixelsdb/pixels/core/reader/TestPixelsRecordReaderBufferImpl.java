@@ -48,9 +48,9 @@ public class TestPixelsRecordReaderBufferImpl
     public void testReadBatch() throws RetinaException, IOException, TransException, MetadataException
     {
 
-        Storage storage = StorageFactory.Instance().getStorage("minio");
+        Storage storage = StorageFactory.Instance().getStorage("s3");
         String schemaName = "pixels_bench_sf10x";
-        String tableName = "checking";
+        String tableName = "checkingaccount";
 
         MetadataService metadataService = MetadataService.Instance();
         List<Column> columns = metadataService.getColumns(schemaName, tableName, false);
@@ -95,7 +95,11 @@ public class TestPixelsRecordReaderBufferImpl
         );
 
 
-        int exceptedBatchNum = superVersion.getIdsList().size() + 1;
+        int exceptedBatchNum = superVersion.getIdsList().size();
+        if(activeMemtableData.length > 0)
+        {
+            ++exceptedBatchNum;
+        }
         int readBatchNum = 0;
         while(true)
         {
