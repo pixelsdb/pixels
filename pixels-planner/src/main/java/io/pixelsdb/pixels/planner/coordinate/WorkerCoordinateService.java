@@ -170,7 +170,7 @@ public class WorkerCoordinateService
     }
 
     /**
-     * During the lifetime of a cloud function worker, it must extend its lease before the lease is expired.
+     * During the lifetime of a cloud function worker, it must extend its lease before the lease has expired.
      * @param workerId the id of this worker
      * @return the new start time in milliseconds since the Unix epoch of the extended lease
      * @throws WorkerCoordinateException if failed to extend the lease, in this case the worker must terminate itself

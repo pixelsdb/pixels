@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.transaction;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -209,15 +210,15 @@ public class TransContextManager
     /**
      * Try to extend the lease of the transaction if it is not expired.
      * @param transId the trans id
-     * @param currentTimeMs the current time in micro seconds
-     * @return true if the lease of the transaction is readonly or extended successfully;
-     * false if the transaction does not exist or has expired
+     * @return the new lease start time if the lease of the transaction extended successfully,
+     * 0 if the transaction is readonly, -1 if the transaction has expired, and -2 if the transaction does not exist
      */
-    public boolean extendTransLease(long transId, long currentTimeMs)
+    public long extendTransLease(long transId)
     {
         this.contextLock.readLock().lock();
         try
         {
+            long currentTimeMs = System.currentTimeMillis();
             TransContext context = this.transIdToContext.get(transId);
             if (context != null)
             {
@@ -226,13 +227,14 @@ public class TransContextManager
                     Lease lease = context.getLease();
                     if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
                     {
-                        return false;
+                        return -1L;
                     }
                     lease.updateStartMs(currentTimeMs);
+                    return currentTimeMs;
                 }
-                return true;
+                return 0L;
             }
-            return false;
+            return -2L;
         }
         finally
         {
@@ -243,19 +245,19 @@ public class TransContextManager
     /**
      * Try to extend the lease of the transactions if they are not expired.
      * @param transIds the trans ids
-     * @param currentTimeMs the current time in micro seconds
-     * @return for each transaction, true if the lease of the transaction is readonly or extended successfully;
-     * false if the transaction does not exist or has expired
+     * @param success for each transaction, true if the lease of the transaction is readonly or extended successfully;
+     * false if the transaction has expired
+     * @return the new lease start time, or negative value if there are other errors except lease expire
      */
-    public List<Boolean> extendTransLeaseBatch(List<Long> transIds, long currentTimeMs)
+    public long extendTransLeaseBatch(List<Long> transIds, List<Boolean> success)
     {
         this.contextLock.readLock().lock();
         try
         {
-            List<Boolean> res = new ArrayList<>(transIds.size());
-            for (int i = 0; i < transIds.size(); i++)
+            long currentTimeMs = System.currentTimeMillis();
+            boolean allSuccess = true;
+            for (long transId : transIds)
             {
-                long transId = transIds.get(i);
                 TransContext context = this.transIdToContext.get(transId);
                 if (context != null)
                 {
@@ -264,19 +266,55 @@ public class TransContextManager
                         Lease lease = context.getLease();
                         if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
                         {
-                            res.add(false);
+                            success.add(false);
                             continue;
                         }
                         lease.updateStartMs(currentTimeMs);
                     }
-                    res.add(true);
-                }
-                else
+                    success.add(true);
+                } else
                 {
-                    res.add(false);
+                    success.add(false);
+                    allSuccess = false;
                 }
             }
-            return res;
+            if (allSuccess)
+            {
+                return currentTimeMs;
+            }
+            else
+            {
+                return -2L;
+            }
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * @return the ids of the transactions with lease expired
+     */
+    public List<Long> getExpiredTransIds()
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            long currentTimeMs = System.currentTimeMillis();
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            for (TransContext context : this.transIdToContext.values())
+            {
+                if (!context.isReadOnly() &&
+                        context.getStatus() != TransProto.TransStatus.COMMIT &&
+                        context.getStatus() != TransProto.TransStatus.ROLLBACK &&
+                        context.getLease().hasExpired(currentTimeMs, Lease.Role.Assigner))
+                {
+                    // the transaction is non-readonly, yet not terminated, and has expired
+                    builder.add(context.getTransId());
+                }
+            }
+            return builder.build();
         }
         finally
         {
@@ -301,9 +339,9 @@ public class TransContextManager
                 if (status == TransProto.TransStatus.COMMIT &&
                         context.getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Assigner))
                 {
-                    // Issue #1163: stop committing and rollback the transaction if its lease is expired
+                    // Issue #1163: stop committing and rollback the transaction if its lease has expired
                     context.setStatus(TransProto.TransStatus.ROLLBACK);
-                    log.error("failed to commit transaction id {} as its lease is expired", transId);
+                    log.error("failed to commit transaction id {} as its lease has expired", transId);
                     res = false;
                 }
                 else

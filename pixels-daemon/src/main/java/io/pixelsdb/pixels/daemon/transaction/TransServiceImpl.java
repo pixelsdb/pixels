@@ -34,6 +34,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -74,6 +75,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     private static final AtomicLong highWatermark;
 
     private static final ScheduledExecutorService watermarksCheckpoint;
+    private static final ScheduledExecutorService leaseCheckAndCleanup;
 
     static
     {
@@ -101,11 +103,25 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 highWatermark = new AtomicLong(Long.parseLong(highWatermarkKv.getValue().toString(StandardCharsets.UTF_8)));
             }
             watermarksCheckpoint = Executors.newSingleThreadScheduledExecutor();
-            int period = Constants.TRANS_WATERMARKS_CHECKPOINT_PERIOD_SEC;
+            int watermarkInterval = Constants.TRANS_WATERMARKS_CHECKPOINT_INTERVAL_SEC;
             watermarksCheckpoint.scheduleAtFixedRate(() -> {
                 EtcdUtil.Instance().putKeyValue(Constants.TRANS_LOW_WATERMARK_KEY, Long.toString(lowWatermark.get()));
                 EtcdUtil.Instance().putKeyValue(Constants.TRANS_HIGH_WATERMARK_KEY, Long.toString(highWatermark.get()));
-            }, period, period, TimeUnit.SECONDS);
+            }, watermarkInterval, watermarkInterval, TimeUnit.SECONDS);
+
+            int leaseCheckInterval = Constants.TRANS_LEASE_CHECK_INTERVAL_SEC;
+            leaseCheckAndCleanup = Executors.newSingleThreadScheduledExecutor();
+            leaseCheckAndCleanup.scheduleAtFixedRate(() -> {
+                List<Long> expiredTransIds = TransContextManager.Instance().getExpiredTransIds();
+                for (long expiredTransId : expiredTransIds)
+                {
+                    pushWatermarks(false);
+                    boolean success = TransContextManager.Instance().setTransRollback(expiredTransId);
+                    logger.debug("transaction {} has been rolled back successfully ({}) due to lease expire",
+                            expiredTransId, success);
+                }
+            }, leaseCheckInterval, leaseCheckInterval, TimeUnit.SECONDS);
+
         } catch (EtcdException e)
         {
             logger.error("failed to create persistent auto-increment ids for transaction service", e);
@@ -312,7 +328,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 {
                     error = ErrorCode.TRANS_LEASE_EXPIRED;
                 }
-                // rollback the transaction no mater it is expired or not
+                // rollback the transaction no mater it has expired or not
                 boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
                 if (!success)
                 {
@@ -337,14 +353,24 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                                  StreamObserver<TransProto.ExtendTransLeaseResponse> responseObserver)
     {
         int error = ErrorCode.SUCCESS;
-        long currentTimeMs = -1;
+        long newLeaseStartMs = -1;
         if (TransContextManager.Instance().isTransExist(request.getTransId()))
         {
-            currentTimeMs = System.currentTimeMillis();
-            boolean success = TransContextManager.Instance().extendTransLease(request.getTransId(), currentTimeMs);
-            if (!success)
+            newLeaseStartMs = TransContextManager.Instance().extendTransLease(request.getTransId());
+            if (newLeaseStartMs < 0)
             {
-                error = ErrorCode.TRANS_EXTEND_LEASE_FAILED;
+                if (newLeaseStartMs == -1L)
+                {
+                    error = ErrorCode.TRANS_LEASE_EXPIRED;
+                }
+                else if (newLeaseStartMs == -2L)
+                {
+                    error = ErrorCode.TRANS_ID_NOT_EXIST;
+                }
+                else
+                {
+                    error = ErrorCode.TRANS_EXTEND_LEASE_FAILED;
+                }
             }
         }
         else
@@ -354,7 +380,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
 
         TransProto.ExtendTransLeaseResponse response = TransProto.ExtendTransLeaseResponse.newBuilder()
-                .setErrorCode(error).setNewLeaseStartMs(currentTimeMs).build();
+                .setErrorCode(error).setNewLeaseStartMs(newLeaseStartMs).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -377,23 +403,23 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 
         final int numTrans = request.getTransIdsCount();
         int errorCode = ErrorCode.SUCCESS;
-        long currentTimeMs = System.currentTimeMillis();
-        List<Boolean> success = TransContextManager.Instance().extendTransLeaseBatch(request.getTransIdsList(), currentTimeMs);
-        if (success == null || numTrans != success.size())
+        List<Boolean> success = new ArrayList<>(numTrans);
+        long newLeaseStartMs = TransContextManager.Instance().extendTransLeaseBatch(request.getTransIdsList(), success);
+        if (numTrans != success.size())
         {
             errorCode = ErrorCode.TRANS_BATCH_EXTEND_LEASE_FAILED;
         }
         else
         {
             responseBuilder.addAllSuccess(success);
-            responseBuilder.setNewLeaseStartMs(currentTimeMs);
+            responseBuilder.setNewLeaseStartMs(newLeaseStartMs);
         }
         responseBuilder.setErrorCode(errorCode);
         responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();
     }
 
-    private void pushWatermarks(boolean readOnly)
+    private static void pushWatermarks(boolean readOnly)
     {
         long timestamp = TransContextManager.Instance().getMinRunningTransTimestamp(readOnly);
         if (readOnly)

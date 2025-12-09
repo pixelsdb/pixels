@@ -77,7 +77,7 @@ public class Lease
      * {@link #expiring(long, Role)} to check if the lease is likely to be expiring.
      * @param currentTimeMs the current time in microseconds
      * @param role the role of the caller
-     * @return for lease assigner, true if the lease is expired;
+     * @return for lease assigner, true if the lease has expired;
      * for leaseholder, true if the lease is certain to be expired
      * @throws InvalidArgumentException if the role is not {@link Role#Holder} or {@link Role#Assigner}
      */

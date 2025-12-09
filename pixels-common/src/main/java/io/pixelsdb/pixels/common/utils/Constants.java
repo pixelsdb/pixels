@@ -67,11 +67,15 @@ public final class Constants
     public static final String TRANS_CONTEXT_SCAN_BYTES_KEY = "trans_scan_bytes";
     public static final String TRANS_HIGH_WATERMARK_KEY = "trans_high_watermark";
     public static final String TRANS_LOW_WATERMARK_KEY = "trans_low_watermark";
-    public static final int TRANS_WATERMARKS_CHECKPOINT_PERIOD_SEC = 10;
+    public static final int TRANS_WATERMARKS_CHECKPOINT_INTERVAL_SEC = 10;
     /**
      * Must be larger than ({@link #LEASE_NETWORK_LATENCY_MS} + {@link #LEASE_TIME_SKEW_MS})/{@link #LEASE_EXPIRING_THRESHOLD}.
      */
-    public static final long TRANS_LEASE_PERIOD_MS = 30000L;
+    public static final int TRANS_LEASE_PERIOD_MS = 30000;
+    /**
+     * The interval that transaction server checks if the transactions' lease
+     */
+    public static final int TRANS_LEASE_CHECK_INTERVAL_SEC = 30;
 
     /**
      * The time in seconds that a relaxed query can be postponed for execution.
@@ -96,8 +100,8 @@ public final class Constants
 
     public static final String LOAD_DEFAULT_RETINA_PREFIX = "default_retina_";
 
-    public static final long LEASE_TIME_SKEW_MS = 500;
-    public static final long LEASE_NETWORK_LATENCY_MS = 500;
+    public static final int LEASE_TIME_SKEW_MS = 500;
+    public static final int LEASE_NETWORK_LATENCY_MS = 500;
     /**
      * The fraction of lease period upon which the lease is considered expiring.
      * E.g., the lease period is 1000ms, a threshold 0.5 means if the remaining time is less than 1000*(1-0.5) ms,
