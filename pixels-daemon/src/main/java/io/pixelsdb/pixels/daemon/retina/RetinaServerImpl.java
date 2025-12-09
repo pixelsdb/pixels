@@ -640,6 +640,56 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
+    @Override
+    public void registerOffload(RetinaProto.RegisterOffloadRequest request,
+                                StreamObserver<RetinaProto.RegisterOffloadResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            this.retinaResourceManager.registerOffload(request.getTransId(), request.getTimestamp());
+            responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } catch (RetinaException e)
+        {
+            logger.error("registerOffload failed for transId={}, timestamp={}",
+                    request.getTransId(), request.getTimestamp(), e);
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } finally
+        {
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void unregisterOffload(RetinaProto.UnregisterOffloadRequest request,
+                                  StreamObserver<RetinaProto.UnregisterOffloadResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            this.retinaResourceManager.unregisterOffload(request.getTransId(), request.getTimestamp());
+            responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } catch (Exception e)
+        {
+            logger.error("unregisterOffload failed for transId={}, timestamp={}",
+                    request.getTransId(), request.getTimestamp(), e);
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } finally
+        {
+            responseObserver.onCompleted();
+        }
+    }
+
     /**
      * Check if the order or compact paths from pixels metadata is valid.
      *

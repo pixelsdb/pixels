@@ -109,19 +109,6 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
 
     public TransServiceImpl()
     {
-        /*
-         * Initiate a background monitoring thread to periodically (every 5 minutes)
-         * trigger the detection and offloading process for long-running queries,
-         * thereby ensuring the persistent release of blockages on the Low Watermarks
-         * and guaranteeing the proper functioning of the garbage collection mechanism.
-         */
-        ScheduledExecutorService offloadScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "trans-offload-monitor");
-            t.setDaemon(true);
-            return t;
-        });
-        offloadScheduler.scheduleAtFixedRate(() ->
-                TransContextManager.Instance().offloadLongRunningQueries(), 5, 5, TimeUnit.MINUTES);
     }
 
     @Override
@@ -494,6 +481,35 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 .setErrorCode(ErrorCode.SUCCESS)
                 .setTimestamp(safeTs)
                 .build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void pushWatermark(TransProto.PushWatermarkRequest request,
+                             StreamObserver<TransProto.PushWatermarkResponse> responseObserver)
+    {
+        pushWatermarks(request.getReadOnly());
+        TransProto.PushWatermarkResponse response = TransProto.PushWatermarkResponse.newBuilder()
+                .setErrorCode(ErrorCode.SUCCESS).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void markTransOffloaded(TransProto.MarkTransOffloadedRequest request,
+                                   StreamObserver<TransProto.MarkTransOffloadedResponse> responseObserver)
+    {
+        int error = ErrorCode.SUCCESS;
+        boolean success = TransContextManager.Instance().markTransOffloaded(request.getTransId());
+        if (!success)
+        {
+            logger.error("transaction id {} does not exist or failed to mark as offloaded", request.getTransId());
+            error = ErrorCode.TRANS_ID_NOT_EXIST;
+        }
+        
+        TransProto.MarkTransOffloadedResponse response = TransProto.MarkTransOffloadedResponse.newBuilder()
+                .setErrorCode(error).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
