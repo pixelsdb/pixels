@@ -329,11 +329,20 @@ public class TransService
             throw new TransException("failed to extend lease of transactions, error code=" + response.getErrorCode());
         }
         long newLeaseStartMs = response.getNewLeaseStartMs();
-        for (TransContext transContext : transContexts)
+        List<Boolean> success = response.getSuccessList();
+        if (success.size() != transContexts.size())
         {
-            transContext.getLease().updateStartMs(newLeaseStartMs);
+            throw new TransException("invalid response returned by transaction server");
         }
-        return response.getSuccessList();
+        for (int i = 0; i < transContexts.size(); i++)
+        {
+            if (success.get(i))
+            {
+                TransContext transContext = transContexts.get(i);
+                transContext.getLease().updateStartMs(newLeaseStartMs);
+            }
+        }
+        return success;
     }
 
     public TransContext getTransContext(long transId) throws TransException

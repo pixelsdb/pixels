@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.common.transaction;
 
 import io.pixelsdb.pixels.common.exception.TransException;
+import io.pixelsdb.pixels.common.lease.Lease;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -46,13 +48,19 @@ public class TestTransService
     {
         TransService service = TransService.Instance();
         List<TransContext> contexts = service.beginTransBatch(10, false);
-        Thread.sleep(3000);
+        Thread.sleep(35000);
         List<Long> transIds = new ArrayList<>();
         for (TransContext context : contexts)
         {
             transIds.add(context.getTransId());
         }
-        service.extendTransLeaseBatch(contexts);
+        List<Boolean> res = service.extendTransLeaseBatch(contexts);
+        for (int i = 0; i < res.size(); i++)
+        {
+            Assert.assertTrue(!res.get(i));
+            Assert.assertTrue(contexts.get(i).getLease().expiring(System.currentTimeMillis(), Lease.Role.Holder));
+            Assert.assertTrue(contexts.get(i).getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Holder));
+        }
         service.commitTransBatch(transIds, false);
     }
 }
