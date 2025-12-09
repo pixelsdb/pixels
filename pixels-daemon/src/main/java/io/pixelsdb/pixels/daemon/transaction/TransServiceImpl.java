@@ -353,9 +353,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         int errorCode = ErrorCode.SUCCESS;
         long currentTimeMs = System.currentTimeMillis();
         List<Boolean> success = TransContextManager.Instance().extendTransLeaseBatch(request.getTransIdsList(), currentTimeMs);
-        if (success == null || numTrans == success.size())
+        if (success == null || numTrans != success.size())
         {
-            errorCode = ErrorCode.TRANS_EXTEND_LEASE_FAILED;
+            errorCode = ErrorCode.TRANS_BATCH_EXTEND_LEASE_FAILED;
         }
         else
         {
