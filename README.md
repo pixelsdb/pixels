@@ -1,9 +1,12 @@
 Pixels
 =======
 [![Pixels Daily Build](https://github.com/pixelsdb/pixels/actions/workflows/daily-build.yml/badge.svg)](https://github.com/pixelsdb/pixels/releases/tag/daily-latest)
-![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/pixelsdb/pixels/master)
+![GitHub commits](https://img.shields.io/github/commit-activity/m/pixelsdb/pixels/master)
+![GitHub Issues](https://img.shields.io/github/issues-closed/pixelsdb/pixels)
+![GitHub Pull Requests](https://img.shields.io/github/issues-pr-closed/pixelsdb/pixels)
+[![Visitors](https://api.visitorbadge.io/api/combined?path=https%3A%2F%2Fgithub.com%2Fpixelsdb%2Fpixels&label=visitors&countColor=%23ff8a65&style=flat)](https://visitorbadge.io/status?path=https%3A%2F%2Fgithub.com%2Fpixelsdb%2Fpixels)
 ![GitHub Created At](https://img.shields.io/github/created-at/pixelsdb/pixels)
-![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/pixelsdb/pixels)
+![GitHub code size](https://img.shields.io/github/languages/code-size/pixelsdb/pixels)
 ![GitHub repo size](https://img.shields.io/github/repo-size/pixelsdb/pixels)
 [![GitHub License](https://img.shields.io/github/license/pixelsdb/pixels)](https://github.com/pixelsdb/pixels/blob/master/LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/pixelsdb/pixels)
