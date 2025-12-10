@@ -39,6 +39,7 @@ public class TransContext implements Comparable<TransContext>
     private final boolean readOnly;
     private final AtomicReference<TransProto.TransStatus> status;
     private final Properties properties;
+    private final long startTime;
     private volatile boolean isOffloaded;
 
     public TransContext(long transId, long timestamp, boolean readOnly)
@@ -48,6 +49,7 @@ public class TransContext implements Comparable<TransContext>
         this.readOnly = readOnly;
         this.status = new AtomicReference<>(TransProto.TransStatus.PENDING);
         this.properties = new Properties();
+        this.startTime = System.currentTimeMillis();
         this.isOffloaded = false;
     }
 
@@ -59,7 +61,14 @@ public class TransContext implements Comparable<TransContext>
         this.status = new AtomicReference<>(contextPb.getStatus());
         this.properties = new Properties();
         this.properties.putAll(contextPb.getPropertiesMap());
+        this.startTime = System.currentTimeMillis();
         this.isOffloaded = false;
+    }
+
+
+    public long getStartTime()
+    {
+        return startTime;
     }
 
     public boolean isOffloaded()
