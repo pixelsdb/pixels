@@ -65,7 +65,6 @@ public class TransContext implements Comparable<TransContext>
         this.isOffloaded = false;
     }
 
-
     public long getStartTime()
     {
         return startTime;
