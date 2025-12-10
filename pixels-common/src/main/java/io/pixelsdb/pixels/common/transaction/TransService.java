@@ -434,26 +434,6 @@ public class TransService
     }
 
     /**
-     * Push the watermark for garbage collection. This is called after a long-running query
-     * is offloaded to allow the garbage collection to proceed.
-     * 
-     * @param readOnly true for read-only transactions (low watermark), false for write transactions (high watermark)
-     * @return true on success
-     * @throws TransException if the operation fails
-     */
-    public boolean pushWatermark(boolean readOnly) throws TransException
-    {
-        TransProto.PushWatermarkRequest request = TransProto.PushWatermarkRequest.newBuilder()
-                .setReadOnly(readOnly).build();
-        TransProto.PushWatermarkResponse response = this.stub.pushWatermark(request);
-        if (response.getErrorCode() != ErrorCode.SUCCESS)
-        {
-            throw new TransException("failed to push watermark, error code=" + response.getErrorCode());
-        }
-        return true;
-    }
-
-    /**
      * Mark a transaction as offloaded. This allows the transaction to be skipped when
      * calculating the minimum running transaction timestamp for garbage collection.
      * 

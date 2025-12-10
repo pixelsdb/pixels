@@ -44,7 +44,6 @@ service TransService {
     rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
     rpc DumpTrans (DumpTransRequest) returns (DumpTransResponse);
     rpc GetSafeGcTimestamp(google.protobuf.Empty) returns (GetSafeGcTimestampResponse);
-    rpc PushWatermark (PushWatermarkRequest) returns (PushWatermarkResponse);
     rpc MarkTransOffloaded (MarkTransOffloadedRequest) returns (MarkTransOffloadedResponse);
 }
 

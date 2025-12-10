@@ -301,7 +301,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         responseObserver.onCompleted();
     }
 
-    static void pushWatermarks(boolean readOnly)
+    private void pushWatermarks(boolean readOnly)
     {
         long timestamp = TransContextManager.Instance().getMinRunningTransTimestamp(readOnly);
         if (readOnly)
@@ -486,17 +486,6 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     }
 
     @Override
-    public void pushWatermark(TransProto.PushWatermarkRequest request,
-                             StreamObserver<TransProto.PushWatermarkResponse> responseObserver)
-    {
-        pushWatermarks(request.getReadOnly());
-        TransProto.PushWatermarkResponse response = TransProto.PushWatermarkResponse.newBuilder()
-                .setErrorCode(ErrorCode.SUCCESS).build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
     public void markTransOffloaded(TransProto.MarkTransOffloadedRequest request,
                                    StreamObserver<TransProto.MarkTransOffloadedResponse> responseObserver)
     {
@@ -507,6 +496,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             logger.error("transaction id {} does not exist or failed to mark as offloaded", request.getTransId());
             error = ErrorCode.TRANS_ID_NOT_EXIST;
         }
+
+        // After marking, attempt to push low watermark.
+        pushWatermarks(true);
         
         TransProto.MarkTransOffloadedResponse response = TransProto.MarkTransOffloadedResponse.newBuilder()
                 .setErrorCode(error).build();

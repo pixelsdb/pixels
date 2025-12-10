@@ -70,7 +70,6 @@ public class RetinaResourceManager
     private final String checkpointDir;
     private long latestGcTimestamp = -1;
 
-    private final Set<Long> offloadedTransIds; // identity routing whitelist
     private final Map<Long, AtomicInteger> checkpointRefCounts;
 
     private static class RecoveredState
@@ -98,7 +97,6 @@ public class RetinaResourceManager
         this.rgVisibilityMap = new ConcurrentHashMap<>();
         this.pixelsWriteBufferMap = new ConcurrentHashMap<>();
         this.offloadedCheckpoints = new ConcurrentHashMap<>();
-        this.offloadedTransIds = ConcurrentHashMap.newKeySet();
         this.checkpointRefCounts = new ConcurrentHashMap<>();
         this.checkpointDir = ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir");
         this.recoveryCache = new ConcurrentHashMap<>();
@@ -310,13 +308,13 @@ public class RetinaResourceManager
     public long[] queryVisibility(long fileId, int rgId, long timestamp, long transId) throws RetinaException
     {
         // [Routing Logic] Only read from disk if the transaction is explicitly registered as Offload
-        if (transId != -1 && offloadedTransIds.contains(transId))
+        if (transId != -1)
         {
             if (offloadedCheckpoints.containsKey(timestamp))
             {
                 return loadBitmapFromDisk(timestamp, fileId, rgId);
             }
-            logger.error("Offloaded checkpoint missing for TransID {}, falling back to memory.", transId);
+            throw new RetinaException("Offloaded checkpoint missing for TransID" + transId);
         }
         // otherwise read from memory
         RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
@@ -373,7 +371,6 @@ public class RetinaResourceManager
                     }
                 }
             }
-            offloadedTransIds.add(transId);
             logger.info("Registered offload for TransID: {}, Timestamp: {}", transId, timestamp);
             return;
         }
@@ -381,26 +378,23 @@ public class RetinaResourceManager
 
     public void unregisterOffload(long transId, long timestamp)
     {
-        if (offloadedTransIds.remove(transId))
+        AtomicInteger refCount = checkpointRefCounts.get(timestamp);
+        if (refCount != null)
         {
-            AtomicInteger refCount = checkpointRefCounts.get(timestamp);
-            if (refCount != null)
+            synchronized (refCount)
             {
-                synchronized (refCount)
+                int remaining = refCount.decrementAndGet();
+                if (remaining <= 0)
                 {
-                    int remaining = refCount.decrementAndGet();
-                    if (remaining <= 0)
+                    offloadedCheckpoints.remove(timestamp);
+                    if (refCount.get() > 0)
                     {
-                        offloadedCheckpoints.remove(timestamp);
-                        if (refCount.get() > 0)
-                        {
-                            logger.info("Checkpoint resurrection detected, skipping deletion. TS: {}", timestamp);
-                            return;
-                        }
-                        removeCheckpointFile(timestamp, CheckpointType.OFFLOAD);
-                        checkpointRefCounts.remove(timestamp);
-                        logger.info("Offload checkpoint for timestamp {} removed.", timestamp);
+                        logger.info("Checkpoint resurrection detected, skipping deletion. TS: {}", timestamp);
+                        return;
                     }
+                    removeCheckpointFile(timestamp, CheckpointType.OFFLOAD);
+                    checkpointRefCounts.remove(timestamp);
+                    logger.info("Offload checkpoint for timestamp {} removed.", timestamp);
                 }
             }
         }
