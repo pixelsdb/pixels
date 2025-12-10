@@ -649,13 +649,13 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try
         {
-            this.retinaResourceManager.registerOffload(request.getTransId(), request.getTimestamp());
+            this.retinaResourceManager.registerOffload(request.getTimestamp());
             responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build());
         } catch (RetinaException e)
         {
-            logger.error("registerOffload failed for transId={}, timestamp={}",
-                    request.getTransId(), request.getTimestamp(), e);
+            logger.error("registerOffload failed for timestamp={}",
+                    request.getTimestamp(), e);
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build());
@@ -674,13 +674,13 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try
         {
-            this.retinaResourceManager.unregisterOffload(request.getTransId(), request.getTimestamp());
+            this.retinaResourceManager.unregisterOffload(request.getTimestamp());
             responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build());
         } catch (Exception e)
         {
-            logger.error("unregisterOffload failed for transId={}, timestamp={}",
-                    request.getTransId(), request.getTimestamp(), e);
+            logger.error("unregisterOffload failed for timestamp={}",
+                    request.getTimestamp(), e);
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build());

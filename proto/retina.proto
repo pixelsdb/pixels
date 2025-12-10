@@ -176,8 +176,7 @@ message GetWriteBufferResponse {
 // register offload
 message RegisterOffloadRequest {
     RequestHeader header = 1;
-    int64 transId = 2;
-    uint64 timestamp = 3;
+    uint64 timestamp = 2;
 }
 
 message RegisterOffloadResponse {
@@ -187,8 +186,7 @@ message RegisterOffloadResponse {
 // unregister offload
 message UnregisterOffloadRequest {
     RequestHeader header = 1;
-    int64 transId = 2;
-    uint64 timestamp = 3;
+    uint64 timestamp = 2;
 }
 
 message UnregisterOffloadResponse {

@@ -338,11 +338,10 @@ public class RetinaResourceManager
      * Therefore, even if checkpoints are created under the same timestamp
      * and only one copy is retained, this has virtually no impact on queries.
      *
-     * @param transId
      * @param timestamp
      * @throws RetinaException
      */
-    public void registerOffload(long transId, long timestamp) throws RetinaException
+    public void registerOffload(long timestamp) throws RetinaException
     {
         while (true)
         {
@@ -362,7 +361,7 @@ public class RetinaResourceManager
                     {
                         if (!offloadedCheckpoints.containsKey(timestamp))
                         {
-                            createDiskCheckpoint(timestamp, CheckpointType.OFFLOAD);
+                            createCheckpoint(timestamp, CheckpointType.OFFLOAD);
                         }
                     } catch (Exception e)
                     {
@@ -371,12 +370,12 @@ public class RetinaResourceManager
                     }
                 }
             }
-            logger.info("Registered offload for TransID: {}, Timestamp: {}", transId, timestamp);
+            logger.info("Registered offload for Timestamp: {}", timestamp);
             return;
         }
     }
 
-    public void unregisterOffload(long transId, long timestamp)
+    public void unregisterOffload(long timestamp)
     {
         AtomicInteger refCount = checkpointRefCounts.get(timestamp);
         if (refCount != null)
@@ -400,7 +399,7 @@ public class RetinaResourceManager
         }
     }
 
-    private void createDiskCheckpoint(long timestamp, CheckpointType type) throws RetinaException
+    private void createCheckpoint(long timestamp, CheckpointType type) throws RetinaException
     {
         String prefix = (type == CheckpointType.GC) ? "vis_gc_" : "vis_offload_";
         String fileName = prefix + timestamp + ".bin";
@@ -732,7 +731,7 @@ public class RetinaResourceManager
         try
         {
             // 1. Persist first
-            createDiskCheckpoint(timestamp, CheckpointType.GC);
+            createCheckpoint(timestamp, CheckpointType.GC);
             // 2. Then clean memory
             for (Map.Entry<String, RGVisibility> entry: this.rgVisibilityMap.entrySet())
             {

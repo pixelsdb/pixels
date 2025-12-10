@@ -410,18 +410,16 @@ public class RetinaService
 
     /**
      * Register a long-running query to be offloaded to disk checkpoint.
-     * 
-     * @param transId the transaction id
+     *
      * @param timestamp the transaction timestamp
      * @return true on success
      * @throws RetinaException if the operation fails
      */
-    public boolean registerOffload(long transId, long timestamp) throws RetinaException
+    public boolean registerOffload(long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.RegisterOffloadRequest request = RetinaProto.RegisterOffloadRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setTransId(transId)
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.RegisterOffloadResponse response = this.stub.registerOffload(request);
@@ -439,18 +437,16 @@ public class RetinaService
 
     /**
      * Unregister a long-running query's offload checkpoint when the query completes.
-     * 
-     * @param transId the transaction id
+     *
      * @param timestamp the transaction timestamp
      * @return true on success
      * @throws RetinaException if the operation fails
      */
-    public boolean unregisterOffload(long transId, long timestamp) throws RetinaException
+    public boolean unregisterOffload(long timestamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.UnregisterOffloadRequest request = RetinaProto.UnregisterOffloadRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
-                .setTransId(transId)
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.UnregisterOffloadResponse response = this.stub.unregisterOffload(request);
