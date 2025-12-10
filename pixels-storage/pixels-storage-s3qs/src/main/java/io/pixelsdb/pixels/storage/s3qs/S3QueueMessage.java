@@ -5,6 +5,7 @@ public class S3QueueMessage
     private String objectPath;
     private int WorkerNum;
     private int PartitionNum;
+    private boolean EndWork;
     private String bucketName;
     private long timestamp;
     private String metadata; // 可选：其他元数据
@@ -43,6 +44,15 @@ public class S3QueueMessage
 
     public S3QueueMessage setPartitionNum(int PartitionNum) {
         this.PartitionNum = PartitionNum;
+        return this;
+    }
+
+    public boolean getEndWork() {
+        return this.EndWork;
+    }
+
+    public S3QueueMessage setEndwork(boolean endwork) {
+        this.EndWork = endwork;
         return this;
     }
 

@@ -20,17 +20,24 @@
 package io.pixelsdb.pixels.storage.s3qs;
 
 import io.pixelsdb.pixels.common.physical.ObjectPath;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.storage.s3.AbstractS3;
 import io.pixelsdb.pixels.storage.s3qs.io.S3QSInputStream;
 import io.pixelsdb.pixels.storage.s3qs.io.S3QSOutputStream;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
+import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
+import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
+import software.amazon.awssdk.services.sqs.model.SqsException;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  * {@link S3QS} is to write and read the small intermediate files in data shuffling. It is compatible with S3, hence its
@@ -49,11 +56,20 @@ public final class S3QS extends AbstractS3
 {
     private static final String SchemePrefix = Scheme.s3qs.name() + "://";
 
+    public final HashSet<Integer> producerSet;
+    // maybe can use array to improve
+    private final HashSet<Integer> PartitionSet;
+    private final HashMap<Integer, S3Queue> PartitionMap;
+
+
     private SqsClient sqs;
 
     public S3QS()
     {
         this.connect();
+        this.producerSet = new HashSet<>();
+        this.PartitionSet = new HashSet<>();
+        this.PartitionMap = new HashMap<>();
     }
 
     private synchronized void connect()
@@ -90,10 +106,70 @@ public final class S3QS extends AbstractS3
         return SchemePrefix + path;
     }
 
+    //producers in a shuffle offer their message to s3qs.
+    public PhysicalWriter offer(S3QueueMessage mesg) throws IOException
+    {
+        S3Queue queue = null;
+
+        //if current Partition is new one, create a new queue
+        if(!(this.PartitionSet).contains(mesg.getPartitionNum()))
+        {
+            String queueUrl = "";
+            try {
+                queueUrl = createQueue(sqs,
+                        (String.valueOf(System.currentTimeMillis()))
+                        + "-" + mesg.getPartitionNum()
+                );
+            }catch (SqsException e) {
+                //TODO: if name is duplicated in aws try again later
+                throw new IOException(e);
+            }
+            if(!(queueUrl.isEmpty()))
+            {
+                queue = openQueue(queueUrl);
+                PartitionSet.add(mesg.getPartitionNum());
+                PartitionMap.put(mesg.getPartitionNum(), queue);
+            } else{
+                throw new IOException("create new queue failed.");
+            }
+        }
+        else
+        {
+            queue = PartitionMap.get(mesg.getPartitionNum());
+            if(queue.isClosed()) throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
+        }
+        return queue.offer(mesg);
+    }
+
+    private static String createQueue(SqsClient sqsClient, String queueName) {
+        try {
+            //System.out.println("\nCreate Queue");
+
+            CreateQueueRequest createQueueRequest = CreateQueueRequest.builder()
+                    .queueName(queueName)
+                    .build();
+
+            sqsClient.createQueue(createQueueRequest);
+
+            //System.out.println("\nGet queue url");
+
+            GetQueueUrlResponse getQueueUrlResponse = sqsClient
+                    .getQueueUrl(GetQueueUrlRequest.builder().queueName(queueName).build());
+            return getQueueUrlResponse.queueUrl();
+
+        } catch (SqsException e) {
+            System.err.println(e.awsErrorDetails().errorMessage());
+            System.exit(1);
+        }
+        return "";
+    }
+
     public S3Queue openQueue(String queueUrl)
     {
         return new S3Queue(this, queueUrl);
     }
+
+
 
     @Override
     public DataInputStream open(String path) throws IOException
@@ -149,6 +225,12 @@ public final class S3QS extends AbstractS3
     @Override
     public void close() throws IOException
     {
+        for (S3Queue queue : PartitionMap.values()){
+            queue.close();
+        }
+        this.producerSet.clear();
+        this.PartitionSet.clear();
+        this.PartitionMap.clear();
         if (this.sqs != null)
         {
             this.sqs.close();
@@ -157,6 +239,16 @@ public final class S3QS extends AbstractS3
         {
             s3.close();
         }
+    }
+
+    public void flush() throws IOException
+    {
+        for (S3Queue queue : PartitionMap.values()){
+            queue.close();
+        }
+        this.producerSet.clear();
+        this.PartitionSet.clear();
+        this.PartitionMap.clear();
     }
 
     public SqsClient getSqsClient()

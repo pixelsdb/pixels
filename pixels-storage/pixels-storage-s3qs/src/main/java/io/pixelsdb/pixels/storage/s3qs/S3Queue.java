@@ -73,9 +73,7 @@ public class S3Queue implements Closeable
 
     private final S3QS s3qs;
 
-    private final HashSet<Integer> producerSet;
-
-    private final HashSet<Integer> consumerSet;
+    private final HashSet<Integer>consumerSet;
 
     private final Lock lock = new ReentrantLock();
 
@@ -86,21 +84,21 @@ public class S3Queue implements Closeable
         this.s3qs = s3qs;
         this.queueUrl = queueUrl;
         this.sqsClient = this.s3qs.getSqsClient();
-        this.producerSet = new HashSet<>();
         this.consumerSet = new HashSet<>();
     }
 
     public void addProducer(int workerId)
     {
-        if(!this.producerSet.contains(workerId)){
-            this.producerSet.add(workerId);
+        if(!(this.s3qs.producerSet).contains(workerId)){
+            this.s3qs.producerSet.add(workerId);
         }
     }
 
+    //s3qs is the highest manager of a shuffle, so producerSet is in charge of s3qs.
     public void removeProducer(int workerId)
     {
-        this.producerSet.remove(workerId);
-        if(this.producerSet.isEmpty())
+        this.s3qs.producerSet.remove(workerId);
+        if(this.s3qs.producerSet.isEmpty())
         {
             this.push("");
         }
@@ -108,12 +106,13 @@ public class S3Queue implements Closeable
 
     public void addConsumer(int workerId)
     {
-        if(!this.consumerSet.contains(workerId))
+        if(!(this.consumerSet).contains(workerId))
         {
             this.consumerSet.add(workerId);
         }
     }
 
+    //maybe unnecessary
     public void removeConsumer(int workerId)
     {
         this.consumerSet.remove(workerId);
@@ -123,6 +122,7 @@ public class S3Queue implements Closeable
         }
     }
 
+    //TODO: Implement DLQ to handle bad message.
 
 
     /**
@@ -206,7 +206,8 @@ public class S3Queue implements Closeable
      */
     public PhysicalWriter offer(S3QueueMessage body) throws IOException
     {
-        String objectPath =  getMessageGroup(body);
+        if(endWork(body)) removeProducer(body.getWorkerNum());
+        String objectPath = getObjectPath(body);
         addProducer(body.getWorkerNum());
 
         PhysicalS3QSWriter writer = (PhysicalS3QSWriter) PhysicalWriterUtil
@@ -215,9 +216,14 @@ public class S3Queue implements Closeable
         return writer;
     }
 
-    private String getMessageGroup(S3QueueMessage body) throws IOException
+    private String getObjectPath(S3QueueMessage body) throws IOException
     {
-        return body.getObjectPath()+body.getPartitionNum();
+        return body.getObjectPath()+body.getPartitionNum() + "/"+ String.valueOf(System.currentTimeMillis()) ;
+    }
+
+    private boolean endWork(S3QueueMessage body) throws IOException
+    {
+        return body.getEndWork();
     }
 
 
