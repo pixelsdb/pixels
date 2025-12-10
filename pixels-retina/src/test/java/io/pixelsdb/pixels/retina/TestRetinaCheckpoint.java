@@ -295,9 +295,13 @@ public class TestRetinaCheckpoint
             offloadedField.setAccessible(true);
             ((Map<?, ?>) offloadedField.get(retinaManager)).clear();
 
-            Field transField = RetinaResourceManager.class.getDeclaredField("offloadedTransIds");
-            transField.setAccessible(true);
-            ((Set<?>) transField.get(retinaManager)).clear();
+            Field refCountsField = RetinaResourceManager.class.getDeclaredField("checkpointRefCounts");
+            refCountsField.setAccessible(true);
+            ((Map<?, ?>) refCountsField.get(retinaManager)).clear();
+
+            Field gcTimestampField = RetinaResourceManager.class.getDeclaredField("latestGcTimestamp");
+            gcTimestampField.setAccessible(true);
+            gcTimestampField.setLong(retinaManager, -1L);
 
             Field recoveryCacheField = RetinaResourceManager.class.getDeclaredField("recoveryCache");
             recoveryCacheField.setAccessible(true);
@@ -321,14 +325,6 @@ public class TestRetinaCheckpoint
     private boolean assertFalse(String message, boolean condition)
     {
         return assertTrue(message, !condition);
-    }
-
-    private void assertEquals(String message, int expected, int actual)
-    {
-        if (expected != actual)
-        {
-            throw new AssertionError(message + " expected: " + expected + " actual: " + actual);
-        }
     }
 
     private boolean isBitSet(long[] bitmap, int rowIndex)
