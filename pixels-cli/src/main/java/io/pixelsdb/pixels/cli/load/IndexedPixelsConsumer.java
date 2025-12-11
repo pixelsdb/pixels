@@ -33,6 +33,7 @@
  import io.pixelsdb.pixels.common.physical.StorageFactory;
  import io.pixelsdb.pixels.common.utils.ConfigFactory;
  import io.pixelsdb.pixels.common.utils.DateUtil;
+ import io.pixelsdb.pixels.common.utils.RetinaUtils;
  import io.pixelsdb.pixels.core.PixelsWriter;
  import io.pixelsdb.pixels.core.TypeDescription;
  import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -97,7 +98,7 @@
                  // 1. Calculate Primary Key and Bucket ID
                  ByteString pkByteString = calculatePrimaryKeyBytes(colsInLine);
                  // Assume BucketCache has the necessary method and configuration
-                 int bucketId = BucketCache.getBucketIdFromByteBuffer(pkByteString);
+                 int bucketId = RetinaUtils.getBucketIdFromByteBuffer(pkByteString);
 
                  // 2. Get/Initialize the Writer for this Bucket
                  PerBucketWriter bucketWriter = bucketWriters.computeIfAbsent(bucketId, id ->

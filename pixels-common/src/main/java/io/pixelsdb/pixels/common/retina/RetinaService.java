@@ -407,4 +407,58 @@ public class RetinaService
         }
         return true;
     }
+
+    /**
+     * Register a long-running query to be offloaded to disk checkpoint.
+     *
+     * @param timestamp the transaction timestamp
+     * @return true on success
+     * @throws RetinaException if the operation fails
+     */
+    public boolean registerOffload(long timestamp) throws RetinaException
+    {
+        String token = UUID.randomUUID().toString();
+        RetinaProto.RegisterOffloadRequest request = RetinaProto.RegisterOffloadRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTimestamp(timestamp)
+                .build();
+        RetinaProto.RegisterOffloadResponse response = this.stub.registerOffload(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("Failed to register offload: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("Response token does not match");
+        }
+        return true;
+    }
+
+    /**
+     * Unregister a long-running query's offload checkpoint when the query completes.
+     *
+     * @param timestamp the transaction timestamp
+     * @return true on success
+     * @throws RetinaException if the operation fails
+     */
+    public boolean unregisterOffload(long timestamp) throws RetinaException
+    {
+        String token = UUID.randomUUID().toString();
+        RetinaProto.UnregisterOffloadRequest request = RetinaProto.UnregisterOffloadRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTimestamp(timestamp)
+                .build();
+        RetinaProto.UnregisterOffloadResponse response = this.stub.unregisterOffload(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("Failed to unregister offload: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("Response token does not match");
+        }
+        return true;
+    }
 }

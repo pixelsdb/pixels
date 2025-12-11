@@ -362,6 +362,7 @@ public class TransContextManager
         return false;
     }
 
+
     /**
      * Dump the context of transactions in this manager to a history file and remove terminated transactions. This method
      * blocks {@link #addTransContext(TransContext)}, {@link #setTransCommit(long)}, {@link #setTransRollback(long)},
@@ -435,9 +436,16 @@ public class TransContextManager
         {
             iterator = this.runningWriteTrans.iterator();
         }
-        if (iterator.hasNext())
+        while (iterator.hasNext())
         {
-            return iterator.next().getTimestamp();
+            TransContext ctx = iterator.next();
+
+            // Only skip read-only transactions that have already been offloaded.
+            if (readOnly && ctx.isOffloaded())
+            {
+                continue;
+            }
+            return ctx.getTimestamp();
         }
         return 0;
     }
@@ -504,5 +512,23 @@ public class TransContextManager
         {
             this.contextLock.writeLock().unlock();
         }
+    }
+
+    /**
+     * Mark a transaction as offloaded. This allows the transaction context manager to
+     * skip it when calculating the minimum running transaction timestamp.
+     * 
+     * @param transId the transaction id
+     * @return true if the transaction exists and was marked as offloaded, false otherwise
+     */
+    public boolean markTransOffloaded(long transId)
+    {
+        TransContext context = this.transIdToContext.get(transId);
+        if (context != null)
+        {
+            context.setOffloaded(true);
+            return true;
+        }
+        return false;
     }
 }

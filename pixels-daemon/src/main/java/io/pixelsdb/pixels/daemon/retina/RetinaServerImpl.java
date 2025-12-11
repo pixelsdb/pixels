@@ -64,6 +64,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         this.retinaResourceManager = RetinaResourceManager.Instance();
         try
         {
+            logger.info("Pre-loading checkpoints...");
+            this.retinaResourceManager.recoverCheckpoints();
+
             List<Schema> schemas = this.metadataService.getSchemas();
             for (Schema schema : schemas)
             {
@@ -104,6 +107,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
                 }
             }
+            this.retinaResourceManager.finishRecovery();
         } catch (Exception e)
         {
             logger.error("Error while initializing RetinaServerImpl", e);
@@ -530,6 +534,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             long fileId = request.getFileId();
             int[] rgIds = request.getRgIdsList().stream().mapToInt(Integer::intValue).toArray();
             long timestamp = request.getTimestamp();
+            long transId = request.hasTransId() ? request.getTransId() : -1;
 
             RetinaProto.QueryVisibilityResponse.Builder responseBuilder = RetinaProto.QueryVisibilityResponse
                     .newBuilder()
@@ -537,7 +542,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
             for (int rgId : rgIds)
             {
-                long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp);
+                long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp, transId);
                 RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
                         .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
                         .build();
@@ -631,6 +636,56 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             responseObserver.onNext(RetinaProto.GetWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void registerOffload(RetinaProto.RegisterOffloadRequest request,
+                                StreamObserver<RetinaProto.RegisterOffloadResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            this.retinaResourceManager.registerOffload(request.getTimestamp());
+            responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } catch (RetinaException e)
+        {
+            logger.error("registerOffload failed for timestamp={}",
+                    request.getTimestamp(), e);
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } finally
+        {
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void unregisterOffload(RetinaProto.UnregisterOffloadRequest request,
+                                  StreamObserver<RetinaProto.UnregisterOffloadResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            this.retinaResourceManager.unregisterOffload(request.getTimestamp());
+            responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } catch (Exception e)
+        {
+            logger.error("unregisterOffload failed for timestamp={}",
+                    request.getTimestamp(), e);
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } finally
+        {
             responseObserver.onCompleted();
         }
     }

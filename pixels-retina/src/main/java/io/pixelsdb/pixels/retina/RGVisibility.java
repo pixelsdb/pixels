@@ -68,6 +68,17 @@ public class RGVisibility implements AutoCloseable
         this.nativeHandle = createNativeObject(rgRecordNum);
     }
 
+    public RGVisibility(long rgRecordNum, long timestamp, long[] initialBitmap)
+    {
+        if (initialBitmap == null)
+        {
+            this.nativeHandle = createNativeObject(rgRecordNum);
+        } else
+        {
+            this.nativeHandle = createNativeObjectInitialized(rgRecordNum, timestamp, initialBitmap);
+        }
+    }
+
     @Override
     public void close()
     {
@@ -79,6 +90,7 @@ public class RGVisibility implements AutoCloseable
 
     // native methods
     private native long createNativeObject(long rgRecordNum);
+    private native long createNativeObjectInitialized(long rgRecordNum, long timestamp, long[] bitmap);
     private native void destroyNativeObject(long nativeHandle);
     private native void deleteRecord(int rgRowOffset, long timestamp, long nativeHandle);
     private native long[] getVisibilityBitmap(long timestamp, long nativeHandle);

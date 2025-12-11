@@ -17,6 +17,14 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNative
 
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    createNativeObjectInitialized
+ * Signature: (JJ[J)J
+ */
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNativeObjectInitialized
+  (JNIEnv *, jobject, jlong, jlong, jlongArray);
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    destroyNativeObject
  * Signature: (J)V
  */
@@ -26,7 +34,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_destroyNative
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    deleteRecord
- * Signature: (JJJ)V
+ * Signature: (IJJ)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_deleteRecord
   (JNIEnv *, jobject, jint, jlong, jlong);

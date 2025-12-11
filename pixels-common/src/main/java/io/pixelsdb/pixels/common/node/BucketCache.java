@@ -86,31 +86,6 @@ public class BucketCache
     }
 
     /**
-     * Calculates the bucketId on the hash ring for the input data.
-     * Uses MurmurHash3_32 and the modulo operation to constrain the result to the
-     * discrete range [0, bucketNum - 1].
-     * * @param byteString The input data to be hashed
-     *
-     * @return The calculated bucketId
-     */
-    public static int getBucketIdFromByteBuffer(ByteString byteString)
-    {
-        // Get the singleton instance to access bucketNum
-        BucketCache cacheInstance = getInstance();
-
-        // 1. Calculate the hash using MurmurHash3_32
-        int hash = Hashing.murmur3_32_fixed()
-                .hashBytes(byteString.toByteArray())
-                .asInt();
-
-        // 2. Take the absolute value (MurmurHash3_32 can return negative integers)
-        int absHash = Math.abs(hash);
-
-        // 3. Apply modulo operation to compress the hash value to the range [0, bucketNum - 1]
-        return absHash % cacheInstance.bucketNum;
-    }
-
-    /**
      * Core lookup method: Retrieves the corresponding RetinaNodeInfo for a given bucketId.
      * Uses a cache-aside strategy (lazy loading) to populate the cache upon miss.
      * * @param bucketId The hash bucket ID of the data (range 0 to bucketNum - 1)

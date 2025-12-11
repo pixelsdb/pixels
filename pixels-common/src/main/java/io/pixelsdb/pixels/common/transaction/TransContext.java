@@ -41,6 +41,8 @@ public class TransContext implements Comparable<TransContext>
     private final AtomicReference<TransProto.TransStatus> status;
     private final Properties properties;
     private final Lease lease;
+    private final long startTime;
+    private volatile boolean isOffloaded;
 
     public TransContext(long transId, long timestamp, long leaseStartMs, long leasePeriodMs, boolean readOnly)
     {
@@ -50,6 +52,8 @@ public class TransContext implements Comparable<TransContext>
         this.readOnly = readOnly;
         this.status = new AtomicReference<>(TransProto.TransStatus.PENDING);
         this.properties = new Properties();
+        this.startTime = System.currentTimeMillis();
+        this.isOffloaded = false;
     }
 
     public TransContext(TransProto.TransContext contextPb)
@@ -61,6 +65,23 @@ public class TransContext implements Comparable<TransContext>
         this.properties = new Properties();
         this.properties.putAll(contextPb.getPropertiesMap());
         this.lease = new Lease(contextPb.getLeaseStartMs(), contextPb.getLeasePeriodMs());
+        this.startTime = System.currentTimeMillis();
+        this.isOffloaded = false;
+    }
+
+    public long getStartTime()
+    {
+        return startTime;
+    }
+
+    public boolean isOffloaded()
+    {
+        return isOffloaded;
+    }
+
+    public void setOffloaded(boolean offloaded)
+    {
+        this.isOffloaded = offloaded;
     }
 
     public long getTransId()

@@ -129,7 +129,9 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         }
     }
 
-    public TransServiceImpl() { }
+    public TransServiceImpl()
+    {
+    }
 
     @Override
     public void beginTrans(TransProto.BeginTransRequest request,
@@ -599,6 +601,27 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 .setErrorCode(ErrorCode.SUCCESS)
                 .setTimestamp(safeTs)
                 .build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void markTransOffloaded(TransProto.MarkTransOffloadedRequest request,
+                                   StreamObserver<TransProto.MarkTransOffloadedResponse> responseObserver)
+    {
+        int error = ErrorCode.SUCCESS;
+        boolean success = TransContextManager.Instance().markTransOffloaded(request.getTransId());
+        if (!success)
+        {
+            logger.error("transaction id {} does not exist or failed to mark as offloaded", request.getTransId());
+            error = ErrorCode.TRANS_ID_NOT_EXIST;
+        }
+
+        // After marking, attempt to push low watermark.
+        pushWatermarks(true);
+        
+        TransProto.MarkTransOffloadedResponse response = TransProto.MarkTransOffloadedResponse.newBuilder()
+                .setErrorCode(error).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

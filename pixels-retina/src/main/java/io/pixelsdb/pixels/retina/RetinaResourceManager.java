@@ -25,7 +25,6 @@ import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -38,15 +37,18 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -63,11 +65,41 @@ public class RetinaResourceManager
     // GC related fields
     private final ScheduledExecutorService gcExecutor;
 
+    // Checkpoint related fields
+    private final Map<Long, String> offloadedCheckpoints;
+    private final String checkpointDir;
+    private long latestGcTimestamp = -1;
+
+    private final Map<Long, AtomicInteger> checkpointRefCounts;
+
+    private static class RecoveredState
+    {
+        final long timestamp;
+        final long[] bitmap;
+
+        RecoveredState(long timestamp, long[] bitmap)
+        {
+            this.timestamp = timestamp;
+            this.bitmap = bitmap;
+        }
+    }
+    private final Map<String, RecoveredState> recoveryCache;
+
+    private enum CheckpointType
+    {
+        GC,
+        OFFLOAD
+    }
+
     private RetinaResourceManager()
     {
         this.metadataService = MetadataService.Instance();
         this.rgVisibilityMap = new ConcurrentHashMap<>();
         this.pixelsWriteBufferMap = new ConcurrentHashMap<>();
+        this.offloadedCheckpoints = new ConcurrentHashMap<>();
+        this.checkpointRefCounts = new ConcurrentHashMap<>();
+        this.checkpointDir = ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir");
+        this.recoveryCache = new ConcurrentHashMap<>();
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
                     Thread t = new Thread(r, "retina-gc-thread");
@@ -117,11 +149,131 @@ public class RetinaResourceManager
         return InstanceHolder.instance;
     }
 
+    public void recoverCheckpoints()
+    {
+        try
+        {
+            Storage storage = StorageFactory.Instance().getStorage(checkpointDir);
+            if (!storage.exists(checkpointDir))
+            {
+                storage.mkdirs(checkpointDir);
+                return;
+            }
+
+            List<String> allFiles = storage.listPaths(checkpointDir);
+            // filter only .bin files
+            allFiles = allFiles.stream().filter(p -> p.endsWith(".bin")).collect(Collectors.toList());
+
+            List<Long> gcTimestamps = new ArrayList<>();
+            for (String path : allFiles)
+            {
+                // use Paths.get().getFileName() to extract filename from path string
+                String filename = Paths.get(path).getFileName().toString();
+                if (filename.startsWith("vis_offload_"))
+                {
+                    // delete offload checkpoint files when restarting
+                    try
+                    {
+                        storage.delete(path, false);
+                    } catch (IOException e)
+                    {
+                        logger.error("Failed to delete checkpoint file {}", path, e);
+                    }
+                } else if (filename.startsWith("vis_gc_"))
+                {
+                    try
+                    {
+                        gcTimestamps.add(Long.parseLong(filename.replace("vis_gc_", "").replace(".bin", "")));
+                    } catch (Exception e)
+                    {
+                        logger.error("Failed to parse checkpoint timestamp from file {}", path, e);
+                    }
+                }
+            }
+
+            if (gcTimestamps.isEmpty())
+            {
+                return;
+            }
+
+            Collections.sort(gcTimestamps);
+            long latestTs = gcTimestamps.get(gcTimestamps.size() - 1);
+            this.latestGcTimestamp = latestTs;
+            logger.info("Loading system state from GC checkpoint: {}", latestTs);
+
+            // load to recoveryCache
+            loadCheckpointToCache(latestTs);
+
+            // delete old GC checkpoint files
+            for (int i = 0; i < gcTimestamps.size() - 1; i++)
+            {
+                removeCheckpointFile(gcTimestamps.get(i), CheckpointType.GC);
+            }
+        } catch (IOException e)
+        {
+            logger.error("Failed to recover checkpoints", e);
+        }
+    }
+
+    private void loadCheckpointToCache(long timestamp)
+    {
+        String fileName = "vis_gc_" + timestamp + ".bin";
+        // construct path. Storage expects '/' separator usually, but let's be safe
+        String path = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
+
+        try
+        {
+            Storage storage = StorageFactory.Instance().getStorage(path);
+            if (!storage.exists(path))
+            {
+                return;
+            }
+
+            try (DataInputStream in = storage.open(path))
+            {
+                int rgCount = in.readInt();
+                for (int i = 0; i < rgCount; i++)
+                {
+                    long fileId = in.readLong();
+                    int rgId = in.readInt();
+                    int len = in.readInt();
+                    long[] bitmap = new long[len];
+                    for (int j = 0; j < len; j++)
+                    {
+                        bitmap[j] = in.readLong();
+                    }
+                    recoveryCache.put(fileId + "_" + rgId, new RecoveredState(timestamp, bitmap));
+                }
+            }
+        } catch (IOException e)
+        {
+            logger.error("Failed to read checkpoint file: {}", e);
+        }
+    }
+
     public void addVisibility(long fileId, int rgId, int recordNum)
     {
-        RGVisibility rgVisibility = new RGVisibility(recordNum);
         String rgKey = fileId + "_" + rgId;
+        RecoveredState recoveredState = recoveryCache.remove(rgKey);
+
+        RGVisibility rgVisibility;
+        if (recoveredState != null)
+        {
+            rgVisibility = new RGVisibility(recordNum, recoveredState.timestamp, recoveredState.bitmap);
+        } else
+        {
+            rgVisibility = new RGVisibility(recordNum);
+        }
         rgVisibilityMap.put(rgKey, rgVisibility);
+    }
+
+    public void finishRecovery()
+    {
+        if (!recoveryCache.isEmpty())
+        {
+            logger.info("Dropping {} orphaned entries from recovery cache.", recoveryCache.size());
+            recoveryCache.clear();
+        }
     }
 
     public void addVisibility(String filePath) throws RetinaException
@@ -153,8 +305,18 @@ public class RetinaResourceManager
         }
     }
 
-    public long[] queryVisibility(long fileId, int rgId, long timestamp) throws RetinaException
+    public long[] queryVisibility(long fileId, int rgId, long timestamp, long transId) throws RetinaException
     {
+        // [Routing Logic] Only read from disk if the transaction is explicitly registered as Offload
+        if (transId != -1)
+        {
+            if (offloadedCheckpoints.containsKey(timestamp))
+            {
+                return loadBitmapFromDisk(timestamp, fileId, rgId);
+            }
+            throw new RetinaException("Offloaded checkpoint missing for TransID" + transId);
+        }
+        // otherwise read from memory
         RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
         long[] visibilityBitmap = rgVisibility.getVisibilityBitmap(timestamp);
         if (visibilityBitmap == null)
@@ -162,6 +324,201 @@ public class RetinaResourceManager
             throw new RetinaException(String.format("Failed to get visibility for fileId: %d, rgId: %d", fileId, rgId));
         }
         return visibilityBitmap;
+    }
+
+    public long[] queryVisibility(long fileId, int rgId, long timestamp) throws RetinaException
+    {
+        return queryVisibility(fileId, rgId, timestamp, -1);
+    }
+
+    /**
+     * Long-running queries register an "Offload" status and ensure that
+     * the required visibility checkpoint is correctly created and manages.
+     * For long-running transactions, newly written data is not required.
+     * Therefore, even if checkpoints are created under the same timestamp
+     * and only one copy is retained, this has virtually no impact on queries.
+     *
+     * @param timestamp
+     * @throws RetinaException
+     */
+    public void registerOffload(long timestamp) throws RetinaException
+    {
+        while (true)
+        {
+            AtomicInteger refCount = checkpointRefCounts.computeIfAbsent(timestamp, k -> new AtomicInteger(0));
+
+            synchronized (refCount)
+            {
+                if (checkpointRefCounts.get(timestamp) != refCount)
+                {
+                    continue;
+                }
+
+                int currentRef = refCount.incrementAndGet();
+                if (currentRef == 1)
+                {
+                    try
+                    {
+                        if (!offloadedCheckpoints.containsKey(timestamp))
+                        {
+                            createCheckpoint(timestamp, CheckpointType.OFFLOAD);
+                        }
+                    } catch (Exception e)
+                    {
+                        refCount.decrementAndGet();
+                        throw e;
+                    }
+                }
+            }
+            logger.info("Registered offload for Timestamp: {}", timestamp);
+            return;
+        }
+    }
+
+    public void unregisterOffload(long timestamp)
+    {
+        AtomicInteger refCount = checkpointRefCounts.get(timestamp);
+        if (refCount != null)
+        {
+            synchronized (refCount)
+            {
+                int remaining = refCount.decrementAndGet();
+                if (remaining <= 0)
+                {
+                    offloadedCheckpoints.remove(timestamp);
+                    if (refCount.get() > 0)
+                    {
+                        logger.info("Checkpoint resurrection detected, skipping deletion. TS: {}", timestamp);
+                        return;
+                    }
+                    removeCheckpointFile(timestamp, CheckpointType.OFFLOAD);
+                    checkpointRefCounts.remove(timestamp);
+                    logger.info("Offload checkpoint for timestamp {} removed.", timestamp);
+                }
+            }
+        }
+    }
+
+    private void createCheckpoint(long timestamp, CheckpointType type) throws RetinaException
+    {
+        String prefix = (type == CheckpointType.GC) ? "vis_gc_" : "vis_offload_";
+        String fileName = prefix + timestamp + ".bin";
+        String filePath = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
+
+        try
+        {
+            Storage storage = StorageFactory.Instance().getStorage(filePath);
+            // Write directly to the final file as atomic move is not supported by all storages (e.g. S3).
+            // Object stores typically guarantee atomicity of the put operation.
+            try (DataOutputStream out = storage.create(filePath, true, 4096))
+            {
+                int rgCount = this.rgVisibilityMap.size();
+                out.writeInt(rgCount);
+                for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
+                {
+                    String[] parts = entry.getKey().split("_");
+                    long fileId = Long.parseLong(parts[0]);
+                    int rgId = Integer.parseInt(parts[1]);
+                    long[] bitmap = entry.getValue().getVisibilityBitmap(timestamp);
+
+                    out.writeLong(fileId);
+                    out.writeInt(rgId);
+                    out.writeInt(bitmap.length);
+                    for (long l : bitmap)
+                    {
+                        out.writeLong(l);
+                    }
+                }
+                out.flush();
+            }
+
+            if (type == CheckpointType.OFFLOAD)
+            {
+                offloadedCheckpoints.put(timestamp, filePath);
+            } else
+            {
+                long oldGcTs = this.latestGcTimestamp;
+                this.latestGcTimestamp = timestamp;
+                if (oldGcTs != -1 && oldGcTs != timestamp)
+                {
+                    removeCheckpointFile(oldGcTs, CheckpointType.GC);
+                }
+            }
+        } catch (IOException e)
+        {
+            // Try to cleanup the potentially corrupted or partial file
+            try
+            {
+                StorageFactory.Instance().getStorage(filePath).delete(filePath, false);
+            } catch (IOException ignored)
+            {
+            }
+            throw new RetinaException("Failed to commit checkpoint file", e);
+        }
+    }
+
+    private long[] loadBitmapFromDisk(long timestamp, long targetFileId, int targetRgId) throws RetinaException
+    {
+        String path = offloadedCheckpoints.get(timestamp);
+        if (path == null)
+        {
+            throw new RetinaException("Checkpoint missing: " + timestamp);
+        }
+
+        try
+        {
+            Storage storage = StorageFactory.Instance().getStorage(path);
+            if (!storage.exists(path))
+            {
+                 throw new RetinaException("Checkpoint file missing: " + path);
+            }
+
+            try (DataInputStream in = storage.open(path))
+            {
+                int rgCount = in.readInt();
+                for (int i = 0; i < rgCount; i++)
+                {
+                    long fileId = in.readLong();
+                    int rgId = in.readInt();
+                    int len = in.readInt();
+                    if (fileId == targetFileId && rgId == targetRgId)
+                    {
+                        long[] bitmap = new long[len];
+                        for (int j = 0; j < len; j++)
+                        {
+                            bitmap[j] = in.readLong();
+                        }
+                        return bitmap;
+                    } else
+                    {
+                        int skipped = in.skipBytes(len * 8);
+                        if (skipped != len * 8)
+                        {
+                            throw new IOException("Unexpected EOF");
+                        }
+                    }
+                }
+            }
+        } catch (IOException e)
+        {
+            throw new RetinaException("Failed to read checkpoint file", e);
+        }
+        return new long[0];
+    }
+
+    private void removeCheckpointFile(long timestamp, CheckpointType type)
+    {
+        String prefix = (type == CheckpointType.GC) ? "vis_gc_" : "vis_offload_";
+        String fileName = prefix + timestamp + ".bin";
+        String path = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
+
+        try
+        {
+            StorageFactory.Instance().getStorage(path).delete(path, false);
+        } catch (IOException e)
+        {
+            logger.warn("Failed to delete checkpoint file", e);
+        }
     }
 
     public void reclaimVisibility(long fileId, int rgId, long timestamp) throws RetinaException
@@ -190,8 +547,8 @@ public class RetinaResourceManager
              * Already been validated when adding visibility.
              */
             Layout latestLayout = this.metadataService.getLatestLayout(schemaName, tableName);
-            List<Path> orderedPaths = latestLayout.getOrderedPaths();
-            List<Path> compactPaths = latestLayout.getCompactPaths();
+            List<io.pixelsdb.pixels.common.metadata.domain.Path> orderedPaths = latestLayout.getOrderedPaths();
+            List<io.pixelsdb.pixels.common.metadata.domain.Path> compactPaths = latestLayout.getCompactPaths();
 
             // get schema
             List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
@@ -365,10 +722,25 @@ public class RetinaResourceManager
             logger.error("Error while getting safe garbage collection timestamp", e);
             return;
         }
-        for (Map.Entry<String, RGVisibility> entry: this.rgVisibilityMap.entrySet())
+
+        if (timestamp <= this.latestGcTimestamp)
         {
-            RGVisibility rgVisibility = entry.getValue();
-            rgVisibility.garbageCollect(timestamp);
+            return;
+        }
+
+        try
+        {
+            // 1. Persist first
+            createCheckpoint(timestamp, CheckpointType.GC);
+            // 2. Then clean memory
+            for (Map.Entry<String, RGVisibility> entry: this.rgVisibilityMap.entrySet())
+            {
+                RGVisibility rgVisibility = entry.getValue();
+                rgVisibility.garbageCollect(timestamp);
+            }
+        } catch (Exception e)
+        {
+            logger.error("Error while running GC", e);
         }
     }
 }
