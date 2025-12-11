@@ -37,6 +37,8 @@ service TransService {
     rpc CommitTrans (CommitTransRequest) returns (CommitTransResponse);
     rpc CommitTransBatch (CommitTransBatchRequest) returns (CommitTransBatchResponse);
     rpc RollbackTrans (RollbackTransRequest) returns (RollbackTransResponse);
+    rpc ExtendTransLease (ExtendTransLeaseRequest) returns (ExtendTransLeaseResponse);
+    rpc ExtendTransLeaseBatch (ExtendTransLeaseBatchRequest) returns (ExtendTransLeaseBatchResponse);
     rpc GetTransContext (GetTransContextRequest) returns (GetTransContextResponse);
     rpc SetTransProperty (SetTransPropertyRequest) returns (SetTransPropertyResponse);
     rpc UpdateQueryCosts (UpdateQueryCostsRequest) returns (UpdateQueryCostsResponse);
@@ -61,9 +63,11 @@ enum TransStatus {
 message TransContext {
     uint64 transId = 1;
     uint64 timestamp = 2;
-    bool readOnly = 3;
-    TransStatus status = 4;
-    map<string, string> properties = 5;
+    uint64 leaseStartMs = 3;
+    uint64 leasePeriodMs = 4;
+    bool readOnly = 5;
+    TransStatus status = 6;
+    map<string, string> properties = 7;
 }
 
 message BeginTransRequest {
@@ -74,6 +78,8 @@ message BeginTransResponse {
     int32 errorCode = 1;
     uint64 transId = 2;
     uint64 timestamp = 3;
+    uint64 leaseStartMs = 4;
+    uint64 leasePeriodMs = 5;
 }
 
 message BeginTransBatchRequest {
@@ -85,7 +91,9 @@ message BeginTransBatchResponse {
     int32 errorCode = 1;
     repeated uint64 transIds = 2;
     repeated uint64 timestamps = 3;
-    uint32 exactNumTrans = 4;
+    repeated uint64 leaseStartMses = 4;
+    repeated uint64 leasePeriodMses = 5;
+    uint32 exactNumTrans = 6;
 }
 
 message CommitTransRequest {
@@ -111,6 +119,25 @@ message RollbackTransRequest {
 
 message RollbackTransResponse {
     int32 errorCode = 1;
+}
+
+message ExtendTransLeaseRequest {
+    uint64 transId = 1;
+}
+
+message ExtendTransLeaseResponse {
+    int32 errorCode = 1;
+    uint64 newLeaseStartMs = 2;
+}
+
+message ExtendTransLeaseBatchRequest {
+    repeated uint64 transIds = 1;
+}
+
+message ExtendTransLeaseBatchResponse {
+    int32 errorCode = 1;
+    uint64 newLeaseStartMs = 2;
+    repeated bool success = 3;
 }
 
 message GetTransContextRequest {

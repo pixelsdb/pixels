@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.common.transaction;
 
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.daemon.TransProto;
 
 import java.util.Map;
@@ -39,13 +40,15 @@ public class TransContext implements Comparable<TransContext>
     private final boolean readOnly;
     private final AtomicReference<TransProto.TransStatus> status;
     private final Properties properties;
+    private final Lease lease;
     private final long startTime;
     private volatile boolean isOffloaded;
 
-    public TransContext(long transId, long timestamp, boolean readOnly)
+    public TransContext(long transId, long timestamp, long leaseStartMs, long leasePeriodMs, boolean readOnly)
     {
         this.transId = transId;
         this.timestamp = timestamp;
+        this.lease = new Lease(leaseStartMs, leasePeriodMs);
         this.readOnly = readOnly;
         this.status = new AtomicReference<>(TransProto.TransStatus.PENDING);
         this.properties = new Properties();
@@ -61,6 +64,7 @@ public class TransContext implements Comparable<TransContext>
         this.status = new AtomicReference<>(contextPb.getStatus());
         this.properties = new Properties();
         this.properties.putAll(contextPb.getPropertiesMap());
+        this.lease = new Lease(contextPb.getLeaseStartMs(), contextPb.getLeasePeriodMs());
         this.startTime = System.currentTimeMillis();
         this.isOffloaded = false;
     }
@@ -108,6 +112,11 @@ public class TransContext implements Comparable<TransContext>
     public Properties getProperties()
     {
         return this.properties;
+    }
+
+    public Lease getLease()
+    {
+        return lease;
     }
 
     @Override

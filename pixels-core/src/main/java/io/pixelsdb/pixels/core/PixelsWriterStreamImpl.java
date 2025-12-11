@@ -469,7 +469,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 "this file is not hash partitioned, use addRowBatch(rowBatch) instead");
         if (hashValueIsSet)
         {
-            // As the current hash value is set, at lease one row batch has been added.
+            // As the current hash value is set, at least one row batch has been added.
             if (currHashValue != hashValue)
             {
                 // Write the current hash partition (row group) and add the row batch to a new hash partition.

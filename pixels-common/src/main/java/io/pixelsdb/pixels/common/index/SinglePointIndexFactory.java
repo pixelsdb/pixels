@@ -61,7 +61,7 @@ public class SinglePointIndexFactory
         requireNonNull(value, "enabled.single.point.index.schemes is not configured");
         String[] schemeNames = value.trim().split(",");
         checkArgument(schemeNames.length > 0,
-                "at lease one single point index scheme must be enabled");
+                "at least one single point index scheme must be enabled");
 
         ImmutableMap.Builder<SinglePointIndex.Scheme, SinglePointIndexProvider> providersBuilder = ImmutableMap.builder();
         ServiceLoader<SinglePointIndexProvider> providerLoader = ServiceLoader.load(SinglePointIndexProvider.class);

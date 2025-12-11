@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.daemon.transaction;
 
+import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
@@ -159,23 +161,22 @@ public class TransContextManager
      * @param success whether each transaction commits successfully
      * @return true if all transactions commit successfully
      */
-    public boolean setTransCommitBatch(long[] transIds, Boolean[] success)
+    public boolean setTransCommitBatch(List<Long> transIds, Boolean[] success)
     {
         requireNonNull(transIds, "transIds is null");
         requireNonNull(success, "success is null");
-        checkArgument(transIds.length == success.length,
+        checkArgument(transIds.size() == success.length,
                 "transIds and success have different length");
         this.contextLock.readLock().lock();
         try
         {
             boolean allSuccess = true;
-            for (int i = 0; i < transIds.length; i++)
+            for (int i = 0; i < transIds.size(); i++)
             {
-                success[i] = terminateTrans(transIds[i], TransProto.TransStatus.COMMIT);
+                success[i] = terminateTrans(transIds.get(i), TransProto.TransStatus.COMMIT);
                 if(!success[i])
                 {
                     allSuccess = false;
-                    log.error("failed to commit transaction id {}", transIds[i]);
                 }
             }
             return allSuccess;
@@ -206,24 +207,147 @@ public class TransContextManager
         }
     }
 
+    /**
+     * Try to extend the lease of the transaction if it is not expired.
+     * @param transId the trans id
+     * @return the new lease start time if the lease of the transaction extended successfully,
+     * 0 if the transaction is readonly, -1 if the transaction has expired, and -2 if the transaction does not exist
+     */
+    public long extendTransLease(long transId)
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            long currentTimeMs = System.currentTimeMillis();
+            TransContext context = this.transIdToContext.get(transId);
+            if (context != null)
+            {
+                if (!context.isReadOnly())
+                {
+                    Lease lease = context.getLease();
+                    if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
+                    {
+                        return -1L;
+                    }
+                    lease.updateStartMs(currentTimeMs);
+                    return currentTimeMs;
+                }
+                return 0L;
+            }
+            return -2L;
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Try to extend the lease of the transactions if they are not expired.
+     * @param transIds the trans ids
+     * @param success for each transaction, true if the lease of the transaction is readonly or extended successfully;
+     * false if the transaction has expired
+     * @return the new lease start time, or negative value if there are other errors except lease expire
+     */
+    public long extendTransLeaseBatch(List<Long> transIds, List<Boolean> success)
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            long currentTimeMs = System.currentTimeMillis();
+            boolean allSuccess = true;
+            for (long transId : transIds)
+            {
+                TransContext context = this.transIdToContext.get(transId);
+                if (context != null)
+                {
+                    if (!context.isReadOnly())
+                    {
+                        Lease lease = context.getLease();
+                        if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
+                        {
+                            success.add(false);
+                            continue;
+                        }
+                        lease.updateStartMs(currentTimeMs);
+                    }
+                    success.add(true);
+                } else
+                {
+                    success.add(false);
+                    allSuccess = false;
+                }
+            }
+            if (allSuccess)
+            {
+                return currentTimeMs;
+            }
+            else
+            {
+                return -2L;
+            }
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * @return the ids of the transactions with lease expired
+     */
+    public List<Long> getExpiredTransIds()
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            long currentTimeMs = System.currentTimeMillis();
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            for (TransContext context : this.transIdToContext.values())
+            {
+                if (!context.isReadOnly() &&
+                        context.getStatus() != TransProto.TransStatus.COMMIT &&
+                        context.getStatus() != TransProto.TransStatus.ROLLBACK &&
+                        context.getLease().hasExpired(currentTimeMs, Lease.Role.Assigner))
+                {
+                    // the transaction is non-readonly, yet not terminated, and has expired
+                    builder.add(context.getTransId());
+                }
+            }
+            return builder.build();
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
     private boolean terminateTrans(long transId, TransProto.TransStatus status)
     {
         TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
-            /*
-             * Adding the same lock in {@link #offloadLongRunningQueries()}
-             * constitutes a mutually exclusive critical section.
-             */
-            context.setStatus(status);
-
+            boolean res = true;
             if (context.isReadOnly())
             {
+                context.setStatus(status);
                 this.readOnlyConcurrency.decrementAndGet();
                 this.runningReadOnlyTrans.remove(context);
             }
             else
             {
+                if (status == TransProto.TransStatus.COMMIT &&
+                        context.getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Assigner))
+                {
+                    // Issue #1163: stop committing and rollback the transaction if its lease has expired
+                    context.setStatus(TransProto.TransStatus.ROLLBACK);
+                    log.error("failed to commit transaction id {} as its lease has expired", transId);
+                    res = false;
+                }
+                else
+                {
+                    context.setStatus(status);
+                }
                 // only clear the context of write transactions
                 this.transIdToContext.remove(context.getTransId());
                 this.runningWriteTrans.remove(context);
@@ -233,7 +357,7 @@ public class TransContextManager
                     this.traceIdToTransId.remove(traceId);
                 }
             }
-            return true;
+            return res;
         }
         return false;
     }

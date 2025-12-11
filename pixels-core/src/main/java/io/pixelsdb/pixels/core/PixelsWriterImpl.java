@@ -474,7 +474,7 @@ public class PixelsWriterImpl implements PixelsWriter
                 "use addRowBatch(rowBatch) instead");
         if (hashValueIsSet)
         {
-            // As the current hash value is set, at lease one row batch has been added.
+            // As the current hash value is set, at least one row batch has been added.
             if (currHashValue != hashValue)
             {
                 // Write the current partition (row group) and add the row batch to a new partition.
