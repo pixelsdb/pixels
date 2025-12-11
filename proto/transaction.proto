@@ -193,14 +193,6 @@ message GetSafeGcTimestampResponse {
     uint64 timestamp = 2;
 }
 
-message PushWatermarkRequest {
-    bool readOnly = 1;
-}
-
-message PushWatermarkResponse {
-    int32 errorCode = 1;
-}
-
 message MarkTransOffloadedRequest {
     uint64 transId = 1;
 }
