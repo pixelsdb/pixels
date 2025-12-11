@@ -22,7 +22,6 @@ package io.pixelsdb.pixels.daemon.transaction;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
-import io.pixelsdb.pixels.retina.RetinaResourceManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -74,8 +73,6 @@ public class TransContextManager
     private final AtomicInteger readOnlyConcurrency = new AtomicInteger(0);
 
     private final ReadWriteLock contextLock = new ReentrantReadWriteLock();
-
-    private static final long OFFLOAD_THRESHOLD = Long.parseLong(ConfigFactory.Instance().getProperty("pixels.transaction.offload.threshold"));
 
     private TransContextManager() { }
 
@@ -218,20 +215,7 @@ public class TransContextManager
              * Adding the same lock in {@link #offloadLongRunningQueries()}
              * constitutes a mutually exclusive critical section.
              */
-            synchronized (context)
-            {
-                context.setStatus(status);
-                if (context.isOffloaded())
-                {
-                    try
-                    {
-                        RetinaResourceManager.Instance().unregisterOffload(context.getTransId(), context.getTimestamp());
-                    } catch (Exception e)
-                    {
-                        log.error("Unregister failed", e);
-                    }
-                }
-            }
+            context.setStatus(status);
 
             if (context.isReadOnly())
             {
@@ -254,52 +238,6 @@ public class TransContextManager
         return false;
     }
 
-    /**
-     * Offload long-running queries to disk.
-     */
-    public void offloadLongRunningQueries()
-    {
-        long now = System.currentTimeMillis();
-        boolean pushed = false;
-
-        for (TransContext ctx : runningReadOnlyTrans)
-        {
-            if (ctx.isOffloaded())
-            {
-                continue;
-            }
-
-            if ((now - ctx.getStartTime()) > OFFLOAD_THRESHOLD)
-            {
-                try
-                {
-                    // 1. Register and generate snapshot
-                    RetinaResourceManager.Instance().registerOffload(ctx.getTransId(), ctx.getTimestamp());
-
-                    // 2. Double-checked locking
-                    synchronized (ctx)
-                    {
-                        if (ctx.getStatus() == TransProto.TransStatus.PENDING)
-                        {
-                            ctx.setOffloaded(true);
-                            pushed = true;
-                        } else
-                        {
-                            // Transaction has ended, rollback registration
-                            RetinaResourceManager.Instance().unregisterOffload(ctx.getTransId(), ctx.getTimestamp());
-                        }
-                    }
-                } catch (Exception e)
-                {
-                    log.error("Failed to offload transaction {}", ctx.getTransId(), e);
-                }
-            }
-        }
-        if (pushed)
-        {
-            TransServiceImpl.pushWatermarks(true);
-        }
-    }
 
     /**
      * Dump the context of transactions in this manager to a history file and remove terminated transactions. This method
@@ -450,5 +388,23 @@ public class TransContextManager
         {
             this.contextLock.writeLock().unlock();
         }
+    }
+
+    /**
+     * Mark a transaction as offloaded. This allows the transaction context manager to
+     * skip it when calculating the minimum running transaction timestamp.
+     * 
+     * @param transId the transaction id
+     * @return true if the transaction exists and was marked as offloaded, false otherwise
+     */
+    public boolean markTransOffloaded(long transId)
+    {
+        TransContext context = this.transIdToContext.get(transId);
+        if (context != null)
+        {
+            context.setOffloaded(true);
+            return true;
+        }
+        return false;
     }
 }

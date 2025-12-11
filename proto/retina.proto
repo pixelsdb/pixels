@@ -42,6 +42,10 @@ service RetinaWorkerService {
     rpc AddWriteBuffer (AddWriteBufferRequest) returns (AddWriteBufferResponse);
     // Get a unified view of the data in the writer buffer
     rpc GetWriteBuffer (GetWriteBufferRequest) returns (GetWriteBufferResponse);
+    // Register offload for long-running queries
+    rpc RegisterOffload (RegisterOffloadRequest) returns (RegisterOffloadResponse);
+    // Unregister offload when query completes
+    rpc UnregisterOffload (UnregisterOffloadRequest) returns (UnregisterOffloadResponse);
 }
 
 // header
@@ -167,4 +171,24 @@ message GetWriteBufferResponse {
     bytes data = 2;
     repeated int64 ids = 3;
     repeated VisibilityBitmap bitmaps = 4;
+}
+
+// register offload
+message RegisterOffloadRequest {
+    RequestHeader header = 1;
+    uint64 timestamp = 2;
+}
+
+message RegisterOffloadResponse {
+    ResponseHeader header = 1;
+}
+
+// unregister offload
+message UnregisterOffloadRequest {
+    RequestHeader header = 1;
+    uint64 timestamp = 2;
+}
+
+message UnregisterOffloadResponse {
+    ResponseHeader header = 1;
 }

@@ -44,6 +44,7 @@ service TransService {
     rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
     rpc DumpTrans (DumpTransRequest) returns (DumpTransResponse);
     rpc GetSafeGcTimestamp(google.protobuf.Empty) returns (GetSafeGcTimestampResponse);
+    rpc MarkTransOffloaded (MarkTransOffloadedRequest) returns (MarkTransOffloadedResponse);
 }
 
 // begin request/response definition for rpc services
@@ -190,6 +191,14 @@ message DumpTransResponse {
 message GetSafeGcTimestampResponse {
     int32 errorCode = 1;
     uint64 timestamp = 2;
+}
+
+message MarkTransOffloadedRequest {
+    uint64 transId = 1;
+}
+
+message MarkTransOffloadedResponse {
+    int32 errorCode = 1;
 }
 
 // end request/response definition for rpc services
