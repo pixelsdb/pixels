@@ -71,11 +71,11 @@ public final class Constants
     /**
      * Must be larger than ({@link #LEASE_NETWORK_LATENCY_MS} + {@link #LEASE_TIME_SKEW_MS})/{@link #LEASE_EXPIRING_THRESHOLD}.
      */
-    public static final int TRANS_LEASE_PERIOD_MS = 30000;
+    public static final int TRANS_LEASE_PERIOD_MS = 300000;
     /**
      * The interval that transaction server checks if the transactions' lease
      */
-    public static final int TRANS_LEASE_CHECK_INTERVAL_SEC = 30;
+    public static final int TRANS_LEASE_CHECK_INTERVAL_SEC = 300;
 
     /**
      * The time in seconds that a relaxed query can be postponed for execution.
@@ -104,7 +104,7 @@ public final class Constants
     public static final int LEASE_NETWORK_LATENCY_MS = 500;
     /**
      * The fraction of lease period upon which the lease is considered expiring.
-     * E.g., the lease period is 1000ms, a threshold 0.5 means if the remaining time is less than 1000*(1-0.5) ms,
+     * E.g., the lease period is 10000ms, a threshold 0.9 means if the remaining time is less than 10000*(1-0.9) ms,
      * then the lease is considered expiring.
      */
     public static final double LEASE_EXPIRING_THRESHOLD = 0.5;
