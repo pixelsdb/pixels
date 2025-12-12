@@ -195,13 +195,13 @@ public final class LocalFS implements Storage
             throw new IOException("Path '" + path + "' is not a valid local fs path.");
         }
         File file = new File(p.realPath);
-        if (!file.isDirectory())
-        {
-            throw new IOException("Path '" + p.realPath + "' is not a directory.");
-        }
         if (file.exists())
         {
-            throw new IOException("Directory '" + p.realPath + "' already exists.");
+            if (!file.isDirectory())
+            {
+                throw new IOException("Path '" + p.realPath + "' already exists but is not a directory.");
+            }
+            return false;
         }
         return file.mkdirs();
     }
