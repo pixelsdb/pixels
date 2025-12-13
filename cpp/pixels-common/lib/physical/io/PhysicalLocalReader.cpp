@@ -28,7 +28,7 @@
 #include <utility>
 #include "profiler/TimeProfiler.h"
 
-PhysicalLocalReader::PhysicalLocalReader(std::shared_ptr <Storage> storage, std::string path_)
+PhysicalLocalReader::PhysicalLocalReader(std::shared_ptr<Storage> storage, std::string path_)
 {
     // TODO: should support async
     if (std::dynamic_pointer_cast<LocalFS>(storage).get() != nullptr)
@@ -51,13 +51,13 @@ PhysicalLocalReader::PhysicalLocalReader(std::shared_ptr <Storage> storage, std:
     asyncNumRequests = 0;
 }
 
-std::shared_ptr <ByteBuffer> PhysicalLocalReader::readFully(int length)
+std::shared_ptr<ByteBuffer> PhysicalLocalReader::readFully(int length)
 {
     numRequests++;
     return raf->readFully(length);
 }
 
-std::shared_ptr <ByteBuffer> PhysicalLocalReader::readFully(int length, std::shared_ptr <ByteBuffer> bb)
+std::shared_ptr<ByteBuffer> PhysicalLocalReader::readFully(int length, std::shared_ptr<ByteBuffer> bb)
 {
     numRequests++;
     return raf->readFully(length, bb);
@@ -104,49 +104,37 @@ std::string PhysicalLocalReader::getName()
     }
     return path.substr(path.find_last_of('/') + 1);
 }
-void PhysicalLocalReader::addRingIndex(int ring_index) {
-    ring_index_vector.insert(ring_index);
+
+void PhysicalLocalReader::addRingIndex(int ringIndex)
+{
+    ring_index_vector.insert(ringIndex);
 }
 
-std::unordered_set<int>& PhysicalLocalReader::getRingIndexes() {
+std::unordered_set<int>& PhysicalLocalReader::getRingIndexes()
+{
     return ring_index_vector;
 }
 
-std::unordered_map<int,uint32_t> PhysicalLocalReader::getRingIndexCountMap() {
+std::unordered_map<int, uint32_t> PhysicalLocalReader::getRingIndexCountMap()
+{
     return ringIndexCountMap;
 }
 
-void PhysicalLocalReader::setRingIndexCountMap(std::unordered_map<int,uint32_t> ringIndexCount) {
+void PhysicalLocalReader::setRingIndexCountMap(std::unordered_map<int, uint32_t> ringIndexCount)
+{
     //first clear
     ringIndexCountMap.clear();
-    ringIndexCountMap=ringIndexCount;
+    ringIndexCountMap = ringIndexCount;
 }
-std::shared_ptr <ByteBuffer> PhysicalLocalReader::readAsync(int length, std::shared_ptr <ByteBuffer> buffer, int index,int ring_index,int start_offset)
+
+std::shared_ptr<ByteBuffer> PhysicalLocalReader::readAsync(int length, std::shared_ptr<ByteBuffer> buffer, int index,
+                                                           int ringIndex, int startOffset)
 {
     numRequests++;
     if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
     {
         auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
-        return directRaf->readAsync(length, std::move(buffer), index,ring_index,start_offset);
-    }
-    else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
-    {
-        throw InvalidArgumentException("PhysicalLocalReader::readAsync: We don't support aio for our async read yet.");
-    }
-    else
-    {
-        throw InvalidArgumentException("PhysicalLocalReader::readAsync: the async read method is unknown. ");
-    }
-
-}
-
-void PhysicalLocalReader::readAsyncSubmit(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ring_index)
-{
-    numRequests++;
-    if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
-    {
-        auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
-        directRaf->readAsyncSubmit(sizes,ring_index);
+        return directRaf->readAsync(length, std::move(buffer), index, ringIndex, startOffset);
     }
     else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
     {
@@ -158,13 +146,31 @@ void PhysicalLocalReader::readAsyncSubmit(std::unordered_map<int,uint32_t> sizes
     }
 }
 
-void PhysicalLocalReader::readAsyncComplete(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ring_index)
+void PhysicalLocalReader::readAsyncSubmit(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ringIndex)
 {
     numRequests++;
     if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
     {
         auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
-        directRaf->readAsyncComplete(sizes,ring_index);
+        directRaf->readAsyncSubmit(sizes, ringIndex);
+    }
+    else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
+    {
+        throw InvalidArgumentException("PhysicalLocalReader::readAsync: We don't support aio for our async read yet.");
+    }
+    else
+    {
+        throw InvalidArgumentException("PhysicalLocalReader::readAsync: the async read method is unknown. ");
+    }
+}
+
+void PhysicalLocalReader::readAsyncComplete(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ringIndex)
+{
+    numRequests++;
+    if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
+    {
+        auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
+        directRaf->readAsyncComplete(sizes, ringIndex);
     }
     else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
     {
@@ -178,17 +184,17 @@ void PhysicalLocalReader::readAsyncComplete(std::unordered_map<int,uint32_t> siz
 
 
 // not use?
-void PhysicalLocalReader::readAsyncSubmitAndComplete(uint32_t size,std::unordered_set<int> ring_index)
+void PhysicalLocalReader::readAsyncSubmitAndComplete(uint32_t size, std::unordered_set<int> ringIndex)
 {
     numRequests++;
     if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
     {
         auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
-        std::unordered_map<int,uint32_t> sizes;
-        sizes[0]=0;
-        directRaf->readAsyncSubmit(sizes,ring_index);
+        std::unordered_map<int, uint32_t> sizes;
+        sizes[0] = 0;
+        directRaf->readAsyncSubmit(sizes, ringIndex);
         ::TimeProfiler::Instance().Start("async wait");
-        directRaf->readAsyncComplete(sizes,ring_index);
+        directRaf->readAsyncComplete(sizes, ringIndex);
         ::TimeProfiler::Instance().End("async wait");
     }
     else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")

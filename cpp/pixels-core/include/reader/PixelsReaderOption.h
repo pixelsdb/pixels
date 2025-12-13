@@ -89,6 +89,6 @@ class PixelsReaderOption
   int batchSize;
   int rgStart;
   int rgLen;
- int ring_index;
+ int ringIndex;
 };
 #endif //PIXELS_PIXELSREADEROPTION_H

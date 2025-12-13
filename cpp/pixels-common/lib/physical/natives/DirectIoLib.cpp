@@ -28,47 +28,57 @@
 #include <cstring>
 #include <errno.h>
 
-
 DirectIoLib::DirectIoLib(int fsBlockSize)
 {
     this->fsBlockSize = fsBlockSize;
-    this->fsBlockNotMask = ~((long) fsBlockSize - 1);
+    this->fsBlockNotMask = ~((long)fsBlockSize - 1);
 }
 
-template <typename T> struct huge_page_allocator {
-  constexpr static std::size_t huge_page_size = 1 << 21; // 2 MiB
-  using value_type = T;
+template <typename T>
+struct huge_page_allocator
+{
+    constexpr static std::size_t huge_page_size = 1 << 21; // 2 MiB
+    using value_type = T;
 
-  huge_page_allocator() = default;
-  template <class U>
-  constexpr huge_page_allocator(const huge_page_allocator<U> &) noexcept {}
+    huge_page_allocator() = default;
 
-  size_t round_to_huge_page_size(size_t n) {
-    return (((n - 1) / huge_page_size) + 1) * huge_page_size;
-  }
-
-  T *allocate(std::size_t n) {
-    if (n > std::numeric_limits<std::size_t>::max() / sizeof(T)) {
-      throw std::bad_alloc();
+    template <class U>
+    constexpr huge_page_allocator(const huge_page_allocator<U>&) noexcept
+    {
     }
-    auto p = static_cast<T *>(mmap(
-        nullptr, round_to_huge_page_size(n * sizeof(T)), PROT_READ | PROT_WRITE,
-        MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0));
-    if (p == MAP_FAILED) {
-      throw std::bad_alloc();
-    }
-    return p;
-  }
 
-  void deallocate(T *p, std::size_t n) {
-    munmap(p, round_to_huge_page_size(n * sizeof(T)));
-  }
+    size_t round_to_huge_page_size(size_t n)
+    {
+        return (((n - 1) / huge_page_size) + 1) * huge_page_size;
+    }
+
+    T* allocate(std::size_t n)
+    {
+        if (n > std::numeric_limits<std::size_t>::max() / sizeof(T))
+        {
+            throw std::bad_alloc();
+        }
+        auto p = static_cast<T*>(mmap(
+            nullptr, round_to_huge_page_size(n * sizeof(T)), PROT_READ | PROT_WRITE,
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, -1, 0));
+        if (p == MAP_FAILED)
+        {
+            throw std::bad_alloc();
+        }
+        return p;
+    }
+
+    void deallocate(T* p, std::size_t n)
+    {
+        munmap(p, round_to_huge_page_size(n * sizeof(T)));
+    }
 };
 
 std::shared_ptr<ByteBuffer> DirectIoLib::allocateDirectBuffer(long size, bool isSmallBuffer)
 {
     // Lambda function to convert string to boolean
-    auto strToBool = [](const std::string& s) {
+    auto strToBool = [](const std::string& s)
+    {
         return s == "true" || s == "1" || s == "yes";
     };
 
@@ -76,9 +86,11 @@ std::shared_ptr<ByteBuffer> DirectIoLib::allocateDirectBuffer(long size, bool is
     std::string configValue = ConfigFactory::Instance().getProperty("pixel.bufferpool.hugepage");
     bool isHugePage = strToBool(configValue);
 
-    if (isHugePage && !isSmallBuffer) {
+    if (isHugePage && !isSmallBuffer)
+    {
         // Allocate memory using huge page allocator
-        try {
+        try
+        {
             // Calculate the size to allocate (considering block alignment)
             int toAllocate = blockEnd(size) + (size == 1 ? 0 : fsBlockSize);
 
@@ -89,8 +101,10 @@ std::shared_ptr<ByteBuffer> DirectIoLib::allocateDirectBuffer(long size, bool is
             uint8_t* directBufferPointer = allocator.allocate(toAllocate);
 
             // Create custom deleter to free memory using the allocator
-            auto deleter = [allocator, toAllocate](ByteBuffer* buf) mutable {
-                if (buf && buf->getBuffer()) {
+            auto deleter = [allocator, toAllocate](ByteBuffer* buf) mutable
+            {
+                if (buf && buf->getBuffer())
+                {
                     // Deallocate memory using the allocator's deallocate method
                     allocator.deallocate(const_cast<uint8_t*>(buf->getBuffer()), toAllocate);
                 }
@@ -103,23 +117,29 @@ std::shared_ptr<ByteBuffer> DirectIoLib::allocateDirectBuffer(long size, bool is
             // Return shared_ptr with custom deleter
             return std::shared_ptr<ByteBuffer>(buf, deleter);
         }
-        catch (const std::bad_alloc& e) {
+        catch (const std::bad_alloc& e)
+        {
             throw std::runtime_error("Huge page memory allocation failed: " + std::string(e.what()) +
-                                   ", error code: " + std::string(strerror(errno)));
+                ", error code: " + std::string(strerror(errno)));
         }
-    } else {
+    }
+    else
+    {
         // Normal memory allocation path
         int toAllocate = blockEnd(size) + (size == 1 ? 0 : fsBlockSize);
         uint8_t* directBufferPointer;
 
         // Allocate aligned memory using posix_memalign
-        if (posix_memalign((void**)&directBufferPointer, fsBlockSize, toAllocate) != 0) {
+        if (posix_memalign((void**)&directBufferPointer, fsBlockSize, toAllocate) != 0)
+        {
             throw std::runtime_error("Normal memory allocation failed: " + std::string(strerror(errno)));
         }
 
         // Create custom deleter to free memory
-        auto deleter = [](ByteBuffer* buf) {
-            if (buf && buf->getBuffer()) {
+        auto deleter = [](ByteBuffer* buf)
+        {
+            if (buf && buf->getBuffer())
+            {
                 free(const_cast<uint8_t*>(buf->getBuffer()));
             }
             // delete buf;
@@ -131,21 +151,21 @@ std::shared_ptr<ByteBuffer> DirectIoLib::allocateDirectBuffer(long size, bool is
     }
 }
 
-int DirectIoLib::getToAllocate(int size) {
+int DirectIoLib::getToAllocate(int size)
+{
     return blockEnd(size) + (size == 1 ? 0 : fsBlockSize);
 }
 
 
-
-
-std::shared_ptr <ByteBuffer> DirectIoLib::read(int fd, long fileOffset,
-                                               std::shared_ptr <ByteBuffer> directBuffer, long length)
+std::shared_ptr<ByteBuffer> DirectIoLib::read(int fd, long fileOffset,
+                                              std::shared_ptr<ByteBuffer> directBuffer, long length)
 {
     // the file will be read from blockStart(fileOffset), and the first fileDelta bytes should be ignored.
     long fileOffsetAligned = blockStart(fileOffset);
     long toRead = blockEnd(fileOffset + length) - blockStart(fileOffset);
     ssize_t ret = pread(fd, directBuffer->getPointer(), toRead, fileOffsetAligned);
-    if (ret == -1) {
+    if (ret == -1)
+    {
         perror("pread failed");
         throw InvalidArgumentException("DirectIoLib::read: pread fail. ");
     }
@@ -164,4 +184,3 @@ long DirectIoLib::blockEnd(long value)
 {
     return (value + fsBlockSize - 1) & fsBlockNotMask;
 }
-

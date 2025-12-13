@@ -68,7 +68,8 @@ void RequestBatch::add(Request request)
 }
 
 
-Request& RequestBatch::getRequest(int index) {
+Request& RequestBatch::getRequest(int index)
+{
     if (index < 0 || index >= size) {
         throw std::out_of_range("RequestBatch::getRequest: index out of range");
     }

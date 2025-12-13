@@ -54,8 +54,8 @@ std::mutex BufferPool::bufferPoolMutex;
 thread_local bool BufferPool::isInitialized;
 thread_local std::vector<std::shared_ptr<BufferPoolEntry>>
 BufferPool::registeredBuffers[2];
-thread_local long BufferPool::global_free_size = 0;
-thread_local long BufferPool::global_used_size = 0;
+thread_local long BufferPool::globalFreeSize = 0;
+thread_local long BufferPool::globalUsedSize = 0;
 thread_local std::shared_ptr<DirectIoLib> BufferPool::directIoLib;
 thread_local int BufferPool::nextRingIndex = 1;
 thread_local std::shared_ptr<BufferPoolEntry>
@@ -72,8 +72,8 @@ BufferPool::buffersAllocated[2];
 thread_local std::unordered_map<
     uint32_t, std::shared_ptr<BufferPool::BufferPoolManagedEntry>>
 BufferPool::ringBufferMap[2];
-thread_local size_t BufferPool::thread_local_used_size[2] = {0, 0};
-thread_local int BufferPool::thread_local_buffer_count[2] = {0, 0};
+thread_local size_t BufferPool::threadLocalUsedSize[2] = {0, 0};
+thread_local int BufferPool::threadLocalBufferCount[2] = {0, 0};
 
 void BufferPool::Initialize(std::vector<uint32_t> colIds,
                             std::vector<uint64_t> bytes,
@@ -146,7 +146,7 @@ void BufferPool::InitializeBuffers()
                                               0);
         registeredBuffers[idx].emplace_back(buffer_pool_entry);
         buffer_pool_entry->setInUse(true);
-        global_free_size += size_;
+        globalFreeSize += size_;
     }
 }
 
@@ -190,8 +190,6 @@ std::shared_ptr<ByteBuffer> BufferPool::AllocateNewBuffer(
             nextEmptyBufferPoolEntry[currBufferIdx]->getSize())
         {
             // there are anthor regisitered Buffers
-            // std::cout<<"curBufID:"<<currBufferIdx<<" colID:"<<colId<<"
-            // "<<columnName<<" has registered"<<std::endl;
             currentBuffer = nextEmptyBufferPoolEntry[currBufferIdx];
         }
         else
@@ -199,8 +197,6 @@ std::shared_ptr<ByteBuffer> BufferPool::AllocateNewBuffer(
             // find more space
             // 1. register a new io_uring bounded buffer
             // 2. reallocate current buffer
-            // std::cout<<" offset:"<<offset<<" totalSize:"<<totalSize<<"
-            // original-size():"<<original->size()<<std::endl;
             currentBuffer->setInUse(false);
             currentBuffer = BufferPool::AddNewBuffer(currentBuffer->getSize());
             std::vector<std::shared_ptr<ByteBuffer>> buffers;
@@ -235,9 +231,9 @@ std::shared_ptr<ByteBuffer> BufferPool::AllocateNewBuffer(
     newBufferPoolManageEntry->setOffset(offset);
     newBufferPoolManageEntry->setRingIndex(currentBuffer->getRingIndex());
 
-    global_used_size += totalSize;
-    thread_local_used_size[currBufferIdx] += totalSize;
-    thread_local_buffer_count[currBufferIdx]++;
+    globalUsedSize += totalSize;
+    threadLocalUsedSize[currBufferIdx] += totalSize;
+    threadLocalBufferCount[currBufferIdx]++;
     return sliced;
 }
 
@@ -299,10 +295,10 @@ void BufferPool::Reset()
         BufferPool::buffersAllocated[idx].clear();
         BufferPool::ringBufferMap[idx].clear();
         // BufferPool::registeredBuffers[idx].clear();
-        // thread_local_used_size[idx]=0;
-        // thread_local_buffer_count[idx]=0;
-        // global_free_size=0;
-        global_used_size = 0;
+        // threadLocalUsedSize[idx]=0;
+        // threadLocalBufferCount[idx]=0;
+        // globalFreeSize=0;
+        globalUsedSize = 0;
         for (auto bufferEntry : registeredBuffers[idx])
         {
             bufferEntry->reset();
@@ -320,7 +316,6 @@ void BufferPool::Switch()
 
 std::shared_ptr<BufferPoolEntry> BufferPool::AddNewBuffer(size_t size)
 {
-    // std::cout<<"Adding new buffer"<<std::endl;
     if (csvReader != nullptr)
     {
         assert(false && "Unexpected code path reached!");
@@ -331,7 +326,7 @@ std::shared_ptr<BufferPoolEntry> BufferPool::AddNewBuffer(size_t size)
                                           currBufferIdx, nextRingIndex++);
     registeredBuffers[currBufferIdx].emplace_back(buffer_pool_entry);
     buffer_pool_entry->setInUse(true);
-    global_free_size += size;
+    globalFreeSize += size;
     nextEmptyBufferPoolEntry[currBufferIdx] = buffer_pool_entry;
     return buffer_pool_entry;
 }

@@ -361,7 +361,7 @@ void PixelsRecordReaderImpl::prepareRead()
             uint64_t footerOffset = rowGroupInformation.footeroffset();
             uint64_t footerLength = rowGroupInformation.footerlength();
             fis.push_back(i);
-            requestBatch.add(queryId, (int) footerOffset, (int) footerLength,ring_index);
+            requestBatch.add(queryId, (int) footerOffset, (int) footerLength,ringIndex);
             rowGroupFooterCacheHit.at(i) = false;
         }
     }
@@ -482,16 +482,16 @@ bool PixelsRecordReaderImpl::read()
             auto byte=bytes.at(i);
             auto currentBufferEntry=::BufferPool::GetBuffer(colId,byte,columnNames[colId]);
             originalByteBuffers.emplace_back(currentBufferEntry);
-            requestBatch.getRequest(i).ring_index=::BufferPool::getRingIndex(colId);
+            requestBatch.getRequest(i).ringIndex=::BufferPool::getRingIndex(colId);
             if (currentBufferEntry->size()-requestBatch.getRequest(i).length<=4096) {
-                std::cout<<"i:"<<i<<" ring_index:"<<requestBatch.getRequest(i).ring_index<<
+                std::cout<<"i:"<<i<<" ringIndex:"<<requestBatch.getRequest(i).ringIndex<<
                     " colId:"<<colId<<" byte:"<<byte<<" currentBuffer size"<<currentBufferEntry->size()<<
                 " requestBatch.length"<<requestBatch.getRequest(i).length<<
                     " columnNames:"<<columnNames[colId]<<std::endl;
                 throw InvalidArgumentException("PixelsRecordReaderImpl:read 临界区");
             }
 
-            if (requestBatch.getRequest(i).ring_index !=0) {
+            if (requestBatch.getRequest(i).ringIndex !=0) {
                 requestBatch.getRequest(i).bufferId=0;
                 ring_col.emplace_back(i);
             }

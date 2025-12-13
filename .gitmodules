@@ -8,5 +8,6 @@
 	path = cpp/third-party/googletest
 	url = git@github.com:google/googletest.git
 [submodule "cpp/FlameGraph"]
-	path = cpp/FlameGraph
-	url = git@github.com:brendangregg/FlameGraph.git
+    path = cpp/third-party/FlameGraph
+    url = git@github.com:brendangregg/FlameGraph.git
+

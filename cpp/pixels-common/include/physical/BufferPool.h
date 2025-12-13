@@ -63,16 +63,16 @@ public:
 
     private:
         std::shared_ptr<BufferPoolEntry> bufferPoolEntry;
-        int ring_index;
-        size_t current_size;
+        int ringIndex;
+        size_t currentSize;
         int offset;
         State state;
 
     public:
         BufferPoolManagedEntry(std::shared_ptr<BufferPoolEntry> entry, int ringIdx,
                                size_t currSize, off_t off)
-            : bufferPoolEntry(std::move(entry)), ring_index(ringIdx),
-              current_size(currSize), offset(off),
+            : bufferPoolEntry(std::move(entry)), ringIndex(ringIdx),
+              currentSize(currSize), offset(off),
               state(State::InitizaledNotAllocated)
         {
         }
@@ -84,22 +84,22 @@ public:
 
         int getRingIndex() const
         {
-            return ring_index;
+            return ringIndex;
         }
 
         void setRingIndex(int index)
         {
-            ring_index = index;
+            ringIndex = index;
         }
 
         size_t getCurrentSize() const
         {
-            return current_size;
+            return currentSize;
         }
 
         void setCurrentSize(size_t size)
         {
-            current_size = size;
+            currentSize = size;
         }
 
         int getOffset() const
@@ -158,18 +158,18 @@ public:
         // Print global buffer usage: used size / free size
         // Convert thread ID to integer for readability using hash
         printf("Thread %zu -> Global buffer usage: %ld / %ld\n",
-               std::hash<std::thread::id>{}(tid), global_used_size,
-               global_free_size);
+               std::hash<std::thread::id>{}(tid), globalUsedSize,
+               globalFreeSize);
 
         // Print thread-local statistics for Buffer0
         printf("Thread %zu -> Buffer0 usage: %zu, Buffer count: %d\n",
-               std::hash<std::thread::id>{}(tid), thread_local_used_size[0],
-               thread_local_buffer_count[0]);
+               std::hash<std::thread::id>{}(tid), threadLocalUsedSize[0],
+               threadLocalBufferCount[0]);
 
         // Print thread-local statistics for Buffer1
         printf("Thread %zu -> Buffer1 usage: %zu, Buffer count: %d\n",
-               std::hash<std::thread::id>{}(tid), thread_local_used_size[1],
-               thread_local_buffer_count[1]);
+               std::hash<std::thread::id>{}(tid), threadLocalUsedSize[1],
+               threadLocalBufferCount[1]);
     }
 private:
     BufferPool() = default;
@@ -180,8 +180,8 @@ private:
     static thread_local bool isInitialized;
     static thread_local std::vector<std::shared_ptr<BufferPoolEntry>>
     registeredBuffers[2];
-    static thread_local long global_used_size;
-    static thread_local long global_free_size;
+    static thread_local long globalUsedSize;
+    static thread_local long globalFreeSize;
     static thread_local std::shared_ptr<DirectIoLib> directIoLib;
     static thread_local int nextRingIndex;
     static thread_local std::shared_ptr<BufferPoolEntry>
@@ -197,7 +197,7 @@ private:
         uint32_t, std::shared_ptr<BufferPoolManagedEntry>>
     ringBufferMap[2];
 
-    static thread_local size_t thread_local_used_size[2];
-    static thread_local int thread_local_buffer_count[2];
+    static thread_local size_t threadLocalUsedSize[2];
+    static thread_local int threadLocalBufferCount[2];
 };
 #endif // DUCKDB_BUFFERPOOL_H

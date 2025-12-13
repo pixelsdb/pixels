@@ -46,7 +46,7 @@ ByteBuffer::ByteBuffer(uint32_t size)
  * @param arr uint8_t array of data (should be of length len)
  * @param size Size of space to allocate
  */
-ByteBuffer::ByteBuffer(uint8_t *arr, uint32_t size, bool allocated_by_new)
+ByteBuffer::ByteBuffer(uint8_t* arr, uint32_t size, bool allocated_by_new)
 {
     buf = arr;
     bufSize = size;
@@ -54,10 +54,9 @@ ByteBuffer::ByteBuffer(uint8_t *arr, uint32_t size, bool allocated_by_new)
     name = "";
     fromOtherBB = false;
     this->allocated_by_new = allocated_by_new;
-
 }
 
-ByteBuffer::ByteBuffer(ByteBuffer &bb, uint32_t startId, uint32_t length)
+ByteBuffer::ByteBuffer(ByteBuffer& bb, uint32_t startId, uint32_t length)
 {
     assert(startId >= 0 && startId + length <= bb.size() && length > 0);
     buf = bb.getPointer() + startId;
@@ -66,9 +65,10 @@ ByteBuffer::ByteBuffer(ByteBuffer &bb, uint32_t startId, uint32_t length)
     name = "";
     fromOtherBB = true;
     allocated_by_new = true;
-    fromSlice=false;
+    fromSlice = false;
 }
-ByteBuffer::ByteBuffer(ByteBuffer &bb, uint32_t startId, uint32_t length,bool from_slice)
+
+ByteBuffer::ByteBuffer(ByteBuffer& bb, uint32_t startId, uint32_t length, bool fromSlice)
 {
     assert(startId >= 0 && startId + length <= bb.size() && length > 0);
     buf = bb.getPointer() + startId;
@@ -77,15 +77,17 @@ ByteBuffer::ByteBuffer(ByteBuffer &bb, uint32_t startId, uint32_t length,bool fr
     name = "";
     fromOtherBB = true;
     allocated_by_new = true;
-    fromSlice=true;
+    fromSlice = true;
 }
 
-std::shared_ptr<ByteBuffer> ByteBuffer::slice(uint32_t offset, uint32_t length) {
-    if (offset + length > this->bufSize) {
+std::shared_ptr<ByteBuffer> ByteBuffer::slice(uint32_t offset, uint32_t length)
+{
+    if (offset + length > this->bufSize)
+    {
         throw std::runtime_error("Slice range out of bounds");
     }
 
-    return std::make_shared<ByteBuffer>(*this, offset, length,true);
+    return std::make_shared<ByteBuffer>(*this, offset, length, true);
 }
 
 /**
@@ -171,7 +173,7 @@ uint8_t ByteBuffer::get(uint32_t index)
     return read<uint8_t>(index);
 }
 
-void ByteBuffer::getBytes(uint8_t *buffer, uint32_t len)
+void ByteBuffer::getBytes(uint8_t* buffer, uint32_t len)
 {
     for (uint32_t i = 0; i < len; i++)
     {
@@ -211,23 +213,23 @@ float ByteBuffer::getFloat(uint32_t index)
 
 int ByteBuffer::getInt()
 {
-    return (int) read<int>();
+    return (int)read<int>();
 }
 
 int ByteBuffer::getInt(uint32_t index)
 {
-    return (int) read<int>(index);
+    return (int)read<int>(index);
 }
 
 long ByteBuffer::getLong()
 {
     //TODO: if other type should use this function?
-    return (long) read<uint64_t>();
+    return (long)read<uint64_t>();
 }
 
 long ByteBuffer::getLong(uint32_t index)
 {
-    return (long) read<uint64_t>(index);
+    return (long)read<uint64_t>(index);
 }
 
 short ByteBuffer::getShort()
@@ -240,9 +242,9 @@ short ByteBuffer::getShort(uint32_t index)
     return read<short>(index);
 }
 
-int ByteBuffer::read(uint8_t *buffer, uint32_t off, uint32_t len)
+int ByteBuffer::read(uint8_t* buffer, uint32_t off, uint32_t len)
 {
-    int actualLen = std::min((int) len, (int) bytesRemaining());
+    int actualLen = std::min((int)len, (int)bytesRemaining());
     if (actualLen == 0)
     {
         return 0;
@@ -254,7 +256,7 @@ int ByteBuffer::read(uint8_t *buffer, uint32_t off, uint32_t len)
 
 // Write Functions
 
-void ByteBuffer::put(ByteBuffer *src)
+void ByteBuffer::put(ByteBuffer* src)
 {
     uint32_t len = src->size();
     for (uint32_t i = 0; i < len; i++)
@@ -273,7 +275,7 @@ void ByteBuffer::put(uint8_t b, uint32_t index)
     insert<uint8_t>(b, index);
 }
 
-void ByteBuffer::putBytes(uint8_t *b, uint32_t len)
+void ByteBuffer::putBytes(uint8_t* b, uint32_t len)
 {
     // Insert the data one byte at a time into the internal buffer at position i+starting index
     for (uint32_t i = 0; i < len; i++)
@@ -282,7 +284,7 @@ void ByteBuffer::putBytes(uint8_t *b, uint32_t len)
     }
 }
 
-void ByteBuffer::putBytes(uint8_t *b, uint32_t len, uint32_t index)
+void ByteBuffer::putBytes(uint8_t* b, uint32_t len, uint32_t index)
 {
     wpos = index;
 
@@ -419,7 +421,7 @@ void ByteBuffer::printPosition()
 {
     uint32_t length = size();
     std::cout << "ByteBuffer " << name.c_str() << " Length: " << length << " Read Pos: " << rpos << ". Write Pos: "
-              << wpos << std::endl;
+        << wpos << std::endl;
 }
 
 ByteBuffer::~ByteBuffer()
@@ -441,7 +443,7 @@ ByteBuffer::~ByteBuffer()
     buf = nullptr;
 }
 
-uint8_t *ByteBuffer::getPointer()
+uint8_t* ByteBuffer::getPointer()
 {
     return buf;
 }
@@ -463,7 +465,7 @@ void ByteBuffer::resetReaderIndex()
  *
  * @return internal buffers
  */
-uint8_t *ByteBuffer::getBuffer()
+uint8_t* ByteBuffer::getBuffer()
 {
     return buf + rpos;
 }
@@ -475,8 +477,5 @@ uint8_t *ByteBuffer::getBuffer()
 int ByteBuffer::getBufferOffset()
 {
     return rpos;
-//    return 0;
+    //    return 0;
 }
-
-
-

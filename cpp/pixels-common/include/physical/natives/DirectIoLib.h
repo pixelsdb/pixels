@@ -28,8 +28,7 @@
 /**
  * Mapping Linux I/O functions to native methods.
  * Partially referenced the implementation of Jaydio(https://github.com/smacke/jaydio),
- * which is implemented by Stephen Macke and
- * licensed under Apache 2.0. <p>
+ * which is implemented by Stephen Macke and licensed under Apache 2.0. <p>
  * Created at: 02/02/2023
  * Author: Liangyong Yu
  */

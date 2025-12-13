@@ -26,16 +26,16 @@
 #include "physical/BufferPool/BufferPoolEntry.h"
 #include "physical/BufferPool/Bitmap.h"
 
-BufferPoolEntry::BufferPoolEntry(size_t size, int slice_size, std::shared_ptr<DirectIoLib> direct_lib, int offset,
-                                 int ring_index)
-    : size_(size), is_full_(false), next_free_(0), is_in_use_(false), offset_in_buffers_(offset), is_registered(false),
-      ring_index(ring_index)
+BufferPoolEntry::BufferPoolEntry(size_t size, int slice_size, std::shared_ptr<DirectIoLib> directLib, int offset,
+                                 int ringIndex)
+    : size_(size), isFull_(false), inexFree_(0), isInUse_(false), offsetInBuffers_(offset), isRegistered(false),
+      ringIndex(ringIndex)
 {
     if (size == 0 || slice_size <= 0)
     {
         throw std::invalid_argument("Invalid buffer size or slice size");
     }
-    if (!direct_lib)
+    if (!directLib)
     {
         throw std::invalid_argument("DirectIoLib pointer cannot be null");
     }
@@ -43,7 +43,7 @@ BufferPoolEntry::BufferPoolEntry(size_t size, int slice_size, std::shared_ptr<Di
     const int slice_count = static_cast<int>(size + slice_size - 1 / slice_size);
     // bitmap_ = std::make_shared<Bitmap>(slice_count);
 
-    buffer_ = direct_lib->allocateDirectBuffer(size_, false);
+    buffer_ = directLib->allocateDirectBuffer(size_, false);
     memset(buffer_->getPointer(), 0, buffer_->size());
     if (!buffer_)
     {
@@ -69,22 +69,22 @@ std::shared_ptr<ByteBuffer> BufferPoolEntry::getBuffer() const
 
 bool BufferPoolEntry::isFull() const
 {
-    return is_full_;
+    return isFull_;
 }
 
 
 int BufferPoolEntry::getNextFreeIndex() const
 {
-    return next_free_;
+    return inexFree_;
 }
 
 
 int BufferPoolEntry::setNextFreeIndex(int index)
 {
-    const int old_index = next_free_;
-    next_free_ = index;
-    is_full_ = (index > size_);
-    if (is_full_)
+    const int old_index = inexFree_;
+    inexFree_ = index;
+    isFull_ = (index > size_);
+    if (isFull_)
     {
         return -1;
         // the buffer is full
@@ -94,63 +94,63 @@ int BufferPoolEntry::setNextFreeIndex(int index)
 
 uint64_t BufferPoolEntry::checkCol(uint32_t col) const
 {
-    return nr_bytes_.find(col) == nr_bytes_.end() ? -1 : nr_bytes_.at(col);
+    return nrBytes_.find(col) == nrBytes_.end() ? -1 : nrBytes_.at(col);
 }
 
 void BufferPoolEntry::addCol(uint32_t colId, uint64_t bytes)
 {
-    nr_bytes_[colId] = bytes;
+    nrBytes_[colId] = bytes;
 }
 
 bool BufferPoolEntry::isInUse() const
 {
-    return is_in_use_;
+    return isInUse_;
 }
 
 void BufferPoolEntry::setInUse(bool in_use)
 {
-    is_in_use_ = in_use;
+    isInUse_ = in_use;
 }
 
 int BufferPoolEntry::getOffsetInBuffers() const
 {
-    return offset_in_buffers_;
+    return offsetInBuffers_;
 }
 
 void BufferPoolEntry::setOffsetInBuffers(int offset)
 {
-    offset_in_buffers_ = offset;
+    offsetInBuffers_ = offset;
 }
 
 bool BufferPoolEntry::getIsRegistered() const
 {
-    return is_registered;
+    return isRegistered;
 }
 
 void BufferPoolEntry::setIsRegistered(bool registered)
 {
-    is_registered = registered;
+    isRegistered = registered;
 }
 
 int BufferPoolEntry::getRingIndex() const
 {
-    return ring_index;
+    return ringIndex;
 }
 
-void BufferPoolEntry::setRingIndex(int ring_index)
+void BufferPoolEntry::setRingIndex(int ringIndex)
 {
-    ring_index = ring_index;
+    ringIndex = ringIndex;
 }
 
 void BufferPoolEntry::reset()
 {
-    is_full_ = false;
-    next_free_ = 0;
+    isFull_ = false;
+    inexFree_ = 0;
     // if (bitmap_) {
     //   bitmap_.reset();
     // }
-    nr_bytes_.clear();
-    is_in_use_ = false;
+    nrBytes_.clear();
+    isInUse_ = false;
     // reset direct buffer?
 }
 

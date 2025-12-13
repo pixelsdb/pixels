@@ -34,9 +34,9 @@
 #include "physical/allocator/OrdinaryAllocator.h"
 #include "physical/allocator/BufferPoolAllocator.h"
 
-DirectRandomAccessFile::DirectRandomAccessFile(const std::string &file)
+DirectRandomAccessFile::DirectRandomAccessFile(const std::string& file)
 {
-    FILE *fp = fopen(file.c_str(), "r");
+    FILE* fp = fopen(file.c_str(), "r");
     // checking if the file exist or not
     if (fp == nullptr)
     {
@@ -64,14 +64,13 @@ DirectRandomAccessFile::DirectRandomAccessFile(const std::string &file)
     directIoLib = std::make_shared<DirectIoLib>(fsBlockSize);
     try
     {
-        smallDirectBuffer = directIoLib->allocateDirectBuffer(fsBlockSize,true);
+        smallDirectBuffer = directIoLib->allocateDirectBuffer(fsBlockSize, true);
     }
     catch (...)
     {
         throw std::runtime_error("failed to allocate buffer");
     }
     allocator = std::make_shared<BufferPoolAllocator>();
-
 }
 
 void DirectRandomAccessFile::close()
@@ -87,11 +86,11 @@ void DirectRandomAccessFile::close()
     len = 0;
 }
 
-std::shared_ptr <ByteBuffer> DirectRandomAccessFile::readFully(int len)
+std::shared_ptr<ByteBuffer> DirectRandomAccessFile::readFully(int len)
 {
     if (enableDirect)
     {
-        auto directBuffer = directIoLib->allocateDirectBuffer(len,true);
+        auto directBuffer = directIoLib->allocateDirectBuffer(len, true);
         auto buffer = directIoLib->read(fd, offset, directBuffer, len);
         seek(offset + len);
         largeBuffers.emplace_back(directBuffer);
@@ -108,10 +107,9 @@ std::shared_ptr <ByteBuffer> DirectRandomAccessFile::readFully(int len)
         largeBuffers.emplace_back(buffer);
         return buffer;
     }
-
 }
 
-std::shared_ptr <ByteBuffer> DirectRandomAccessFile::readFully(int len, std::shared_ptr <ByteBuffer> bb)
+std::shared_ptr<ByteBuffer> DirectRandomAccessFile::readFully(int len, std::shared_ptr<ByteBuffer> bb)
 {
     if (enableDirect)
     {
@@ -196,10 +194,4 @@ void DirectRandomAccessFile::populatedBuffer()
         smallBuffer->resetPosition();
         bufferValid = true;
     }
-
 }
-
-
-
-
-

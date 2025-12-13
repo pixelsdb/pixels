@@ -33,7 +33,8 @@
 #include <iostream>
 #include <unordered_set>
 
-class PhysicalLocalReader : public PhysicalReader {
+class PhysicalLocalReader : public PhysicalReader
+{
 public:
   PhysicalLocalReader(std::shared_ptr <Storage> storage, std::string path);
 
@@ -41,13 +42,13 @@ public:
 
   std::shared_ptr <ByteBuffer> readFully(int length, std::shared_ptr <ByteBuffer> bb) override;
 
-  std::shared_ptr <ByteBuffer> readAsync(int length, std::shared_ptr <ByteBuffer> bb, int index,int ring_index,int start_offset);
+  std::shared_ptr <ByteBuffer> readAsync(int length, std::shared_ptr <ByteBuffer> bb, int index,int ringIndex,int startOffset);
 
-  void readAsyncSubmit(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ring_index);
+  void readAsyncSubmit(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ringIndex);
 
-  void readAsyncComplete(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ring_index);
+  void readAsyncComplete(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ringIndex);
 
-  void readAsyncSubmitAndComplete(uint32_t size,std::unordered_set<int> ring_index);
+  void readAsyncSubmitAndComplete(uint32_t size,std::unordered_set<int> ringIndex);
 
   void close() override;
 
@@ -63,7 +64,7 @@ public:
 
   std::string getName() override;
 
-  void addRingIndex(int ring_index);
+  void addRingIndex(int ringIndex);
 
   std::unordered_set<int>& getRingIndexes();
 

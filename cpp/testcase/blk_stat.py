@@ -4,7 +4,7 @@ import re
 import csv
 import argparse
 from collections import Counter
-import os # <-- 导入 os 模块
+import os # <-- import os model
 
 
 def clear_page_cache():
@@ -73,9 +73,9 @@ p2.terminate()
 
 # -------------------- 8️⃣ Create Output Directory and Save Results --------------------
 output_dir = "io_results"
-output_filename = os.path.join(output_dir, f"io_granularity_stats-{benchmark_name}.csv") # 使用 os.path.join 组合路径
+output_filename = os.path.join(output_dir, f"io_granularity_stats-{benchmark_name}.csv")
 
-# --- 检查并创建目录 ---
+# --- check and make directory ---
 if not os.path.exists(output_dir):
     print(f"📁 Output directory '{output_dir}' not found. Creating it...")
     # recursively create directories if they don't exist

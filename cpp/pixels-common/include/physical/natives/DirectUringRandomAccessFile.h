@@ -50,12 +50,12 @@ public:
 
     static bool RegisterMoreBuffer(int index, std::vector<std::shared_ptr<ByteBuffer>> buffers);
 
-    std::shared_ptr<ByteBuffer> readAsync(int length, std::shared_ptr<ByteBuffer> buffer, int index, int ring_index,
-                                          int start_offset);
+    std::shared_ptr<ByteBuffer> readAsync(int length, std::shared_ptr<ByteBuffer> buffer, int index, int ringIndex,
+                                          int startOffset);
 
-    void readAsyncSubmit(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ring_indexs);
+    void readAsyncSubmit(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ringIndexs);
 
-    void readAsyncComplete(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ring_indexs);
+    void readAsyncComplete(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ringIndexs);
 
     void seekByIndex(long offset, int index);
 
@@ -69,9 +69,9 @@ private:
     static thread_local bool isRegistered;
     // static MutexTracker g_mutex_tracker;
     // static TrackedMutex g_mutex;
-    static thread_local std::vector<struct io_uring*> ring_vector;
-    static thread_local std::vector<struct iovec*> iovecs_vector;
+    static thread_local std::vector<struct io_uring*> ringVector;
+    static thread_local std::vector<struct iovec*> iovecsVector;
     static thread_local uint32_t iovecSize;
-    static thread_local std::vector<long> offsets_vector;
+    static thread_local std::vector<long> offsetsVector;
 };
 #endif // DUCKDB_DIRECTURINGRANDOMACCESSFILE_H

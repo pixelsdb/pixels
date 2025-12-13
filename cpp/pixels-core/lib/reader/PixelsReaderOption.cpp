@@ -68,11 +68,11 @@ long PixelsReaderOption::getQueryId()
 }
 
 int PixelsReaderOption::getRingIndex() const {
-    return ring_index;
+    return ringIndex;
 }
 
 void PixelsReaderOption::setRingIndex(int i) {
-    ring_index = i;
+    ringIndex = i;
 }
 
 void PixelsReaderOption::setRGRange(int start, int len)

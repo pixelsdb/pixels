@@ -9,7 +9,7 @@
 # ====================================================
 
 # --- Configure FlameGraph Path ---
-FLAMEGRAPH_DIR="$HOME/FlameGraph"
+FLAMEGRAPH_DIR="$HOME/third-party/FlameGraph"
 STACKCOLLAPSE="${FLAMEGRAPH_DIR}/stackcollapse-perf.pl"
 FLAMEGRAPH_PL="${FLAMEGRAPH_DIR}/flamegraph.pl"
 

@@ -1,5 +1,5 @@
 /*
-* Copyright 2025 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -19,131 +19,162 @@
  */
 
 /*
+ * File Description:
+ * This file provides mutex tracking utilities for debugging and diagnosing
+ * concurrency issues. It wraps std::mutex to record ownership information
+ * (which thread currently holds a mutex) and helps detect incorrect usage
+ * such as repeated locking of non-recursive mutexes by the same thread.
+ * It used in previous version: global Bufferpool, but it has been deprecated in latest version: threadLocal Bufferpool
+ *
+ * The main components include:
+ *  - MutexTracker: A global tracker that maintains mutex-to-thread ownership.
+ *  - TrackedMutex: A mutex wrapper that reports lock/unlock events.
+ *  - TrackedLockGuard: An RAII-style lock guard for TrackedMutex.
+ *
  * @author whz
  * @create 2025-08-23
  */
 
 #ifndef DUCKDB_MUTEX_H
 #define DUCKDB_MUTEX_H
+
 #include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <stdexcept>
 #include <iostream>
 #include <string>
-class MutexTracker {
+
+class MutexTracker
+{
 private:
-    // Stores the mapping between mutexes and their owning thread IDs
-    std::unordered_map<const std::mutex*, std::thread::id> mutex_owners;
-    // Internal mutex to protect the mapping table
-    std::mutex internal_mutex;
+    // Mapping between mutex pointers and their owning thread IDs
+    std::unordered_map<const std::mutex*, std::thread::id> mutexOwners;
+
+    // Internal mutex to protect the ownership map
+    std::mutex internalMutex;
 
 public:
-    // Gets the thread ID of the mutex owner; returns default ID if not held
-    std::thread::id get_owner(const std::mutex* mutex) {
-        std::lock_guard<std::mutex> lock(internal_mutex);
-        auto it = mutex_owners.find(mutex);
-        if (it != mutex_owners.end()) {
+    // Returns the owner thread ID of a mutex, or default thread::id if not held
+    std::thread::id getOwner(const std::mutex* mutex)
+    {
+        std::lock_guard<std::mutex> lock(internalMutex);
+        auto it = mutexOwners.find(mutex);
+        if (it != mutexOwners.end())
+        {
             return it->second;
         }
-        return std::thread::id(); // Not held by any thread
+        return std::thread::id();
     }
 
-    // Records that a mutex has been acquired
-    void lock_acquired(const std::mutex* mutex) {
-        std::lock_guard<std::mutex> lock(internal_mutex);
-        auto current_thread = std::this_thread::get_id();
+    // Records that the mutex has been acquired by the current thread
+    void lockAcquired(const std::mutex* mutex)
+    {
+        std::lock_guard<std::mutex> lock(internalMutex);
+        auto currentThread = std::this_thread::get_id();
 
-        // Check for duplicate acquisition (to prevent recursive lock issues)
-        auto it = mutex_owners.find(mutex);
-        if (it != mutex_owners.end()) {
-            if (it->second == current_thread) {
-                // Same thread acquiring a non-recursive mutex repeatedly, may cause deadlock
-                throw std::runtime_error("Same thread acquiring non-recursive mutex repeatedly");
-            }
+        auto it = mutexOwners.find(mutex);
+        if (it != mutexOwners.end() && it->second == currentThread)
+        {
+            throw std::runtime_error(
+                "Same thread acquiring non-recursive mutex repeatedly");
         }
 
-        mutex_owners[mutex] = current_thread;
+        mutexOwners[mutex] = currentThread;
     }
 
-    // Records that a mutex has been released
-    void lock_released(const std::mutex* mutex) {
-        std::lock_guard<std::mutex> lock(internal_mutex);
-        mutex_owners.erase(mutex);
+    // Records that the mutex has been released
+    void lockReleased(const std::mutex* mutex)
+    {
+        std::lock_guard<std::mutex> lock(internalMutex);
+        mutexOwners.erase(mutex);
     }
 
-    // Prints information about the mutex owner
-    void print_owner(const std::mutex* mutex, const std::string& mutex_name) {
-        std::thread::id owner = get_owner(mutex);
-        if (owner == std::thread::id()) {
-            std::cout << mutex_name << " is not held by any thread" << std::endl;
-        } else {
-            std::cout << mutex_name << " is held by thread " << std::hash<std::thread::id>{}(owner)
+    // Prints the owner information of a mutex
+    void printOwner(const std::mutex* mutex, const std::string& mutexName)
+    {
+        std::thread::id owner = getOwner(mutex);
+        if (owner == std::thread::id())
+        {
+            std::cout << mutexName << " is not held by any thread" << std::endl;
+        }
+        else
+        {
+            std::cout << mutexName << " is held by thread "
+                      << std::hash<std::thread::id>{}(owner)
                       << std::endl;
         }
     }
 };
 
-
-// Mutex wrapper with tracking functionality
-class TrackedMutex {
+// Mutex wrapper with ownership tracking
+class TrackedMutex
+{
 private:
-    std::mutex internal_mutex;
+    std::mutex internalMutex;
     std::string name;
-    MutexTracker g_mutex_tracker;
+    MutexTracker& mutexTracker;
 
 public:
-    TrackedMutex(const std::string& name, MutexTracker& g_mutex_tracker) : name(name) {}
-
-    // Locks the mutex and records the owner
-    void lock() {
-        internal_mutex.lock();
-        g_mutex_tracker.lock_acquired(&internal_mutex);
+    TrackedMutex(const std::string& name, MutexTracker& mutexTracker)
+        : name(name), mutexTracker(mutexTracker)
+    {
     }
 
-    // Unlocks the mutex and clears the owner record
-    void unlock() {
-        g_mutex_tracker.lock_released(&internal_mutex);
-        internal_mutex.unlock();
+    void lock()
+    {
+        internalMutex.lock();
+        mutexTracker.lockAcquired(&internalMutex);
     }
 
-    // Tries to lock the mutex (records owner if successful)
-    bool try_lock() {
-        if (internal_mutex.try_lock()) {
-            g_mutex_tracker.lock_acquired(&internal_mutex);
+    void unlock()
+    {
+        mutexTracker.lockReleased(&internalMutex);
+        internalMutex.unlock();
+    }
+
+    bool tryLock()
+    {
+        if (internalMutex.try_lock())
+        {
+            mutexTracker.lockAcquired(&internalMutex);
             return true;
         }
         return false;
     }
 
-    // Gets the mutex name
-    const std::string& get_name() const { return name; }
+    const std::string& getName() const
+    {
+        return name;
+    }
 
-    // Gets pointer to internal mutex (for tracking purposes)
-    const std::mutex* get_internal_mutex() const {
-        return &internal_mutex;
+    const std::mutex* getInternalMutex() const
+    {
+        return &internalMutex;
     }
 };
 
-// RAII lock manager for use with TrackedMutex
-template<typename Mutex>
-class TrackedLockGuard {
+// RAII-style lock guard for TrackedMutex
+template <typename Mutex>
+class TrackedLockGuard
+{
 private:
     Mutex& mutex;
 
 public:
-    TrackedLockGuard(Mutex& m) : mutex(m) {
+    explicit TrackedLockGuard(Mutex& mutex) : mutex(mutex)
+    {
         mutex.lock();
     }
 
-    ~TrackedLockGuard() {
+    ~TrackedLockGuard()
+    {
         mutex.unlock();
     }
 
-    // Disable copying
     TrackedLockGuard(const TrackedLockGuard&) = delete;
     TrackedLockGuard& operator=(const TrackedLockGuard&) = delete;
 };
 
-
 #endif // DUCKDB_MUTEX_H
+

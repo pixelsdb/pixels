@@ -71,13 +71,13 @@ std::vector<std::shared_ptr<ByteBuffer>> NoopScheduler::executeBatch(
             }
             results.at(i) = localReader->readAsync(request.length, reuseBuffers.at(i),
                                                    request.bufferId,
-                                                   request.ring_index, request.start);
-            if (ring_index_set.find(request.ring_index) == ring_index_set.end())
+                                                   request.ringIndex, request.start);
+            if (ring_index_set.find(request.ringIndex) == ring_index_set.end())
             {
-                ring_index_set.insert(request.ring_index);
-                localReader->addRingIndex(request.ring_index);
+                ring_index_set.insert(request.ringIndex);
+                localReader->addRingIndex(request.ringIndex);
             }
-            ringIndexCountMap[request.ring_index]++;
+            ringIndexCountMap[request.ringIndex]++;
         }
         localReader->readAsyncSubmit(ringIndexCountMap, ring_index_set);
         localReader->setRingIndexCountMap(ringIndexCountMap);

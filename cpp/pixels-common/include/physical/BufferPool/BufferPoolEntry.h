@@ -1,5 +1,5 @@
 /*
-* Copyright 2025 PixelsDB.
+ * Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -34,8 +34,8 @@ class BufferPoolEntry
 {
 public:
     explicit BufferPoolEntry(size_t size, int slice_size,
-                             std::shared_ptr<DirectIoLib> direct_lib, int offset,
-                             int ring_index);
+                             std::shared_ptr<DirectIoLib> directLib, int offset,
+                             int ringIndex);
     size_t getSize() const;
     std::shared_ptr<Bitmap> getBitmap() const;
     std::shared_ptr<ByteBuffer> getBuffer() const;
@@ -52,20 +52,20 @@ public:
     bool getIsRegistered() const;
     void setIsRegistered(bool registered);
     int getRingIndex() const;
-    void setRingIndex(int ring_index);
+    void setRingIndex(int ringIndex);
     void reset();
 
 private:
     size_t size_;
     std::shared_ptr<Bitmap> bitmap_;
     std::shared_ptr<ByteBuffer> buffer_;
-    bool is_full_;
-    int next_free_;
-    std::map<uint32_t, uint64_t> nr_bytes_;
-    bool is_in_use_;
-    int offset_in_buffers_;
-    bool is_registered;
-    int ring_index;
+    bool isFull_;
+    int inexFree_;
+    std::map<uint32_t, uint64_t> nrBytes_;
+    bool isInUse_;
+    int offsetInBuffers_;
+    bool isRegistered;
+    int ringIndex;
 };
 
 #endif // BUFFERPOOLENTRY_H

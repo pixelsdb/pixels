@@ -31,10 +31,10 @@ std::mutex DirectUringRandomAccessFile::mutex_;
 // thread local
 thread_local bool DirectUringRandomAccessFile::isRegistered = false;
 thread_local std::vector<struct io_uring*>
-DirectUringRandomAccessFile::ring_vector;
+DirectUringRandomAccessFile::ringVector;
 thread_local std::vector<struct iovec*>
-DirectUringRandomAccessFile::iovecs_vector;
-thread_local std::vector<long> DirectUringRandomAccessFile::offsets_vector;
+DirectUringRandomAccessFile::iovecsVector;
+thread_local std::vector<long> DirectUringRandomAccessFile::offsetsVector;
 thread_local uint32_t DirectUringRandomAccessFile::iovecSize = 0;
 
 DirectUringRandomAccessFile::DirectUringRandomAccessFile(
@@ -67,12 +67,10 @@ void DirectUringRandomAccessFile::RegisterBufferFromPool(
             iovecs[i].iov_base = buffer->getPointer();
             iovecs[i].iov_len = buffer->size();
         }
-        iovecs_vector.emplace_back(iovecs);
+        iovecsVector.emplace_back(iovecs);
         int ret = io_uring_register_buffers(ring, iovecs, iovecSize);
         if (ret != 0)
         {
-            std::cerr << "io_uring_register_buffers failed: " << strerror(errno)
-                << ", ret=" << ret << std::strerror(ret) << std::endl;
             throw InvalidArgumentException(
                 "DirectUringRandomAccessFile::RegisterBufferFromPool: register "
                 "buffer fails. ");
@@ -97,8 +95,8 @@ void DirectUringRandomAccessFile::RegisterBuffer(
             iovecs[i].iov_len = buffer->size();
             memset(iovecs[i].iov_base, 0, buffer->size());
         }
-        ring_vector.emplace_back(ring);
-        iovecs_vector.emplace_back(iovecs);
+        ringVector.emplace_back(ring);
+        iovecsVector.emplace_back(iovecs);
         int ret = io_uring_register_buffers(ring, iovecs, iovecSize);
         if (ret != 0)
         {
@@ -121,24 +119,20 @@ void DirectUringRandomAccessFile::Reset()
     // For example, two threads A and B share the same global state. If A finish
     // all files while B just starts, B would execute Reset function from
     // InitLocal. If we don't set this 'if' branch, ring would be double freed.
-    for (auto ring : ring_vector)
+    for (auto ring : ringVector)
     {
         if (ring != nullptr)
         {
             // We don't use this function anymore since it slows down the speed
-            //		if(io_uring_unregister_buffers(ring) != 0) {
-            //			throw
-            //InvalidArgumentException("DirectUringRandomAccessFile::UnregisterBuffer:
-            //unregister buffer fails. ");
-            //		}
+            // TODO: use this function to reset the bufferpool
             io_uring_queue_exit(ring);
             delete (ring);
             ring = nullptr;
             isRegistered = false;
         }
     }
-    ring_vector.clear();
-    for (auto iovecs : iovecs_vector)
+    ringVector.clear();
+    for (auto iovecs : iovecsVector)
     {
         if (iovecs != nullptr)
         {
@@ -146,7 +140,7 @@ void DirectUringRandomAccessFile::Reset()
             iovecs = nullptr;
         }
     }
-    iovecs_vector.clear();
+    iovecsVector.clear();
 }
 
 bool DirectUringRandomAccessFile::RegisterMoreBuffer(
@@ -163,7 +157,7 @@ bool DirectUringRandomAccessFile::RegisterMoreBuffer(
         iovecs[i].iov_base = buffer->getPointer();
         iovecs[i].iov_len = buffer->size();
     }
-    iovecs_vector.emplace_back(iovecs);
+    iovecsVector.emplace_back(iovecs);
     int ret = io_uring_register_buffers(ring, iovecs, iovecSize);
     if (ret != 0)
     {
@@ -179,11 +173,11 @@ DirectUringRandomAccessFile::~DirectUringRandomAccessFile()
 }
 
 std::shared_ptr<ByteBuffer> DirectUringRandomAccessFile::readAsync(
-    int length, std::shared_ptr<ByteBuffer> buffer, int index, int ring_index,
-    int start_offset)
+    int length, std::shared_ptr<ByteBuffer> buffer, int index, int ringIndex,
+    int startOffset)
 {
-    auto ring = DirectUringRandomAccessFile::getRing(ring_index);
-    auto offset = start_offset;
+    auto ring = DirectUringRandomAccessFile::getRing(ringIndex);
+    auto offset = startOffset;
 
     if (enableDirect)
     {
@@ -207,7 +201,7 @@ std::shared_ptr<ByteBuffer> DirectUringRandomAccessFile::readAsync(
                 "insufficient. "
                 << "Required: " << required_buffer_size
                 << ", Actual: " << buffer->size()
-                << ", ring_index: " << ring_index << ", index: " << index
+                << ", ringIndex: " << ringIndex << ", index: " << index
                 << "Required alignment: " << block_size << ", length:" << length
                 << std::endl;;
             throw InvalidArgumentException(ss.str());
@@ -223,7 +217,7 @@ std::shared_ptr<ByteBuffer> DirectUringRandomAccessFile::readAsync(
 
         auto bb = std::make_shared<ByteBuffer>(*buffer, offset - fileOffsetAligned,
                                                length);
-        seekByIndex(offset + length, ring_index);
+        seekByIndex(offset + length, ringIndex);
         return bb;
     }
     else
@@ -239,11 +233,11 @@ std::shared_ptr<ByteBuffer> DirectUringRandomAccessFile::readAsync(
 
 void DirectUringRandomAccessFile::seekByIndex(long off, int index)
 {
-    if (index < 0 || static_cast<size_t>(index) >= offsets_vector.size())
+    if (index < 0 || static_cast<size_t>(index) >= offsetsVector.size())
     {
         std::stringstream ss;
         ss << "DirectUringRandomAccessFile::seekByIndex: invalid index. "
-            << "Index: " << index << ", Vector size: " << offsets_vector.size();
+            << "Index: " << index << ", Vector size: " << offsetsVector.size();
         throw InvalidArgumentException(ss.str());
     }
     if (off < 0)
@@ -253,14 +247,14 @@ void DirectUringRandomAccessFile::seekByIndex(long off, int index)
             << "Offset: " << off << ", Index: " << index;
         throw InvalidArgumentException(ss.str());
     }
-    offsets_vector.at(index) = off;
+    offsetsVector.at(index) = off;
 }
 
 void DirectUringRandomAccessFile::readAsyncSubmit(
     std::unordered_map<int, uint32_t> sizes,
-    std::unordered_set<int> ring_index)
+    std::unordered_set<int> ringIndex)
 {
-    for (auto i : ring_index)
+    for (auto i : ringIndex)
     {
         auto ring = DirectUringRandomAccessFile::getRing(i);
         int ret = io_uring_submit(ring);
@@ -283,17 +277,16 @@ void DirectUringRandomAccessFile::readAsyncSubmit(
 
 void DirectUringRandomAccessFile::readAsyncComplete(
     std::unordered_map<int, uint32_t> sizes,
-    std::unordered_set<int> ring_index)
+    std::unordered_set<int> ringIndex)
 {
     // Important! We cannot write the code as io_uring_wait_cqe_nr(ring, &cqe,
     // iovecSize). The reason is unclear, but some random bugs would happen. It
     // takes me nearly a week to find this bug
-    for (auto idx : ring_index)
+    for (auto idx : ringIndex)
     {
-        // 重命名外层循环变量，避免与内层冲突
         struct io_uring_cqe* cqe;
         auto ring = DirectUringRandomAccessFile::getRing(idx);
-        for (int j = 0; j < sizes[idx]; j++) // 注意：这里使用外层的idx作为sizes的键
+        for (int j = 0; j < sizes[idx]; j++)
         {
             if (io_uring_wait_cqe_nr(ring, &cqe, 1) != 0)
             {
@@ -307,7 +300,7 @@ void DirectUringRandomAccessFile::readAsyncComplete(
 
 struct io_uring* DirectUringRandomAccessFile::getRing(int index)
 {
-    if (index >= ring_vector.size())
+    if (index >= ringVector.size())
     {
         // need to add more rings
         // initialize io_uring ring
@@ -327,8 +320,8 @@ struct io_uring* DirectUringRandomAccessFile::getRing(int index)
                     "DirectRandomAccessFile: initialize io_uring fails.");
             }
         }
-        ring_vector.emplace_back(ring);
-        offsets_vector.emplace_back(0);
+        ringVector.emplace_back(ring);
+        offsetsVector.emplace_back(0);
     }
-    return ring_vector[index];
+    return ringVector[index];
 }

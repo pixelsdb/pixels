@@ -43,7 +43,7 @@ public:
 
     ByteBuffer(ByteBuffer &bb, uint32_t startId, uint32_t length);
 
-    ByteBuffer(ByteBuffer &bb,uint32_t startId,uint32_t length,bool from_slice);
+    ByteBuffer(ByteBuffer &bb,uint32_t startId,uint32_t length,bool fromSlice);
 
     ~ByteBuffer();
 

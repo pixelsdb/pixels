@@ -106,7 +106,7 @@ private:
     PixelsReaderOption option;
     duckdb::TableFilterSet *filter;
     long queryId;
-    int ring_index;
+    int ringIndex;
     int RGStart;
     int RGLen;
     bool everRead;
