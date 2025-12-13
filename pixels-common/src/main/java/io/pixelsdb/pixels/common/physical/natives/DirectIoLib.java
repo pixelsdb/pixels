@@ -52,7 +52,7 @@ public class DirectIoLib
 {
     private static final Logger logger = LogManager.getLogger(DirectIoLib.class);
     /**
-     * The soft block size for use with transfer multiples and memory alignment multiples
+     * The soft block size for use with transfer multiples and memory alignment multiples.
      */
     public static final int FsBlockSize;
     private static final long fsBlockNotMask;
@@ -190,9 +190,9 @@ public class DirectIoLib
      * <tt>alignment</tt>. It is guaranteed that the block may be freed by calling @{link {@link #free(Pointer)}
      * on the starting address. See "man 3 posix_memalign".
      *
-     * @param memptr The pointer-to-pointer which will point to the address of the allocated aligned block
-     * @param alignment The alignment multiple of the starting address of the allocated block
-     * @param size The number of bytes to allocate
+     * @param memptr the pointer-to-pointer which will point to the address of the allocated aligned block
+     * @param alignment the alignment multiple of the starting address of the allocated block
+     * @param size the number of bytes to allocate
      * @return 0 on success, one of the error codes in errno.h (however, errno is not set) on failure.
      */
     private static native int posix_memalign(PointerByReference memptr, long alignment, long size);
@@ -266,7 +266,7 @@ public class DirectIoLib
      * manually free the allocated memory in time, which further improves the memory allocation performance.
      * </p>
      * @param size the number of byte should be allocated at least, must be positive.
-     * @return
+     * @return the allocated direct buffer
      */
     public static DirectBuffer allocateBuffer(int size) throws IllegalAccessException, InvocationTargetException, IOException
     {
@@ -299,11 +299,11 @@ public class DirectIoLib
 
     /**
      * This method is used to read files that are opened by {@link #open(String, boolean)}..
-     * @param fd A file descriptor to pass to native pread
-     * @param fileOffset The file offset at which to read
-     * @param buffer he buffer into which to record the file read
+     * @param fd the file descriptor to pass to native pread
+     * @param fileOffset the file offset at which to read
+     * @param buffer the buffer into which to record the file read
      * @param length the number of bytes to read from the file
-     * @return The number of bytes successfully read from the file
+     * @return the number of bytes successfully read from the file
      * @throws IOException
      */
     public static int read(int fd, long fileOffset, DirectBuffer buffer, int length) throws IOException
@@ -330,11 +330,11 @@ public class DirectIoLib
      * Currently, the only other flags passed in are <tt>O_RDONLY</tt> if <tt>readOnly</tt> is <tt>true</tt>, and
      * (if not) <tt>O_RDWR</tt> and <tt>O_CREAT</tt>.
      *
-     * @param path The path to the file to open. If file does not exist, and we are opening
+     * @param path the path to the file to open. If file does not exist, and we are opening
      *             with <tt>readOnly</tt>, this will throw an error. Otherwise, if it does
      *             not exist, but we have <tt>readOnly</tt> set to false, create the file.
-     * @param readOnly Whether to pass in <tt>O_RDONLY</tt>
-     * @return An integer file descriptor for the opened file
+     * @param readOnly whether to pass in <tt>O_RDONLY</tt>
+     * @return an integer file descriptor for the opened file
      * @throws IOException
      */
     public static int open(String path, boolean readOnly) throws IOException
@@ -409,7 +409,7 @@ public class DirectIoLib
     /**
      * Hooks into errno using Native.getLastError(), and parses it with native strerror function.
      *
-     * @return An error message corresponding to the last <tt>errno</tt>
+     * @return an error message corresponding to the last <tt>errno</tt>
      */
     private static String getLastError()
     {
@@ -423,7 +423,7 @@ public class DirectIoLib
      * to <tt>value</tt> which is a multiple of the fs block size.
      *
      * @param value
-     * @return The largest number less than or equal to <tt>value</tt>
+     * @return the largest number less than or equal to <tt>value</tt>
      * which is a multiple of the soft block size
      */
     private static long blockStart(long value)
@@ -444,7 +444,7 @@ public class DirectIoLib
      * to <tt>value</tt> which is a multiple of the fs block size.
      *
      * @param value
-     * @return The smallest number greater than or equal to <tt>value</tt>
+     * @return the smallest number greater than or equal to <tt>value</tt>
      * which is a multiple of the soft block size
      */
     private static long blockEnd(long value)

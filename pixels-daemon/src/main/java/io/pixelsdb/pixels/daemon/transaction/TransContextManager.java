@@ -424,7 +424,7 @@ public class TransContextManager
      * Get the minimal timestamp of running readonly or non-readonly transactions.
      * This method does not acquire a lock as it only reads a snapshot of the current running transactions.
      * @param readOnly readonly trans or not
-     * @return the minimal transaction time stamp
+     * @return the minimal transaction timestamp
      */
     public long getMinRunningTransTimestamp(boolean readOnly)
     {
