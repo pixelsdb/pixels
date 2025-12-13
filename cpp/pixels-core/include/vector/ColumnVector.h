@@ -85,6 +85,7 @@ public:
     uint64_t *isValid;
 
     explicit ColumnVector(uint64_t len, bool encoding);
+    ~ColumnVector();
 
     idx_t getCapacity() const;
 

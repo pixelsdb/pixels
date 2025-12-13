@@ -31,33 +31,47 @@
 #include "exception/InvalidArgumentException.h"
 #include "DirectIoLib.h"
 #include "physical/BufferPool.h"
+#include "unordered_set"
+#include <mutex>
+#include "utils/MutexTracker.h"
 
 class DirectUringRandomAccessFile : public DirectRandomAccessFile
 {
 public:
-    explicit DirectUringRandomAccessFile(const std::string &file);
+    explicit DirectUringRandomAccessFile(const std::string& file);
 
-    static void RegisterBuffer(std::vector <std::shared_ptr<ByteBuffer>> buffers);
+    static void RegisterBuffer(std::vector<std::shared_ptr<ByteBuffer>> buffers);
 
-    static void RegisterBufferFromPool(std::vector <uint32_t> colIds);
+    static void RegisterBufferFromPool(std::vector<uint32_t> colIds);
 
     static void Initialize();
 
     static void Reset();
 
-    std::shared_ptr <ByteBuffer> readAsync(int length, std::shared_ptr <ByteBuffer> buffer, int index);
+    static bool RegisterMoreBuffer(int index, std::vector<std::shared_ptr<ByteBuffer>> buffers);
 
-    void readAsyncSubmit(int size);
+    std::shared_ptr<ByteBuffer> readAsync(int length, std::shared_ptr<ByteBuffer> buffer, int index, int ringIndex,
+                                          int startOffset);
 
-    void readAsyncComplete(int size);
+    void readAsyncSubmit(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ringIndexs);
+
+    void readAsyncComplete(std::unordered_map<int, uint32_t> sizes, std::unordered_set<int> ringIndexs);
+
+    void seekByIndex(long offset, int index);
+
+    static struct io_uring* getRing(int index);
 
     ~DirectUringRandomAccessFile();
 
 private:
-    static thread_local struct io_uring *ring;
+    // thread_local
+    static std::mutex mutex_;
     static thread_local bool isRegistered;
-    static thread_local struct iovec *iovecs;
-    static thread_local uint32_t
-    iovecSize;
+    // static MutexTracker g_mutex_tracker;
+    // static TrackedMutex g_mutex;
+    static thread_local std::vector<struct io_uring*> ringVector;
+    static thread_local std::vector<struct iovec*> iovecsVector;
+    static thread_local uint32_t iovecSize;
+    static thread_local std::vector<long> offsetsVector;
 };
 #endif // DUCKDB_DIRECTURINGRANDOMACCESSFILE_H

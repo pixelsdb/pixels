@@ -26,52 +26,64 @@
 #define PIXELS_READER_PHYSICALLOCALREADER_H
 
 #include "physical/PhysicalReader.h"
-#include "physical/storage/LocalFS.h"
 #include "physical/natives/DirectRandomAccessFile.h"
 #include "physical/natives/DirectUringRandomAccessFile.h"
-#include <iostream>
+#include "physical/storage/LocalFS.h"
 #include <atomic>
-
+#include <iostream>
+#include <unordered_set>
 
 class PhysicalLocalReader : public PhysicalReader
 {
 public:
-    PhysicalLocalReader(std::shared_ptr <Storage> storage, std::string path);
+  PhysicalLocalReader(std::shared_ptr <Storage> storage, std::string path);
 
-    std::shared_ptr <ByteBuffer> readFully(int length) override;
+  std::shared_ptr <ByteBuffer> readFully(int length) override;
 
-    std::shared_ptr <ByteBuffer> readFully(int length, std::shared_ptr <ByteBuffer> bb) override;
+  std::shared_ptr <ByteBuffer> readFully(int length, std::shared_ptr <ByteBuffer> bb) override;
 
-    std::shared_ptr <ByteBuffer> readAsync(int length, std::shared_ptr <ByteBuffer> bb, int index);
+  std::shared_ptr <ByteBuffer> readAsync(int length, std::shared_ptr <ByteBuffer> bb, int index,int ringIndex,int startOffset);
 
-    void readAsyncSubmit(uint32_t size);
+  void readAsyncSubmit(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ringIndex);
 
-    void readAsyncComplete(uint32_t size);
+  void readAsyncComplete(std::unordered_map<int,uint32_t> sizes,std::unordered_set<int> ringIndex);
 
-    void readAsyncSubmitAndComplete(uint32_t size);
+  void readAsyncSubmitAndComplete(uint32_t size,std::unordered_set<int> ringIndex);
 
-    void close() override;
+  void close() override;
 
-    long getFileLength() override;
+  long getFileLength() override;
 
-    void seek(long desired) override;
+  void seek(long desired) override;
 
-    long readLong() override;
+  long readLong() override;
 
-    int readInt() override;
+  int readInt() override;
 
-    char readChar() override;
+  char readChar() override;
 
-    std::string getName() override;
+  std::string getName() override;
+
+  void addRingIndex(int ringIndex);
+
+  std::unordered_set<int>& getRingIndexes();
+
+  std::unordered_map<int,uint32_t> getRingIndexCountMap();
+
+  void setRingIndexCountMap(std::unordered_map<int,uint32_t> ringIndexCount);
 
 private:
-    std::shared_ptr <LocalFS> local;
-    std::string path;
-    long id;
-    std::atomic<int> numRequests;
-    std::atomic<int> asyncNumRequests;
-    std::shared_ptr <PixelsRandomAccessFile> raf;
-
+  std::shared_ptr <LocalFS> local;
+  std::string path;
+  long id;
+  std::atomic<int> numRequests;
+  std::atomic<int> asyncNumRequests;
+  std::shared_ptr <PixelsRandomAccessFile> raf;
+  // usr for bufferpool
+  bool isBufferValid;
+  std::unordered_set<std::shared_ptr<PixelsRandomAccessFile>> ringIndexes;
+  std::unordered_set<int> ring_index_vector;
+  std::unordered_map<int, uint32_t> ringIndexCountMap;
 };
 
 #endif //PIXELS_READER_PHYSICALLOCALREADER_H

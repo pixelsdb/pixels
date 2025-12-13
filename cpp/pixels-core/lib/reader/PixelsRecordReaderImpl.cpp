@@ -25,7 +25,7 @@
 #include "reader/PixelsRecordReaderImpl.h"
 #include "physical/io/PhysicalLocalReader.h"
 #include "profiler/CountProfiler.h"
-
+std::mutex PixelsRecordReaderImpl::mutex_;
 PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> reader,
                                                const pixels::proto::PostScript &pixelsPostScript,
                                                const pixels::proto::Footer &pixelsFooter,
@@ -37,7 +37,7 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> 
     postScript = pixelsPostScript;
     footerCache = pixelsFooterCache;
     option = opt;
-    // TODO: intialize all kinds of variables
+    // TODO: intialize all kinds of variable
     queryId = option.getQueryId();
     RGStart = option.getRGStart();
     RGLen = option.getRGLen();
@@ -361,7 +361,7 @@ void PixelsRecordReaderImpl::prepareRead()
             uint64_t footerOffset = rowGroupInformation.footeroffset();
             uint64_t footerLength = rowGroupInformation.footerlength();
             fis.push_back(i);
-            requestBatch.add(queryId, (int) footerOffset, (int) footerLength);
+            requestBatch.add(queryId, (int) footerOffset, (int) footerLength,ringIndex);
             rowGroupFooterCacheHit.at(i) = false;
         }
     }
@@ -401,7 +401,8 @@ void PixelsRecordReaderImpl::asyncReadComplete(int requestSize)
         if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
         {
             auto localReader = std::static_pointer_cast<PhysicalLocalReader>(physicalReader);
-            localReader->readAsyncComplete(requestSize);
+            auto ringIndexCountMap=localReader->getRingIndexCountMap();
+            localReader->readAsyncComplete(ringIndexCountMap,localReader->getRingIndexes());
             asyncReadRequestNum -= requestSize;
         }
         else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
@@ -456,6 +457,7 @@ bool PixelsRecordReaderImpl::read()
 
     if (!diskChunks.empty())
     {
+        // std::lock_guard<std::mutex> lock(mutex_);
         RequestBatch requestBatch((int) diskChunks.size());
         Scheduler *scheduler = SchedulerFactory::Instance()->getScheduler();
         std::vector <uint32_t> colIds;
@@ -463,20 +465,41 @@ bool PixelsRecordReaderImpl::read()
         for (int i = 0; i < diskChunks.size(); i++)
         {
             ChunkId chunk = diskChunks.at(i);
-            requestBatch.add(queryId, chunk.offset, (int) chunk.length, ::BufferPool::GetBufferId(i));
+            requestBatch.add(queryId, chunk.offset, (int) chunk.length, ::BufferPool::GetBufferId());
             colIds.emplace_back(chunk.columnId);
             bytes.emplace_back(chunk.length);
         }
-        ::BufferPool::Initialize(colIds, bytes, fileSchema->getFieldNames());
+
+        std::thread::id thread_id=std::this_thread::get_id();
+        auto columnNames=fileSchema->getFieldNames();
+        ::BufferPool::Initialize(colIds, bytes, columnNames);
         ::DirectUringRandomAccessFile::RegisterBufferFromPool(colIds);
         std::vector <std::shared_ptr<ByteBuffer>> originalByteBuffers;
+        std::vector<int> ring_col;
         for (int i = 0; i < colIds.size(); i++)
         {
             auto colId = colIds.at(i);
-            originalByteBuffers.emplace_back(::BufferPool::GetBuffer(colId));
+            auto byte=bytes.at(i);
+            auto currentBufferEntry=::BufferPool::GetBuffer(colId,byte,columnNames[colId]);
+            originalByteBuffers.emplace_back(currentBufferEntry);
+            requestBatch.getRequest(i).ringIndex=::BufferPool::getRingIndex(colId);
+            if (currentBufferEntry->size()-requestBatch.getRequest(i).length<=4096) {
+                std::cout<<"i:"<<i<<" ringIndex:"<<requestBatch.getRequest(i).ringIndex<<
+                    " colId:"<<colId<<" byte:"<<byte<<" currentBuffer size"<<currentBufferEntry->size()<<
+                " requestBatch.length"<<requestBatch.getRequest(i).length<<
+                    " columnNames:"<<columnNames[colId]<<std::endl;
+                throw InvalidArgumentException("PixelsRecordReaderImpl:read 临界区");
+            }
+
+            if (requestBatch.getRequest(i).ringIndex !=0) {
+                requestBatch.getRequest(i).bufferId=0;
+                ring_col.emplace_back(i);
+            }
         }
 
-        auto byteBuffers = scheduler->executeBatch(
+        // ::BufferPool::PrintStats();
+
+           auto byteBuffers = scheduler->executeBatch(
             physicalReader, requestBatch, originalByteBuffers, queryId);
 
         if(ConfigFactory::Instance().boolCheckProperty("localfs.enable.async.io")
@@ -490,6 +513,7 @@ bool PixelsRecordReaderImpl::read()
             ChunkId chunk = diskChunks.at(index);
             std::shared_ptr <ByteBuffer> bb = byteBuffers.at(index);
             uint32_t colId = chunk.columnId;
+
             if (bb != nullptr)
             {
                 chunkBuffers.at(colId) = bb;

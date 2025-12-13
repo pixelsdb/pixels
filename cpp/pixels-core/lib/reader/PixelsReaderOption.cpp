@@ -67,6 +67,14 @@ long PixelsReaderOption::getQueryId()
     return queryId;
 }
 
+int PixelsReaderOption::getRingIndex() const {
+    return ringIndex;
+}
+
+void PixelsReaderOption::setRingIndex(int i) {
+    ringIndex = i;
+}
+
 void PixelsReaderOption::setRGRange(int start, int len)
 {
     rgStart = start;

@@ -57,6 +57,8 @@ class PixelsReaderOption
 
   void setFilter(duckdb::TableFilterSet *filter);
 
+  void setRingIndex(int ringIndex);
+
   duckdb::TableFilterSet *getFilter();
 
   int getRGStart();
@@ -64,6 +66,8 @@ class PixelsReaderOption
   int getRGLen();
 
   int getBatchSize() const;
+
+  int getRingIndex() const;
 
   void setTolerantSchemaEvolution(bool t);
 
@@ -85,5 +89,6 @@ class PixelsReaderOption
   int batchSize;
   int rgStart;
   int rgLen;
+ int ringIndex;
 };
 #endif //PIXELS_PIXELSREADEROPTION_H

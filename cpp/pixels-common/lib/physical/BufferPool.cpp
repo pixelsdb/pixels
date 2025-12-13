@@ -23,30 +23,71 @@
  * @create 2023-05-25
  */
 #include "physical/BufferPool.h"
+#include <chrono>
+#include <duckdb/storage/buffer/buffer_pool.hpp>
+#include <iostream>
+#include <physical/natives/DirectUringRandomAccessFile.h>
+#include <stdexcept>
 
+using TimePoint = std::chrono::high_resolution_clock::time_point;
+using Duration = std::chrono::duration<double, std::milli>;
+
+TimePoint getCurrentTime()
+{
+    return std::chrono::high_resolution_clock::now();
+}
+
+// global
+std::string columnSizePath =
+    ConfigFactory::Instance().getProperty("pixel.column.size.path");
+std::shared_ptr<ColumnSizeCSVReader> csvReader;
+int sliceSize = std::stoi(
+    ConfigFactory::Instance().getProperty("pixel.bufferpool.sliceSize"));
+int bufferSize = std::stoi(
+    ConfigFactory::Instance().getProperty("pixel.bufferpool.bufferpoolSize"));
+const size_t SLICE_SIZE = sliceSize * 1024;
+int bufferNum = std::stoi(
+    ConfigFactory::Instance().getProperty("pixel.bufferpool.bufferNum"));
+std::mutex BufferPool::bufferPoolMutex;
+
+// thread_local
+thread_local bool BufferPool::isInitialized;
+thread_local std::vector<std::shared_ptr<BufferPoolEntry>>
+BufferPool::registeredBuffers[2];
+thread_local long BufferPool::globalFreeSize = 0;
+thread_local long BufferPool::globalUsedSize = 0;
+thread_local std::shared_ptr<DirectIoLib> BufferPool::directIoLib;
+thread_local int BufferPool::nextRingIndex = 1;
+thread_local std::shared_ptr<BufferPoolEntry>
+BufferPool::nextEmptyBufferPoolEntry[2] = {nullptr, nullptr};
+thread_local std::vector<BufferPoolEntry> globalBuffers;
 thread_local int BufferPool::colCount = 0;
-thread_local std::map<uint32_t, uint64_t>
-BufferPool::nrBytes;
-thread_local bool BufferPool::isInitialized = false;
-thread_local std::map<uint32_t, std::shared_ptr < ByteBuffer>>
-BufferPool::buffers[2];
 // The currBufferIdx is set to 1. When executing the first file, this value is 0
 // since we call switch function first.
 thread_local int BufferPool::currBufferIdx = 1;
 thread_local int BufferPool::nextBufferIdx = 0;
-std::shared_ptr <DirectIoLib> BufferPool::directIoLib;
 
-void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t> bytes,
-                            std::vector <std::string> columnNames)
+thread_local std::map<uint32_t, std::shared_ptr<ByteBuffer>>
+BufferPool::buffersAllocated[2];
+thread_local std::unordered_map<
+    uint32_t, std::shared_ptr<BufferPool::BufferPoolManagedEntry>>
+BufferPool::ringBufferMap[2];
+thread_local size_t BufferPool::threadLocalUsedSize[2] = {0, 0};
+thread_local int BufferPool::threadLocalBufferCount[2] = {0, 0};
+
+void BufferPool::Initialize(std::vector<uint32_t> colIds,
+                            std::vector<uint64_t> bytes,
+                            std::vector<std::string> columnNames)
 {
     assert(colIds.size() == bytes.size());
     int fsBlockSize = std::stoi(ConfigFactory::Instance().getProperty("localfs.block.size"));
-    std::string columnSizePath = ConfigFactory::Instance().getProperty("pixel.column.size.path");
-    std::shared_ptr <ColumnSizeCSVReader> csvReader;
-    if (!columnSizePath.empty())
-    {
-        csvReader = std::make_shared<ColumnSizeCSVReader>(columnSizePath);
-    }
+    auto strToBool = [](const std::string& s) {
+
+        return s == "true" || s == "1" || s == "yes";
+    };
+    std::string configValue =
+        ConfigFactory::Instance().getProperty("pixel.bufferpool.fixedsize");
+    bool isFixedSize = strToBool(configValue);
 
     // give the maximal column size, which is stored in csv reader
     if (!BufferPool::isInitialized)
@@ -54,25 +95,21 @@ void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t
         currBufferIdx = 0;
         nextBufferIdx = 1;
         directIoLib = std::make_shared<DirectIoLib>(fsBlockSize);
+        BufferPool::InitializeBuffers();
         for (int i = 0; i < colIds.size(); i++)
         {
             uint32_t colId = colIds.at(i);
-            std::string columnName = columnNames[colId];
-            for (int idx = 0; idx < 2; idx++)
+            if (isFixedSize)
             {
-                std::shared_ptr <ByteBuffer> buffer;
-                if (columnSizePath.empty())
+                if (!columnSizePath.empty())
                 {
-                    buffer = BufferPool::directIoLib->allocateDirectBuffer(bytes.at(i) + EXTRA_POOL_SIZE);
+                    csvReader = std::make_shared<ColumnSizeCSVReader>(columnSizePath);
                 }
-                else
-                {
-                    buffer = BufferPool::directIoLib->allocateDirectBuffer(csvReader->get(columnName));
-                }
-
-                BufferPool::nrBytes[colId] = buffer->size();
-                BufferPool::buffers[idx][colId] = buffer;
             }
+            auto byte = bytes.at(i);
+            BufferPool::ringBufferMap[currBufferIdx][colId] =
+                std::make_shared<BufferPoolManagedEntry>(
+                    registeredBuffers[currBufferIdx][0], 0, byte, 0);
         }
         BufferPool::colCount = colIds.size();
         BufferPool::isInitialized = true;
@@ -80,43 +117,194 @@ void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t
     else
     {
         // check if resize the buffer is needed
-        assert(colIds.size() == BufferPool::colCount);
+        // 1.add more columns
+        // 2.resive the buffer
+        //
+        // assert(colIds.size() == BufferPool::colCount);
         for (int i = 0; i < colIds.size(); i++)
         {
             uint32_t colId = colIds.at(i);
             uint64_t byte = bytes.at(i);
-            std::string columnName = columnNames[colId];
-            if (BufferPool::nrBytes.find(colId) == BufferPool::nrBytes.end())
-            {
-                throw InvalidArgumentException("BufferPool::Initialize: no such the column id.");
-            }
-            // Note: this code should never happen in the pixels scenario
-            if (BufferPool::nrBytes[colId] < byte)
-            {
-                throw InvalidArgumentException("the new buffer byte cannot larger than the previous buffer byte. ");
-            }
+            if (BufferPool::ringBufferMap[currBufferIdx].find(colId) ==
+                BufferPool::ringBufferMap[currBufferIdx].end())
+                BufferPool::ringBufferMap[currBufferIdx][colId] =
+                    std::make_shared<BufferPoolManagedEntry>(
+                        registeredBuffers[currBufferIdx][0], 0, byte, 0);
         }
     }
 }
 
-int64_t BufferPool::GetBufferId(uint32_t index)
+void BufferPool::InitializeBuffers()
 {
-    return index + currBufferIdx * colCount;
+    for (int idx = 0; idx < 2; idx++)
+    {
+        const int size_ = bufferSize + EXTRA_POOL_SIZE;
+        // Calculate the required space, allocate it in advance, and then register
+        // it.
+        std::shared_ptr<BufferPoolEntry> buffer_pool_entry =
+            std::make_shared<BufferPoolEntry>(size_, sliceSize, directIoLib, idx,
+                                              0);
+        registeredBuffers[idx].emplace_back(buffer_pool_entry);
+        buffer_pool_entry->setInUse(true);
+        globalFreeSize += size_;
+    }
 }
 
-std::shared_ptr <ByteBuffer> BufferPool::GetBuffer(uint32_t colId)
+int64_t BufferPool::GetBufferId()
 {
-    return BufferPool::buffers[currBufferIdx][colId];
+    return currBufferIdx;
+}
+
+std::shared_ptr<ByteBuffer> BufferPool::AllocateNewBuffer(
+    std::shared_ptr<BufferPoolManagedEntry> currentBufferManagedEntry,
+    uint32_t colId, uint64_t byte, std::string columnName)
+{
+    auto strToBool = [](const std::string& s)
+    {
+        return s == "true" || s == "1" || s == "yes";
+    };
+    std::string configValue =
+        ConfigFactory::Instance().getProperty("pixel.bufferpool.fixedsize");
+    bool isFixedSize = strToBool(configValue);
+    if (isFixedSize)
+    {
+        byte = csvReader->get(columnName);
+    }
+
+    size_t sliceCount = (byte + SLICE_SIZE - 1) / SLICE_SIZE + 1;
+    size_t totalSizeRaw = (sliceCount + 1) * SLICE_SIZE;
+    size_t totalSize = directIoLib->getToAllocate(totalSizeRaw);
+    // need to reallocate
+    // get origin registered ByteBuffer
+    auto currentBuffer = currentBufferManagedEntry->getBufferPoolEntry();
+    std::shared_ptr<ByteBuffer> original = currentBuffer->getBuffer();
+
+    // get offset
+    size_t offset = currentBuffer->getNextFreeIndex();
+    // fisrt find anthor empty buffer
+    if (offset + totalSize > original->size())
+    {
+        if (nextEmptyBufferPoolEntry[currBufferIdx] != nullptr &&
+            nextEmptyBufferPoolEntry[currBufferIdx]->getNextFreeIndex() +
+            totalSize <
+            nextEmptyBufferPoolEntry[currBufferIdx]->getSize())
+        {
+            // there are anthor regisitered Buffers
+            currentBuffer = nextEmptyBufferPoolEntry[currBufferIdx];
+        }
+        else
+        {
+            // find more space
+            // 1. register a new io_uring bounded buffer
+            // 2. reallocate current buffer
+            currentBuffer->setInUse(false);
+            currentBuffer = BufferPool::AddNewBuffer(currentBuffer->getSize());
+            std::vector<std::shared_ptr<ByteBuffer>> buffers;
+            buffers.emplace_back(currentBuffer->getBuffer());
+            if (!::DirectUringRandomAccessFile::RegisterMoreBuffer(
+                currentBuffer->getRingIndex(), buffers))
+            {
+                throw std::runtime_error("Failed to register more buffers");
+            }
+            currentBuffer->setInUse(true);
+            currentBuffer->setIsRegistered(true);
+        }
+        offset = currentBuffer->getNextFreeIndex();
+        auto newBufferPoolManageEntry = std::make_shared<BufferPoolManagedEntry>(
+            currentBuffer, currentBuffer->getRingIndex(), totalSize, offset);
+        BufferPool::ringBufferMap[currBufferIdx][colId] = newBufferPoolManageEntry;
+        newBufferPoolManageEntry->setStatus(
+            BufferPoolManagedEntry::State::AllocatedAndInUse);
+        original = currentBuffer->getBuffer();
+    }
+
+    currentBuffer->setNextFreeIndex(offset + totalSize);
+
+    std::shared_ptr<ByteBuffer> sliced = original->slice(offset, totalSize);
+    currentBuffer->addCol(colId, sliced->size());
+    BufferPool::buffersAllocated[currBufferIdx][colId] = sliced;
+    auto newBufferPoolManageEntry =
+        BufferPool::ringBufferMap[currBufferIdx][colId];
+    newBufferPoolManageEntry->setStatus(
+        BufferPoolManagedEntry::State::AllocatedAndInUse);
+    newBufferPoolManageEntry->setCurrentSize(sliced->size());
+    newBufferPoolManageEntry->setOffset(offset);
+    newBufferPoolManageEntry->setRingIndex(currentBuffer->getRingIndex());
+
+    globalUsedSize += totalSize;
+    threadLocalUsedSize[currBufferIdx] += totalSize;
+    threadLocalBufferCount[currBufferIdx]++;
+    return sliced;
+}
+
+std::shared_ptr<ByteBuffer> BufferPool::GetBuffer(uint32_t colId, uint64_t byte,
+                                                  std::string columnName)
+{
+    // Retrieve the current buffer management entry and previously allocated
+    // buffer
+    auto currentBufferManagedEntry = ringBufferMap[currBufferIdx][colId];
+    auto previousBuffer = buffersAllocated[currBufferIdx][colId];
+
+    // Allocation scenarios:
+    // 1. Buffer not yet allocated - check the entry's state
+    // 2. Buffer already allocated
+
+    // Size scenarios:
+    // 1. Can reuse the previous buffer (reusePrevious())
+    // 2. Can allocate required space within the same large buffer
+    // (allocateBuffer)
+    // 3. Insufficient remaining space in current large buffer - need a new large
+    // buffer
+
+    if (currentBufferManagedEntry->getStatus() ==
+        BufferPoolManagedEntry::State::InitizaledNotAllocated)
+    {
+        // Buffer not allocated yet
+        return AllocateNewBuffer(currentBufferManagedEntry, colId, byte,
+                                 columnName);
+    }
+    else
+    {
+        // Buffer already allocated
+        // Check if current buffer size is sufficient and leaves enough remaining
+        // space (after accounting for block size)
+        if (currentBufferManagedEntry->getCurrentSize() >= byte &&
+            currentBufferManagedEntry->getCurrentSize() -
+            directIoLib->getBlockSize() >=
+            byte)
+        {
+            // Reuse the previous buffer
+            return previousBuffer;
+        }
+        else
+        {
+            // Need to allocate a new buffer
+            return AllocateNewBuffer(currentBufferManagedEntry, colId, byte,
+                                     columnName);
+        }
+    }
 }
 
 void BufferPool::Reset()
 {
-    BufferPool::isInitialized = false;
-    BufferPool::nrBytes.clear();
+    // BufferPool::isInitialized = false;
+    // std::lock_guard<std::mutex> lock(bufferPoolMutex);
     for (int idx = 0; idx < 2; idx++)
     {
-        BufferPool::buffers[idx].clear();
+        // BufferPool::currentBuffers[idx]->clear();;
+        BufferPool::buffersAllocated[idx].clear();
+        BufferPool::ringBufferMap[idx].clear();
+        // BufferPool::registeredBuffers[idx].clear();
+        // threadLocalUsedSize[idx]=0;
+        // threadLocalBufferCount[idx]=0;
+        // globalFreeSize=0;
+        globalUsedSize = 0;
+        for (auto bufferEntry : registeredBuffers[idx])
+        {
+            bufferEntry->reset();
+        }
     }
+
     BufferPool::colCount = 0;
 }
 
@@ -126,4 +314,26 @@ void BufferPool::Switch()
     nextBufferIdx = 1 - nextBufferIdx;
 }
 
+std::shared_ptr<BufferPoolEntry> BufferPool::AddNewBuffer(size_t size)
+{
+    if (csvReader != nullptr)
+    {
+        assert(false && "Unexpected code path reached!");
+    }
+    // Calculate the required space, allocate it in advance, and then register it.
+    std::shared_ptr<BufferPoolEntry> buffer_pool_entry =
+        std::make_shared<BufferPoolEntry>(size, sliceSize, directIoLib,
+                                          currBufferIdx, nextRingIndex++);
+    registeredBuffers[currBufferIdx].emplace_back(buffer_pool_entry);
+    buffer_pool_entry->setInUse(true);
+    globalFreeSize += size;
+    nextEmptyBufferPoolEntry[currBufferIdx] = buffer_pool_entry;
+    return buffer_pool_entry;
+}
 
+int BufferPool::getRingIndex(uint32_t colId)
+{
+    return ringBufferMap[currBufferIdx][colId]
+           ->getBufferPoolEntry()
+           ->getRingIndex();
+}
