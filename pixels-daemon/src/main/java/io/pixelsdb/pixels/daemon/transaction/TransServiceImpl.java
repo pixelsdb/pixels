@@ -190,7 +190,11 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             TransContext[] contexts = new TransContext[numTrans];
             if (request.getReadOnly())
             {
-                long timestamp = highWatermark.get();
+                /* Issue #1234:
+                 * HWM means all transactions with a timestamp below it are commited, hence query should get a
+                 * timestamp = HWM -1 instead of HWM.
+                 */
+                long timestamp = highWatermark.get() - 1;
                 for (int i = 0; i < numTrans; i++, transId++)
                 {
                     response.addTransIds(transId).addTimestamps(timestamp);
