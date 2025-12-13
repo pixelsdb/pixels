@@ -63,4 +63,47 @@ public class TestTransService
         }
         service.commitTransBatch(transIds, false);
     }
+
+    @Test
+    public void testPushWatermarks1() throws TransException, InterruptedException
+    {
+        TransService service = TransService.Instance();
+        TransContext ctxT1 = service.beginTrans(false);
+        Thread.sleep(1000);
+        TransContext ctxT2 = service.beginTrans(false);
+        Thread.sleep(1000);
+        TransContext ctxT3 = service.beginTrans(false);
+        Thread.sleep(1000);
+        service.commitTrans(ctxT2.getTransId(), false);
+        Thread.sleep(1000);
+        service.commitTrans(ctxT3.getTransId(), false);
+        Thread.sleep(1000);
+        service.commitTrans(ctxT1.getTransId(), false);
+        TransContext ctxQ1 = service.beginTrans(true);
+        Assert.assertEquals(ctxQ1.getTimestamp(), ctxT3.getTimestamp());
+        service.commitTrans(ctxQ1.getTransId(), true);
+    }
+
+    @Test
+    public void testPushWatermarks2() throws TransException, InterruptedException
+    {
+        TransService service = TransService.Instance();
+        TransContext ctxT1 = service.beginTrans(false);
+        Thread.sleep(1000);
+        TransContext ctxT2 = service.beginTrans(false);
+        Thread.sleep(1000);
+        TransContext ctxT3 = service.beginTrans(false);
+        Thread.sleep(1000);
+        TransContext ctxT4 = service.beginTrans(false);
+        Thread.sleep(1000);
+        service.commitTrans(ctxT2.getTransId(), false);
+        Thread.sleep(1000);
+        service.commitTrans(ctxT3.getTransId(), false);
+        Thread.sleep(1000);
+        service.commitTrans(ctxT1.getTransId(), false);
+        TransContext ctxQ1 = service.beginTrans(true);
+        Assert.assertEquals(ctxQ1.getTimestamp(), ctxT3.getTimestamp());
+        service.commitTrans(ctxQ1.getTransId(), true);
+        service.commitTrans(ctxT4.getTransId(), false);
+    }
 }

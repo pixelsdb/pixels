@@ -229,7 +229,7 @@ public class TransService
             throw new IllegalArgumentException("transIds is null or empty");
         }
         TransProto.CommitTransBatchRequest request = TransProto.CommitTransBatchRequest.newBuilder()
-                .addAllTransIds(transIds).build();
+                .setReadOnly(readOnly).addAllTransIds(transIds).build();
         TransProto.CommitTransBatchResponse response = this.stub.commitTransBatch(request);
         if (response.getErrorCode() == ErrorCode.TRANS_INVALID_ARGUMENT) // other error codes are not thrown as exceptions
         {
