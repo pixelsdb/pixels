@@ -35,10 +35,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -68,7 +68,18 @@ public class TransContextManager
      * a sorted set that sorts the transaction contexts by transaction timestamp and id. This is important for watermark pushing.
      */
     private final Set<TransContext> runningReadOnlyTrans = new ConcurrentSkipListSet<>();
+    /**
+     * Similar to {@link #runningReadOnlyTrans}, but for non-readonly transactions
+     */
     private final Set<TransContext> runningWriteTrans = new ConcurrentSkipListSet<>();
+    /**
+     * The max timestamp of terminated non-readonly transactions.
+     */
+    private final AtomicLong maxTermedWriteTransTs = new AtomicLong(-1L);
+    /**
+     * The max timestamp of terminated readonly transactions.
+     */
+    private final AtomicLong maxTermedReadonlyTransTs = new AtomicLong(-1L);
 
     private final Map<String, Long> traceIdToTransId = new ConcurrentHashMap<>();
     private final Map<Long, String> transIdToTraceId = new ConcurrentHashMap<>();
@@ -161,20 +172,19 @@ public class TransContextManager
      * @param success whether each transaction commits successfully
      * @return true if all transactions commit successfully
      */
-    public boolean setTransCommitBatch(List<Long> transIds, Boolean[] success)
+    public boolean setTransCommitBatch(List<Long> transIds, List<Boolean> success)
     {
         requireNonNull(transIds, "transIds is null");
         requireNonNull(success, "success is null");
-        checkArgument(transIds.size() == success.length,
-                "transIds and success have different length");
         this.contextLock.readLock().lock();
         try
         {
             boolean allSuccess = true;
             for (int i = 0; i < transIds.size(); i++)
             {
-                success[i] = terminateTrans(transIds.get(i), TransProto.TransStatus.COMMIT);
-                if(!success[i])
+                boolean res = terminateTrans(transIds.get(i), TransProto.TransStatus.COMMIT);
+                success.add(res);
+                if(!res)
                 {
                     allSuccess = false;
                 }
@@ -333,6 +343,14 @@ public class TransContextManager
                 context.setStatus(status);
                 this.readOnlyConcurrency.decrementAndGet();
                 this.runningReadOnlyTrans.remove(context);
+                // Issue #1245: update max terminated transaction timestamp after termination
+                long maxTermedTransTs = this.maxTermedReadonlyTransTs.get();
+                final long currTransTs = context.getTimestamp();
+                while (currTransTs > maxTermedTransTs &&
+                        !this.maxTermedReadonlyTransTs.compareAndSet(maxTermedTransTs, currTransTs))
+                {
+                    maxTermedTransTs = this.maxTermedReadonlyTransTs.get();
+                }
             }
             else
             {
@@ -355,6 +373,14 @@ public class TransContextManager
                 if (traceId != null)
                 {
                     this.traceIdToTransId.remove(traceId);
+                }
+                // Issue #1245: update max terminated transaction timestamp after termination
+                long maxTermedTransTs = this.maxTermedWriteTransTs.get();
+                final long currTransTs = context.getTimestamp();
+                while (currTransTs > maxTermedTransTs &&
+                        !this.maxTermedWriteTransTs.compareAndSet(maxTermedTransTs, currTransTs))
+                {
+                    maxTermedTransTs = this.maxTermedWriteTransTs.get();
                 }
             }
             return res;
@@ -423,8 +449,8 @@ public class TransContextManager
     /**
      * Get the minimal timestamp of running readonly or non-readonly transactions.
      * This method does not acquire a lock as it only reads a snapshot of the current running transactions.
-     * @param readOnly readonly trans or not
-     * @return the minimal transaction timestamp
+     * @param readOnly readonly transaction or not
+     * @return the minimal timestamp of running transactions, or negative if there is no running transactions
      */
     public long getMinRunningTransTimestamp(boolean readOnly)
     {
@@ -447,7 +473,25 @@ public class TransContextManager
             }
             return ctx.getTimestamp();
         }
-        return 0;
+        return -1;
+    }
+
+    /**
+     * This method does not acquire a lock as it backed by atomic variable read.
+     * @param readOnly readonly transaction or not
+     * @return the max timestamp of terminated transactions, or negative if there is no transactions terminated since
+     * this {@link TransContextManager} instance is created
+     */
+    public long getMaxTerminatedTransTimestamp(boolean readOnly)
+    {
+        if (readOnly)
+        {
+            return this.maxTermedReadonlyTransTs.get();
+        }
+        else
+        {
+            return this.maxTermedWriteTransTs.get();
+        }
     }
 
     public TransContext getTransContext(long transId)

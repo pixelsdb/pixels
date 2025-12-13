@@ -35,7 +35,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -115,10 +114,14 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 List<Long> expiredTransIds = TransContextManager.Instance().getExpiredTransIds();
                 for (long expiredTransId : expiredTransIds)
                 {
-                    pushWatermarks(false);
                     boolean success = TransContextManager.Instance().setTransRollback(expiredTransId);
                     logger.debug("transaction {} has been rolled back successfully ({}) due to lease expire",
                             expiredTransId, success);
+                    /* Issue #1245:
+                     * Push watermarks after transaction termination to ensure watermarks are pushed correctly when the
+                     * transactions terminate in a different order than begin.
+                     */
+                    pushWatermarks(false);
                 }
             }, leaseCheckInterval, leaseCheckInterval, TimeUnit.SECONDS);
 
@@ -141,13 +144,28 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         try
         {
             long transId = TransServiceImpl.transId.getAndIncrement();
-            long timestamp = request.getReadOnly() ? highWatermark.get() : transId;
-            long leaseStartMs = request.getReadOnly() ? 0L : System.currentTimeMillis();
-            long leasePeriodMs = request.getReadOnly() ? 0L : TRANS_LEASE_PERIOD_MS;
-            response = TransProto.BeginTransResponse.newBuilder()
-                    .setErrorCode(ErrorCode.SUCCESS).setTransId(transId).setTimestamp(timestamp)
-                    .setLeaseStartMs(leaseStartMs).setLeasePeriodMs(leasePeriodMs).build();
-            TransContext context = new TransContext(transId, timestamp, leaseStartMs, leasePeriodMs, request.getReadOnly());
+            /* Issue #1234:
+             * HWM means all transactions with a timestamp below it are commited, hence query should get a
+             * timestamp = HWM -1 instead of HWM.
+             */
+            long timestamp = request.getReadOnly() ? highWatermark.get() - 1 : transId;
+            TransContext context;
+            if (request.getReadOnly())
+            {
+                response = TransProto.BeginTransResponse.newBuilder()
+                        .setErrorCode(ErrorCode.SUCCESS).setTransId(transId).setTimestamp(timestamp).build();
+                context = new TransContext(transId, timestamp, 0L, 0L, request.getReadOnly());
+            }
+            else
+            {
+                // Issue #1163: lease is only required for non-readonly transactions.
+                long leaseStartMs = System.currentTimeMillis();
+                long leasePeriodMs = TRANS_LEASE_PERIOD_MS;
+                response = TransProto.BeginTransResponse.newBuilder()
+                        .setErrorCode(ErrorCode.SUCCESS).setTransId(transId).setTimestamp(timestamp)
+                        .setLeaseStartMs(leaseStartMs).setLeasePeriodMs(leasePeriodMs).build();
+                context = new TransContext(transId, timestamp, leaseStartMs, leasePeriodMs, request.getReadOnly());
+            }
             TransContextManager.Instance().addTransContext(context);
         } catch (EtcdException e)
         {
@@ -175,7 +193,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 long timestamp = highWatermark.get();
                 for (int i = 0; i < numTrans; i++, transId++)
                 {
-                    response.addTransIds(transId).addTimestamps(timestamp).addLeaseStartMses(0L).addLeasePeriodMses(0L);
+                    response.addTransIds(transId).addTimestamps(timestamp);
                     TransContext context = new TransContext(transId, timestamp, 0L, 0L, true);
                     contexts[i] = context;
                 }
@@ -183,12 +201,14 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             else
             {
                 long timestamp = transId;
+                // Issue #1163: lease is only required for non-readonly transactions.
                 long leaseStartMs = System.currentTimeMillis();
+                long leasePeriodMs = TRANS_LEASE_PERIOD_MS;
                 for (int i = 0; i < numTrans; i++, transId++, timestamp++)
                 {
                     response.addTransIds(transId).addTimestamps(timestamp)
-                            .addLeaseStartMses(leaseStartMs).addLeasePeriodMses(TRANS_LEASE_PERIOD_MS);
-                    TransContext context = new TransContext(transId, timestamp, leaseStartMs, TRANS_LEASE_PERIOD_MS, false);
+                            .addLeaseStartMses(leaseStartMs).addLeasePeriodMses(leasePeriodMs);
+                    TransContext context = new TransContext(transId, timestamp, leaseStartMs, leasePeriodMs, false);
                     contexts[i] = context;
                 }
             }
@@ -210,15 +230,11 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                             StreamObserver<TransProto.CommitTransResponse> responseObserver)
     {
         int error = ErrorCode.SUCCESS;
+        // must get transaction context before terminating transaction
         TransContext context = TransContextManager.Instance().getTransContext(request.getTransId());
         if (context != null)
         {
-            /*
-             * Issue #755:
-             * push the watermarks before setTransCommit()
-             * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
-             */
-            pushWatermarks(context.isReadOnly());
+            // Issue #1163: check lease early to set error code for lease expire.
             if (!context.isReadOnly() && context.getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Assigner))
             {
                 boolean success = TransContextManager.Instance().setTransRollback(request.getTransId());
@@ -239,6 +255,11 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                     error = ErrorCode.TRANS_COMMIT_FAILED;
                 }
             }
+            /* Issue #1245:
+             * Push watermarks after transaction termination to ensure watermarks are pushed correctly when the
+             * transactions terminate in a different order than begin.
+             */
+            pushWatermarks(context.isReadOnly());
         }
         else
         {
@@ -256,9 +277,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     public void commitTransBatch(TransProto.CommitTransBatchRequest request,
                                  StreamObserver<TransProto.CommitTransBatchResponse> responseObserver)
     {
-        TransProto.CommitTransBatchResponse.Builder responseBuilder =
-                TransProto.CommitTransBatchResponse.newBuilder();
-
+        TransProto.CommitTransBatchResponse.Builder responseBuilder = TransProto.CommitTransBatchResponse.newBuilder();
         if (request.getTransIdsCount() == 0)
         {
             logger.error("the count of transaction ids is zero, no transactions to commit");
@@ -267,48 +286,24 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             responseObserver.onCompleted();
             return;
         }
-
         final int numTrans = request.getTransIdsCount();
-        int errorCode = ErrorCode.SUCCESS;
-        for (int i = 0; i < numTrans; ++i)
-        {
-            long transId = request.getTransIds(i);
-            TransContext context = TransContextManager.Instance().getTransContext(transId);
-            if (context != null)
-            {
-                /*
-                 * Issue #755:
-                 * push the watermarks before setTransCommit()
-                 * ensure pushWatermarks calls getMinRunningTransTimestamp() to get the correct value
-                 */
-                pushWatermarks(context.isReadOnly());
-            }
-            else
-            {
-                logger.error("transaction id {} does not exist in the context manager", transId);
-                errorCode = ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST;
-            }
-        }
-        Boolean[] success = new Boolean[numTrans];
+        List<Boolean> success = new ArrayList<>(numTrans);
         // Issue #1163: lease is checked inside setTransCommitBatch, we do not set dedicated error code for expired leases.
         boolean allSuccess = TransContextManager.Instance().setTransCommitBatch(request.getTransIdsList(), success);
-        responseBuilder.addAllResults(Arrays.asList(success));
         if (allSuccess)
         {
             responseBuilder.setErrorCode(ErrorCode.SUCCESS);
         }
         else
         {
-            if (errorCode != ErrorCode.TRANS_BATCH_PARTIAL_ID_NOT_EXIST)
-            {
-                // other errors occurred
-                responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_COMMIT_FAILED);
-            }
-            else
-            {
-                responseBuilder.setErrorCode(errorCode);
-            }
+            responseBuilder.setErrorCode(ErrorCode.TRANS_BATCH_PARTIAL_COMMIT_FAILED);
         }
+        /* Issue #1245:
+         * Push watermarks after transaction termination to ensure watermarks are pushed correctly when the
+         * transactions terminate in a different order than begin.
+         */
+        pushWatermarks(request.getReadOnly());
+        responseBuilder.addAllResults(success);
         responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();
     }
@@ -324,8 +319,6 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
             TransContext context = TransContextManager.Instance().getTransContext(request.getTransId());
             if (context != null)
             {
-                // Issue #1163: push the watermarks before setTransRollback as in commitTrans().
-                pushWatermarks(context.isReadOnly());
                 if (!context.isReadOnly() && context.getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Assigner))
                 {
                     error = ErrorCode.TRANS_LEASE_EXPIRED;
@@ -336,6 +329,11 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                 {
                     error = ErrorCode.TRANS_ROLLBACK_FAILED;
                 }
+                /* Issue #1245:
+                 * Push watermarks after transaction termination to ensure watermarks are pushed correctly when the
+                 * transactions terminate in a different order than begin.
+                 */
+                pushWatermarks(context.isReadOnly());
             }
         }
         else
@@ -421,9 +419,43 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
         responseObserver.onCompleted();
     }
 
+    /**
+     * To push the watermarks correctly, this method must be called after the termination of a transaction.
+     * @param readOnly whether the transaction is readonly
+     */
     private static void pushWatermarks(boolean readOnly)
     {
         long timestamp = TransContextManager.Instance().getMinRunningTransTimestamp(readOnly);
+        if (timestamp < 0)
+        {
+            /* Issue #1245:
+             * In case of no running transactions, push low/high watermark right behind the max timestamp of
+             * terminated readonly/non-readonly transactions.
+             * Thus, the existing terminated transactions are visible.
+             */
+            timestamp = TransContextManager.Instance().getMaxTerminatedTransTimestamp(readOnly) + 1;
+            /* Double check if there are running transactions, because there is an interval between previous
+             * getMinRunningTransTimestamp() and getMaxTerminatedTransTimestamp(), new transactions may begin and
+             * terminate during this interval, making it incorrect to push the watermark to the max timestamp of
+             * terminated transactions.
+             */
+            long minRunningTransTimestamp = TransContextManager.Instance().getMinRunningTransTimestamp(readOnly);
+            if (minRunningTransTimestamp > 0)
+            {
+                if (timestamp > 0 && minRunningTransTimestamp < timestamp)
+                {
+                    logger.error("new running transactions obtained backward timestamps, this is illegal");
+                    return;
+                }
+                // ush watermark to the new min running transaction timestamp
+                timestamp = minRunningTransTimestamp;
+            }
+            if (timestamp < 0)
+            {
+                logger.error("trying to push watermarks before any transaction is terminated, this is illegal");
+                return;
+            }
+        }
         if (readOnly)
         {
             long value = lowWatermark.get();

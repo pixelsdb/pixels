@@ -78,8 +78,8 @@ message BeginTransResponse {
     int32 errorCode = 1;
     uint64 transId = 2;
     uint64 timestamp = 3;
-    uint64 leaseStartMs = 4;
-    uint64 leasePeriodMs = 5;
+    optional uint64 leaseStartMs = 4;
+    optional uint64 leasePeriodMs = 5;
 }
 
 message BeginTransBatchRequest {
@@ -105,7 +105,11 @@ message CommitTransResponse {
 }
 
 message CommitTransBatchRequest {
-    repeated uint64 transIds = 1;
+    // true means all transactions to commit are readonly;
+    // false means all transactions to commit are non-readonly.
+    // readonly and non-readonly transactions can not mix in the same request.
+    bool readOnly = 1;
+    repeated uint64 transIds = 2;
 }
 
 message CommitTransBatchResponse {
