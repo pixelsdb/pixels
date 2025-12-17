@@ -30,16 +30,21 @@ public class TestBinaryColumnVector
         VectorizedRowBatch vectorizedRowBatch = new VectorizedRowBatch(1, 10240);
         BinaryColumnVector columnVector = new BinaryColumnVector(10240);
         vectorizedRowBatch.cols[0] = columnVector;
-        for (int i = 0; i < 10000; ++i)
+        int writeNum = 10000;
+        for (int i = 0; i < writeNum; ++i)
         {
             columnVector.add("test" + i);
         }
+        vectorizedRowBatch.size = writeNum;
         byte[] data = vectorizedRowBatch.serialize();
         int length = data.length;
         Assert.assertEquals(length < 4 * 1024 * 1024, true);
         VectorizedRowBatch newBatch = VectorizedRowBatch.deserialize(data);
+
+        Assert.assertEquals(newBatch.size, writeNum);
+
         BinaryColumnVector col = (BinaryColumnVector) newBatch.cols[0];
-        for (int i = 0; i < 10000; ++i)
+        for (int i = 0; i < writeNum; ++i)
         {
             String decode = new String(col.vector[i], col.start[i], col.lens[i]);
             Assert.assertEquals(decode, "test" + i);

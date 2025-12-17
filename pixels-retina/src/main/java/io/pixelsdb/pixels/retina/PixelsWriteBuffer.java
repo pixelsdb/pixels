@@ -33,10 +33,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -108,7 +105,7 @@ public class PixelsWriteBuffer
     private final ReadWriteLock versionLock = new ReentrantReadWriteLock();
 
     private int currentMemTableCount;
-    private final List<FileWriterManager> fileWriterManagers;
+    private final Queue<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
     private AtomicLong maxObjectKey;
     private String retinaHostName;
@@ -144,7 +141,7 @@ public class PixelsWriteBuffer
         this.flushMinioExecutor = Executors.newSingleThreadExecutor();
         this.flushDiskExecutor = Executors.newSingleThreadScheduledExecutor();
 
-        this.fileWriterManagers = new ArrayList<>();
+        this.fileWriterManagers = new ConcurrentLinkedQueue<>();
         this.maxObjectKey = new AtomicLong(-1);
 
         this.retinaHostName = retinaHostName;

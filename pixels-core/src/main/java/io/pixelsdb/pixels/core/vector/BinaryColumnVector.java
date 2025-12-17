@@ -823,12 +823,13 @@ public class BinaryColumnVector extends ColumnVector
     public int serialize(FlatBufferBuilder builder)
     {
         int baseOffset = super.serialize(builder);
-        int[] byteArrayOffsets = new int[writeIndex];
 
         IdentityHashMap<byte[], Integer> bufToIndex = new IdentityHashMap<>();
         ArrayList<byte[]> physicalList = new ArrayList<>();
 
-        for (int i = 0; i < writeIndex; ++i)
+        int serializedWriteIndex = writeIndex;
+
+        for (int i = 0; i < serializedWriteIndex; ++i)
         {
             byte[] buf = vector[i];
             if (buf == null)
@@ -872,8 +873,8 @@ public class BinaryColumnVector extends ColumnVector
             physicalBufferOffset = BinaryColumnVectorFlat.createPhysicalBufferVector(builder, physicalOffsets);
         }
 
-        int[] vectorIndices = new int[writeIndex];
-        for (int i = 0; i < writeIndex; ++i)
+        int[] vectorIndices = new int[serializedWriteIndex];
+        for (int i = 0; i < serializedWriteIndex; ++i)
         {
             byte[] buf = vector[i];
             if (buf == null)
