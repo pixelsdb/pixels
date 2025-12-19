@@ -137,7 +137,7 @@
 
         <!-- logging -->
         <!-- log4j-2.18.0 is compatible with slf4j-1.7.36 -->
-        <dep.log4j.version>2.18.0</dep.log4j.version>
+        <dep.log4j.version>2.25.3</dep.log4j.version>
         <!-- we only use log4j in pixels, the following are for third-party libraries -->
         <dep.commons-logging.version>1.2</dep.commons-logging.version>
         <!-- slf4j-1.7.36 is compatible with 1.7.x that is widely used in third-party libraries -->
