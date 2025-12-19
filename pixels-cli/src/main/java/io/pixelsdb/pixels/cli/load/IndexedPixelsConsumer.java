@@ -252,6 +252,8 @@
          // Push index entries to the corresponding IndexService (determined by targetNode address)
          bucketWriter.indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), bucketWriter.indexEntries);
          bucketWriter.indexEntries.clear();
+
+         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),bucketWriter.currFile.getId(), true);
      }
 
      private void closePixelsFile(PerBucketWriter bucketWriter) throws IOException, MetadataException, IndexException
