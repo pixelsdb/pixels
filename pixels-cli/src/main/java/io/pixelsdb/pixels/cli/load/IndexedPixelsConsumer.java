@@ -164,7 +164,7 @@
      /**
       * Initializes a new PixelsWriter and associated File/Path for a given bucket ID.
       */
-     private PerBucketWriter initializeBucketWriter(int bucketId) throws IOException, MetadataException
+     private PerBucketWriter initializeBucketWriter(int bucketId) throws IOException, MetadataException, IndexException
      {
          // Use the Node Cache to find the responsible Retina Node
          NodeProto.NodeInfo targetNode = bucketCache.getRetinaNodeInfoByBucketId(bucketId);
@@ -252,8 +252,6 @@
          // Push index entries to the corresponding IndexService (determined by targetNode address)
          bucketWriter.indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), bucketWriter.indexEntries);
          bucketWriter.indexEntries.clear();
-
-         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),bucketWriter.currFile.getId(), true);
      }
 
      private void closePixelsFile(PerBucketWriter bucketWriter) throws IOException, MetadataException, IndexException
@@ -264,6 +262,7 @@
              flushRowBatch(bucketWriter);
          }
 
+         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),bucketWriter.currFile.getId(), true);
          closeWriterAndAddFile(bucketWriter.pixelsWriter, bucketWriter.currFile, bucketWriter.currTargetPath, bucketWriter.targetNode);
      }
 
@@ -295,7 +294,7 @@
              this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
              this.indexService = indexServices.computeIfAbsent(node, nodeInfo ->
                      RPCIndexService.CreateInstance(nodeInfo.getAddress(), indexServerPort));
-             this.rowIdAllocator = new RowIdAllocator(index.getTableId(), 1000, this.indexService);
+             this.rowIdAllocator = new RowIdAllocator(index.getTableId(), maxRowNum, this.indexService);
          }
      }
  }
