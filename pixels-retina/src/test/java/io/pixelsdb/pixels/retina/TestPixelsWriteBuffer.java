@@ -58,7 +58,7 @@ public class TestPixelsWriteBuffer
             columnTypes.add("int");
 
             schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
-            buffer = new PixelsWriteBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath, "localhost");  // table id get from mysql `TBLS` table
+            buffer = new PixelsWriteBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath, "localhost", null);  // table id get from mysql `TBLS` table
         } catch (Exception e)
         {
             System.out.println("setup error: " + e);

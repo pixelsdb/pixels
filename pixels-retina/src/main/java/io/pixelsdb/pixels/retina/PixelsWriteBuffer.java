@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
+import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -109,9 +110,10 @@ public class PixelsWriteBuffer
     private FileWriterManager currentFileWriterManager;
     private AtomicLong maxObjectKey;
     private String retinaHostName;
+    private final SinglePointIndex index;
 
     public PixelsWriteBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
-                              Path targetCompactDirPath, String retinaHostName) throws RetinaException
+                             Path targetCompactDirPath, String retinaHostName, SinglePointIndex index) throws RetinaException
     {
         this.tableId = tableId;
         this.schema = schema;
@@ -163,6 +165,7 @@ public class PixelsWriteBuffer
         // initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
         this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize, IndexServiceProvider.ServiceMode.local);
+        this.index = index;
 
         startFlushMinioToDiskScheduler(Long.parseLong(configFactory.getProperty("retina.buffer.flush.interval")));
     }
@@ -361,6 +364,8 @@ public class PixelsWriteBuffer
                         this.versionLock.writeLock().unlock();
 
                         finished.get();
+                        IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local)
+                                .flushIndexEntriesOfFile(tableId, index.getId(), fileWriterManager.getFileId(), true);
                         for (ObjectEntry objectEntry : toRemove)
                         {
                             if (objectEntry.unref())
