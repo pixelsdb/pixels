@@ -298,6 +298,9 @@ void PixelsFilter::ApplyFilter(std::shared_ptr <ColumnVector> vector, duckdb::Ta
         case duckdb::TableFilterType::IS_NULL:
             // TODO: support is null
             break;
+        case duckdb::TableFilterType::OPTIONAL_FILTER:
+            // nothing to do
+            return;
         default:
             D_ASSERT(0);
             break;

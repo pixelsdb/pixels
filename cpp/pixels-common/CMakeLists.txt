@@ -4,50 +4,21 @@ set(CMAKE_CXX_STANDARD 17)
 
 include(ExternalProject)
 
-set(pixels_common_cxx
-        lib/physical/storage/LocalFS.cpp
-		lib/physical/storage/LocalFSProvider.cpp
-		lib/physical/storage/PhysicalLocalWriter.cpp
-		lib/physical/PhysicalWriterOption.cpp
-		lib/physical/Status.cpp
-        lib/physical/Storage.cpp
-		lib/physical/FilePath.cpp
-        lib/physical/natives/PixelsRandomAccessFile.cpp
-        lib/physical/natives/DirectRandomAccessFile.cpp
-        lib/physical/natives/ByteBuffer.cpp
-        lib/physical/io/PhysicalLocalReader.cpp
-        lib/physical/StorageFactory.cpp
-        lib/physical/Request.cpp
-        lib/physical/RequestBatch.cpp
-        lib/physical/scheduler/NoopScheduler.cpp
-        lib/physical/SchedulerFactory.cpp
-        lib/exception/InvalidArgumentException.cpp
-        lib/utils/Constants.cpp
-        lib/utils/String.cpp
-        include/physical/natives/DirectIoLib.h
-        lib/physical/natives/DirectIoLib.cpp
-        include/utils/ConfigFactory.h
-        lib/utils/ConfigFactory.cpp
-        include/physical/MergedRequest.h
-        include/physical/scheduler/SortMergeScheduler.h
-        lib/physical/scheduler/SortMergeScheduler.cpp
-        lib/MergedRequest.cpp include/profiler/TimeProfiler.h
-        lib/profiler/TimeProfiler.cpp
-        include/profiler/CountProfiler.h
-        lib/profiler/CountProfiler.cpp
-        include/profiler/AbstractProfiler.h
-        include/physical/allocator/Allocator.h
-        include/physical/allocator/OrdinaryAllocator.h
-        lib/physical/allocator/OrdinaryAllocator.cpp
-        include/physical/allocator/BufferPoolAllocator.h
-        lib/physical/allocator/BufferPoolAllocator.cpp
-        include/physical/BufferPool.h
-        lib/physical/BufferPool.cpp
-        include/physical/natives/DirectUringRandomAccessFile.h
-        lib/physical/natives/DirectUringRandomAccessFile.cpp
-		include/utils/ColumnSizeCSVReader.h lib/utils/ColumnSizeCSVReader.cpp
-        include/physical/StorageArrayScheduler.h lib/physical/StorageArrayScheduler.cpp
-		include/physical/natives/ByteOrder.h
+
+file(GLOB_RECURSE pixels_common_cxx
+		"lib/physical/*.cpp"
+		"lib/physical/*.h"
+		"lib/exception/*.cpp"
+		"lib/exception/*.h"
+		"lib/utils/*.cpp"
+		"lib/utils/*.h"
+		"lib/profiler/*.cpp"
+		"lib/profiler/*.h"
+		"include/physical/*.h"
+		"include/profiler/*.h"
+		"include/utils/*.h"
+		"include/physical/BufferPool/*.h"
+		"lib/MergedRequest.cpp"
 )
 
 include_directories(include)

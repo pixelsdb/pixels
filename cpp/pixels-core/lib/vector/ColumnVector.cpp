@@ -38,6 +38,10 @@ ColumnVector::ColumnVector(uint64_t len, bool encoding)
     posix_memalign(reinterpret_cast<void **>(&isValid), 64, ceil(1.0 * len / 64) * sizeof(uint64_t));
 }
 
+ColumnVector::~ColumnVector()
+{
+}
+
 void ColumnVector::close()
 {
     if (!closed)
@@ -49,6 +53,10 @@ void ColumnVector::close()
         {
             free(isValid);
             isValid = nullptr;
+        }
+        if (isNull != nullptr)
+        {
+            isNull = nullptr;
         }
     }
 }

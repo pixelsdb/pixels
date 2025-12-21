@@ -98,6 +98,7 @@ private:
 
     void UpdateRowGroupInfo();
 
+    static std::mutex mutex_;
     std::shared_ptr <PhysicalReader> physicalReader;
     pixels::proto::Footer footer;
     pixels::proto::PostScript postScript;
@@ -105,6 +106,7 @@ private:
     PixelsReaderOption option;
     duckdb::TableFilterSet *filter;
     long queryId;
+    int ringIndex;
     int RGStart;
     int RGLen;
     bool everRead;

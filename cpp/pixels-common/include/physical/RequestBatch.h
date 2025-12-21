@@ -42,6 +42,8 @@ public:
 
     void add(Request request);
 
+    Request& getRequest(int index);
+
     int getSize();
 
     std::vector <Request> getRequests();

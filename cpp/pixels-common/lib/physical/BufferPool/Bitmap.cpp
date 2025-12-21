@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 PixelsDB.
+* Copyright 2025 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -18,29 +18,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+
 /*
- * @author liyu
- * @create 2023-03-07
+ * @author whz
+ * @create 2025-07-30
  */
-#ifndef PIXELS_REQUEST_H
-#define PIXELS_REQUEST_H
-
-#include <iostream>
-
-class Request
-{
-public:
-    int64_t bufferId;
-    uint64_t queryId;
-    uint64_t start;
-    uint64_t length;
-    int ringIndex;
-
-    Request(uint64_t queryId_, uint64_t start_, uint64_t length_,
-            int64_t bufferId = -1);
-
-    int hashCode();
-
-    int comparedTo(Request o);
-};
-#endif //PIXELS_REQUEST_H
+#include "physical/BufferPool/BufferPoolEntry.h"
+#include "physical/BufferPool/Bitmap.h"
