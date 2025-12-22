@@ -113,7 +113,7 @@ namespace duckdb
         PixelsScanInitLocal(ExecutionContext &context, TableFunctionInitInput &input,
                             GlobalTableFunctionState *gstate_p);
 
-        static bool PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
+        static bool PixelsParallelStateNext(ClientContext &context, PixelsReadBindData &bind_data,
                                             PixelsReadLocalState &scan_data, PixelsReadGlobalState &parallel_state,
                                             bool is_init_state = false);
 

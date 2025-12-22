@@ -78,7 +78,7 @@ public class PixelsWriteBuffer
     private final Storage targetCompactStorage;
     private final RowIdAllocator rowIdAllocator;
     /**
-     * Allocate unique identifier for data (MemTable/MinioEntry).
+     * Allocate unique identifier for data (MemTable/ObjectEntry).
      * There is no need to use atomic variables because
      * there are write locks in all concurrent situations.
      */
@@ -98,9 +98,9 @@ public class PixelsWriteBuffer
     private volatile SuperVersion currentVersion;
 
     // backend flush thread
-    private final ExecutorService flushMinioExecutor;
-    private final ScheduledExecutorService flushDiskExecutor;
-    private ScheduledFuture<?> flushDiskFuture;
+    private final ExecutorService flushObjectExecutor;
+    private final ScheduledExecutorService flushFileExecutor;
+    private ScheduledFuture<?> flushFileFuture;
 
     // lock for SuperVersion switch
     private final ReadWriteLock versionLock = new ReentrantReadWriteLock();
@@ -108,7 +108,16 @@ public class PixelsWriteBuffer
     private int currentMemTableCount;
     private final Queue<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
-    private AtomicLong maxObjectKey;
+
+    /**
+     * Issue #1254: Multi-threaded flush
+     * Add `outOfOrderFlushedIds` to store flushed IDs, and `continuousFlushedId`
+     * to represent the maximum value of consecutively flushed IDs.
+     */
+    private AtomicLong continuousFlushedId;
+    private final PriorityQueue<Long> outOfOrderFlushedIds;
+    private final Object flushLock = new Object();
+
     private String retinaHostName;
     private final SinglePointIndex index;
 
@@ -140,11 +149,12 @@ public class PixelsWriteBuffer
         this.immutableMemTables = new ArrayList<>();
         this.objectEntries = new ArrayList<>();
 
-        this.flushMinioExecutor = Executors.newSingleThreadExecutor();
-        this.flushDiskExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.flushObjectExecutor = Executors.newFixedThreadPool(Integer.parseInt(configFactory.getProperty("retina.buffer.object.flush.threads")));
+        this.flushFileExecutor = Executors.newSingleThreadScheduledExecutor();
 
         this.fileWriterManagers = new ConcurrentLinkedQueue<>();
-        this.maxObjectKey = new AtomicLong(-1);
+        this.continuousFlushedId = new AtomicLong(-1);
+        this.outOfOrderFlushedIds = new PriorityQueue<>();
 
         this.retinaHostName = retinaHostName;
         this.objectStorageManager = ObjectStorageManager.Instance();
@@ -167,7 +177,7 @@ public class PixelsWriteBuffer
         this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize, IndexServiceProvider.ServiceMode.local);
         this.index = index;
 
-        startFlushMinioToDiskScheduler(Long.parseLong(configFactory.getProperty("retina.buffer.flush.interval")));
+        startFlushObjectToFileScheduler(Long.parseLong(configFactory.getProperty("retina.buffer.flush.interval")));
     }
 
     /**
@@ -260,7 +270,7 @@ public class PixelsWriteBuffer
             this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
             oldVersion.unref();
 
-            triggerFlushToMinio(oldMemTable);
+            triggerFlushToObject(oldMemTable);
         } catch (Exception e)
         {
             throw new RetinaException("Failed to switch memtable", e);
@@ -270,12 +280,12 @@ public class PixelsWriteBuffer
         }
     }
 
-    private void triggerFlushToMinio(MemTable flushMemTable)
+    private void triggerFlushToObject(MemTable flushMemTable)
     {
-        flushMinioExecutor.submit(() -> {
+        flushObjectExecutor.submit(() -> {
             try
             {
-                // put into minio
+                // put into object storage
                 long id = flushMemTable.getId();
                 this.objectStorageManager.write(this.tableId, id, flushMemTable.serialize());
 
@@ -283,7 +293,23 @@ public class PixelsWriteBuffer
                         flushMemTable.getStartIndex(), flushMemTable.getLength());
                 objectEntry.ref();
 
-                this.maxObjectKey.updateAndGet(current -> Math.max(current, id));
+                // update watermark
+                synchronized (flushLock)
+                {
+                    long nextId = continuousFlushedId.get() + 1;
+                    if (id == nextId)
+                    {
+                        continuousFlushedId.incrementAndGet();
+                        while (!outOfOrderFlushedIds.isEmpty() && outOfOrderFlushedIds.peek() == continuousFlushedId.get() + 1)
+                        {
+                            outOfOrderFlushedIds.poll();
+                            continuousFlushedId.incrementAndGet();
+                        }
+                    } else
+                    {
+                        outOfOrderFlushedIds.add(id);
+                    }
+                }
 
                 // update SuperVersion
                 versionLock.writeLock().lock();
@@ -331,19 +357,19 @@ public class PixelsWriteBuffer
 
     /**
      * Determine whether the last data block managed by fileWriterManager has
-     * been written to MinIO. If it has been written, execute the file write
+     * been written to Object. If it has been written, execute the file write
      * operation and delete the corresponding ObjectEntry in the unified view.
      */
-    private void startFlushMinioToDiskScheduler(long intervalSeconds)
+    private void startFlushObjectToFileScheduler(long intervalSeconds)
     {
-        this.flushDiskFuture = this.flushDiskExecutor.scheduleWithFixedDelay(() -> {
+        this.flushFileFuture = this.flushFileExecutor.scheduleWithFixedDelay(() -> {
             try
             {
                 Iterator<FileWriterManager> iterator = this.fileWriterManagers.iterator();
                 while (iterator.hasNext())
                 {
                     FileWriterManager fileWriterManager = iterator.next();
-                    if (fileWriterManager.getLastBlockId() <= this.maxObjectKey.get())
+                    if (fileWriterManager.getLastBlockId() <= this.continuousFlushedId.get())
                     {
                         CompletableFuture<Void> finished = fileWriterManager.finish();
                         iterator.remove();
@@ -388,33 +414,33 @@ public class PixelsWriteBuffer
     public void close() throws RetinaException
     {
         // First, shut down the flush process to prevent changes to the data view.
-        this.flushMinioExecutor.shutdown();
+        this.flushObjectExecutor.shutdown();
         try
         {
-            if (!this.flushMinioExecutor.awaitTermination(60, TimeUnit.SECONDS))
+            if (!this.flushObjectExecutor.awaitTermination(60, TimeUnit.SECONDS))
             {
-                this.flushMinioExecutor.shutdownNow();
+                this.flushObjectExecutor.shutdownNow();
             }
         } catch (InterruptedException e)
         {
-            this.flushMinioExecutor.shutdownNow();
+            this.flushObjectExecutor.shutdownNow();
             Thread.currentThread().interrupt();
-            throw new RetinaException("Close process was interrupted while waiting for flushMinioExecutor", e);
+            throw new RetinaException("Close process was interrupted while waiting for flushObjectExecutor", e);
         }
-        if (this.flushDiskFuture != null)
+        if (this.flushFileFuture != null)
         {
-            this.flushDiskFuture.cancel(false);
+            this.flushFileFuture.cancel(false);
         }
-        this.flushDiskExecutor.shutdown();
+        this.flushFileExecutor.shutdown();
         try
         {
-            if (!this.flushDiskExecutor.awaitTermination(60, TimeUnit.SECONDS))
+            if (!this.flushFileExecutor.awaitTermination(60, TimeUnit.SECONDS))
             {
-                this.flushDiskExecutor.shutdownNow();
+                this.flushFileExecutor.shutdownNow();
             }
         } catch (InterruptedException e)
         {
-            this.flushDiskExecutor.shutdownNow();
+            this.flushFileExecutor.shutdownNow();
             Thread.currentThread().interrupt();
             throw new RetinaException("Close process was interrupted while waiting for flushDiskExecutor", e);
         }
@@ -423,7 +449,7 @@ public class PixelsWriteBuffer
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         try
         {
-            long maxObjectKey = this.maxObjectKey.get();
+            long maxObjectKey = this.continuousFlushedId.get();
 
             // process current fileWriterManager
             this.currentFileWriterManager.setLastBlockId(maxObjectKey);
@@ -447,7 +473,7 @@ public class PixelsWriteBuffer
                 firstBlockId = fileWriterManager.getFirstBlockId();
                 long lastBlockId = fileWriterManager.getLastBlockId();
 
-                // all written to minio
+                // all written to object
                 if (lastBlockId <= maxObjectKey)
                 {
                     futures.add(fileWriterManager.finish());
@@ -466,7 +492,7 @@ public class PixelsWriteBuffer
                         }
                     }
 
-                    // elements in minio will be processed in finish() later
+                    // elements in object will be processed in finish() later
                     fileWriterManager.setLastBlockId(maxObjectKey);
                     futures.add(fileWriterManager.finish());
                 }

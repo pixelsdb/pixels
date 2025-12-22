@@ -27,29 +27,31 @@
 
 /**
  * Mapping Linux I/O functions to native methods.
- * Partially referenced the implementation of Jaydio (https://github.com/smacke/jaydio),
- * which is implemented by Stephen Macke and licensed under Apache 2.0.
- * <p>
+ * Partially referenced the implementation of Jaydio(https://github.com/smacke/jaydio),
+ * which is implemented by Stephen Macke and licensed under Apache 2.0. <p>
  * Created at: 02/02/2023
  * Author: Liangyong Yu
  */
 
-#include "utils/ConfigFactory.h"
-#include "physical/natives/ByteBuffer.h"
-#include <iostream>
-#include <string>
-#include <fcntl.h>
-#include <unistd.h>
 #include "liburing.h"
 #include "liburing/io_uring.h"
-
+#include "physical/natives/ByteBuffer.h"
+#include "utils/ConfigFactory.h"
+#include <errno.h>
+#include <fcntl.h>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string.h>
+#include <string>
+#include <sys/mman.h>
+#include <unistd.h>
 
 struct uringData
 {
     int idx;
-    ByteBuffer *bb;
+    ByteBuffer* bb;
 };
-
 
 class DirectIoLib
 {
@@ -59,13 +61,23 @@ public:
      */
     DirectIoLib(int fsBlockSize);
 
-    std::shared_ptr <ByteBuffer> allocateDirectBuffer(long size);
+    std::shared_ptr<ByteBuffer> allocateDirectBuffer(long size,
+                                                     bool isSmallBuffer);
 
-    std::shared_ptr <ByteBuffer> read(int fd, long fileOffset, std::shared_ptr <ByteBuffer> directBuffer, long length);
+    int getToAllocate(int size);
+
+    std::shared_ptr<ByteBuffer> read(int fd, long fileOffset,
+                                     std::shared_ptr<ByteBuffer> directBuffer,
+                                     long length);
 
     long blockStart(long value);
 
     long blockEnd(long value);
+
+    int getBlockSize() const
+    {
+        return fsBlockSize;
+    };
 
 private:
     int fsBlockSize;
