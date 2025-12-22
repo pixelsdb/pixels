@@ -43,7 +43,8 @@ enum NodeRole {
 message NodeInfo {
   string address = 1;
   uint32 port = 2;
-  NodeRole role = 3;
+  uint32 virtualNodeId = 3;
+  NodeRole role = 4;
 }
 
 message GetRetinaListResponse {

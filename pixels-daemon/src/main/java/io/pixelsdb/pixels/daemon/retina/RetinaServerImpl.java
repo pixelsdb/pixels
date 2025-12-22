@@ -393,7 +393,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                         IndexProto.PrimaryIndexEntry.Builder builder =
                                 this.retinaResourceManager.insertRecord(schemaName, tableName,
-                                        colValuesByteArray, timestamp);
+                                        colValuesByteArray, timestamp, request.getVirtualNodeId());
                         builder.setIndexKey(insertData.getIndexKeys(0));
                         IndexProto.PrimaryIndexEntry entry = builder.build();
                         primaryIndexEntries.add(entry);
@@ -457,7 +457,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                         IndexProto.PrimaryIndexEntry.Builder builder =
                                 this.retinaResourceManager.insertRecord(schemaName, tableName,
-                                        colValuesByteArray, timestamp);
+                                        colValuesByteArray, timestamp, request.getVirtualNodeId());
 
                         builder.setIndexKey(updateData.getIndexKeys(0));
                         IndexProto.PrimaryIndexEntry entry = builder.build();
@@ -625,7 +625,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         try
         {
             RetinaProto.GetWriteBufferResponse.Builder response = this.retinaResourceManager.getWriteBuffer(
-                    request.getSchemaName(), request.getTableName(), request.getTimestamp());
+                    request.getSchemaName(), request.getTableName(), request.getTimestamp(), request.getVirtualNodeId());
             response.setHeader(headerBuilder);
 
             responseObserver.onNext(response.build());

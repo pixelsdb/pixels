@@ -97,13 +97,14 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     private TypeDescription resultSchema = null;
     private long dataReadBytes = 0L;
     private long dataReadRow = 0L;
-
+    private int vNodeId;
     public PixelsRecordReaderBufferImpl(PixelsReaderOption option,
                                         String retinaHost,
                                         byte[] activeMemtableData, List<Long> fileIds,  // read version
                                         List<RetinaProto.VisibilityBitmap> visibilityBitmap,
                                         Storage storage,
                                         long tableId, // to locate file with file id
+                                        int vNodeId,
                                         TypeDescription typeDescription
     ) throws IOException
     {
@@ -123,7 +124,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         this.visibilityBitmap = visibilityBitmap;
         this.includedColumnTypes = new ArrayList<>();
         this.everRead = false;
-
+        this.vNodeId = vNodeId;
         this.maxPrefetchTasks = Integer.parseInt(configFactory.getProperty("retina.reader.prefetch.threads"));
         this.prefetchQueueCapacity = DEFAULT_QUEUE_CAPACITY;
 
@@ -199,7 +200,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
                     try
                     {
                         // I/O Blocking Operation
-                        String path = getRetinaBufferStoragePathFromId(fileId);
+                        String path = getRetinaBufferStoragePathFromId(fileId, vNodeId);
                         buffer = getMemtableDataFromStorage(path);
 
                         // CPU Intensive Operation
@@ -437,9 +438,9 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         prefetchExecutor.shutdownNow();
     }
 
-    private String getRetinaBufferStoragePathFromId(long entryId)
+    private String getRetinaBufferStoragePathFromId(long entryId, int virtualId)
     {
-        return this.retinaBufferStorageFolder + String.format("%d/%s_%d", tableId, retinaHost, entryId);
+        return this.retinaBufferStorageFolder + String.format("%d/%d/%s_%d", tableId, virtualId, retinaHost, entryId);
     }
 
     private ByteBuffer getMemtableDataFromStorage(String path) throws IOException

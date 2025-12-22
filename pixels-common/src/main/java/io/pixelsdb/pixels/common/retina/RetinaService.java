@@ -145,12 +145,13 @@ public class RetinaService
         }
     }
 
-    public boolean updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
+    public boolean updateRecord(String schemaName, int virtualNodeId, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
+                .setVirtualNodeId(virtualNodeId)
                 .addAllTableUpdateData(tableUpdateData)
                 .build();
         RetinaProto.UpdateRecordResponse response = this.stub.updateRecord(request);
@@ -185,7 +186,7 @@ public class RetinaService
             this.requestObserver = requestObserver;
         }
 
-        public CompletableFuture<RetinaProto.UpdateRecordResponse> updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
+        public CompletableFuture<RetinaProto.UpdateRecordResponse> updateRecord(String schemaName, int vNodeId, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
         {
             if (isClosed)
             {
@@ -199,6 +200,7 @@ public class RetinaService
             RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                     .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                     .setSchemaName(schemaName)
+                    .setVirtualNodeId(vNodeId)
                     .addAllTableUpdateData(tableUpdateData)
                     .build();
             
@@ -361,13 +363,14 @@ public class RetinaService
         return true;
     }
 
-    public RetinaProto.GetWriteBufferResponse getWriteBuffer(String schemaName, String tableName, long timeStamp) throws RetinaException
+    public RetinaProto.GetWriteBufferResponse getWriteBuffer(String schemaName, String tableName, int virtualNodeId, long timeStamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.GetWriteBufferRequest request = RetinaProto.GetWriteBufferRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
+                .setVirtualNodeId(virtualNodeId)
                 .setTimestamp(timeStamp)
                 .build();
         RetinaProto.GetWriteBufferResponse response = this.stub.getWriteBuffer(request);

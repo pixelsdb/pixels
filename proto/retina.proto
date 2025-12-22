@@ -106,6 +106,7 @@ message UpdateRecordRequest {
     RequestHeader header = 1;
     string schemaName = 2;
     repeated TableUpdateData tableUpdateData = 3;
+    uint32 virtualNodeId = 4;
 }
 
 message UpdateRecordResponse {
@@ -164,6 +165,7 @@ message GetWriteBufferRequest {
     string schemaName = 2;
     string tableName = 3;
     uint64 timestamp = 4;
+    uint32 virtualNodeId = 5;
 }
 
 message GetWriteBufferResponse {

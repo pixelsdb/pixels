@@ -60,10 +60,10 @@
  public class IndexedPixelsConsumer extends AbstractPixelsConsumer
  {
 
-     // Map: Bucket ID -> Writer state
-     private final Map<Integer, PerBucketWriter> bucketWriters = new ConcurrentHashMap<>();
+     // Map: Retina Host -> Writer state
+     private final Map<String, PerRetinaNodeWriter> retinaWriters = new ConcurrentHashMap<>();
      private final BucketCache bucketCache = BucketCache.getInstance();
-     private final Map<NodeProto.NodeInfo, IndexService> indexServices = new ConcurrentHashMap<>();
+     private final Map<String, IndexService> indexServices = new ConcurrentHashMap<>();
      private final int indexServerPort;
 
      public IndexedPixelsConsumer(BlockingQueue<String> queue, Parameters parameters,
@@ -99,13 +99,13 @@
                  ByteString pkByteString = calculatePrimaryKeyBytes(colsInLine);
                  // Assume BucketCache has the necessary method and configuration
                  int bucketId = RetinaUtils.getBucketIdFromByteBuffer(pkByteString);
-
+                 String retinaName = RetinaUtils.getRetinaHostNameFromBucketId(bucketId);
                  // 2. Get/Initialize the Writer for this Bucket
-                 PerBucketWriter bucketWriter = bucketWriters.computeIfAbsent(bucketId, id ->
+                 PerRetinaNodeWriter retinaNodeWriter = retinaWriters.computeIfAbsent(retinaName, id ->
                  {
                      try
                      {
-                         return initializeBucketWriter(id);
+                         return initializeRetinaWriter(bucketId);
                      } catch (Exception e)
                      {
                          throw new RuntimeException("Failed to initialize writer for bucket " + id, e);
@@ -113,26 +113,26 @@
                  });
 
                  // 3. Write Data Row
-                 writeRowToBatch(bucketWriter.rowBatch, colsInLine, timestamp);
-                 bucketWriter.rowCounter++;
+                 writeRowToBatch(retinaNodeWriter.rowBatch, colsInLine, timestamp);
+                 retinaNodeWriter.rowCounter++;
 
                  try
                  {
                      // 4. Update Index Entry
-                     updateIndexEntry(bucketWriter, pkByteString);
+                     updateIndexEntry(retinaNodeWriter, pkByteString);
 
                      // 5. Check and Flush Row Batch
-                     if (bucketWriter.rowBatch.size >= bucketWriter.rowBatch.getMaxSize())
+                     if (retinaNodeWriter.rowBatch.size >= retinaNodeWriter.rowBatch.getMaxSize())
                      {
-                         flushRowBatch(bucketWriter);
+                         flushRowBatch(retinaNodeWriter);
                      }
 
                      // 6. Check and Close File
-                     if (bucketWriter.rowCounter >= maxRowNum)
+                     if (retinaNodeWriter.rowCounter >= maxRowNum)
                      {
-                         closePixelsFile(bucketWriter);
+                         closePixelsFile(retinaNodeWriter);
                          // Remove writer to force re-initialization on next use
-                         bucketWriters.remove(bucketId);
+                         retinaWriters.remove(retinaName);
                      }
                  } catch (IndexException e)
                  {
@@ -145,7 +145,7 @@
      @Override
      protected void flushRemainingData() throws IOException, MetadataException
      {
-         for (PerBucketWriter bucketWriter : bucketWriters.values())
+         for (PerRetinaNodeWriter bucketWriter : retinaWriters.values())
          {
              if (bucketWriter.rowCounter > 0)
              {
@@ -158,13 +158,13 @@
                  }
              }
          }
-         bucketWriters.clear();
+         retinaWriters.clear();
      }
 
      /**
       * Initializes a new PixelsWriter and associated File/Path for a given bucket ID.
       */
-     private PerBucketWriter initializeBucketWriter(int bucketId) throws IOException, MetadataException, IndexException
+     private PerRetinaNodeWriter initializeRetinaWriter(int bucketId) throws IOException, MetadataException
      {
          // Use the Node Cache to find the responsible Retina Node
          NodeProto.NodeInfo targetNode = bucketCache.getRetinaNodeInfoByBucketId(bucketId);
@@ -187,7 +187,7 @@
          File currFile = openTmpFile(targetFileName, currTargetPath);
          tmpFiles.add(currFile);
 
-         return new PerBucketWriter(pixelsWriter, currFile, currTargetPath, targetNode);
+         return new PerRetinaNodeWriter(pixelsWriter, currFile, currTargetPath, targetNode);
      }
 
      // --- Private Helper Methods ---
@@ -219,7 +219,7 @@
          return ByteString.copyFrom((ByteBuffer) indexKeyBuffer.rewind());
      }
 
-     private void updateIndexEntry(PerBucketWriter bucketWriter, ByteString pkByteString) throws IndexException
+     private void updateIndexEntry(PerRetinaNodeWriter bucketWriter, ByteString pkByteString) throws IndexException
      {
          IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
          builder.getIndexKeyBuilder()
@@ -237,7 +237,7 @@
          bucketWriter.indexEntries.add(builder.build());
      }
 
-     private void flushRowBatch(PerBucketWriter bucketWriter) throws IOException, IndexException
+     private void flushRowBatch(PerRetinaNodeWriter bucketWriter) throws IOException, IndexException
      {
          bucketWriter.pixelsWriter.addRowBatch(bucketWriter.rowBatch);
          bucketWriter.rowBatch.reset();
@@ -254,7 +254,7 @@
          bucketWriter.indexEntries.clear();
      }
 
-     private void closePixelsFile(PerBucketWriter bucketWriter) throws IOException, MetadataException, IndexException
+     private void closePixelsFile(PerRetinaNodeWriter bucketWriter) throws IOException, IndexException
      {
          // Final flush of remaining rows/indexes
          if (bucketWriter.rowBatch.size != 0)
@@ -266,7 +266,7 @@
          closeWriterAndAddFile(bucketWriter.pixelsWriter, bucketWriter.currFile, bucketWriter.currTargetPath, bucketWriter.targetNode);
      }
 
-     private class PerBucketWriter
+     private class PerRetinaNodeWriter
      {
          PixelsWriter pixelsWriter;
          File currFile;
@@ -281,7 +281,7 @@
          IndexService indexService;
          RowIdAllocator rowIdAllocator;
 
-         public PerBucketWriter(PixelsWriter writer, File file, Path path, NodeProto.NodeInfo node)
+         public PerRetinaNodeWriter(PixelsWriter writer, File file, Path path, NodeProto.NodeInfo node)
          {
              this.pixelsWriter = writer;
              this.currFile = file;
@@ -292,8 +292,8 @@
              this.rgRowOffset = 0;
              this.rowCounter = 0;
              this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
-             this.indexService = indexServices.computeIfAbsent(node, nodeInfo ->
-                     RPCIndexService.CreateInstance(nodeInfo.getAddress(), indexServerPort));
+             this.indexService = indexServices.computeIfAbsent(node.getAddress(), nodeInfo ->
+                     RPCIndexService.CreateInstance(nodeInfo, indexServerPort));
              this.rowIdAllocator = new RowIdAllocator(index.getTableId(), maxRowNum, this.indexService);
          }
      }

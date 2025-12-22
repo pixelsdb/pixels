@@ -34,6 +34,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -97,10 +99,9 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
             hashRing.clear();
             for (KeyValue kv : retinaNodes)
             {
-                NodeProto.NodeInfo node = NodeProto.NodeInfo.newBuilder()
+                NodeProto.NodeInfo.Builder node = NodeProto.NodeInfo.newBuilder()
                         .setAddress(getAddressFromKV(kv))
-                        .setRole(NodeProto.NodeRole.RETINA)
-                        .build();
+                        .setRole(NodeProto.NodeRole.RETINA);
                 addNodeInternal(node);
             }
             logger.info("Initial hash ring loaded with {} physical nodes and {} virtual nodes.",
@@ -174,10 +175,9 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
             {
                 if (!existingAddresses.contains(newAddr))
                 {
-                    NodeProto.NodeInfo node = NodeProto.NodeInfo.newBuilder()
+                    NodeProto.NodeInfo.Builder node = NodeProto.NodeInfo.newBuilder()
                             .setAddress(newAddr)
-                            .setRole(NodeProto.NodeRole.RETINA)
-                            .build();
+                            .setRole(NodeProto.NodeRole.RETINA);
                     addNodeInternal(node);
                     logger.info("Added node to hash ring: " + newAddr);
                 }
@@ -191,12 +191,13 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
     /**
      * Add a node to the hash ring internally, mapping to the fixed hash points [0, bucketNum-1].
      */
-    private void addNodeInternal(NodeProto.NodeInfo node)
+    private void addNodeInternal(NodeProto.NodeInfo.Builder node)
     {
         for (int i = 0; i < virtualNode; i++)
         {
+            node.setVirtualNodeId(i);
             int hashPoint = hash(node.getAddress() + "#" + i) % bucketNum;
-            hashRing.put(hashPoint, node);
+            hashRing.put(hashPoint, node.build());
         }
     }
 
@@ -227,7 +228,19 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
      */
     private int hash(String key)
     {
-        return key.hashCode();
+        try
+        {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] digest = md.digest(key.getBytes(StandardCharsets.UTF_8));
+            int hash = ((digest[0] & 0xFF) << 24)
+                    | ((digest[1] & 0xFF) << 16)
+                    | ((digest[2] & 0xFF) << 8)
+                    | (digest[3] & 0xFF);
+            return hash & 0x7FFFFFFF;
+        } catch (NoSuchAlgorithmException e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
