@@ -20,13 +20,11 @@
 package io.pixelsdb.pixels.retina;
 
 import com.google.protobuf.ByteString;
-import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
@@ -561,17 +559,9 @@ public class RetinaResourceManager
 
             // get primary index
             Table table = metadataService.getTable(schemaName, tableName);
-            SinglePointIndex index = null;
-            try
-            {
-                index = metadataService.getPrimaryIndex(table.getId());
-            } catch (MetadataException ignored)
-            {
-                logger.warn("There isn't primary index on table {}", tableName);
-            }
 
             PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(latestLayout.getTableId(),
-                    schema, orderedPaths.get(0), compactPaths.get(0), retinaHostName, index);
+                    schema, orderedPaths.get(0), compactPaths.get(0), retinaHostName);
             String writeBufferKey = schemaName + "_" + tableName;
             pixelsWriteBufferMap.put(writeBufferKey, pixelsWriteBuffer);
         } catch (Exception e)

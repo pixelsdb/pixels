@@ -47,7 +47,7 @@ import java.util.concurrent.Future;
 public class TestSqliteMainIndexQuery
 {
     MainIndex mainIndex;
-    Long tableId =2876L;
+    Long tableId =3035L;
     Connection connection;
     @BeforeEach
     public void setUp() throws Exception
