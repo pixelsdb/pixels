@@ -567,6 +567,7 @@ public class RetinaResourceManager
                 index = metadataService.getPrimaryIndex(table.getId());
             } catch (MetadataException ignored)
             {
+                logger.warn("There isn't primary index on table {}", tableName);
             }
 
             PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(latestLayout.getTableId(),
