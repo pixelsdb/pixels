@@ -128,6 +128,8 @@ public class RocksDBFactory
                 .setFilterPolicy(new BloomFilter(10, false))
                 .setWholeKeyFiltering(false)
                 .setBlockSize(blockSize)
+                .setCacheIndexAndFilterBlocks(true)
+                .setPinL0FilterAndIndexBlocksInCache(true)
                 .setBlockCache(blockCache);
 
         // ColumnFamily Options
@@ -141,6 +143,7 @@ public class RocksDBFactory
         int maxBytesForLevelMultiplier = Integer.parseInt(config.getProperty("index.rocksdb.max.bytes.for.level.multiplier"));
         long targetFileSizeBase = Long.parseLong(config.getProperty("index.rocksdb.target.file.size.base"));
         int targetFileSizeMultiplier = Integer.parseInt(config.getProperty("index.rocksdb.target.file.size.multiplier"));
+        int fixedLengthPrefix = Integer.parseInt(config.getProperty("index.rocksdb.prefix.length"));
         CompactionStyle compactionStyle = CompactionStyle.valueOf(config.getProperty("index.rocksdb.compaction.style"));
 
         // Compression Options
@@ -160,7 +163,8 @@ public class RocksDBFactory
                 .setTargetFileSizeMultiplier(targetFileSizeMultiplier)
                 .setCompressionType(compressionType)
                 .setBottommostCompressionType(bottommostCompressionType)
-                .setCompactionStyle(compactionStyle);
+                .setCompactionStyle(compactionStyle)
+                .useFixedLengthPrefixExtractor(fixedLengthPrefix);
 
         return new ColumnFamilyDescriptor(name, cfOptions);
     }

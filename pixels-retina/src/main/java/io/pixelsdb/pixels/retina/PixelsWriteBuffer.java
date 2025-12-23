@@ -20,10 +20,13 @@
 package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.exception.IndexException;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
+import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -116,11 +119,13 @@ public class PixelsWriteBuffer
     private AtomicLong continuousFlushedId;
     private final PriorityQueue<Long> outOfOrderFlushedIds;
     private final Object flushLock = new Object();
+    private final Object rowLock = new Object();
 
     private String retinaHostName;
+    private SinglePointIndex index;
 
     public PixelsWriteBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
-                              Path targetCompactDirPath, String retinaHostName) throws RetinaException
+                             Path targetCompactDirPath, String retinaHostName) throws RetinaException
     {
         this.tableId = tableId;
         this.schema = schema;
@@ -192,15 +197,25 @@ public class PixelsWriteBuffer
 
         MemTable currentMemTable = null;
         int rowOffset = -1;
+        long rowId = -1;
         while (rowOffset < 0)
         {
             currentMemTable = this.activeMemTable;
             try
             {
-                rowOffset = currentMemTable.add(values, timestamp);
+                synchronized (rowLock)
+                {
+                    // Ensure rgRowOffset and rowId are allocated synchronously to minimize
+                    // fragmentation after MainIndex flush.
+                    rowOffset = currentMemTable.add(values, timestamp);
+                    rowId = rowIdAllocator.getRowId();
+                }
             } catch (NullPointerException e)
             {
                 continue;
+            } catch (IndexException e)
+            {
+                throw new RetinaException("Fail to get rowId from rowIdAllocator", e);
             }
 
             // active memTable is full
@@ -217,13 +232,7 @@ public class PixelsWriteBuffer
         builder.setFileId(activeMemTable.getFileId())
                 .setRgId(0)
                 .setRgRowOffset(rgRowOffset);
-        try
-        {
-            return rowIdAllocator.getRowId();
-        } catch (IndexException e)
-        {
-            throw new RetinaException("Fail to get rowId from rowIdAllocator", e);
-        }
+        return rowId;
     }
 
     private void switchMemTable() throws RetinaException
@@ -362,6 +371,17 @@ public class PixelsWriteBuffer
         this.flushFileFuture = this.flushFileExecutor.scheduleWithFixedDelay(() -> {
             try
             {
+                if(index == null)
+                {
+                    try
+                    {
+                        index = MetadataService.Instance().getPrimaryIndex(tableId);
+                    } catch (MetadataException ignored)
+                    {
+                        logger.warn("There isn't primary index on table {}", tableId);
+                    }
+                }
+
                 Iterator<FileWriterManager> iterator = this.fileWriterManagers.iterator();
                 while (iterator.hasNext())
                 {
@@ -387,6 +407,11 @@ public class PixelsWriteBuffer
                         this.versionLock.writeLock().unlock();
 
                         finished.get();
+                        if(index != null)
+                        {
+                            IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local)
+                                    .flushIndexEntriesOfFile(tableId, index.getId(), fileWriterManager.getFileId(), true);
+                        }
                         for (ObjectEntry objectEntry : toRemove)
                         {
                             if (objectEntry.unref())

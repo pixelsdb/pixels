@@ -188,10 +188,10 @@ public class MainIndexBuffer implements Closeable
                     currRangeBuilder.setRowIdEnd(prevRowId + 1);
                     currRangeBuilder.setRgRowOffsetEnd(prevRgRowOffset + 1);
                     ranges.add(currRangeBuilder.build());
-                    last = true;
                 }
                 // start constructing a new row id range
                 first = false;
+                last = true;
                 currRangeBuilder.setRowIdStart(rowId);
                 currRangeBuilder.setFileId(fileId);
                 currRangeBuilder.setRgId(rgId);
@@ -202,13 +202,17 @@ public class MainIndexBuffer implements Closeable
             prevRgRowOffset = rgRowOffset;
         }
         // add the last range
-        if (!last)
+        if (last)
         {
             currRangeBuilder.setRowIdEnd(prevRowId + 1);
             currRangeBuilder.setRgRowOffsetEnd(prevRgRowOffset + 1);
             ranges.add(currRangeBuilder.build());
         }
         // release the flushed file index buffer
+        if(fileBuffer.size() != rowIds.length)
+        {
+            throw new MainIndexException("FileBuffer Changed while flush");
+        }
         fileBuffer.clear();
         this.indexBuffer.remove(fileId);
         if (this.indexBuffer.size() <= CACHE_POP_ENABLE_THRESHOLD)
