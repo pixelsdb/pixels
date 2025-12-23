@@ -251,6 +251,7 @@
 
          // Push index entries to the corresponding IndexService (determined by targetNode address)
          bucketWriter.indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), bucketWriter.indexEntries);
+         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),bucketWriter.currFile.getId(), true);
          bucketWriter.indexEntries.clear();
      }
 
@@ -262,7 +263,6 @@
              flushRowBatch(bucketWriter);
          }
 
-         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),bucketWriter.currFile.getId(), true);
          closeWriterAndAddFile(bucketWriter.pixelsWriter, bucketWriter.currFile, bucketWriter.currTargetPath, bucketWriter.targetNode);
      }
 
