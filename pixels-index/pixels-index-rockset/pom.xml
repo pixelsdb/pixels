@@ -39,6 +39,12 @@
             <artifactId>grpc-testing</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.rocksdb</groupId>
+            <artifactId>rocksdbjni</artifactId>
+            <version>10.2.1</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>

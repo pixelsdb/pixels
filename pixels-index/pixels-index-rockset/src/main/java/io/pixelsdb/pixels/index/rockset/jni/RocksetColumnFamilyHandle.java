@@ -2,15 +2,24 @@ package io.pixelsdb.pixels.index.rockset.jni;
 
 public class RocksetColumnFamilyHandle extends RocksetHandle
 {
-    private RocksetColumnFamilyHandle(long handle)
+    private final RocksetDB rocksetDB;
+    RocksetColumnFamilyHandle(long handle)
     {
         super(handle);
+        this.rocksetDB = null;
     }
 
-    public static RocksetColumnFamilyHandle create()
+    RocksetColumnFamilyHandle(RocksetDB rocksetDB, long handle)
     {
-        return new RocksetColumnFamilyHandle(nativeCreate());
+        super(handle);
+        assert rocksetDB != null;
+        this.rocksetDB = rocksetDB;
     }
+
+//    public static RocksetColumnFamilyHandle create()
+//    {
+//        return new RocksetColumnFamilyHandle(nativeCreate());
+//    }
 
     @Override
     public void close()
@@ -18,6 +27,6 @@ public class RocksetColumnFamilyHandle extends RocksetHandle
         nativeRelease(nativeHandle);
     }
 
-    private static native long nativeCreate();
+//    private static native long nativeCreate();
     private static native void nativeRelease(long handle);
 }
