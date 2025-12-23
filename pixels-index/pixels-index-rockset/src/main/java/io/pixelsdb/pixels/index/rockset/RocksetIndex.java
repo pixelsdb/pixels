@@ -176,15 +176,14 @@ public class RocksetIndex extends CachingSinglePointIndex
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean removed = new AtomicBoolean(false);
 
-    public RocksetIndex(long tableId, long indexId, CloudDBOptions options, boolean unique)
-    {
+    public RocksetIndex(long tableId, long indexId, CloudDBOptions options, boolean unique) throws Exception {
         this.tableId = tableId;
         this.indexId = indexId;
         this.rocksDBPath = RocksetFactory.getDbPath();
         this.unique = unique;
         this.dbHandle = CreateDBCloud(options);
         this.writeOptions = RocksetWriteOptions.create();
-        this.columnFamilyHandle = RocksetColumnFamilyHandle.create();
+        this.columnFamilyHandle = RocksetFactory.getOrCreateColumnFamily(tableId, indexId);
     }
 
     // ---------------- SinglePointIndex interface ----------------
