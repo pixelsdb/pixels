@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 {
@@ -68,6 +69,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final List<RetinaProto.VisibilityBitmap> visibilityBitmap;
     private final List<PixelsProto.Type> includedColumnTypes;
+    private final AtomicLong memoryUsage = new AtomicLong(0L);
     /**
      * Columns included by reader option; if included, set true
      */
@@ -156,8 +158,10 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
             {
                 try
                 {
+                    memoryUsage.addAndGet(activeMemtableData.length);
                     ByteBuffer buffer = ByteBuffer.wrap(activeMemtableData);
                     VectorizedRowBatch batch = VectorizedRowBatch.deserialize(buffer);
+                    memoryUsage.addAndGet(batch.getMemoryUsage());
                     prefetchQueue.put(batch);
                 } catch (Exception e)
                 {
@@ -205,7 +209,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 
                         // CPU Intensive Operation
                         VectorizedRowBatch batch = VectorizedRowBatch.deserialize(buffer);
-
+                        memoryUsage.addAndGet(batch.getMemoryUsage());
                         // Put result into the queue (blocks if queue is full)
                         prefetchQueue.put(batch);
                     } catch (Exception e)
@@ -429,7 +433,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     @Override
     public long getMemoryUsage()
     {
-        return 0;
+        return memoryUsage.get();
     }
 
     @Override
@@ -456,6 +460,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
                 {
                     int length = (int) reader.getFileLength();
                     dataReadBytes += length;
+                    memoryUsage.addAndGet(length);
                     return reader.readFully(length);
                 }
             }
