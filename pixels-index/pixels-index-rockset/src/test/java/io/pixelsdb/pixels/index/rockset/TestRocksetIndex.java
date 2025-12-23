@@ -396,3 +396,4 @@ public class TestRocksetIndex
         System.out.printf("Deleted %,d entries in %.2f ms (%.2f ops/sec)%n", count, durationMs, count * 1000.0 / durationMs);
     }
 }
+
