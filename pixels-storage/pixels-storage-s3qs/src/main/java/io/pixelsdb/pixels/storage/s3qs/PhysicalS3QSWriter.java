@@ -116,10 +116,14 @@ public class PhysicalS3QSWriter implements PhysicalWriter
     @Override
     public void close() throws IOException
     {
-        this.out.close();
-        if (this.queue != null && !this.queue.isClosed())
+        try
         {
-            this.queue.push(this.pathStr);
+            this.out.close();
+            if (this.queue != null && !this.queue.isClosed()) {
+                this.queue.push(this.pathStr);
+            }
+        }catch (IOException e){
+            throw e;
         }
     }
 

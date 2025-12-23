@@ -20,24 +20,26 @@
 package io.pixelsdb.pixels.storage.s3qs;
 
 import io.pixelsdb.pixels.common.physical.ObjectPath;
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.storage.s3.AbstractS3;
+import io.pixelsdb.pixels.storage.s3qs.exception.TaskErrorException;
 import io.pixelsdb.pixels.storage.s3qs.io.S3QSInputStream;
 import io.pixelsdb.pixels.storage.s3qs.io.S3QSOutputStream;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sqs.SqsClient;
-import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
-import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
-import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
-import software.amazon.awssdk.services.sqs.model.SqsException;
+import software.amazon.awssdk.services.sqs.model.*;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.lang.UnsupportedOperationException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * {@link S3QS} is to write and read the small intermediate files in data shuffling. It is compatible with S3, hence its
@@ -56,6 +58,7 @@ public final class S3QS extends AbstractS3
 {
     private static final String SchemePrefix = Scheme.s3qs.name() + "://";
 
+    //TODO: need thread safe
     public final HashSet<Integer> producerSet;
     // maybe can use array to improve
     private final HashSet<Integer> PartitionSet;
@@ -106,6 +109,16 @@ public final class S3QS extends AbstractS3
         return SchemePrefix + path;
     }
 
+    public void addProducer(int workerId)
+    {
+        if(!(this.producerSet).contains(workerId)){
+            this.producerSet.add(workerId);
+        }
+    }
+
+
+    //TODO: GC for files, objects and sqs.
+    //TODO: can modify the timeout that message keep invisible for other thread
     //producers in a shuffle offer their message to s3qs.
     public PhysicalWriter offer(S3QueueMessage mesg) throws IOException
     {
@@ -117,8 +130,8 @@ public final class S3QS extends AbstractS3
             String queueUrl = "";
             try {
                 queueUrl = createQueue(sqs,
-                        (String.valueOf(System.currentTimeMillis()))
-                        + "-" + mesg.getPartitionNum()
+                        mesg.getPartitionNum()+"-"+
+                                (String.valueOf(System.currentTimeMillis()))
                 );
             }catch (SqsException e) {
                 //TODO: if name is duplicated in aws try again later
@@ -136,7 +149,7 @@ public final class S3QS extends AbstractS3
         else
         {
             queue = PartitionMap.get(mesg.getPartitionNum());
-            if(queue.isClosed()) throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
+            if(queue.getStopInput()) throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
         }
         return queue.offer(mesg);
     }
@@ -158,10 +171,8 @@ public final class S3QS extends AbstractS3
             return getQueueUrlResponse.queueUrl();
 
         } catch (SqsException e) {
-            System.err.println(e.awsErrorDetails().errorMessage());
-            System.exit(1);
+            throw new RuntimeException("fail to create sqs queue: " + queueName, e);
         }
-        return "";
     }
 
     public S3Queue openQueue(String queueUrl)
@@ -170,7 +181,87 @@ public final class S3QS extends AbstractS3
     }
 
 
+    /**
+    @return including writer and recipthanle(to sign a mesg in sqs).
+    3 situation :closed(exception) / not ready or timeout or endinput(null) / succeed(writer)
+     */
+    public Map.Entry<String,PhysicalReader> poll(S3QueueMessage mesg, int timeoutSec) throws IOException
+    {
+        S3Queue queue = PartitionMap.get(mesg.getPartitionNum());
+        if(queue.isClosed()) throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
+        if(queue == null) return null;
 
+        //if there is no more input, just wait invisibletime. if timeout, no more message
+        //issue: dead message maybe only handle twice, I think that's reasonable
+        //TODO: once a message dead, push it in dead message queue. when delete a message, delete
+        Map.Entry<String,PhysicalReader> pair = null;
+        try{
+            if (queue.getStopInput()) {
+                pair = queue.poll(queue.getInvisibleTime());
+                if (pair == null) { // no more message
+                    queue.close(); //logical close, no effect to consumers
+                    return null; //come back later and find queue is closed
+                }
+            } else {
+                pair = queue.poll(timeoutSec);
+                if (pair == null) return null; //upstream is working, come back later
+            }
+        }catch (TaskErrorException e) {
+            //clean up
+        }
+
+//        PhysicalReader reader = pair.getValue();
+//        if(Objects.equals(reader.getPath(), "")) {
+//            queue.stopInput();
+//            return null; //comeback later. Maybe there are some message failed and return queue
+//        }
+        queue.addConsumer(mesg.getWorkerNum());
+        return pair;
+    }
+
+    public int finishWork(S3QueueMessage mesg) throws IOException
+    {
+        //DONOT close queue here. we don't know whether downstream workers meet error
+        //if we check to close queue here, we maybe check many times. That is expensive
+        // Once queue closed, consumers in the queue will know in the next poll.
+        String receiptHandle = mesg.getReceiptHandle();
+        S3Queue queue = PartitionMap.get(mesg.getPartitionNum());
+
+        // queue close means consumer don't need to listen from it
+        //if(queue.isClosed()) throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
+
+        if(queue == null) {
+            //queue not exist: an error, or a timeout worker
+            throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
+        }
+        try {
+            queue.deleteMessage(receiptHandle);
+        }catch (SqsException e) {
+            //TODO: log
+            return 2;
+        }
+
+        // TODO: when all the consumers exit with some messages staying in DLQ, the work occur an error
+        // though we can actually close in poll() function, we close here make sure sqs can close safely.
+        // thus, we can check which part of task failed in sqs.
+        if(queue.removeConsumer(mesg.getWorkerNum()) && queue.isClosed())
+        {
+            try {
+                DeleteQueueRequest deleteQueueRequest = DeleteQueueRequest.builder()
+                        .queueUrl(queue.getQueueUrl())
+                        .build();
+
+                sqs.deleteQueue(deleteQueueRequest);
+
+            } catch (SqsException e) {
+                // TODO： log
+                return 1;
+            }
+
+        }
+
+        return 0;
+    }
     @Override
     public DataInputStream open(String path) throws IOException
     {
@@ -241,7 +332,7 @@ public final class S3QS extends AbstractS3
         }
     }
 
-    public void flush() throws IOException
+    public void refresh() throws IOException
     {
         for (S3Queue queue : PartitionMap.values()){
             queue.close();

@@ -3,12 +3,12 @@ package io.pixelsdb.pixels.storage.s3qs;
 public class S3QueueMessage
 {
     private String objectPath;
-    private int WorkerNum;
-    private int PartitionNum;
-    private boolean EndWork;
-    private String bucketName;
-    private long timestamp;
-    private String metadata; // 可选：其他元数据
+    private int workerNum = 0;
+    private int partitionNum = 0;
+    private boolean endWork = false;//specific to workers, indicating whether his work is finished
+    private String receiptHandle = "";//specific to consumers, indicating which mesg is consumed.
+    private long timestamp = System.currentTimeMillis();
+    private String metadata = "";
 
     // 无参构造函数
     public S3QueueMessage() {
@@ -30,38 +30,38 @@ public class S3QueueMessage
     }
 
     public int getWorkerNum() {
-        return this.WorkerNum;
+        return this.workerNum;
     }
 
     public S3QueueMessage setWorkerNum(int WorkerNum) {
-        this.WorkerNum = WorkerNum;
+        this.workerNum = WorkerNum;
         return this;
     }
 
     public int getPartitionNum() {
-        return this.PartitionNum;
+        return this.partitionNum;
     }
 
     public S3QueueMessage setPartitionNum(int PartitionNum) {
-        this.PartitionNum = PartitionNum;
+        this.partitionNum = PartitionNum;
         return this;
     }
 
     public boolean getEndWork() {
-        return this.EndWork;
+        return this.endWork;
     }
 
     public S3QueueMessage setEndwork(boolean endwork) {
-        this.EndWork = endwork;
+        this.endWork = endwork;
         return this;
     }
 
-    public String getBucketName() {
-        return bucketName;
+    public String getReceiptHandle() {
+        return this.receiptHandle;
     }
 
-    public S3QueueMessage setBucketName(String bucketName) {
-        this.bucketName = bucketName;
+    public S3QueueMessage setReceiptHandle(String ReceiptHandle) {
+        this.receiptHandle = ReceiptHandle;
         return this;
     }
 
