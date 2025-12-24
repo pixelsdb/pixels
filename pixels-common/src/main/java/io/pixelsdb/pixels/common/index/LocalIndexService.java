@@ -495,6 +495,10 @@ public class LocalIndexService implements IndexService
                         rowLocationFirst.getRgRowOffset(),
                         rowLocationLast.getRgRowOffset()
                 );
+                if (mainIndex.hasCache())
+                {
+                    mainIndex.flushCache(rowLocationFirst.getFileId());
+                }
                 mainIndex.deleteRowIdRange(rowIdRange);
             }
             return true;

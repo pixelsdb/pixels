@@ -612,6 +612,10 @@ public class IndexServiceImpl extends IndexServiceGrpc.IndexServiceImplBase
                             rowLocationFirst.getRgId(),
                             rowLocationFirst.getRgRowOffset(),
                             rowLocationLast.getRgRowOffset());
+                    if (mainIndex.hasCache())
+                    {
+                        mainIndex.flushCache(rowLocationFirst.getFileId());
+                    }
                     mainIndex.deleteRowIdRange(rowIdRange);
                 }
                 else

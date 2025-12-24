@@ -248,10 +248,11 @@ public class SqliteMainIndex implements MainIndex
         try
         {
             RowIdRange rowIdRange = getRowIdRangeFromSqlite(rowId);
-            // Issue #1150: add the range to cache to accelerate main index lookups
-            this.indexCache.admitRange(rowIdRange);
             if (rowIdRange != null)
             {
+                // Issue #1150: add the range to cache to accelerate main index lookups
+                this.indexCache.admitRange(rowIdRange);
+
                 long rowIdStart = rowIdRange.getRowIdStart();
                 long fileId = rowIdRange.getFileId();
                 int rgId = rowIdRange.getRgId();

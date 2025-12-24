@@ -38,7 +38,7 @@ import java.util.List;
 public interface MainIndex extends Closeable
 {
     /**
-     * If we want to add more single point index schemes here, modify this enum.
+     * If we want to add more main index schemes, modify this enum.
      */
     enum Scheme
     {
@@ -83,7 +83,7 @@ public interface MainIndex extends Closeable
     }
 
     /**
-     * @return the tableId of this mainIndex
+     * @return the table id of this main index
      */
     long getTableId();
 
@@ -97,7 +97,7 @@ public interface MainIndex extends Closeable
     boolean hasCache();
 
     /**
-     * Allocate rowId batch for single point index.
+     * Allocate row id batch for single point index.
      * <br/><b>For better performance, use consistent numRowIds when calling this method.</b>
      * @param tableId the table id of single point index
      * @param numRowIds the number of row ids to allocate
@@ -136,7 +136,8 @@ public interface MainIndex extends Closeable
 
     /**
      * Delete a range of row ids from the main index. This method only has effect on the persistent storage
-     * of the main index.
+     * of the main index. {@link #flushCache(long fileId)} should be called before this method
+     * delete the row ids from both cache and persistent storage.
      * {@link #getLocation(long)} of a row id within a deleted range returns null.
      * @param rowIdRange the row id range to be deleted
      * @return true on success
@@ -154,7 +155,7 @@ public interface MainIndex extends Closeable
     boolean flushCache(long fileId) throws MainIndexException;
 
     /**
-     * Flush the main index cache if exists and close the main index instance.
+     * Flush the main index cache (if exists) and close the main index instance.
      * This method is to be used by the main index factory to close the
      * managed main index instances when the process is shutting down.
      * <p/>

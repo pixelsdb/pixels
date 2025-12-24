@@ -125,8 +125,7 @@ public class MainIndexBuffer implements Closeable
      */
     public IndexProto.RowLocation lookup(long rowId) throws MainIndexException
     {
-        IndexProto.RowLocation location = null;
-        location = this.indexCache.lookup(rowId);
+        IndexProto.RowLocation location = this.indexCache.lookup(rowId);
         if (location == null)
         {
             for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : this.indexBuffer.entrySet())
