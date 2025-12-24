@@ -36,10 +36,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.UnsupportedOperationException;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * {@link S3QS} is to write and read the small intermediate files in data shuffling. It is compatible with S3, hence its
@@ -63,16 +60,22 @@ public final class S3QS extends AbstractS3
     // maybe can use array to improve
     private final HashSet<Integer> PartitionSet;
     private final HashMap<Integer, S3Queue> PartitionMap;
+    private final int invisibleTime;
 
 
     private SqsClient sqs;
 
     public S3QS()
     {
+        this(30);
+    }
+
+    public S3QS(int invisibleTime){
         this.connect();
         this.producerSet = new HashSet<>();
         this.PartitionSet = new HashSet<>();
         this.PartitionMap = new HashMap<>();
+        this.invisibleTime = invisibleTime;
     }
 
     private synchronized void connect()
@@ -118,7 +121,8 @@ public final class S3QS extends AbstractS3
 
 
     //TODO: GC for files, objects and sqs.
-    //TODO: can modify the timeout that message keep invisible for other thread
+    //TODO(DONE): can modify the timeout that message keep invisible for other thread
+    //TODO: allow independent invisible time config
     //producers in a shuffle offer their message to s3qs.
     public PhysicalWriter offer(S3QueueMessage mesg) throws IOException
     {
@@ -129,7 +133,7 @@ public final class S3QS extends AbstractS3
         {
             String queueUrl = "";
             try {
-                queueUrl = createQueue(sqs,
+                queueUrl = createQueue(sqs,invisibleTime,
                         mesg.getPartitionNum()+"-"+
                                 (String.valueOf(System.currentTimeMillis()))
                 );
@@ -154,12 +158,15 @@ public final class S3QS extends AbstractS3
         return queue.offer(mesg);
     }
 
-    private static String createQueue(SqsClient sqsClient, String queueName) {
+    private static String createQueue(SqsClient sqsClient,int invisibleTime, String queueName) {
         try {
             //System.out.println("\nCreate Queue");
 
             CreateQueueRequest createQueueRequest = CreateQueueRequest.builder()
                     .queueName(queueName)
+                    .attributes(Collections.singletonMap(
+                            QueueAttributeName.VISIBILITY_TIMEOUT, String.valueOf(invisibleTime)
+                    ))
                     .build();
 
             sqsClient.createQueue(createQueueRequest);
@@ -193,7 +200,7 @@ public final class S3QS extends AbstractS3
 
         //if there is no more input, just wait invisibletime. if timeout, no more message
         //issue: dead message maybe only handle twice, I think that's reasonable
-        //TODO: once a message dead, push it in dead message queue. when delete a message, delete
+        //TODO(OUT-OF-DATE): once a message dead, push it in dead message queue. when delete a message, delete
         Map.Entry<String,PhysicalReader> pair = null;
         try{
             if (queue.getStopInput()) {
@@ -241,7 +248,7 @@ public final class S3QS extends AbstractS3
             return 2;
         }
 
-        // TODO: when all the consumers exit with some messages staying in DLQ, the work occur an error
+        // TODO(OUT-OF-DATE): when all the consumers exit with some messages staying in DLQ, the work occur an error
         // though we can actually close in poll() function, we close here make sure sqs can close safely.
         // thus, we can check which part of task failed in sqs.
         if(queue.removeConsumer(mesg.getWorkerNum()) && queue.isClosed())

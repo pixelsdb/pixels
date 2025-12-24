@@ -134,7 +134,7 @@ public class S3Queue implements Closeable
         return consumerSet.isEmpty();
     }
 
-    //TODO: Implement DLQ to handle bad message.
+    //TODO(OUT-OF-DATE): Implement DLQ to handle bad message.
 
 
     /**

@@ -74,13 +74,15 @@ public class TestS3QS
                         .setPartitionNum(99)
                         .setWorkerNum(2+i);
                 PhysicalReader reader = null;
+                String receiptHandle = null;
                 try{
                     HashMap.Entry<String,PhysicalReader>  pair = s3qs.poll(body,20);
-                    reader = pair.getValue();
-                    String receiptHandle = pair.getKey();
-                    body.setReceiptHandle(receiptHandle);
-                    //reader.append(buffer);
-                    System.out.println("read object " + reader.getPath());  // 添加日志
+                    if(pair != null) {
+                        reader = pair.getValue();
+                        receiptHandle = pair.getKey();
+                        body.setReceiptHandle(receiptHandle);
+                        System.out.println("read object " + reader.getPath());  // 添加日志
+                    }
                 }
                 catch (IOException e)
                 {
@@ -94,12 +96,12 @@ public class TestS3QS
                         } catch (IOException e) {
                                 throw new RuntimeException(e);
                         }
+                        try {
+                            s3qs.finishWork(body);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
                     }
-                }
-                try {
-                    s3qs.finishWork(body);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
                 }
             }
 
