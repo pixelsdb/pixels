@@ -52,6 +52,11 @@ public class MainIndexCache implements Closeable
      */
     private final List<Map<Long, IndexProto.RowLocation>> entryCacheBuckets;
 
+    /**
+     * Caches the ranges of row ids and the corresponding locations. The cache elements are of the {@link RowIdRange}
+     * type. However, we use {@link Object} to support looking up single row ids in this range cache.
+     * Ranges in this cache may overlap but not duplicate.
+     */
     private final TreeSet<Object> rangeCache;
 
     public MainIndexCache()
@@ -124,13 +129,17 @@ public class MainIndexCache implements Closeable
         }
     }
 
+    /**
+     * Admitting a row id range that is overlapping but not duplicate with existing ranges in this cache is acceptable.
+     * @param range the range to admit into the cache.
+     */
     public void admitRange(RowIdRange range)
     {
         this.rangeCache.add(range);
     }
 
     /**
-     * @param range the range to delete
+     * @param range the range to delete from the cache
      * @return true if the range is found and deleted
      */
     public boolean evictRange(RowIdRange range)

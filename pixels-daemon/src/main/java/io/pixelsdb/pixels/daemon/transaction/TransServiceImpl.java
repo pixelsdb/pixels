@@ -451,7 +451,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                     logger.error("new running transactions obtained backward timestamps, this is illegal");
                     return;
                 }
-                // ush watermark to the new min running transaction timestamp
+                // push watermark to the new min running transaction timestamp
                 timestamp = minRunningTransTimestamp;
             }
             if (timestamp < 0)
