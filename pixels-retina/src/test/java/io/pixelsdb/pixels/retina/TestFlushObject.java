@@ -103,7 +103,7 @@ public class TestFlushObject
                 try
                 {
                     byte[][] row = rowSupplier.get();
-                    retinaResourceManager.insertRecord(schemaName, tableName, row, 0);
+                    retinaResourceManager.insertRecord(schemaName, tableName, row, 0, 0);
                 } catch (RetinaException e)
                 {
                     System.out.println("Error inserting record into table " + tableName + ": " + e.getMessage());

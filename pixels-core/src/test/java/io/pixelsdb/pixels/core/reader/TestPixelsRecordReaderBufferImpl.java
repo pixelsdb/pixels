@@ -71,7 +71,7 @@ public class TestPixelsRecordReaderBufferImpl
 
         RetinaService retinaService = RetinaService.Instance();
         assert retinaService.isEnabled();
-        RetinaProto.GetWriteBufferResponse superVersion = retinaService.getWriteBuffer(schemaName, tableName, timeStamp);
+        RetinaProto.GetWriteBufferResponse superVersion = retinaService.getWriteBuffer(schemaName, tableName, 0, timeStamp);
 
         PixelsReaderOption option = new PixelsReaderOption();
 
@@ -91,6 +91,7 @@ public class TestPixelsRecordReaderBufferImpl
                 superVersion.getBitmapsList(),
                 storage,
                 table.getId(),
+                0,
                 schema
         );
 

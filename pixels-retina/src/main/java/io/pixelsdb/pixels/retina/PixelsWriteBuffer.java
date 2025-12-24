@@ -123,12 +123,14 @@ public class PixelsWriteBuffer
 
     private String retinaHostName;
     private SinglePointIndex index;
+    private final int virtualNodeId;
 
     public PixelsWriteBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
-                             Path targetCompactDirPath, String retinaHostName) throws RetinaException
+                             Path targetCompactDirPath, String retinaHostName, int virtualNode) throws RetinaException
     {
         this.tableId = tableId;
         this.schema = schema;
+        this.virtualNodeId = virtualNode;
 
         ConfigFactory configFactory = ConfigFactory.Instance();
         this.memTableSize = Integer.parseInt(configFactory.getProperty("retina.buffer.memTable.size"));
@@ -167,7 +169,7 @@ public class PixelsWriteBuffer
                 this.tableId, this.schema, this.targetOrderedDirPath,
                 this.targetOrderedStorage, this.memTableSize, this.blockSize,
                 this.replication, this.encodingLevel, this.nullsPadding,
-                idCounter, this.memTableSize * this.maxMemTableCount, retinaHostName);
+                idCounter, this.memTableSize * this.maxMemTableCount, retinaHostName, virtualNodeId);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
                 TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
@@ -255,7 +257,7 @@ public class PixelsWriteBuffer
                         this.targetOrderedDirPath, this.targetOrderedStorage,
                         this.memTableSize, this.blockSize, this.replication,
                         this.encodingLevel, this.nullsPadding, this.idCounter,
-                        this.memTableSize * this.maxMemTableCount, this.retinaHostName);
+                        this.memTableSize * this.maxMemTableCount, this.retinaHostName, virtualNodeId);
             }
 
             /*
@@ -293,7 +295,7 @@ public class PixelsWriteBuffer
             {
                 // put into object storage
                 long id = flushMemTable.getId();
-                this.objectStorageManager.write(this.tableId, id, flushMemTable.serialize());
+                this.objectStorageManager.write(this.tableId, virtualNodeId, id, flushMemTable.serialize());
 
                 ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getFileId(),
                         flushMemTable.getStartIndex(), flushMemTable.getLength());
@@ -416,7 +418,7 @@ public class PixelsWriteBuffer
                         {
                             if (objectEntry.unref())
                             {
-                                this.objectStorageManager.delete(this.tableId, objectEntry.getId());
+                                this.objectStorageManager.delete(this.tableId, virtualNodeId, objectEntry.getId());
                             }
                         }
                     }
@@ -542,7 +544,7 @@ public class PixelsWriteBuffer
             for (ObjectEntry objectEntry : sv.getObjectEntries())
             {
                 objectEntry.unref();
-                this.objectStorageManager.delete(this.tableId, objectEntry.getId());
+                this.objectStorageManager.delete(this.tableId, virtualNodeId, objectEntry.getId());
             }
         }
     }

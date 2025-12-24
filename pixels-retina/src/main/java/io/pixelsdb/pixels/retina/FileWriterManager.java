@@ -49,7 +49,7 @@ public class FileWriterManager
     // [firstBlockId, lastBlockId]
     private final long firstBlockId;
     private long lastBlockId = -1;
-
+    private final int virtualNodeId;
     /**
      * Creating pixelsWriter by passing in parameters avoids the need to read
      * the configuration file for each call.
@@ -69,10 +69,11 @@ public class FileWriterManager
                              Path targetOrderedDirPath, Storage targetOrderedStorage,
                              int pixelsStride, long blockSize, short replication,
                              EncodingLevel encodingLevel, boolean nullsPadding,
-                             long firstBlockId, int recordNum, String hostName) throws RetinaException
+                             long firstBlockId, int recordNum, String hostName, int virtualNodeId) throws RetinaException
     {
         this.tableId = tableId;
         this.firstBlockId = firstBlockId;
+        this.virtualNodeId = virtualNodeId;
 
         // Create pixels writer.
         String targetFileName = hostName + "_" + DateUtil.getCurTime() + ".pxl";
@@ -168,7 +169,7 @@ public class FileWriterManager
                      * Issue-1083: Since we obtain a read-only ByteBuffer from the S3 Reader,
                      * we cannot read a byte[]. Instead, we should return the ByteBuffer directly.
                      */
-                    ByteBuffer data = objectStorageManager.read(this.tableId, blockId);
+                    ByteBuffer data = objectStorageManager.read(this.tableId, virtualNodeId, blockId);
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();

@@ -60,7 +60,7 @@ public class RetinaResourceManager
     private static final Logger logger = LogManager.getLogger(RetinaResourceManager.class);
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
-    private final Map<String, PixelsWriteBuffer> pixelsWriteBufferMap;
+    private final Map<String, Map<Integer, PixelsWriteBuffer>> pixelsWriteBufferMap;
     private String retinaHostName;
 
     // GC related fields
@@ -70,6 +70,7 @@ public class RetinaResourceManager
     private final Map<Long, String> offloadedCheckpoints;
     private final String checkpointDir;
     private long latestGcTimestamp = -1;
+    private final int totalVirtualNodeNum;
 
     private final Map<Long, AtomicInteger> checkpointRefCounts;
 
@@ -125,7 +126,7 @@ public class RetinaResourceManager
             logger.error("Failed to start retina background gc", e);
         }
         this.gcExecutor = executor;
-
+        totalVirtualNodeNum = Integer.parseInt(ConfigFactory.Instance().getProperty("node.virtual.num"));
         this.retinaHostName = System.getenv("HOSTNAME");
         if (retinaHostName == null)
         {
@@ -557,23 +558,26 @@ public class RetinaResourceManager
             List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
 
-            // get primary index
-            Table table = metadataService.getTable(schemaName, tableName);
-
-            PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(latestLayout.getTableId(),
-                    schema, orderedPaths.get(0), compactPaths.get(0), retinaHostName);
             String writeBufferKey = schemaName + "_" + tableName;
-            pixelsWriteBufferMap.put(writeBufferKey, pixelsWriteBuffer);
+            Map<Integer, PixelsWriteBuffer> nodeBuffers = pixelsWriteBufferMap.computeIfAbsent(
+                    writeBufferKey, k -> new ConcurrentHashMap<>());
+
+            for (int i = 0; i < totalVirtualNodeNum; i++)
+            {
+                PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(latestLayout.getTableId(),
+                        schema, orderedPaths.get(0), compactPaths.get(0), retinaHostName, i);
+                nodeBuffers.put(i, pixelsWriteBuffer);
+            }
         } catch (Exception e)
         {
             throw new RetinaException(String.format("Failed to add writer buffer for schema %s, table %s", schemaName, tableName), e);
         }
     }
 
-    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp) throws RetinaException
+    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp, int vNodeId) throws RetinaException
     {
         IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
-        PixelsWriteBuffer writeBuffer = checkPixelsWriteBuffer(schemaName, tableName);
+        PixelsWriteBuffer writeBuffer = checkPixelsWriteBuffer(schemaName, tableName, vNodeId);
         builder.setRowId(writeBuffer.addRow(colValues, timestamp, builder.getRowLocationBuilder()));
         return builder;
     }
@@ -603,12 +607,12 @@ public class RetinaResourceManager
                 .build();
     }
 
-    public RetinaProto.GetWriteBufferResponse.Builder getWriteBuffer(String schemaName, String tableName, long timestamp) throws RetinaException
+    public RetinaProto.GetWriteBufferResponse.Builder getWriteBuffer(String schemaName, String tableName, long timestamp, int vNodeId) throws RetinaException
     {
         RetinaProto.GetWriteBufferResponse.Builder responseBuilder = RetinaProto.GetWriteBufferResponse.newBuilder();
 
         // get super version
-        PixelsWriteBuffer writeBuffer = checkPixelsWriteBuffer(schemaName, tableName);
+        PixelsWriteBuffer writeBuffer = checkPixelsWriteBuffer(schemaName, tableName, vNodeId);
         SuperVersion superVersion = writeBuffer.getCurrentVersion();
         MemTable activeMemtable = superVersion.getActiveMemTable();
         List<MemTable> immutableMemTables = superVersion.getImmutableMemTables();
@@ -701,13 +705,15 @@ public class RetinaResourceManager
     /**
      * Check if the writer buffer exists for the given schema and table.
      */
-    private PixelsWriteBuffer checkPixelsWriteBuffer(String schema, String table) throws RetinaException
+    private PixelsWriteBuffer checkPixelsWriteBuffer(String schema, String table, int vNodeId) throws RetinaException
     {
         String writeBufferKey = schema + "_" + table;
-        PixelsWriteBuffer writeBuffer = this.pixelsWriteBufferMap.get(writeBufferKey);
+        Map<Integer, PixelsWriteBuffer> nodeBuffers = this.pixelsWriteBufferMap.get(writeBufferKey);
+        PixelsWriteBuffer writeBuffer = nodeBuffers.get(vNodeId);
         if (writeBuffer == null)
         {
-            throw new RetinaException(String.format("Writer buffer not found for schema: %s, table: %s", schema, table));
+            throw new RetinaException(String.format(
+                    "Writer buffer not found for vNode: %d in table: %s.%s", vNodeId, schema, table));
         }
         return writeBuffer;
     }

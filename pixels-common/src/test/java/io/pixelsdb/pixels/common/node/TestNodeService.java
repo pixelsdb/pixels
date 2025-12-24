@@ -46,7 +46,10 @@ public class TestNodeService
     public void testGetRetinaByBucketId()
     {
         NodeService nodeService = NodeService.Instance();
-        NodeProto.NodeInfo retinaByBucket = nodeService.getRetinaByBucket(1);
-        logger.info("Retina By Bucket: {}", retinaByBucket);
+        for(int i = 0; i < 10; ++i)
+        {
+            NodeProto.NodeInfo retinaByBucket = nodeService.getRetinaByBucket(i * 100);
+            logger.info("Retina By Bucket: {}", retinaByBucket);
+        }
     }
 }

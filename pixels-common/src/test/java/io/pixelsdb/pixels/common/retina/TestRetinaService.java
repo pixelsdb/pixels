@@ -223,7 +223,7 @@ public class TestRetinaService
         RetinaService.StreamHandler streamHandler = threadLocalStreamHandler.get();
         try
         {
-            CompletableFuture<RetinaProto.UpdateRecordResponse> future = streamHandler.updateRecord(schemaName, tableUpdateData);
+            CompletableFuture<RetinaProto.UpdateRecordResponse> future = streamHandler.updateRecord(schemaName, 0, tableUpdateData);
 
             future.whenComplete(((response, throwable) ->
             {

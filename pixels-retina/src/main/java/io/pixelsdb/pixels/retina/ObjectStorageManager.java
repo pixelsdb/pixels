@@ -81,9 +81,9 @@ public class ObjectStorageManager
         return instance;
     }
 
-    private String buildKey(long tableId, long entryId)
+    private String buildKey(long tableId, int virtualNodeId, long entryId)
     {
-        return this.path + String.format("%d/%s%d", tableId, idPrefix, entryId);
+        return this.path + String.format("%d/%d/%s%d", tableId, virtualNodeId, idPrefix, entryId);
     }
 
     public void setIdPrefix(String idPrefix)
@@ -91,9 +91,9 @@ public class ObjectStorageManager
         this.idPrefix = idPrefix;
     }
 
-    public void write(long tableId, long entryId, byte[] data) throws RetinaException
+    public void write(long tableId, int virtualNodeId, long entryId, byte[] data) throws RetinaException
     {
-        String key = buildKey(tableId, entryId);
+        String key = buildKey(tableId, virtualNodeId, entryId);
         try (PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(this.storage, key, true))
         {
             writer.append(data, 0, data.length);
@@ -103,9 +103,9 @@ public class ObjectStorageManager
         }
     }
 
-    public ByteBuffer read(long tableId, long entryId) throws RetinaException
+    public ByteBuffer read(long tableId, int virtualNodeId, long entryId) throws RetinaException
     {
-        String key = buildKey(tableId, entryId);
+        String key = buildKey(tableId, virtualNodeId, entryId);
         try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.storage, key))
         {
             int length = (int) reader.getFileLength();
@@ -116,11 +116,11 @@ public class ObjectStorageManager
         }
     }
 
-    public boolean exist(long tableId, long entryId) throws RetinaException
+    public boolean exist(long tableId, int virtualNodeId, long entryId) throws RetinaException
     {
         try
         {
-            String key = buildKey(tableId, entryId);
+            String key = buildKey(tableId, virtualNodeId, entryId);
             return this.storage.exists(key);
         } catch (IOException e)
         {
@@ -128,11 +128,11 @@ public class ObjectStorageManager
         }
     }
 
-    public void delete(long tableId, long entryId) throws RetinaException
+    public void delete(long tableId, int virtualNodeId, long entryId) throws RetinaException
     {
         try
         {
-            String key = buildKey(tableId, entryId);
+            String key = buildKey(tableId, virtualNodeId, entryId);
             this.storage.delete(key,false);
         } catch (IOException e)
         {

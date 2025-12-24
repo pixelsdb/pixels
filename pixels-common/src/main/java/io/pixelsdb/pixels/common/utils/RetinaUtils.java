@@ -78,9 +78,14 @@ import io.pixelsdb.pixels.common.retina.RetinaService;
         return absHash % retinaUtils.bucketNum;
     }
 
+    public static String getRetinaHostNameFromBucketId(int bucketId)
+    {
+        return BucketCache.getInstance().getRetinaNodeInfoByBucketId(bucketId).getAddress();
+    }
+
     public static RetinaService getRetinaServiceFromBucketId(int bucketId)
     {
-        String retinaHost = BucketCache.getInstance().getRetinaNodeInfoByBucketId(bucketId).getAddress();
+        String retinaHost = getRetinaHostNameFromBucketId(bucketId);
         return RetinaService.CreateInstance(retinaHost, getInstance().defaultRetinaPort);
     }
 
