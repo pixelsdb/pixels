@@ -19,32 +19,51 @@
  */
 
 #include "TileVisibility.h"
+#include "EpochManager.h"
 
 #include <cstring>
 #include <stdexcept>
 
 #include <immintrin.h>
 
-TileVisibility::TileVisibility() : baseTimestamp(0UL) {
-    memset(baseBitmap, 0, 4 * sizeof(uint64_t));
-    head.store(nullptr, std::memory_order_release);
+TileVisibility::TileVisibility() {
+    VersionedData* initialVersion = new VersionedData();
+    currentVersion.store(initialVersion, std::memory_order_release);
     tail.store(nullptr, std::memory_order_release);
     tailUsed.store(0, std::memory_order_release);
 }
 
-TileVisibility::TileVisibility(uint64_t ts, const uint64_t bitmap[4])
-    : baseTimestamp(ts) {
-    memcpy(baseBitmap, bitmap, 4 * sizeof(uint64_t));
-    head.store(nullptr, std::memory_order_release);
+TileVisibility::TileVisibility(uint64_t ts, const uint64_t bitmap[4]) {
+    VersionedData* initialVersion = new VersionedData(ts, bitmap, nullptr);
+    currentVersion.store(initialVersion, std::memory_order_release);
     tail.store(nullptr, std::memory_order_release);
+    tailUsed.store(0, std::memory_order_release);
 }
 
 TileVisibility::~TileVisibility() {
-    DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
-    while (blk) {
-        DeleteIndexBlock *next = blk->next.load(std::memory_order_acquire);
-        delete blk;
-        blk = next;
+    // Clean up current version and its delete chain
+    VersionedData* ver = currentVersion.load(std::memory_order_acquire);
+    if (ver) {
+        DeleteIndexBlock *blk = ver->head;
+        while (blk) {
+            DeleteIndexBlock *next = blk->next.load(std::memory_order_acquire);
+            delete blk;
+            blk = next;
+        }
+        delete ver;
+    }
+    
+    // Clean up retired versions and their delete chains
+    for (auto& retired : this->retired) {
+        if (retired.data) {
+            delete retired.data;
+        }
+        DeleteIndexBlock* blk = retired.blocksToDelete;
+        while (blk) {
+            DeleteIndexBlock* next = blk->next.load(std::memory_order_acquire);
+            delete blk;
+            blk = next;
+        }
     }
 }
 
@@ -52,12 +71,7 @@ void TileVisibility::deleteTileRecord(uint8_t rowId, uint64_t ts) {
     uint64_t item = makeDeleteIndex(rowId, ts);
     while (true) {
         DeleteIndexBlock *curTail = tail.load(std::memory_order_acquire);
-        if (!curTail) { // empty list
-            /**
-             * Issue: There is a delay in reading.
-             * Reads are judged from the head, and if the head pointer is
-             * not changed in time, the latest data cannot be read.
-             */
+        if (!curTail) { // empty list - need to create first block and update version
             DeleteIndexBlock *newBlk = new DeleteIndexBlock();
             newBlk->items[0] = item;
             DeleteIndexBlock *expectedTail = nullptr;
@@ -67,9 +81,23 @@ void TileVisibility::deleteTileRecord(uint8_t rowId, uint64_t ts) {
                 delete newBlk;
                 continue;
             }
-            head.store(newBlk, std::memory_order_release);
-            tailUsed.store(1, std::memory_order_release);
-            return;
+            
+            // COW: Create new version with the new head
+            VersionedData* oldVer = currentVersion.load(std::memory_order_acquire);
+            VersionedData* newVer = new VersionedData(oldVer->baseTimestamp, oldVer->baseBitmap, newBlk);
+            
+            if (currentVersion.compare_exchange_strong(oldVer, newVer, std::memory_order_acq_rel)) {
+                // Success: retire old version (no chain to delete since head was nullptr)
+                delete oldVer;
+                tailUsed.store(1, std::memory_order_release);
+                return;
+            } else {
+                // CAS failed, retry from beginning
+                delete newVer;
+                tail.store(nullptr, std::memory_order_release);
+                delete newBlk;
+                continue;
+            }
         } else {
             size_t pos = tailUsed.load(std::memory_order_acquire);
             if (pos < DeleteIndexBlock::BLOCK_CAPACITY) {
@@ -136,15 +164,21 @@ inline void process_bitmap_block_256(const DeleteIndexBlock *blk,
 }
 
 void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4]) const {
-    if (ts < baseTimestamp) {
+    // Enter epoch protection
+    EpochGuard guard;
+    
+    // Load current version under epoch protection
+    VersionedData* ver = currentVersion.load(std::memory_order_acquire);
+    
+    if (ts < ver->baseTimestamp) {
         throw std::runtime_error("need to read checkpoint from disk");
     }
-    std::memcpy(outBitmap, baseBitmap, 4 * sizeof(uint64_t));
-    if (ts == baseTimestamp) {
+    std::memcpy(outBitmap, ver->baseBitmap, 4 * sizeof(uint64_t));
+    if (ts == ver->baseTimestamp) {
         return;
     }
 
-    DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
+    DeleteIndexBlock *blk = ver->head;
 #ifdef RETINA_SIMD
     const __m256i signBit = _mm256_set1_epi64x(0x8000000000000000ULL);
     const __m256i vThrFlip = _mm256_xor_si256(_mm256_set1_epi64x(ts), signBit);
@@ -194,16 +228,17 @@ void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4])
 }
 
 void TileVisibility::collectTileGarbage(uint64_t ts) {
-    // The upper layers have ensured that there are no reads or writes at this point
-    // so we can safely delete the records
-
-    if (ts <= baseTimestamp) {
+    // Load old version
+    VersionedData* oldVer = currentVersion.load(std::memory_order_acquire);
+    
+    if (ts <= oldVer->baseTimestamp) {
         return;
     }
 
-    DeleteIndexBlock *blk = head.load(std::memory_order_acquire);
+    // Find the last block that should be compacted
+    DeleteIndexBlock *blk = oldVer->head;
     DeleteIndexBlock *lastFullBlk = nullptr;
-    uint64_t newBaseTimestamp = baseTimestamp;
+    uint64_t newBaseTimestamp = oldVer->baseTimestamp;
 
     while (blk) {
         size_t count = (blk == tail.load(std::memory_order_acquire))
@@ -225,26 +260,91 @@ void TileVisibility::collectTileGarbage(uint64_t ts) {
         blk = blk->next.load(std::memory_order_acquire);
     }
 
-    if (lastFullBlk) {
-        getTileVisibilityBitmap(ts, baseBitmap);
-        baseTimestamp = newBaseTimestamp;
+    if (!lastFullBlk) {
+        // Nothing to compact
+        return;
+    }
 
-        DeleteIndexBlock *current = head.load(std::memory_order_acquire);
-        DeleteIndexBlock *newHead =
-            lastFullBlk->next.load(std::memory_order_acquire);
-
-        head.store(newHead, std::memory_order_release);
-
-        DeleteIndexBlock *curTail = tail.load(std::memory_order_acquire);
-        if (!newHead) {
-            tail.store(newHead, std::memory_order_release);
+    // Create new version with Copy-on-Write
+    // Manually compute the new base bitmap from oldVer
+    uint64_t newBaseBitmap[4];
+    std::memcpy(newBaseBitmap, oldVer->baseBitmap, 4 * sizeof(uint64_t));
+    
+    // Apply deletes from oldVer->head up to lastFullBlk
+    blk = oldVer->head;
+    while (blk) {
+        size_t count = (blk == lastFullBlk) 
+                           ? ((blk == tail.load(std::memory_order_acquire))
+                               ? tailUsed.load(std::memory_order_acquire)
+                               : DeleteIndexBlock::BLOCK_CAPACITY)
+                           : DeleteIndexBlock::BLOCK_CAPACITY;
+        
+        for (size_t i = 0; i < count; i++) {
+            uint64_t item = blk->items[i];
+            uint64_t delTs = extractTimestamp(item);
+            if (delTs <= ts) {
+                SET_BITMAP_BIT(newBaseBitmap, extractRowId(item));
+            }
         }
+        
+        if (blk == lastFullBlk) {
+            break;
+        }
+        blk = blk->next.load(std::memory_order_acquire);
+    }
+    
+    // Get new head and break the chain to avoid double-free
+    DeleteIndexBlock* newHead = lastFullBlk->next.load(std::memory_order_acquire);
+    lastFullBlk->next.store(nullptr, std::memory_order_release);
+    
+    // Create new version with new head - this is the atomic COW update
+    VersionedData* newVer = new VersionedData(newBaseTimestamp, newBaseBitmap, newHead);
 
-        while (current != lastFullBlk->next.load(std::memory_order_acquire)) {
-            DeleteIndexBlock *next = current->next.load(
-                std::memory_order_acquire);
-            delete current;
-            current = next;
+    // CAS to install new version atomically
+    if (currentVersion.compare_exchange_strong(oldVer, newVer, 
+                                               std::memory_order_acq_rel)) {
+        // Successfully updated
+        // Retire old version and its delete chain
+        uint64_t retireEpoch = EpochManager::getInstance().advanceEpoch();
+        retired.emplace_back(oldVer, oldVer->head, retireEpoch);
+        
+        // Update tail if needed (if all blocks were compacted)
+        if (!newHead) {
+            tail.store(nullptr, std::memory_order_release);
+            tailUsed.store(0, std::memory_order_release);
+        }
+        
+        // Try to reclaim retired versions
+        reclaimRetiredVersions();
+    } else {
+        // CAS failed, another GC happened concurrently
+        // Restore the chain link
+        lastFullBlk->next.store(newHead, std::memory_order_release);
+        delete newVer;
+    }
+}
+
+void TileVisibility::reclaimRetiredVersions() {
+    // Remove retired versions that can be safely reclaimed
+    auto it = retired.begin();
+    while (it != retired.end()) {
+        if (EpochManager::getInstance().canReclaim(it->retireEpoch)) {
+            // Safe to delete
+            if (it->data) {
+                delete it->data;
+            }
+            
+            // Delete the chain of blocks
+            DeleteIndexBlock* blk = it->blocksToDelete;
+            while (blk) {
+                DeleteIndexBlock* next = blk->next.load(std::memory_order_acquire);
+                delete blk;
+                blk = next;
+            }
+            
+            it = retired.erase(it);
+        } else {
+            ++it;
         }
     }
 }

@@ -38,6 +38,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Source files
 set(SOURCES
+        lib/EpochManager.cpp
         lib/TileVisibility.cpp
         lib/RGVisibility.cpp
         lib/RGVisibilityJni.cpp

@@ -40,20 +40,12 @@ public:
 
 private:
     static constexpr uint32_t VISIBILITY_RECORD_CAPACITY = 256;
-    static constexpr uint32_t MAX_ACCESS_COUNT = 0x007FFFFF;
-    static constexpr uint32_t GC_MASK = 0xFF000000;
-    static constexpr uint32_t ACCESS_MASK = 0x00FFFFFF;
-    static constexpr uint32_t ACCESS_INC = 0x00000001;
     static constexpr uint32_t BITMAP_SIZE_PER_TILE_VISIBILITY = 4;
-    static constexpr uint32_t RG_READ_LEASE_MS = 100;
 
     TileVisibility* tileVisibilities;
     const uint64_t tileCount;
-    std::atomic<uint32_t> flag; // high 1 byte is the gc flag, low 3 bytes are the access count
 
     TileVisibility* getTileVisibility(uint32_t rowId) const;
-    void beginRGAccess();
-    void endRGAccess();
 };
 
 #endif //RG_VISIBILITY_H
