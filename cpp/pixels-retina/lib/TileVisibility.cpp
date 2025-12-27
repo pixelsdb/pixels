@@ -77,7 +77,8 @@ void TileVisibility::deleteTileRecord(uint8_t rowId, uint64_t ts) {
             DeleteIndexBlock *expectedTail = nullptr;
             
             if (!tail.compare_exchange_strong(expectedTail, newBlk,
-                                              std::memory_order_acq_rel)) {
+                                              std::memory_order_release,
+                                              std::memory_order_relaxed)) {
                 delete newBlk;
                 continue;
             }
@@ -101,7 +102,9 @@ void TileVisibility::deleteTileRecord(uint8_t rowId, uint64_t ts) {
         } else {
             size_t pos = tailUsed.load(std::memory_order_acquire);
             if (pos < DeleteIndexBlock::BLOCK_CAPACITY) {
-                if (tailUsed.compare_exchange_strong(pos, pos + 1, std::memory_order_acq_rel)) {
+                if (tailUsed.compare_exchange_strong(pos, pos + 1, 
+                                                     std::memory_order_relaxed,
+                                                     std::memory_order_relaxed)) {
                     curTail->items[pos] = item;
                     return;
                 }
@@ -117,13 +120,16 @@ void TileVisibility::deleteTileRecord(uint8_t rowId, uint64_t ts) {
 
                 DeleteIndexBlock *expectedNext = nullptr;
                 if (!curTail->next.compare_exchange_strong(
-                        expectedNext, newBlk, std::memory_order_acq_rel)) {
+                        expectedNext, newBlk, 
+                        std::memory_order_release,
+                        std::memory_order_relaxed)) {
                     delete newBlk;
                     continue;
                 }
 
                 tail.compare_exchange_strong(curTail, newBlk,
-                                             std::memory_order_acq_rel);
+                                             std::memory_order_release,
+                                             std::memory_order_relaxed);
                 tailUsed.store(1, std::memory_order_release);
                 return;
             }
@@ -186,8 +192,8 @@ void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4])
 #endif
 
     while (blk) {
-        DeleteIndexBlock *currentTail = tail.load(std::memory_order_acquire);
-        size_t currentTailUsed = tailUsed.load(std::memory_order_acquire);
+        DeleteIndexBlock *currentTail = tail.load(std::memory_order_relaxed);
+        size_t currentTailUsed = tailUsed.load(std::memory_order_relaxed);
         size_t count = (blk == currentTail)
                            ? currentTailUsed
                            : DeleteIndexBlock::BLOCK_CAPACITY;
@@ -223,7 +229,7 @@ void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4])
             }
         }
 
-        blk = blk->next.load(std::memory_order_acquire);
+        blk = blk->next.load(std::memory_order_relaxed);
     }
 }
 
