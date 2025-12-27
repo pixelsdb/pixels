@@ -64,6 +64,7 @@ install(TARGETS pixels-retina
 # Add the test executable
 add_executable(tile_visibility_tests test/TileVisibilityTest.cpp)
 add_executable(rg_visibility_tests test/RGVisibilityTest.cpp)
+add_executable(visibility_perf_tests test/VisibilityPerformanceTest.cpp)
 
 # Link the test executable with the library
 target_link_libraries(tile_visibility_tests
@@ -74,10 +75,15 @@ target_link_libraries(rg_visibility_tests
     pixels-retina
     GTest::gtest_main
 )
+target_link_libraries(visibility_perf_tests
+    pixels-retina
+    GTest::gtest_main
+)
 
 include(GoogleTest)
 gtest_discover_tests(tile_visibility_tests)
 gtest_discover_tests(rg_visibility_tests)
+gtest_discover_tests(visibility_perf_tests)
 
 # Set build type to Debug if not specified
 # if (NOT CMAKE_BUILD_TYPE)
