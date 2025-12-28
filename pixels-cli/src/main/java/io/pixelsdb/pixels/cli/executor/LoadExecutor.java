@@ -19,9 +19,7 @@
  */
 package io.pixelsdb.pixels.cli.executor;
 
-import io.pixelsdb.pixels.cli.load.Consumer;
-import io.pixelsdb.pixels.cli.load.Parameters;
-import io.pixelsdb.pixels.cli.load.PixelsConsumer;
+import io.pixelsdb.pixels.cli.load.*;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
@@ -32,10 +30,11 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.transaction.TransService;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+import io.pixelsdb.pixels.daemon.NodeProto;
 import net.sourceforge.argparse4j.inf.Namespace;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -47,7 +46,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 public class LoadExecutor implements CommandExecutor
 {
-    private final RetinaService retinaService = RetinaService.Instance();
+    private final RetinaService defaultRetinaService = RetinaService.Instance();
 
     @Override
     public void execute(Namespace ns, String command) throws Exception
@@ -80,26 +79,40 @@ public class LoadExecutor implements CommandExecutor
         // source already exist, producer option is false, add list of source to the queue
         List<String> fileList = storage.listPaths(origin);
         BlockingQueue<String> inputFiles = new LinkedBlockingQueue<>(fileList.size());
-        ConcurrentLinkedQueue<File> loadedFiles = new ConcurrentLinkedQueue<>();
-        ConcurrentLinkedQueue<Path> loadedPaths = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<LoadedInfo> loadedInfos = new ConcurrentLinkedQueue<>();
         for (String filePath : fileList)
         {
             inputFiles.add(storage.ensureSchemePrefix(filePath));
         }
 
         long startTime = System.currentTimeMillis();
-        if (startConsumers(threadNum, inputFiles, parameters, loadedFiles, loadedPaths))
+        if (startConsumers(threadNum, inputFiles, parameters, loadedInfos))
         {
-            Iterator<File> fileIterator = loadedFiles.iterator();
-            Iterator<Path> pathIterator = loadedPaths.iterator();
-            while (fileIterator.hasNext() && pathIterator.hasNext())
+            int retinaServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
+            for(LoadedInfo loadedInfo : loadedInfos)
             {
-                File file = fileIterator.next();
-                Path path = pathIterator.next();
+                File file = loadedInfo.loadedFile;
+                Path path = loadedInfo.loadedPath;
                 metadataService.updateFile(file);
                 try
                 {
-                    retinaService.addVisibility(File.getFilePath(path, file));
+
+                    NodeProto.NodeInfo nodeInfo = loadedInfo.loadedRetinaNode;
+                    if(nodeInfo == null)
+                    {
+                        if (defaultRetinaService.isEnabled())
+                        {
+                            defaultRetinaService.addVisibility(File.getFilePath(path, file));
+                        }
+                    } else
+                    {
+                        RetinaService retinaService = RetinaService.CreateInstance(nodeInfo.getAddress(), retinaServerPort);
+                        if (retinaService.isEnabled())
+                        {
+                            retinaService.addVisibility(File.getFilePath(path, file));
+                        }
+                    }
+
                 } catch (RetinaException e)
                 {
                     System.out.println("add visibility for ordered file '" + file + "' failed");
@@ -123,11 +136,11 @@ public class LoadExecutor implements CommandExecutor
      * @param concurrency the number of threads for data loading
      * @param inputFiles the queue of the paths of input files
      * @param parameters the parameters for data loading, e.g., the schema name and table name
-     * @param loadedFiles the information of the loaded pixels files
+     * @param loadedInfos the information of the loaded pixels files
      * @return true if consumers complete successfully
      */
     private boolean startConsumers(int concurrency, BlockingQueue<String> inputFiles, Parameters parameters,
-                                   ConcurrentLinkedQueue<File> loadedFiles, ConcurrentLinkedQueue<Path> loadedPaths)
+                                   ConcurrentLinkedQueue<LoadedInfo> loadedInfos)
     {
         boolean success = false;
         try
@@ -147,7 +160,14 @@ public class LoadExecutor implements CommandExecutor
             {
                 for (int i = 0; i < concurrency; i++)
                 {
-                    PixelsConsumer pixelsConsumer = new PixelsConsumer(inputFiles, parameters, loadedFiles, loadedPaths);
+                    AbstractPixelsConsumer pixelsConsumer;
+                    if(parameters.getIndex() == null)
+                    {
+                        pixelsConsumer = new SimplePixelsConsumer(inputFiles, parameters, loadedInfos);
+                    } else
+                    {
+                        pixelsConsumer = new IndexedPixelsConsumer(inputFiles, parameters, loadedInfos);
+                    }
                     consumers[i] = pixelsConsumer;
                     pixelsConsumer.start();
                 }

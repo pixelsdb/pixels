@@ -26,11 +26,15 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+/**
+ * ObjectStorageManager manages the interaction with object storage systems like S3 or MinIO.
+ */
 public class ObjectStorageManager
 {
     private static volatile ObjectStorageManager instance;
     private final Storage storage;
     private final String path;
+    private String idPrefix;
 
     private ObjectStorageManager() throws RetinaException
     {
@@ -42,10 +46,10 @@ public class ObjectStorageManager
         }
         this.path = folder;
 
-        String storageSchema = config.getProperty("retina.buffer.object.storage.schema");
+        String storageScheme = config.getProperty("retina.buffer.object.storage.scheme");
         try
         {
-            switch(storageSchema)
+            switch(storageScheme)
             {
                 case "s3":
                     this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
@@ -54,11 +58,11 @@ public class ObjectStorageManager
                     this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
                     break;
                 default:
-                    throw new RetinaException("Unsupported storage schema: " + storageSchema);
+                    throw new RetinaException("Unsupported storage scheme: " + storageScheme);
             }
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to initialize object storage manager.", e);
+            throw new RetinaException("Failed to get storage", e);
         }
     }
 
@@ -77,60 +81,62 @@ public class ObjectStorageManager
         return instance;
     }
 
-    private String buildKey(long tableId, long entryId)
+    private String buildKey(long tableId, int virtualNodeId, long entryId)
     {
-        return this.path + String.format("%d/%d", tableId, entryId);
+        return this.path + String.format("%d/%d/%s%d", tableId, virtualNodeId, idPrefix, entryId);
     }
 
-    public void write(long tableId, long entryId, byte[] data) throws RetinaException
+    public void setIdPrefix(String idPrefix)
     {
-        try
+        this.idPrefix = idPrefix;
+    }
+
+    public void write(long tableId, int virtualNodeId, long entryId, byte[] data) throws RetinaException
+    {
+        String key = buildKey(tableId, virtualNodeId, entryId);
+        try (PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(this.storage, key, true))
         {
-            String key = buildKey(tableId, entryId);
-            PhysicalWriter writer = PhysicalWriterUtil.newPhysicalWriter(this.storage, key, true);
             writer.append(data, 0, data.length);
-            writer.close();
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to write data to object storage.", e);
+            throw new RetinaException("Failed to write data to object storage", e);
         }
     }
 
-    public ByteBuffer read(long tableId, long entryId) throws RetinaException
+    public ByteBuffer read(long tableId, int virtualNodeId, long entryId) throws RetinaException
     {
-        try
+        String key = buildKey(tableId, virtualNodeId, entryId);
+        try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.storage, key))
         {
-            String key = buildKey(tableId, entryId);
-            PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.storage, key);
             int length = (int) reader.getFileLength();
             return reader.readFully(length);
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to read data from object storage.", e);
+            throw new RetinaException("Failed to read data from object storage", e);
         }
     }
 
-    public boolean exist(long tableId, long entryId) throws RetinaException
+    public boolean exist(long tableId, int virtualNodeId, long entryId) throws RetinaException
     {
         try
         {
-            String key = buildKey(tableId, entryId);
+            String key = buildKey(tableId, virtualNodeId, entryId);
             return this.storage.exists(key);
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to check existence in object storage.", e);
+            throw new RetinaException("Failed to check existence in object storage", e);
         }
     }
 
-    public void delete(long tableId, long entryId) throws RetinaException
+    public void delete(long tableId, int virtualNodeId, long entryId) throws RetinaException
     {
         try
         {
-            String key = buildKey(tableId, entryId);
+            String key = buildKey(tableId, virtualNodeId, entryId);
             this.storage.delete(key,false);
         } catch (IOException e)
         {
-            throw new RetinaException("Failed to delete data from object storage.", e);
+            throw new RetinaException("Failed to delete data from object storage", e);
         }
     }
 }

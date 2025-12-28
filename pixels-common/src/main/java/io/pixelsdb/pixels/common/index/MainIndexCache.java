@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.common.index;
 
 import io.pixelsdb.pixels.common.exception.MainIndexException;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.io.Closeable;
@@ -40,26 +41,31 @@ public class MainIndexCache implements Closeable
     /**
      * As row ids in a table is generated sequentially, and the hot row ids are usually the recent generated ones, the
      * conflict rate of row ids should not be very high. Hence, one hash bucket should be good to cache 1 million main
-     * index entries. And 101 buckets should be large enough to cache 101 million entries, which may consume several GBs
-     * of memory. 101 is a prime number. It helps avoid imbalance buckets.
+     * index entries.
      */
-    private static final int NUM_BUCKETS = 101;
+    private final int NUM_BUCKETS;
 
-    private static final int MAX_BUCKET_SIZE = 1024 * 1024 * 1024;
+    private static final int MAX_BUCKET_SIZE = 1024 * 1024;
     /**
      * tableRowId % NUM_BUCKETS -> {tableRowId -> rowLocation}.
      * We use multiple hash maps (buckets) to reduce hash conflicts in a large cache.
      */
     private final List<Map<Long, IndexProto.RowLocation>> entryCacheBuckets;
 
+    /**
+     * Caches the ranges of row ids and the corresponding locations. The cache elements are of the {@link RowIdRange}
+     * type. However, we use {@link Object} to support looking up single row ids in this range cache.
+     * Ranges in this cache may overlap but not duplicate.
+     */
     private final TreeSet<Object> rangeCache;
 
     public MainIndexCache()
     {
+        this.NUM_BUCKETS = Integer.parseInt(ConfigFactory.Instance().getProperty("index.main.cache.bucket.num"));
         this.entryCacheBuckets = new ArrayList<>(NUM_BUCKETS);
         for (int i = 0; i < NUM_BUCKETS; ++i)
         {
-            this.entryCacheBuckets.add(new HashMap<>());
+            this.entryCacheBuckets.add(new LinkedHashMap<>());
         }
         this.rangeCache = new TreeSet<>((o1, o2) -> {
             /* Issue #1150:
@@ -123,13 +129,17 @@ public class MainIndexCache implements Closeable
         }
     }
 
+    /**
+     * Admitting a row id range that is overlapping but not duplicate with existing ranges in this cache is acceptable.
+     * @param range the range to admit into the cache.
+     */
     public void admitRange(RowIdRange range)
     {
         this.rangeCache.add(range);
     }
 
     /**
-     * @param range the range to delete
+     * @param range the range to delete from the cache
      * @return true if the range is found and deleted
      */
     public boolean evictRange(RowIdRange range)

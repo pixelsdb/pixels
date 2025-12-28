@@ -341,6 +341,8 @@ public class VectorizedRowBatch implements AutoCloseable
 
         int[] columnVectorOffsets = new int[numCols];
         byte[] columnTypeOffsets = new byte[numCols];
+        int writeSize = size;
+
         for (int i = 0; i < numCols; ++i)
         {
             columnVectorOffsets[i] = cols[i].serialize(builder);
@@ -353,7 +355,7 @@ public class VectorizedRowBatch implements AutoCloseable
         VectorizedRowBatchFlat.addNumCols(builder, numCols);
         VectorizedRowBatchFlat.addCols(builder, colsOffset);
         VectorizedRowBatchFlat.addColsType(builder, colsTypeOffset);
-        VectorizedRowBatchFlat.addSize(builder, size);
+        VectorizedRowBatchFlat.addSize(builder, writeSize);
         VectorizedRowBatchFlat.addProjectionSize(builder, projectionSize);
         VectorizedRowBatchFlat.addMaxSize(builder, maxSize);
         VectorizedRowBatchFlat.addMemoryUsage(builder, memoryUsage);

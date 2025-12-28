@@ -39,7 +39,7 @@ public class MemoryIndexProvider implements SinglePointIndexProvider
         {
             return new MemoryIndex(tableId, indexId, unique);
         }
-        throw new SinglePointIndexException("unsupported scheme: " + scheme);
+        throw new SinglePointIndexException("Unsupported scheme: " + scheme);
     }
 
     @Override

@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.daemon.heartbeat;
 
+import io.pixelsdb.pixels.daemon.NodeProto;
 import org.junit.Test;
 
 /**
@@ -30,7 +31,7 @@ public class TestHeartbeatWorker
     @Test
     public void test() throws InterruptedException
     {
-        HeartbeatWorker worker = new HeartbeatWorker();
+        HeartbeatWorker worker = new HeartbeatWorker(NodeProto.NodeRole.WORKER);
         Thread thread = new Thread(worker);
         thread.start();
         thread.join();

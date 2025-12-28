@@ -125,8 +125,7 @@ public class MainIndexBuffer implements Closeable
      */
     public IndexProto.RowLocation lookup(long rowId) throws MainIndexException
     {
-        IndexProto.RowLocation location = null;
-        location = this.indexCache.lookup(rowId);
+        IndexProto.RowLocation location = this.indexCache.lookup(rowId);
         if (location == null)
         {
             for (Map.Entry<Long, Map<Long, IndexProto.RowLocation>> entry : this.indexBuffer.entrySet())
@@ -165,7 +164,8 @@ public class MainIndexBuffer implements Closeable
         long prevRowId = Long.MIN_VALUE;
         int prevRgId = Integer.MIN_VALUE;
         int prevRgRowOffset = Integer.MIN_VALUE;
-        /* Issue #1115: do post-sorting, build a row id array and sorted it in ascending order.
+        /*
+         * Issue #1115: do post-sorting, build a row id array and sorted it in ascending order.
          * This consumes less memory and is much faster than building a tree map from fileBuffer.
          */
         Long[] rowIds = new Long[fileBuffer.size()];
@@ -187,10 +187,10 @@ public class MainIndexBuffer implements Closeable
                     currRangeBuilder.setRowIdEnd(prevRowId + 1);
                     currRangeBuilder.setRgRowOffsetEnd(prevRgRowOffset + 1);
                     ranges.add(currRangeBuilder.build());
-                    last = true;
                 }
                 // start constructing a new row id range
                 first = false;
+                last = true;
                 currRangeBuilder.setRowIdStart(rowId);
                 currRangeBuilder.setFileId(fileId);
                 currRangeBuilder.setRgId(rgId);
@@ -201,13 +201,17 @@ public class MainIndexBuffer implements Closeable
             prevRgRowOffset = rgRowOffset;
         }
         // add the last range
-        if (!last)
+        if (last)
         {
             currRangeBuilder.setRowIdEnd(prevRowId + 1);
             currRangeBuilder.setRgRowOffsetEnd(prevRgRowOffset + 1);
             ranges.add(currRangeBuilder.build());
         }
         // release the flushed file index buffer
+        if(fileBuffer.size() != rowIds.length)
+        {
+            throw new MainIndexException("FileBuffer Changed while flush");
+        }
         fileBuffer.clear();
         this.indexBuffer.remove(fileId);
         if (this.indexBuffer.size() <= CACHE_POP_ENABLE_THRESHOLD)

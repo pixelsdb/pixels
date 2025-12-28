@@ -20,10 +20,7 @@
 package io.pixelsdb.pixels.index.memory;
 
 import com.google.common.collect.ImmutableList;
-import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexFactory;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
@@ -108,7 +105,7 @@ public class MemoryIndex implements SinglePointIndex
         }
         CompositeKey baseKey = extractBaseKey(key);
         long snapshotTimestamp = key.getTimestamp();
-        // Find the latest version visible at the snapshot timestamp
+        // find the latest version visible at the snapshot timestamp
         return findUniqueRowId(baseKey, snapshotTimestamp);
     }
 
@@ -179,14 +176,14 @@ public class MemoryIndex implements SinglePointIndex
     {
         if (unique)
         {
-            // For unique index, store a single rowId per timestamp
+            // for unique index, store a single rowId per timestamp
             ConcurrentSkipListMap<Long, Long> versions =
                     this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
             versions.put(timestamp, rowId);
         }
         else
         {
-            // For non-unique index, store a queue of timestamps per row id
+            // for non-unique index, store a queue of timestamps per row id
             putNonUniqueNewVersion(rowId, baseKey, timestamp);
         }
     }
@@ -231,8 +228,7 @@ public class MemoryIndex implements SinglePointIndex
     }
 
     @Override
-    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries)
-            throws SinglePointIndexException
+    public List<Long> updatePrimaryEntries(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
         checkClosed();
         if (!unique)
@@ -245,7 +241,10 @@ public class MemoryIndex implements SinglePointIndex
             CompositeKey baseKey = extractBaseKey(entry.getIndexKey());
             long timestamp = entry.getIndexKey().getTimestamp();
             long prevRowId = getUniqueRowId(entry.getIndexKey());
-            builder.add(prevRowId);
+            if (prevRowId >= 0)
+            {
+                builder.add(prevRowId);
+            }
             ConcurrentSkipListMap<Long, Long> versions =
                     this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
             versions.put(timestamp, entry.getRowId());
@@ -267,7 +266,10 @@ public class MemoryIndex implements SinglePointIndex
             if (unique)
             {
                 long prevRowId = getUniqueRowId(key);
-                builder.add(prevRowId);
+                if (prevRowId >= 0)
+                {
+                    builder.add(prevRowId);
+                }
                 ConcurrentSkipListMap<Long, Long> versions =
                         this.uniqueIndex.computeIfAbsent(baseKey, k -> new ConcurrentSkipListMap<>());
                 versions.put(timestamp, rowId);
@@ -315,7 +317,7 @@ public class MemoryIndex implements SinglePointIndex
         {
             return -1L;
         }
-        // Add tombstone instead of removing the entry
+        // add tombstone instead of removing the entry
         ConcurrentSkipListSet<Long> existingTombstones =
                 this.tombstones.computeIfAbsent(baseKey, k -> new ConcurrentSkipListSet<>());
         existingTombstones.add(key.getTimestamp());
@@ -326,32 +328,30 @@ public class MemoryIndex implements SinglePointIndex
     public List<Long> deleteEntry(IndexProto.IndexKey key) throws SinglePointIndexException
     {
         checkClosed();
-        try
+        if (unique)
         {
-            if (unique)
+            long rowId = getUniqueRowId(key);
+            if (rowId < 0)
             {
-                long rowId = getUniqueRowId(key);
-                if (rowId < 0)
-                {
-                    return ImmutableList.of();
-                }
-                return ImmutableList.of(rowId);
-            } else
-            {
-                List<Long> rowIds = getRowIds(key);
-                if (rowIds.isEmpty())
-                {
-                    return ImmutableList.of();
-                }
-                return rowIds;
+                return ImmutableList.of();
             }
-        }
-        finally
-        {
             CompositeKey baseKey = extractBaseKey(key);
             ConcurrentSkipListSet<Long> existingTombstones =
                     this.tombstones.computeIfAbsent(baseKey, k -> new ConcurrentSkipListSet<>());
             existingTombstones.add(key.getTimestamp());
+            return ImmutableList.of(rowId);
+        } else
+        {
+            List<Long> rowIds = getRowIds(key);
+            if (rowIds.isEmpty())
+            {
+                return ImmutableList.of();
+            }
+            CompositeKey baseKey = extractBaseKey(key);
+            ConcurrentSkipListSet<Long> existingTombstones =
+                    this.tombstones.computeIfAbsent(baseKey, k -> new ConcurrentSkipListSet<>());
+            existingTombstones.add(key.getTimestamp());
+            return rowIds;
         }
     }
 
@@ -363,10 +363,6 @@ public class MemoryIndex implements SinglePointIndex
         for (IndexProto.IndexKey key : keys)
         {
             List<Long> prevRowIds = deleteEntry(key);
-            if (prevRowIds.isEmpty())
-            {
-                return ImmutableList.of();
-            }
             builder.addAll(prevRowIds);
         }
         return builder.build();
@@ -385,7 +381,7 @@ public class MemoryIndex implements SinglePointIndex
             {
                 continue;
             }
-            // Remove all versions with timestamp <= purgeTimestamp
+            // remove all versions with timestamp <= purgeTimestamp
             Long tombstone = existingTombstones.floor(key.getTimestamp());
             if (tombstone != null && tombstone <= key.getTimestamp())
             {
@@ -469,7 +465,7 @@ public class MemoryIndex implements SinglePointIndex
     }
 
     /**
-     * Get the current size of the index (for testing and monitoring)
+     * Get the current size of the index (for testing and monitoring).
      */
     public int size()
     {
@@ -486,7 +482,7 @@ public class MemoryIndex implements SinglePointIndex
     }
 
     /**
-     * Get the number of tombstones (for testing and monitoring)
+     * Get the number of tombstones (for testing and monitoring).
      */
     public int tombstonesSize()
     {
@@ -494,7 +490,7 @@ public class MemoryIndex implements SinglePointIndex
     }
 
     /**
-     * Check if the index is closed and throw exception if it is
+     * Check if the index is closed and throw exception if it is.
      */
     private void checkClosed() throws SinglePointIndexException
     {
@@ -505,7 +501,7 @@ public class MemoryIndex implements SinglePointIndex
     }
 
     /**
-     * Extract base key (without timestamp) from IndexKey
+     * Extract base key (without timestamp) from IndexKey.
      */
     private CompositeKey extractBaseKey(IndexProto.IndexKey key)
     {
@@ -525,13 +521,13 @@ public class MemoryIndex implements SinglePointIndex
         {
             return -1;
         }
-        // Find the latest version with timestamp <= snapshot timestamp
+        // find the latest version with timestamp <= snapshot timestamp
         Map.Entry<Long, Long> versionEntry = versions.floorEntry(snapshotTimestamp);
         if (versionEntry == null)
         {
             return -1;
         }
-        // Check if this version is visible (not deleted by a tombstone)
+        // check if this version is visible (not deleted by a tombstone)
         if (!isVersionVisible(baseKey, versionEntry.getKey(), snapshotTimestamp))
         {
             return -1;
@@ -566,7 +562,7 @@ public class MemoryIndex implements SinglePointIndex
 
     /**
      * Check is this version of index record is visible (i.e., not marked deleted by a tombstone
-     * with timestamp >= the version's timestamp)
+     * with timestamp >= the version's timestamp).
      * @param baseKey the key of the index record
      * @param versionTimestamp the version of the index record
      * @param snapshotTimestamp the snapshot timestamp of the transaction

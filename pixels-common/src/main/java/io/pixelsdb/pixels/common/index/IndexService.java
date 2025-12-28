@@ -144,7 +144,7 @@ public interface IndexService
      * @param indexId the index id of the primary index
      * @param indexEntries the index entries to update
      * @return the previous row locations of the index entries
-     * IndexException if no existing entry(ies) to update
+     * @throws IndexException if no existing entry(ies) to update
      */
     List<IndexProto.RowLocation> updatePrimaryIndexEntries(long tableId, long indexId,
                                                            List<IndexProto.PrimaryIndexEntry> indexEntries) throws IndexException;
@@ -155,7 +155,7 @@ public interface IndexService
      * @param indexId the index id of the secondary index
      * @param indexEntries the index entries to update
      * @return the previous row ids of the index entries
-     * IndexException if no existing entry(ies) to update
+     * @throws IndexException if no existing entry(ies) to update
      */
     List<Long> updateSecondaryIndexEntries(long tableId, long indexId,
                                            List<IndexProto.SecondaryIndexEntry> indexEntries) throws IndexException;

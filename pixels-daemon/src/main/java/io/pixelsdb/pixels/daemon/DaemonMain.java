@@ -1,9 +1,11 @@
 package io.pixelsdb.pixels.daemon;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
 import io.pixelsdb.pixels.daemon.cache.CacheWorker;
 import io.pixelsdb.pixels.daemon.index.IndexServer;
+import io.pixelsdb.pixels.daemon.node.NodeServer;
 import io.pixelsdb.pixels.daemon.retina.RetinaServer;
 import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatCoordinator;
@@ -32,18 +34,27 @@ public class DaemonMain
 
     public static void main(String[] args)
     {
-        String role = System.getProperty("role");
+        String roleStr = System.getProperty("role");
         String operation = System.getProperty("operation");
 
-        if (role == null || operation == null)
+        if (roleStr == null || operation == null)
         {
             System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker|retina}");
             System.exit(1);
         }
 
-        if ((!role.equalsIgnoreCase("coordinator") && !role.equalsIgnoreCase("worker") && !role.equalsIgnoreCase("retina")) ||
-                (!operation.equalsIgnoreCase("start") && !operation.equalsIgnoreCase("stop")))
-        {
+        NodeProto.NodeRole role;
+        try {
+            role = NodeProto.NodeRole.valueOf(roleStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            System.err.println("Invalid role: " + roleStr);
+            System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker|retina}");
+            System.exit(1);
+            return;
+        }
+
+        if (!operation.equalsIgnoreCase("start") && !operation.equalsIgnoreCase("stop")) {
+            System.err.println("Invalid operation: " + operation);
             System.err.println("Run with -Doperation={start|stop} -Drole={coordinator|worker|retina}");
             System.exit(1);
         }
@@ -53,12 +64,12 @@ public class DaemonMain
         {
             varDir += "/";
         }
-        String lockFile = varDir + "pixels." + role.toLowerCase() + ".lock";
+        String lockFile = varDir + "pixels." + roleStr.toLowerCase() + ".lock";
 
         if (operation.equalsIgnoreCase("start"))
         {
             // this is the main daemon.
-            System.out.println("Starting daemon of " + role + "...");
+            System.out.println("Starting daemon of " + roleStr + "...");
             Daemon mainDaemon = new Daemon();
             mainDaemon.setup(lockFile);
 
@@ -79,12 +90,13 @@ public class DaemonMain
             boolean sinkServerEnabled = Boolean.parseBoolean(config.getProperty("sink.server.enabled"));
             boolean indexServerEnabled = Boolean.parseBoolean(config.getProperty("index.server.enabled"));
 
-            if (role.equalsIgnoreCase("coordinator"))
+            if (role.equals(NodeProto.NodeRole.COORDINATOR))
             {
                 int metadataServerPort = Integer.parseInt(config.getProperty("metadata.server.port"));
                 int transServerPort = Integer.parseInt(config.getProperty("trans.server.port"));
                 int queryScheduleServerPort = Integer.parseInt(config.getProperty("query.schedule.server.port"));
                 int scalingMetricsServerPort = Integer.parseInt(config.getProperty("scaling.metrics.server.port"));
+                int nodeServerPort = Integer.parseInt(config.getProperty("node.server.port"));
 
                 try
                 {
@@ -100,6 +112,9 @@ public class DaemonMain
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
+                    // start node server
+                    NodeServer nodeServer = new NodeServer(nodeServerPort);
+                    container.addServer("node", nodeServer);
 
                     if (autoScalingEnabled)
                     {
@@ -120,7 +135,7 @@ public class DaemonMain
                     log.error("failed to start coordinator", e);
                 }
             }
-            else if (role.equalsIgnoreCase("worker"))
+            else if (role.equals(NodeProto.NodeRole.WORKER))
             {
                 boolean metricsServerEnabled = Boolean.parseBoolean(
                         ConfigFactory.Instance().getProperty("metrics.server.enabled"));
@@ -128,7 +143,7 @@ public class DaemonMain
                 try
                 {
                     // start heartbeat worker
-                    HeartbeatWorker heartbeatWorker = new HeartbeatWorker();
+                    HeartbeatWorker heartbeatWorker = new HeartbeatWorker(role);
                     container.addServer("heartbeat_worker", heartbeatWorker);
                     // start metrics server and cache worker on worker node
                     if (metricsServerEnabled)
@@ -147,9 +162,13 @@ public class DaemonMain
                     log.error("failed to start worker", e);
                 }
             }
-            else
+            else if(role.equals(NodeProto.NodeRole.RETINA))
             {
                 int retinaServerPort = Integer.parseInt(config.getProperty("retina.server.port"));
+
+                // start heartbeat worker
+                HeartbeatWorker heartbeatWorker = new HeartbeatWorker(role);
+                container.addServer("heartbeat_worker", heartbeatWorker);
 
                 try
                 {
@@ -182,8 +201,7 @@ public class DaemonMain
 
             // The shutdown hook ensures the servers are shutdown graceful
             // if this main daemon is terminated by SIGTERM(15) signal.
-            Runtime.getRuntime().addShutdownHook(new Thread(() ->
-            {
+            ShutdownHookManager.Instance().registerShutdownHook(DaemonMain.class, false, () -> {
                 for (String serverName : container.getServerNames())
                 {
                     // shutdown the server threads.
@@ -225,7 +243,7 @@ public class DaemonMain
                  */
                 mainDaemon.shutdown();
                 log.info("all the servers are shutdown, bye...");
-            }));
+            });
 
             // continue the main thread, start and check the server threads.
             // main thread will be terminated with the daemon thread.
@@ -244,7 +262,7 @@ public class DaemonMain
                 }
                 catch (Throwable e)
                 {
-                    log.error("error in the main loop of pixels daemon of {}", role, e);
+                    log.error("error in the main loop of pixels daemon of {}", roleStr, e);
                     break;
                 }
             }
@@ -252,7 +270,7 @@ public class DaemonMain
         }
         else
         {
-            System.out.println("Stopping daemon of " + role + "...");
+            System.out.println("Stopping daemon of " + roleStr + "...");
 
             try
             {
@@ -275,7 +293,7 @@ public class DaemonMain
                         // get the role name of the target daemon (to be killing).
                         for (int i = 2; i < splits.length; ++i)
                         {
-                            if (splits[i].contains("-Drole=" + role))
+                            if (splits[i].contains("-Drole=" + roleStr))
                             {
                                 roleFound = true;
                             }
@@ -291,7 +309,7 @@ public class DaemonMain
                         int pid = Integer.parseInt(splits[0]);
                         if (roleFound && isStartOperation)
                         {
-                            System.out.println("Killing " + role + ", pid (" + pid + ")");
+                            System.out.println("Killing " + roleStr + ", pid (" + pid + ")");
                             // Terminate the daemon gracefully by sending SIGTERM(15) signal.
                             Runtime.getRuntime().exec("kill -15 " + pid);
                         }
@@ -302,7 +320,7 @@ public class DaemonMain
             }
             catch (IOException e)
             {
-                log.error("error when stopping pixels daemon of {}", role, e);
+                log.error("error when stopping pixels daemon of {}", roleStr, e);
             }
         }
     }

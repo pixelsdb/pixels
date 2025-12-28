@@ -15,6 +15,8 @@
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <dep.sqlite.version>3.50.2.0</dep.sqlite.version>
     </properties>
 
     <dependencies>
@@ -23,9 +25,11 @@
             <artifactId>pixels-common</artifactId>
         </dependency>
 
+        <!-- sqlite jdbc -->
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
+            <version>${dep.sqlite.version}</version>
         </dependency>
 
         <dependency>

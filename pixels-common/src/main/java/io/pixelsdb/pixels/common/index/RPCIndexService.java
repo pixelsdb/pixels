@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.index.IndexServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -50,24 +51,20 @@ public class RPCIndexService implements IndexService
         String indexHost = ConfigFactory.Instance().getProperty("index.server.host");
         int indexPort = Integer.parseInt(ConfigFactory.Instance().getProperty("index.server.port"));
         defaultInstance = new RPCIndexService(indexHost, indexPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run() {
-                try
+        ShutdownHookManager.Instance().registerShutdownHook(RPCIndexService.class, false, () -> {
+            try
+            {
+                defaultInstance.shutdown();
+                for (RPCIndexService otherTransService : otherInstances.values())
                 {
-                    defaultInstance.shutdown();
-                    for (RPCIndexService otherTransService : otherInstances.values())
-                    {
-                        otherTransService.shutdown();
-                    }
-                    otherInstances.clear();
-                } catch (InterruptedException e)
-                {
-                    logger.error("failed to shut down index service", e);
+                    otherTransService.shutdown();
                 }
+                otherInstances.clear();
+            } catch (InterruptedException e)
+            {
+                logger.error("failed to shut down index service", e);
             }
-        }));
+        });
     }
 
     /**
@@ -161,7 +158,7 @@ public class RPCIndexService implements IndexService
         }
         else
         {
-            throw new IndexException("failed to lookup unique index, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to lookup unique index, error code=" + response.getErrorCode());
         }
     }
 
@@ -186,7 +183,7 @@ public class RPCIndexService implements IndexService
         }
         else
         {
-            throw new IndexException("failed to lookup non-unique index, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to lookup non-unique index, error code=" + response.getErrorCode());
         }
     }
 
@@ -203,7 +200,7 @@ public class RPCIndexService implements IndexService
         IndexProto.PutPrimaryIndexEntryResponse response = stub.putPrimaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to put primary index entry, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to put primary index entry, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -221,7 +218,7 @@ public class RPCIndexService implements IndexService
         IndexProto.PutSecondaryIndexEntryResponse response = stub.putSecondaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to put secondary index entry, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to put secondary index entry, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -242,7 +239,7 @@ public class RPCIndexService implements IndexService
         IndexProto.PutPrimaryIndexEntriesResponse response = stub.putPrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to put primary index entries, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to put primary index entries, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -263,7 +260,7 @@ public class RPCIndexService implements IndexService
         IndexProto.PutSecondaryIndexEntriesResponse response = stub.putSecondaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to put secondary index entries, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to put secondary index entries, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -281,7 +278,7 @@ public class RPCIndexService implements IndexService
         IndexProto.DeletePrimaryIndexEntryResponse response = stub.deletePrimaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete primary index entry, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to delete primary index entry, error code=" + response.getErrorCode());
         }
         return response.getRowLocation();
     }
@@ -299,7 +296,7 @@ public class RPCIndexService implements IndexService
         IndexProto.DeleteSecondaryIndexEntryResponse response = stub.deleteSecondaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete secondary index entry, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to delete secondary index entry, error code=" + response.getErrorCode());
         }
         return response.getRowIdsList();
     }
@@ -320,7 +317,7 @@ public class RPCIndexService implements IndexService
         IndexProto.DeletePrimaryIndexEntriesResponse response = stub.deletePrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete primary index entries, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to delete primary index entries, error code=" + response.getErrorCode());
         }
         return response.getRowLocationsList();
     }
@@ -341,7 +338,7 @@ public class RPCIndexService implements IndexService
         IndexProto.DeleteSecondaryIndexEntriesResponse response = stub.deleteSecondaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to delete secondary index entries, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to delete secondary index entries, error code=" + response.getErrorCode());
         }
         return response.getRowIdsList();
     }
@@ -359,7 +356,7 @@ public class RPCIndexService implements IndexService
         IndexProto.UpdatePrimaryIndexEntryResponse response = stub.updatePrimaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to update primary index entry, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to update primary index entry, error code=" + response.getErrorCode());
         }
         return response.getPrevRowLocation();
     }
@@ -377,7 +374,7 @@ public class RPCIndexService implements IndexService
         IndexProto.UpdateSecondaryIndexEntryResponse response = stub.updateSecondaryIndexEntry(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to update secondary index entry, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to update secondary index entry, error code=" + response.getErrorCode());
         }
         return response.getPrevRowIdsList();
     }
@@ -398,7 +395,7 @@ public class RPCIndexService implements IndexService
         IndexProto.UpdatePrimaryIndexEntriesResponse response = stub.updatePrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to update primary index entries, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to update primary index entries, error code=" + response.getErrorCode());
         }
         return response.getPrevRowLocationsList();
     }
@@ -419,7 +416,7 @@ public class RPCIndexService implements IndexService
         IndexProto.UpdateSecondaryIndexEntriesResponse response = stub.updateSecondaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to update secondary index entries, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to update secondary index entries, error code=" + response.getErrorCode());
         }
         return response.getPrevRowIdsList();
     }
@@ -442,7 +439,7 @@ public class RPCIndexService implements IndexService
         IndexProto.PurgeIndexEntriesResponse response = stub.purgeIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to purge index entries, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to purge index entries, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -466,7 +463,7 @@ public class RPCIndexService implements IndexService
         IndexProto.FlushIndexEntriesOfFileResponse response = stub.flushIndexEntriesOfFile(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to flush index entries of file, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to flush index entries of file, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -487,7 +484,7 @@ public class RPCIndexService implements IndexService
         IndexProto.OpenIndexResponse response = stub.openIndex(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to open index, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to open index, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -507,7 +504,7 @@ public class RPCIndexService implements IndexService
         IndexProto.CloseIndexResponse response = stub.closeIndex(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to close index, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to close index, error code=" + response.getErrorCode());
         }
         return true;
     }
@@ -527,7 +524,7 @@ public class RPCIndexService implements IndexService
         IndexProto.RemoveIndexResponse response = stub.removeIndex(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
-            throw new IndexException("failed to remove index, error code=" + response.getErrorCode());
+            throw new IndexException("Failed to remove index, error code=" + response.getErrorCode());
         }
         return true;
     }

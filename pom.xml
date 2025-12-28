@@ -66,6 +66,7 @@
         <module>pixels-index/pixels-index-rocksdb</module>
         <module>pixels-index/pixels-index-rockset</module>
         <module>pixels-index/pixels-index-memory</module>
+        <module>pixels-index/pixels-index-mapdb</module>
         <module>pixels-index/pixels-index-main-sqlite</module>
     </modules>
 
@@ -96,8 +97,6 @@
         <dep.awssdk.version>2.30.17</dep.awssdk.version>
         <dep.jedis.version>4.2.0</dep.jedis.version>
         <dep.gcp.version>26.1.2</dep.gcp.version>
-        <dep.rocksdb.version>10.2.1</dep.rocksdb.version>
-        <dep.sqlite.version>3.50.2.0</dep.sqlite.version>
 
         <!-- common libraries -->
         <dep.spike.java.version>0.1.1</dep.spike.java.version>
@@ -300,6 +299,11 @@
                 <artifactId>pixels-index-memory</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.pixelsdb</groupId>
+                <artifactId>pixels-index-mapdb</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <dependency>
                 <groupId>io.pixelsdb</groupId>
@@ -443,13 +447,6 @@
                 </exclusions>
             </dependency>
 
-            <!-- sqlite jdbc -->
-            <dependency>
-                <groupId>org.xerial</groupId>
-                <artifactId>sqlite-jdbc</artifactId>
-                <version>${dep.sqlite.version}</version>
-            </dependency>
-
             <!-- hdfs -->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
@@ -583,12 +580,6 @@
                 <groupId>io.airlift</groupId>
                 <artifactId>slice</artifactId>
                 <version>${dep.airlift.slice.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.rocksdb</groupId>
-                <artifactId>rocksdbjni</artifactId>
-                <version>${dep.rocksdb.version}</version>
             </dependency>
 
             <!-- guava -->

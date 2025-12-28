@@ -34,6 +34,7 @@ public:
     uint64_t queryId;
     uint64_t start;
     uint64_t length;
+    int ringIndex;
 
     Request(uint64_t queryId_, uint64_t start_, uint64_t length_,
             int64_t bufferId = -1);

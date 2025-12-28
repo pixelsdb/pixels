@@ -28,6 +28,7 @@
 #include "physical/PhysicalReader.h"
 #include "physical/RequestBatch.h"
 #include "profiler/TimeProfiler.h"
+#include <mutex>
 
 class Scheduler
 {

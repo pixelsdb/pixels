@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -56,25 +57,20 @@ public class MetadataService
         String metadataHost = ConfigFactory.Instance().getProperty("metadata.server.host");
         int metadataPort = Integer.parseInt(ConfigFactory.Instance().getProperty("metadata.server.port"));
         defaultInstance = new MetadataService(metadataHost, metadataPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run()
+        ShutdownHookManager.Instance().registerShutdownHook(MetadataService.class, false, () -> {
+            try
             {
-                try
+                defaultInstance.shutdown();
+                for (MetadataService otherMetadataService : otherInstances.values())
                 {
-                    defaultInstance.shutdown();
-                    for (MetadataService otherMetadataService : otherInstances.values())
-                    {
-                        otherMetadataService.shutdown();
-                    }
-                    otherInstances.clear();
-                } catch (InterruptedException e)
-                {
-                    logger.error("failed to shut down metadata service", e);
+                    otherMetadataService.shutdown();
                 }
+                otherInstances.clear();
+            } catch (InterruptedException e)
+            {
+                logger.error("failed to shut down metadata service", e);
             }
-        }));
+        });
     }
 
     /**

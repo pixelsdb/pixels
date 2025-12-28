@@ -51,6 +51,7 @@ public final class Constants
     public static final int HOSTNAME_INDEX_IN_CACHE_LOCATION_LITERAL = 3;
     public static final String HEARTBEAT_COORDINATOR_LITERAL = "heartbeat_coordinator_";
     public static final String HEARTBEAT_WORKER_LITERAL = "heartbeat_worker_";
+    public static final String HEARTBEAT_RETINA_LITERAL = "heartbeat_retina_";
     public static final String CACHE_EXPAND_OR_SHRINK_LITERAL = "cache_expand_or_shrink"; // expand or shrink;1:expand, 2:shrink
 
     public static final String PARTITION_OPERATOR_NAME = "partition";
@@ -66,7 +67,15 @@ public final class Constants
     public static final String TRANS_CONTEXT_SCAN_BYTES_KEY = "trans_scan_bytes";
     public static final String TRANS_HIGH_WATERMARK_KEY = "trans_high_watermark";
     public static final String TRANS_LOW_WATERMARK_KEY = "trans_low_watermark";
-    public static final int TRANS_WATERMARKS_CHECKPOINT_PERIOD_SEC = 10;
+    public static final int TRANS_WATERMARKS_CHECKPOINT_INTERVAL_SEC = 10;
+    /**
+     * Must be larger than ({@link #LEASE_NETWORK_LATENCY_MS} + {@link #LEASE_TIME_SKEW_MS})/{@link #LEASE_EXPIRING_THRESHOLD}.
+     */
+    public static final int TRANS_LEASE_PERIOD_MS = 300000;
+    /**
+     * The interval that transaction server checks if the transactions' lease
+     */
+    public static final int TRANS_LEASE_CHECK_INTERVAL_SEC = 300;
 
     /**
      * The time in seconds that a relaxed query can be postponed for execution.
@@ -88,4 +97,15 @@ public final class Constants
     public static final String AI_ROW_ID_PREFIX = "row_id_";
 
     public static final String CF_OUTPUT_STATE_KEY_PREFIX = "pixels_turbo_cf_output";
+
+    public static final String LOAD_DEFAULT_RETINA_PREFIX = "default-retina";
+
+    public static final int LEASE_TIME_SKEW_MS = 500;
+    public static final int LEASE_NETWORK_LATENCY_MS = 500;
+    /**
+     * The fraction of lease period upon which the lease is considered expiring.
+     * E.g., the lease period is 10000ms, a threshold 0.9 means if the remaining time is less than 10000*(1-0.9) ms,
+     * then the lease is considered expiring.
+     */
+    public static final double LEASE_EXPIRING_THRESHOLD = 0.5;
 }

@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.physical.ObjectPath;
 import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -74,7 +75,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
             return thread;
         });
 
-        Runtime.getRuntime().addShutdownHook(new Thread(clientService::shutdownNow));
+        ShutdownHookManager.Instance().registerShutdownHook(PhysicalS3Reader.class, true, clientService::shutdownNow);
     }
 
     protected final AbstractS3 s3;

@@ -1,0 +1,62 @@
+/*
+ * Copyright 2025 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+ 
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = false;
+option java_package = "io.pixelsdb.pixels.daemon";
+option java_outer_classname = "NodeProto";
+
+package node.proto;
+
+// The node management services definition.
+service NodeService {
+  rpc GetRetinaList(google.protobuf.Empty) returns (GetRetinaListResponse);
+  rpc GetRetinaByBucket(GetRetinaByBucketRequest) returns (GetRetinaByBucketResponse);
+}
+
+enum NodeRole {
+  COORDINATOR = 0;
+  WORKER = 1;
+  RETINA = 2;
+}
+
+message NodeInfo {
+  string address = 1;
+  uint32 port = 2;
+  uint32 virtualNodeId = 3;
+  NodeRole role = 4;
+}
+
+message GetRetinaListResponse {
+  int32 errorCode = 1;
+  repeated NodeInfo nodes = 2;
+}
+
+message GetRetinaByBucketRequest {
+  int32 bucket = 1;
+}
+
+message GetRetinaByBucketResponse {
+  int32 errorCode = 1;
+  NodeInfo node = 2;
+}

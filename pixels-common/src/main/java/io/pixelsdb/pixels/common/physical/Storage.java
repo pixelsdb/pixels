@@ -136,7 +136,7 @@ public interface Storage
      * Get the status of this path if it is a file.
      * For local fs, path is considered as local.
      * @param path
-     * @return
+     * @return the status of the file
      * @throws IOException
      */
     Status getStatus(String path) throws IOException;
@@ -147,7 +147,7 @@ public interface Storage
      * For HDFS, we assume each file only has one block, and the
      * file id is the id of this block.
      * @param path
-     * @return
+     * @return the unique id of the file
      * @throws IOException if HDFS file has more than one block.
      */
     long getFileId(String path) throws IOException;
@@ -177,7 +177,7 @@ public interface Storage
      * <p>The default implementation simply parses the location
      * from the URI of the path.</p>
      * @param path the path of the file.
-     * @return
+     * @return the network locations of the file
      * @throws IOException
      */
     default List<Location> getLocations(String path) throws IOException
@@ -194,7 +194,7 @@ public interface Storage
      * <p>The default implementation simply parses the host from the
      * URI of the path.</p>
      * @param path the path of the file.
-     * @return
+     * @return the hostname of the storage nodes
      * @throws IOException
      */
     default String[] getHosts(String path) throws IOException
@@ -206,16 +206,16 @@ public interface Storage
     /**
      * Create the directory named by this abstract pathname,
      * including any necessary but nonexistent parent directories.
-     * @param path
-     * @return
-     * @throws IOException
+     * @param path the path of the directory
+     * @return true of the directory is made successfully, false otherwise
+     * @throws IOException if the path already exist but is not a directory
      */
     boolean mkdirs(String path) throws IOException;
 
     /**
      * For local fs, path is considered as local.
-     * @param path
-     * @return
+     * @param path the path of the file
+     * @return the input stream of the file if opened successfully
      * @throws IOException
      */
     DataInputStream open(String path) throws IOException;
@@ -225,7 +225,7 @@ public interface Storage
      * @param path
      * @param overwrite
      * @param bufferSize
-     * @return
+     * @return the output stream of file if it is created successfully
      * @throws IOException if path is a directory.
      */
     DataOutputStream create(String path, boolean overwrite, int bufferSize) throws IOException;
@@ -236,7 +236,7 @@ public interface Storage
      * @param overwrite
      * @param bufferSize
      * @param replication is ignored by default, if the storage does not have explicit replication.
-     * @return
+     * @return the output stream of file if it is created successfully
      * @throws IOException if path is a directory.
      */
     default DataOutputStream create(String path, boolean overwrite,
@@ -253,7 +253,7 @@ public interface Storage
      * @param bufferSize
      * @param replication
      * @param blockSize is ignored by default, except in HDFS.
-     * @return
+     * @return the output stream of file if it is created successfully
      * @throws IOException if path is a directory.
      */
     default DataOutputStream create(String path, boolean overwrite,
@@ -281,7 +281,7 @@ public interface Storage
      * Copy from the source to the destination without going through this client.
      * @param src
      * @param dest
-     * @return
+     * @return true if success, false otherwise
      * @throws IOException
      */
     boolean directCopy(String src, String dest) throws IOException;
@@ -296,7 +296,7 @@ public interface Storage
     /**
      * For local fs, path is considered as local.
      * @param path
-     * @return
+     * @return true if the path exists
      * @throws IOException
      */
     boolean exists(String path) throws IOException;
@@ -304,7 +304,7 @@ public interface Storage
     /**
      * For local fs, path is considered as local.
      * @param path
-     * @return
+     * @return true if the path exists and is a regular file, false otherwise
      * @throws IOException
      */
     boolean isFile(String path) throws IOException;
@@ -312,7 +312,7 @@ public interface Storage
     /**
      * For local fs, path is considered as local.
      * @param path
-     * @return
+     * @return true if the path exists and is a directory, false otherwise
      * @throws IOException
      */
     boolean isDirectory(String path) throws IOException;

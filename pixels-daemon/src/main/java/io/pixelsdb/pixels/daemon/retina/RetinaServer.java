@@ -71,7 +71,7 @@ public class RetinaServer implements Server
             this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e)
         {
-            log.error("interrupted when shutdown rpc server", e);
+            log.error("Interrupted when shutdown rpc server", e);
         }
     }
 
@@ -85,10 +85,10 @@ public class RetinaServer implements Server
             this.rpcServer.awaitTermination();
         } catch (IOException e)
         {
-            log.error("I/O error when running.", e);
+            log.error("I/O error when running", e);
         } catch (InterruptedException e)
         {
-            log.error("Interrupted when running.", e);
+            log.error("Interrupted when running", e);
         } finally
         {
             this.shutdown();
@@ -114,13 +114,13 @@ public class RetinaServer implements Server
                 HealthCheckResponse response = stub.check(HealthCheckRequest.newBuilder().setService("metadata").build());
                 if (response.getStatus() == HealthCheckResponse.ServingStatus.SERVING)
                 {
-                    log.info("metadata server is ready.");
+                    log.info("Metadata server is ready");
                     channel.shutdown();
                     return;
                 }
             } catch (StatusRuntimeException e)
             {
-                log.info("metadata health check failed, sleep one second and retry ...");
+                log.info("Metadata health check failed, sleep one second and retry");
             }
 
             retry++;
@@ -129,10 +129,15 @@ public class RetinaServer implements Server
                 Thread.sleep(1000);
             } catch (InterruptedException e)
             {
-                throw new RuntimeException("failed to sleep for retry to check metadata server status", e);
+                log.error("Failed to sleep for retry to check metadata server status", e);
+                Thread.currentThread().interrupt();
+                break;
             }
         }
         channel.shutdown();
-        throw new RuntimeException("timeout waiting for metadata server to be ready");
+        if (retry >= maxRetry)
+        {
+            log.error("Timeout waiting for metadata server to be ready");
+        }
     }
 }

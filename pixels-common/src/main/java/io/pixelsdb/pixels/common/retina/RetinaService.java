@@ -25,6 +25,7 @@ import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -48,33 +49,30 @@ public class RetinaService
 
     static
     {
-        String retinaHost = ConfigFactory.Instance().getProperty("retina.server.host");
-        int retinaPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
-        defaultInstance = new RetinaService(retinaHost, retinaPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run()
+        ConfigFactory config = ConfigFactory.Instance();
+        String retinaHost = config.getProperty("retina.server.host");
+        int retinaPort = Integer.parseInt(config.getProperty("retina.server.port"));
+        boolean enabled = Boolean.parseBoolean(config.getProperty("retina.enable"));
+        defaultInstance = new RetinaService(retinaHost, retinaPort, enabled);
+        ShutdownHookManager.Instance().registerShutdownHook(RetinaService.class, false, () -> {
+            try
             {
-                try
+                defaultInstance.shutdown();
+                for (RetinaService otherRetinaService : otherInstances.values())
                 {
-                    defaultInstance.shutdown();
-                    for (RetinaService otherRetinaService : otherInstances.values())
-                    {
-                        otherRetinaService.shutdown();
-                    }
-                    otherInstances.clear();
-                } catch (InterruptedException e)
-                {
-                    logger.error("failed to shut down retina service", e);
+                    otherRetinaService.shutdown();
                 }
+                otherInstances.clear();
+            } catch (InterruptedException e)
+            {
+                logger.error("failed to shut down retina service", e);
             }
-        }));
+        });
     }
 
     /**
      * Get the default retina service instance connecting to the retina host:port configured in
-     * PIXELS_HOME/pixels.properties. This default instance whill be automatically shut down when the process
+     * PIXELS_HOME/pixels.properties. This default instance will be automatically shut down when the process
      * is terminating, no need to call {@link #shutdown()} (although it is idempotent) manually.
      *
      * @return
@@ -95,8 +93,11 @@ public class RetinaService
     public static synchronized RetinaService CreateInstance(String host, int port)
     {
         HostAddress address = HostAddress.fromParts(host, port);
+        // For other instances, we also follow the global configuration.
+        String retinaEnable = ConfigFactory.Instance().getProperty("retina.enable");
+        boolean enabled = Boolean.parseBoolean(retinaEnable);
         return otherInstances.computeIfAbsent(
-                address, addr -> new RetinaService(addr.getHostText(), addr.getPort())
+                address, addr -> new RetinaService(addr.getHostText(), addr.getPort(), enabled)
         );
     }
 
@@ -104,48 +105,64 @@ public class RetinaService
     private final RetinaWorkerServiceGrpc.RetinaWorkerServiceBlockingStub stub;
     private final RetinaWorkerServiceGrpc.RetinaWorkerServiceStub asyncStub;
     private boolean isShutdown;
+    private final boolean enabled;
 
-    private RetinaService(String host, int port)
+    private RetinaService(String host, int port, boolean enabled)
     {
-        assert (host != null);
-        assert (port > 0 && port <= 65535);
-        this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext()
-//                .keepAliveTime(1, TimeUnit.SECONDS)
-//                .keepAliveTimeout(3, TimeUnit.SECONDS)
-//                .keepAliveWithoutCalls(true)
-                .build();
-        this.stub = RetinaWorkerServiceGrpc.newBlockingStub(this.channel);
-        this.asyncStub = RetinaWorkerServiceGrpc.newStub(this.channel);
+        this.enabled = enabled;
+        if (enabled)
+        {
+            assert (host != null);
+            assert (port > 0 && port <= 65535);
+            this.channel = ManagedChannelBuilder.forAddress(host, port).
+                    usePlaintext().build();
+            this.stub = RetinaWorkerServiceGrpc.newBlockingStub(this.channel);
+            this.asyncStub = RetinaWorkerServiceGrpc.newStub(this.channel);
+        } else
+        {
+            this.channel = null;
+            this.stub = null;
+            this.asyncStub = null;
+        }
         this.isShutdown = false;
+    }
+
+    public boolean isEnabled()
+    {
+        return enabled;
     }
 
     private synchronized void shutdown() throws InterruptedException
     {
         if (!this.isShutdown)
         {
-            // Wait for at most 5 seconds, this should be enough to shut down an RPC client.
-            this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            if (this.channel != null)
+            {
+                // Wait for at most 5 seconds, this should be enough to shut down an RPC client.
+                this.channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            }
             this.isShutdown = true;
         }
     }
 
-    public boolean updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
+    public boolean updateRecord(String schemaName, int virtualNodeId, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
         RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
+                .setVirtualNodeId(virtualNodeId)
                 .addAllTableUpdateData(tableUpdateData)
                 .build();
         RetinaProto.UpdateRecordResponse response = this.stub.updateRecord(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new RetinaException("failed to update record: " + response.getHeader().getErrorCode()
+            throw new RetinaException("Failed to update record: " + response.getHeader().getErrorCode()
                     + " " + response.getHeader().getErrorMsg());
         }
         if (!response.getHeader().getToken().equals(token))
         {
-            throw new RetinaException("response token does not match.");
+            throw new RetinaException("Response token does not match");
         }
         return true;
     }
@@ -169,13 +186,13 @@ public class RetinaService
             this.requestObserver = requestObserver;
         }
 
-        public CompletableFuture<RetinaProto.UpdateRecordResponse> updateRecord(String schemaName, List<RetinaProto.TableUpdateData> tableUpdateData)
+        public CompletableFuture<RetinaProto.UpdateRecordResponse> updateRecord(String schemaName, int vNodeId, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
         {
             if (isClosed)
             {
-                throw new IllegalStateException("Stream is already closed");
+                throw new RetinaException("Stream is already closed");
             }
-            
+
             String token = UUID.randomUUID().toString();
             CompletableFuture<RetinaProto.UpdateRecordResponse> future = new CompletableFuture<>();
             pendingRequests.put(token, future);
@@ -183,6 +200,7 @@ public class RetinaService
             RetinaProto.UpdateRecordRequest request = RetinaProto.UpdateRecordRequest.newBuilder()
                     .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                     .setSchemaName(schemaName)
+                    .setVirtualNodeId(vNodeId)
                     .addAllTableUpdateData(tableUpdateData)
                     .build();
             
@@ -191,8 +209,7 @@ public class RetinaService
                 requestObserver.onNext(request);
             } catch (Exception e)
             {
-                logger.error("Failed to send update record request", e);
-                throw new RuntimeException("Failed to send update record request", e);
+                throw new RetinaException("Failed to send update record request", e);
             }
 
             return future;
@@ -229,11 +246,11 @@ public class RetinaService
                 {
                     if (!finishLatch.await(5, TimeUnit.SECONDS))
                     {
-                        logger.warn("Stream completion did not finish in time.");
+                        logger.warn("Stream completion did not finish in time");
                     }
                 } catch (InterruptedException e)
                 {
-                    logger.error("Interrupted while waiting for stream completion.", e);
+                    logger.error("Interrupted while waiting for stream completion", e);
                     Thread.currentThread().interrupt();
                 }
             }
@@ -260,7 +277,7 @@ public class RetinaService
             @Override
             public void onError(Throwable t)
             {
-                logger.error("Retina Stream update failed from server side.", t);
+                logger.error("Retina Stream update failed from server side", t);
                 latch.countDown();
             }
 
@@ -286,12 +303,12 @@ public class RetinaService
         RetinaProto.AddVisibilityResponse response = this.stub.addVisibility(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new RetinaException("failed to add visibility: " + response.getHeader().getErrorCode()
+            throw new RetinaException("Failed to add visibility: " + response.getHeader().getErrorCode()
                     + " " + response.getHeader().getErrorMsg());
         }
         if (!response.getHeader().getToken().equals(token))
         {
-            throw new RetinaException("response token does not match.");
+            throw new RetinaException("Response token does not match");
         }
         return true;
     }
@@ -308,12 +325,12 @@ public class RetinaService
         RetinaProto.QueryVisibilityResponse response = this.stub.queryVisibility(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new RetinaException("failed to query visibility: " + response.getHeader().getErrorCode()
+            throw new RetinaException("Failed to query visibility: " + response.getHeader().getErrorCode()
                     + " " + response.getHeader().getErrorMsg());
         }
         if (!response.getHeader().getToken().equals(token))
         {
-            throw new RetinaException("response token does not match.");
+            throw new RetinaException("Response token does not match");
         }
         long[][] visibilityBitmaps = new long[rgIds.length][];
         for (int i = 0; i < response.getBitmapsCount(); i++)
@@ -336,26 +353,27 @@ public class RetinaService
         RetinaProto.ReclaimVisibilityResponse response = this.stub.reclaimVisibility(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new RetinaException("failed to garbage collect: " + response.getHeader().getErrorCode()
+            throw new RetinaException("Failed to garbage collect: " + response.getHeader().getErrorCode()
                     + " " + response.getHeader().getErrorMsg());
         }
         if (!response.getHeader().getToken().equals(token))
         {
-            throw new RetinaException("response token does not match.");
+            throw new RetinaException("Response token does not match");
         }
         return true;
     }
 
-    public RetinaProto.GetWriterBufferResponse getWriterBuffer(String schemaName, String tableName, long timeStamp) throws RetinaException
+    public RetinaProto.GetWriteBufferResponse getWriteBuffer(String schemaName, String tableName, int virtualNodeId, long timeStamp) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
-        RetinaProto.GetWriterBufferRequest request = RetinaProto.GetWriterBufferRequest.newBuilder()
+        RetinaProto.GetWriteBufferRequest request = RetinaProto.GetWriteBufferRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
+                .setVirtualNodeId(virtualNodeId)
                 .setTimestamp(timeStamp)
                 .build();
-        RetinaProto.GetWriterBufferResponse response = this.stub.getWriterBuffer(request);
+        RetinaProto.GetWriteBufferResponse response = this.stub.getWriteBuffer(request);
         if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("Schema: " + schemaName + "\tTable: " + tableName + ", failed to get superversion: " + response.getHeader().getErrorCode()
@@ -363,32 +381,86 @@ public class RetinaService
         }
         if (!response.getHeader().getToken().equals(token))
         {
-            throw new RetinaException("response token does not match.");
+            throw new RetinaException("Response token does not match");
         }
         return response;
     }
 
-    public boolean addWriterBuffer(String schemaName, String tableName) throws RetinaException
+    public boolean addWriteBuffer(String schemaName, String tableName) throws RetinaException
     {
         /**
          * Since pixels-core was not introduced, TypeDescription cannot be used to represent the schema.
          * Ultimately, it is converted to a string and transmitted via bytes, so it does not matter.
          */
         String token = UUID.randomUUID().toString();
-        RetinaProto.AddWriterBufferRequest request = RetinaProto.AddWriterBufferRequest.newBuilder()
+        RetinaProto.AddWriteBufferRequest request = RetinaProto.AddWriteBufferRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setSchemaName(schemaName)
                 .setTableName(tableName)
                 .build();
-        RetinaProto.AddWriterBufferResponse response = this.stub.addWriterBuffer(request);
+        RetinaProto.AddWriteBufferResponse response = this.stub.addWriteBuffer(request);
         if (response.getHeader().getErrorCode() != 0)
         {
-            throw new RetinaException("failed to add writer: " + response.getHeader().getErrorCode()
+            throw new RetinaException("Failed to add writer: " + response.getHeader().getErrorCode()
                     + " " + response.getHeader().getErrorMsg());
         }
         if (!response.getHeader().getToken().equals(token))
         {
-            throw new RetinaException("response token does not match.");
+            throw new RetinaException("Response token does not match");
+        }
+        return true;
+    }
+
+    /**
+     * Register a long-running query to be offloaded to disk checkpoint.
+     *
+     * @param timestamp the transaction timestamp
+     * @return true on success
+     * @throws RetinaException if the operation fails
+     */
+    public boolean registerOffload(long timestamp) throws RetinaException
+    {
+        String token = UUID.randomUUID().toString();
+        RetinaProto.RegisterOffloadRequest request = RetinaProto.RegisterOffloadRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTimestamp(timestamp)
+                .build();
+        RetinaProto.RegisterOffloadResponse response = this.stub.registerOffload(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("Failed to register offload: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("Response token does not match");
+        }
+        return true;
+    }
+
+    /**
+     * Unregister a long-running query's offload checkpoint when the query completes.
+     *
+     * @param timestamp the transaction timestamp
+     * @return true on success
+     * @throws RetinaException if the operation fails
+     */
+    public boolean unregisterOffload(long timestamp) throws RetinaException
+    {
+        String token = UUID.randomUUID().toString();
+        RetinaProto.UnregisterOffloadRequest request = RetinaProto.UnregisterOffloadRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setTimestamp(timestamp)
+                .build();
+        RetinaProto.UnregisterOffloadResponse response = this.stub.unregisterOffload(request);
+        if (response.getHeader().getErrorCode() != 0)
+        {
+            throw new RetinaException("Failed to unregister offload: " + response.getHeader().getErrorCode()
+                    + " " + response.getHeader().getErrorMsg());
+        }
+        if (!response.getHeader().getToken().equals(token))
+        {
+            throw new RetinaException("Response token does not match");
         }
         return true;
     }

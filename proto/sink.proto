@@ -26,6 +26,20 @@ option java_multiple_files = false;
 option java_package = "io.pixelsdb.pixels.sink";
 option java_outer_classname = "SinkProto";
 
+service PixelsPollingService {
+  rpc PollEvents(PollRequest) returns (PollResponse);
+}
+
+message PollRequest {
+  string schema_name = 1;
+  string table_name = 2;
+  repeated int32 buckets = 3;
+}
+
+message PollResponse {
+  repeated RowRecord records = 1;
+}
+
 enum TransactionStatus {
     BEGIN = 0;
     END = 1;

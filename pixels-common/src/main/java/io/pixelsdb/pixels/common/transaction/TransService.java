@@ -20,13 +20,16 @@
 package io.pixelsdb.pixels.common.transaction;
 
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.Empty;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.TransException;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.daemon.TransProto;
 import io.pixelsdb.pixels.daemon.TransServiceGrpc;
 import org.apache.logging.log4j.LogManager;
@@ -54,24 +57,20 @@ public class TransService
         String transHost = ConfigFactory.Instance().getProperty("trans.server.host");
         int transPort = Integer.parseInt(ConfigFactory.Instance().getProperty("trans.server.port"));
         defaultInstance = new TransService(transHost, transPort);
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
-        {
-            @Override
-            public void run() {
-                try
+        ShutdownHookManager.Instance().registerShutdownHook(TransService.class, false, () -> {
+            try
+            {
+                defaultInstance.shutdown();
+                for (TransService otherTransService : otherInstances.values())
                 {
-                    defaultInstance.shutdown();
-                    for (TransService otherTransService : otherInstances.values())
-                    {
-                        otherTransService.shutdown();
-                    }
-                    otherInstances.clear();
-                } catch (InterruptedException e)
-                {
-                    logger.error("failed to shut down trans service", e);
+                    otherTransService.shutdown();
                 }
+                otherInstances.clear();
+            } catch (InterruptedException e)
+            {
+                logger.error("failed to shut down trans service", e);
             }
-        }));
+        });
     }
 
     /**
@@ -143,7 +142,8 @@ public class TransService
         {
             throw new TransException("failed to begin transaction, error code=" + response.getErrorCode());
         }
-        TransContext context = new TransContext(response.getTransId(), response.getTimestamp(), readOnly);
+        TransContext context = new TransContext(response.getTransId(), response.getTimestamp(),
+                response.getLeaseStartMs(), response.getLeasePeriodMs(), readOnly);
         if (readOnly)
         {
             // Issue #1099: only use trans context cache and metadata cache for read only queries.
@@ -174,8 +174,9 @@ public class TransService
         {
             long transId = response.getTransIds(i);
             long timestamp = response.getTimestamps(i);
-            TransContext context = new TransContext(transId, timestamp, readOnly);
-
+            long leaseStartMs = response.getLeaseStartMses(i);
+            long leasePeriodMs = response.getLeasePeriodMses(i);
+            TransContext context = new TransContext(transId, timestamp, leaseStartMs, leasePeriodMs, readOnly);
             if (readOnly)
             {
                 // Issue #1099: only use trans context cache and metadata cache for read only queries.
@@ -228,7 +229,7 @@ public class TransService
             throw new IllegalArgumentException("transIds is null or empty");
         }
         TransProto.CommitTransBatchRequest request = TransProto.CommitTransBatchRequest.newBuilder()
-                .addAllTransIds(transIds).build();
+                .setReadOnly(readOnly).addAllTransIds(transIds).build();
         TransProto.CommitTransBatchResponse response = this.stub.commitTransBatch(request);
         if (response.getErrorCode() == ErrorCode.TRANS_INVALID_ARGUMENT) // other error codes are not thrown as exceptions
         {
@@ -269,6 +270,79 @@ public class TransService
             MetadataCache.Instance().dropCache(transId);
         }
         return true;
+    }
+
+    /**
+     * Check and extend the lease of the transaction if it is expiring.
+     * <br/>
+     * <b>Note: this method is not thread-safe</b>, do not try to extend the lease of the same transaction
+     * from concurrent threads.
+     * @param transContext the transaction context with a lease
+     * @return true if the lease is not expiring or has been successfully extended, false if the transaction lease
+     * has already expired
+     * @throws TransException if failed to extend the lease on the assigner (transaction server) side
+     */
+    public boolean extendTransLease(TransContext transContext) throws TransException
+    {
+        Lease lease = transContext.getLease();
+        long currentTimeMs = System.currentTimeMillis();
+        if (lease.hasExpired(currentTimeMs, Lease.Role.Holder))
+        {
+            return false;
+        }
+        if (!lease.expiring(currentTimeMs, Lease.Role.Holder))
+        {
+            return true;
+        }
+        TransProto.ExtendTransLeaseRequest request = TransProto.ExtendTransLeaseRequest.newBuilder()
+                .setTransId(transContext.getTransId()).build();
+        TransProto.ExtendTransLeaseResponse response = this.stub.extendTransLease(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("transaction " + transContext.getTransId() +
+                    " not exist or its lease has expired, error code=" + response.getErrorCode());
+        }
+        lease.updateStartMs(response.getNewLeaseStartMs());
+        return true;
+    }
+
+    /**
+     * Check and extend the lease of the transactions if they are expiring.
+     * <br/>
+     * <b>Note: this method is not thread-safe</b>, do not try to extend the lease of the same transaction
+     * from concurrent threads.
+     * @param transContexts the transaction contexts with leases
+     * @return for each transaction, true if the lease is successfully extended,
+     * false if the transaction lease has already expired
+     * @throws TransException if failed to extend the leases on the assigner (transaction server) side
+     */
+    public List<Boolean> extendTransLeaseBatch(List<TransContext> transContexts) throws TransException
+    {
+        TransProto.ExtendTransLeaseBatchRequest.Builder requestBuilder = TransProto.ExtendTransLeaseBatchRequest.newBuilder();
+        for (TransContext transContext : transContexts)
+        {
+            requestBuilder.addTransIds(transContext.getTransId());
+        }
+        TransProto.ExtendTransLeaseBatchResponse response = this.stub.extendTransLeaseBatch(requestBuilder.build());
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to extend lease of transactions, error code=" + response.getErrorCode());
+        }
+        long newLeaseStartMs = response.getNewLeaseStartMs();
+        List<Boolean> success = response.getSuccessList();
+        if (success.size() != transContexts.size())
+        {
+            throw new TransException("invalid response returned by transaction server");
+        }
+        for (int i = 0; i < transContexts.size(); i++)
+        {
+            if (success.get(i))
+            {
+                TransContext transContext = transContexts.get(i);
+                transContext.getLease().updateStartMs(newLeaseStartMs);
+            }
+        }
+        return success;
     }
 
     public TransContext getTransContext(long transId) throws TransException
@@ -420,6 +494,37 @@ public class TransService
         {
             throw new TransException("failed to bind transaction id and external trace id, error code="
                     + response.getErrorCode());
+        }
+        return true;
+    }
+
+    public long getSafeGcTimestamp() throws TransException
+    {
+        TransProto.GetSafeGcTimestampResponse response = this.stub.getSafeGcTimestamp(Empty.getDefaultInstance());
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to get safe garbage collection timestamp"
+                    + response.getErrorCode());
+        }
+        return response.getTimestamp();
+    }
+
+    /**
+     * Mark a transaction as offloaded. This allows the transaction to be skipped when
+     * calculating the minimum running transaction timestamp for garbage collection.
+     * 
+     * @param transId the id of the transaction to mark as offloaded
+     * @return true on success
+     * @throws TransException if the operation fails
+     */
+    public boolean markTransOffloaded(long transId) throws TransException
+    {
+        TransProto.MarkTransOffloadedRequest request = TransProto.MarkTransOffloadedRequest.newBuilder()
+                .setTransId(transId).build();
+        TransProto.MarkTransOffloadedResponse response = this.stub.markTransOffloaded(request);
+        if (response.getErrorCode() != ErrorCode.SUCCESS)
+        {
+            throw new TransException("failed to mark transaction as offloaded, error code=" + response.getErrorCode());
         }
         return true;
     }

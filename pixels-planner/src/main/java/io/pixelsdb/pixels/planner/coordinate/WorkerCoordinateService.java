@@ -23,7 +23,7 @@ import com.google.common.collect.ImmutableList;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
-import io.pixelsdb.pixels.common.task.Lease;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.turbo.TurboProto;
 import io.pixelsdb.pixels.turbo.WorkerCoordinateServiceGrpc;
@@ -84,7 +84,7 @@ public class WorkerCoordinateService
             throw new WorkerCoordinateException("failed to register worker, error code=" + response.getErrorCode());
         }
         return new Worker<>(response.getWorkerId(),
-                new Lease(response.getLeasePeriodMs(), response.getLeaseStartTimeMs()), response.getWorkerPortIndex(), workerInfo);
+                new Lease(response.getLeaseStartTimeMs(), response.getLeasePeriodMs()), response.getWorkerPortIndex(), workerInfo);
     }
 
     /**
@@ -170,7 +170,7 @@ public class WorkerCoordinateService
     }
 
     /**
-     * During the lifetime of a cloud function worker, it must extend its lease before the lease is expired.
+     * During the lifetime of a cloud function worker, it must extend its lease before the lease has expired.
      * @param workerId the id of this worker
      * @return the new start time in milliseconds since the Unix epoch of the extended lease
      * @throws WorkerCoordinateException if failed to extend the lease, in this case the worker must terminate itself

@@ -43,23 +43,23 @@ public class TestObjectStorage
 
             // test write
             byte[] bytes = new byte[]{2, 0, 2, 0, 2, 0, 1, 5, 4, 5};
-            objectStorageManager.write(tableId, entryId, bytes);
+            objectStorageManager.write(tableId, 0, entryId, bytes);
 
             // test exist
-            assert (objectStorageManager.exist(tableId, entryId));
+            assert (objectStorageManager.exist(tableId, 0, entryId));
 
             // test read
-            ByteBuffer readBuffer = objectStorageManager.read(tableId, entryId);
+            ByteBuffer readBuffer = objectStorageManager.read(tableId, 0, entryId);
             byte[] readBytes = new byte[readBuffer.remaining()];
             readBuffer.get(readBytes);
             System.out.println(Arrays.toString(readBytes));
             assert (Arrays.equals(bytes, readBytes));
 
             // test delete
-            objectStorageManager.delete(tableId, entryId);
+            objectStorageManager.delete(tableId, 0, entryId);
 
             // test exists
-            assert (!objectStorageManager.exist(tableId, entryId));
+            assert (!objectStorageManager.exist(tableId, 0, entryId));
 
         } catch (RetinaException e)
         {

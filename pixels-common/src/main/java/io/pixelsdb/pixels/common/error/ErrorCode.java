@@ -108,6 +108,9 @@ public class ErrorCode
     public static final int TRANS_INVALID_ARGUMENT = (ERROR_TRANS + 8);
     public static final int TRANS_BATCH_PARTIAL_ID_NOT_EXIST = (ERROR_TRANS + 9);
     public static final int TRANS_BATCH_PARTIAL_COMMIT_FAILED = (ERROR_TRANS + 10);
+    public static final int TRANS_EXTEND_LEASE_FAILED = (ERROR_TRANS + 11);
+    public static final int TRANS_BATCH_EXTEND_LEASE_FAILED = (ERROR_TRANS + 12);
+    public static final int TRANS_LEASE_EXPIRED = (ERROR_TRANS + 13);
 
     // begin error code for query schedule
     private static final int ERROR_QUERY_SCHEDULE = ERROR_BASE + 300;
@@ -152,4 +155,10 @@ public class ErrorCode
     public static final int INDEX_UPDATE_SINGLE_POINT_INDEX_FAIL = ERROR_INDEX_SERVER + 17;
     public static final int INDEX_PURGE_MAIN_INDEX_FAIL = ERROR_INDEX_SERVER + 18;
     public static final int INDEX_PURGE_SINGLE_POINT_FAIL = ERROR_INDEX_SERVER + 19;
+
+    // error code for node service
+    private static final int ERROR_NODE_SERVER = ERROR_BASE + 700;
+    public static final int NODE_RETINA_INFO_FAIL = ERROR_NODE_SERVER + 1;
+    public static final int NODE_NO_AVAILABLE = ERROR_NODE_SERVER + 2;
+    public static final int NODE_INVALID_BUCKET = ERROR_NODE_SERVER + 3;
 }

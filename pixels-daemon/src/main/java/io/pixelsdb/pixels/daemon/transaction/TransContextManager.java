@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.daemon.transaction;
 
+import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.transaction.TransContext;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.daemon.TransProto;
@@ -33,10 +35,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -66,7 +68,18 @@ public class TransContextManager
      * a sorted set that sorts the transaction contexts by transaction timestamp and id. This is important for watermark pushing.
      */
     private final Set<TransContext> runningReadOnlyTrans = new ConcurrentSkipListSet<>();
+    /**
+     * Similar to {@link #runningReadOnlyTrans}, but for non-readonly transactions
+     */
     private final Set<TransContext> runningWriteTrans = new ConcurrentSkipListSet<>();
+    /**
+     * The max timestamp of terminated non-readonly transactions.
+     */
+    private final AtomicLong maxTermedWriteTransTs = new AtomicLong(-1L);
+    /**
+     * The max timestamp of terminated readonly transactions.
+     */
+    private final AtomicLong maxTermedReadonlyTransTs = new AtomicLong(-1L);
 
     private final Map<String, Long> traceIdToTransId = new ConcurrentHashMap<>();
     private final Map<Long, String> transIdToTraceId = new ConcurrentHashMap<>();
@@ -159,23 +172,21 @@ public class TransContextManager
      * @param success whether each transaction commits successfully
      * @return true if all transactions commit successfully
      */
-    public boolean setTransCommitBatch(long[] transIds, Boolean[] success)
+    public boolean setTransCommitBatch(List<Long> transIds, List<Boolean> success)
     {
         requireNonNull(transIds, "transIds is null");
         requireNonNull(success, "success is null");
-        checkArgument(transIds.length == success.length,
-                "transIds and success have different length");
         this.contextLock.readLock().lock();
         try
         {
             boolean allSuccess = true;
-            for (int i = 0; i < transIds.length; i++)
+            for (int i = 0; i < transIds.size(); i++)
             {
-                success[i] = terminateTrans(transIds[i], TransProto.TransStatus.COMMIT);
-                if(!success[i])
+                boolean res = terminateTrans(transIds.get(i), TransProto.TransStatus.COMMIT);
+                success.add(res);
+                if(!res)
                 {
                     allSuccess = false;
-                    log.error("failed to commit transaction id {}", transIds[i]);
                 }
             }
             return allSuccess;
@@ -206,19 +217,155 @@ public class TransContextManager
         }
     }
 
+    /**
+     * Try to extend the lease of the transaction if it is not expired.
+     * @param transId the trans id
+     * @return the new lease start time if the lease of the transaction extended successfully,
+     * 0 if the transaction is readonly, -1 if the transaction has expired, and -2 if the transaction does not exist
+     */
+    public long extendTransLease(long transId)
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            long currentTimeMs = System.currentTimeMillis();
+            TransContext context = this.transIdToContext.get(transId);
+            if (context != null)
+            {
+                if (!context.isReadOnly())
+                {
+                    Lease lease = context.getLease();
+                    if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
+                    {
+                        return -1L;
+                    }
+                    lease.updateStartMs(currentTimeMs);
+                    return currentTimeMs;
+                }
+                return 0L;
+            }
+            return -2L;
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * Try to extend the lease of the transactions if they are not expired.
+     * @param transIds the trans ids
+     * @param success for each transaction, true if the lease of the transaction is readonly or extended successfully;
+     * false if the transaction has expired
+     * @return the new lease start time, or negative value if there are other errors except lease expire
+     */
+    public long extendTransLeaseBatch(List<Long> transIds, List<Boolean> success)
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            long currentTimeMs = System.currentTimeMillis();
+            boolean allSuccess = true;
+            for (long transId : transIds)
+            {
+                TransContext context = this.transIdToContext.get(transId);
+                if (context != null)
+                {
+                    if (!context.isReadOnly())
+                    {
+                        Lease lease = context.getLease();
+                        if (lease.hasExpired(currentTimeMs, Lease.Role.Assigner))
+                        {
+                            success.add(false);
+                            continue;
+                        }
+                        lease.updateStartMs(currentTimeMs);
+                    }
+                    success.add(true);
+                } else
+                {
+                    success.add(false);
+                    allSuccess = false;
+                }
+            }
+            if (allSuccess)
+            {
+                return currentTimeMs;
+            }
+            else
+            {
+                return -2L;
+            }
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * @return the ids of the transactions with lease expired
+     */
+    public List<Long> getExpiredTransIds()
+    {
+        this.contextLock.readLock().lock();
+        try
+        {
+            long currentTimeMs = System.currentTimeMillis();
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            for (TransContext context : this.transIdToContext.values())
+            {
+                if (!context.isReadOnly() &&
+                        context.getStatus() != TransProto.TransStatus.COMMIT &&
+                        context.getStatus() != TransProto.TransStatus.ROLLBACK &&
+                        context.getLease().hasExpired(currentTimeMs, Lease.Role.Assigner))
+                {
+                    // the transaction is non-readonly, yet not terminated, and has expired
+                    builder.add(context.getTransId());
+                }
+            }
+            return builder.build();
+        }
+        finally
+        {
+            this.contextLock.readLock().unlock();
+        }
+    }
+
     private boolean terminateTrans(long transId, TransProto.TransStatus status)
     {
         TransContext context = this.transIdToContext.get(transId);
         if (context != null)
         {
-            context.setStatus(status);
+            boolean res = true;
             if (context.isReadOnly())
             {
+                context.setStatus(status);
                 this.readOnlyConcurrency.decrementAndGet();
                 this.runningReadOnlyTrans.remove(context);
+                // Issue #1245: update max terminated transaction timestamp after termination
+                long maxTermedTransTs = this.maxTermedReadonlyTransTs.get();
+                final long currTransTs = context.getTimestamp();
+                while (currTransTs > maxTermedTransTs &&
+                        !this.maxTermedReadonlyTransTs.compareAndSet(maxTermedTransTs, currTransTs))
+                {
+                    maxTermedTransTs = this.maxTermedReadonlyTransTs.get();
+                }
             }
             else
             {
+                if (status == TransProto.TransStatus.COMMIT &&
+                        context.getLease().hasExpired(System.currentTimeMillis(), Lease.Role.Assigner))
+                {
+                    // Issue #1163: stop committing and rollback the transaction if its lease has expired
+                    context.setStatus(TransProto.TransStatus.ROLLBACK);
+                    log.error("failed to commit transaction id {} as its lease has expired", transId);
+                    res = false;
+                }
+                else
+                {
+                    context.setStatus(status);
+                }
                 // only clear the context of write transactions
                 this.transIdToContext.remove(context.getTransId());
                 this.runningWriteTrans.remove(context);
@@ -227,11 +374,20 @@ public class TransContextManager
                 {
                     this.traceIdToTransId.remove(traceId);
                 }
+                // Issue #1245: update max terminated transaction timestamp after termination
+                long maxTermedTransTs = this.maxTermedWriteTransTs.get();
+                final long currTransTs = context.getTimestamp();
+                while (currTransTs > maxTermedTransTs &&
+                        !this.maxTermedWriteTransTs.compareAndSet(maxTermedTransTs, currTransTs))
+                {
+                    maxTermedTransTs = this.maxTermedWriteTransTs.get();
+                }
             }
-            return true;
+            return res;
         }
         return false;
     }
+
 
     /**
      * Dump the context of transactions in this manager to a history file and remove terminated transactions. This method
@@ -293,8 +449,8 @@ public class TransContextManager
     /**
      * Get the minimal timestamp of running readonly or non-readonly transactions.
      * This method does not acquire a lock as it only reads a snapshot of the current running transactions.
-     * @param readOnly readonly trans or not
-     * @return the minimal transaction time stamp
+     * @param readOnly readonly transaction or not
+     * @return the minimal timestamp of running transactions, or negative if there is no running transactions
      */
     public long getMinRunningTransTimestamp(boolean readOnly)
     {
@@ -306,11 +462,36 @@ public class TransContextManager
         {
             iterator = this.runningWriteTrans.iterator();
         }
-        if (iterator.hasNext())
+        while (iterator.hasNext())
         {
-            return iterator.next().getTimestamp();
+            TransContext ctx = iterator.next();
+
+            // Only skip read-only transactions that have already been offloaded.
+            if (readOnly && ctx.isOffloaded())
+            {
+                continue;
+            }
+            return ctx.getTimestamp();
         }
-        return 0;
+        return -1;
+    }
+
+    /**
+     * This method does not acquire a lock as it backed by atomic variable read.
+     * @param readOnly readonly transaction or not
+     * @return the max timestamp of terminated transactions, or negative if there is no transactions terminated since
+     * this {@link TransContextManager} instance is created
+     */
+    public long getMaxTerminatedTransTimestamp(boolean readOnly)
+    {
+        if (readOnly)
+        {
+            return this.maxTermedReadonlyTransTs.get();
+        }
+        else
+        {
+            return this.maxTermedWriteTransTs.get();
+        }
     }
 
     public TransContext getTransContext(long transId)
@@ -375,5 +556,23 @@ public class TransContextManager
         {
             this.contextLock.writeLock().unlock();
         }
+    }
+
+    /**
+     * Mark a transaction as offloaded. This allows the transaction context manager to
+     * skip it when calculating the minimum running transaction timestamp.
+     * 
+     * @param transId the transaction id
+     * @return true if the transaction exists and was marked as offloaded, false otherwise
+     */
+    public boolean markTransOffloaded(long transId)
+    {
+        TransContext context = this.transIdToContext.get(transId);
+        if (context != null)
+        {
+            context.setOffloaded(true);
+            return true;
+        }
+        return false;
     }
 }

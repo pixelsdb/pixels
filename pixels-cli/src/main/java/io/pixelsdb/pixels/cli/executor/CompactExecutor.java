@@ -214,18 +214,21 @@ public class CompactExecutor implements CommandExecutor
         while (!compactExecutor.awaitTermination(100, TimeUnit.SECONDS));
         metadataService.addFiles(compactFiles);
 
-        Iterator<File> fileIterator = compactFiles.iterator();
-        Iterator<Path> pathIterator = compactPaths.iterator();
-        while (fileIterator.hasNext() && pathIterator.hasNext())
+        if (retinaService.isEnabled())
         {
-            File file = fileIterator.next();
-            Path path = pathIterator.next();
-            try
+            Iterator<File> fileIterator = compactFiles.iterator();
+            Iterator<Path> pathIterator = compactPaths.iterator();
+            while (fileIterator.hasNext() && pathIterator.hasNext())
             {
-                retinaService.addVisibility(File.getFilePath(path, file));
-            } catch (RetinaException e)
-            {
-                System.out.println("add visibility for compact file '" + file + "' failed");
+                File file = fileIterator.next();
+                Path path = pathIterator.next();
+                try
+                {
+                    retinaService.addVisibility(File.getFilePath(path, file));
+                } catch (RetinaException e)
+                {
+                    System.out.println("add visibility for compact file '" + file + "' failed");
+                }
             }
         }
 

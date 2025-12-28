@@ -31,6 +31,7 @@ import io.pixelsdb.pixels.common.physical.Scheduler;
 import io.pixelsdb.pixels.common.physical.SchedulerFactory;
 import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -57,7 +58,7 @@ import java.util.concurrent.CompletableFuture;
 public class PixelsRecordReaderImpl implements PixelsRecordReader
 {
     private static final Logger logger = LogManager.getLogger(PixelsRecordReaderImpl.class);
-    private final RetinaService retinaService = RetinaService.Instance();
+    private final RetinaService retinaService;
 
     private final PhysicalReader physicalReader;
     private final PixelsProto.PostScript postScript;
@@ -175,6 +176,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.pixelsFooterCache = pixelsFooterCache;
         this.filePath = this.physicalReader.getPath();
         this.includedColumnTypes = new ArrayList<>();
+        this.retinaService = RetinaUtils.getRetinaServiceFromPath(this.filePath);
         // Issue #175: this check is currently not necessary.
         // requireNonNull(TransContextCache.Instance().getQueryTransInfo(this.transId),
         //         "The transaction context does not contain query (trans) id '" + this.transId + "'");
@@ -501,7 +503,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         targetRGNum = targetRGIdx;
 
         // query visibility bitmap of target row groups
-        if (this.option.hasValidTransTimestamp())
+        if (this.option.hasValidTransTimestamp() && retinaService.isEnabled())
         {
             try
             {
@@ -1132,7 +1134,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
                 for (int i = 0; i < curBatchSize; i++)
                 {
                     if ((hiddenTimestampVector == null || hiddenTimestampVector.vector[i] <= this.transTimestamp)
-                        && (!checkBit(rgVisibilityBitmaps[curRGIdx], curRowInRG + i)))
+                        && (rgVisibilityBitmaps == null || !checkBit(rgVisibilityBitmaps[curRGIdx], curRowInRG + i)))
                     {
                         selectedRows.set(i);
                         addedRows++;

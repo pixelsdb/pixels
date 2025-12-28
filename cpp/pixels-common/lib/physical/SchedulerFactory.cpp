@@ -24,9 +24,9 @@
  */
 #include "physical/SchedulerFactory.h"
 
-SchedulerFactory *SchedulerFactory::instance = nullptr;
+SchedulerFactory* SchedulerFactory::instance = nullptr;
 
-SchedulerFactory *SchedulerFactory::Instance()
+SchedulerFactory* SchedulerFactory::Instance()
 {
     if (instance == nullptr)
     {
@@ -35,7 +35,7 @@ SchedulerFactory *SchedulerFactory::Instance()
     return instance;
 }
 
-Scheduler *SchedulerFactory::getScheduler()
+Scheduler* SchedulerFactory::getScheduler()
 {
     return scheduler;
 }

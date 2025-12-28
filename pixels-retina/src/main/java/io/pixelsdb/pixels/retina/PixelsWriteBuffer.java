@@ -19,9 +19,23 @@
  */
 package io.pixelsdb.pixels.retina;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import io.pixelsdb.pixels.common.exception.IndexException;
+import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.index.IndexServiceProvider;
+import io.pixelsdb.pixels.common.index.RowIdAllocator;
+import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
+import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+import io.pixelsdb.pixels.index.IndexProto;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,19 +44,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
-import io.pixelsdb.pixels.common.exception.IndexException;
-import io.pixelsdb.pixels.common.index.IndexServiceProvider;
-import io.pixelsdb.pixels.common.index.RowIdAllocator;
-import io.pixelsdb.pixels.common.metadata.domain.Path;
-import io.pixelsdb.pixels.common.physical.*;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.index.IndexProto;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.core.TypeDescription;
-import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Data flows from the CDC into pixels, where it is first written to
@@ -51,21 +53,21 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
  * for writing data. Once the memTable is full, data is written to an immutable
  * memTable, and multiple immutable memTables can exist. Currently, to simplify
  * the distributed design, the immutable memTable is first written to the shared
- * storage minio, and then the data in minio is dumped to a disk file.
- *  -----        --------------------------------      -------      -----------
- * | CDC | ===> | memTable -> immutable memTable | -> | minio | -> | disk file |
- *  -----        --------------------------------      -------      -----------
+ * storage, and then the data in shared storage is dumped to a disk file.
+ *  -----        --------------------------------      ----------------      -----------
+ * | CDC | ===> | memTable -> immutable memTable | -> | shared storage | -> | disk file |
+ *  -----        --------------------------------      ----------------      -----------
  */
-public class PixelsWriterBuffer
+public class PixelsWriteBuffer
 {
-    private static final Logger logger = LogManager.getLogger(PixelsWriterBuffer.class);
+    private static final Logger logger = LogManager.getLogger(PixelsWriteBuffer.class);
 
     private final long tableId;
 
-    // Column information is recorded to create rowBatch.
+    // column information is recorded to create rowBatch
     private final TypeDescription schema;
 
-    // Configuration information of PixelsWriter
+    // configuration information of PixelsWriter
     private final int memTableSize;
     private final long blockSize;
     private final short replication;
@@ -78,47 +80,61 @@ public class PixelsWriterBuffer
     private final Storage targetCompactStorage;
     private final RowIdAllocator rowIdAllocator;
     /**
-     * Allocate unique identifier for data (MemTable/MinioEntry)
+     * Allocate unique identifier for data (MemTable/ObjectEntry).
      * There is no need to use atomic variables because
      * there are write locks in all concurrent situations.
      */
     private long idCounter = 0L;
 
-    // Active memTable
+    // active memTable
     private MemTable activeMemTable;
 
-    // Wait to refresh to shared storage
+    // wait to refresh to shared storage
     private final List<MemTable> immutableMemTables;
 
     // object storage manager
     private final ObjectStorageManager objectStorageManager;
     private final List<ObjectEntry> objectEntries;
 
-    // Current data view
+    // current data view
     private volatile SuperVersion currentVersion;
 
-    // Backend flush thread
-    private final ExecutorService flushMinioExecutor;
-    private final ScheduledExecutorService flushDiskExecutor;
-    private ScheduledFuture<?> flushDiskFuture;
+    // backend flush thread
+    private final ExecutorService flushObjectExecutor;
+    private final ScheduledExecutorService flushFileExecutor;
+    private ScheduledFuture<?> flushFileFuture;
 
-    // Lock for SuperVersion switch
+    // lock for SuperVersion switch
     private final ReadWriteLock versionLock = new ReentrantReadWriteLock();
 
     private int currentMemTableCount;
-    private final List<FileWriterManager> fileWriterManagers;
+    private final Queue<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
-    private AtomicLong maxObjectKey;
 
-    public PixelsWriterBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
-                              Path targetCompactDirPath) throws RetinaException
+    /**
+     * Issue #1254: Multi-threaded flush
+     * Add `outOfOrderFlushedIds` to store flushed IDs, and `continuousFlushedId`
+     * to represent the maximum value of consecutively flushed IDs.
+     */
+    private AtomicLong continuousFlushedId;
+    private final PriorityQueue<Long> outOfOrderFlushedIds;
+    private final Object flushLock = new Object();
+    private final Object rowLock = new Object();
+
+    private String retinaHostName;
+    private SinglePointIndex index;
+    private final int virtualNodeId;
+
+    public PixelsWriteBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
+                             Path targetCompactDirPath, String retinaHostName, int virtualNode) throws RetinaException
     {
         this.tableId = tableId;
         this.schema = schema;
+        this.virtualNodeId = virtualNode;
 
         ConfigFactory configFactory = ConfigFactory.Instance();
         this.memTableSize = Integer.parseInt(configFactory.getProperty("retina.buffer.memTable.size"));
-        checkArgument(this.memTableSize % 64 == 0,"memTable size must be a multiple of 64.");
+        checkArgument(this.memTableSize % 64 == 0,"MemTable size must be a multiple of 64.");
         this.targetOrderedDirPath = targetOrderedDirPath;
         this.targetCompactDirPath = targetCompactDirPath;
         try
@@ -127,7 +143,6 @@ public class PixelsWriterBuffer
             this.targetCompactStorage = StorageFactory.Instance().getStorage(targetCompactDirPath.getUri());
         } catch (Exception e)
         {
-            logger.error("Failed to get storage", e);
             throw new RetinaException("Failed to get storage", e);
         }
         this.blockSize = Long.parseLong(configFactory.getProperty("block.size"));
@@ -139,19 +154,22 @@ public class PixelsWriterBuffer
         this.immutableMemTables = new ArrayList<>();
         this.objectEntries = new ArrayList<>();
 
-        this.flushMinioExecutor = Executors.newSingleThreadExecutor();
-        this.flushDiskExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.flushObjectExecutor = Executors.newFixedThreadPool(Integer.parseInt(configFactory.getProperty("retina.buffer.object.flush.threads")));
+        this.flushFileExecutor = Executors.newSingleThreadScheduledExecutor();
 
-        this.fileWriterManagers = new ArrayList<>();
-        this.maxObjectKey = new AtomicLong(-1);
+        this.fileWriterManagers = new ConcurrentLinkedQueue<>();
+        this.continuousFlushedId = new AtomicLong(-1);
+        this.outOfOrderFlushedIds = new PriorityQueue<>();
 
+        this.retinaHostName = retinaHostName;
         this.objectStorageManager = ObjectStorageManager.Instance();
+        this.objectStorageManager.setIdPrefix(retinaHostName + "_");
 
         this.currentFileWriterManager = new FileWriterManager(
                 this.tableId, this.schema, this.targetOrderedDirPath,
                 this.targetOrderedStorage, this.memTableSize, this.blockSize,
                 this.replication, this.encodingLevel, this.nullsPadding,
-                idCounter, this.memTableSize * this.maxMemTableCount);
+                idCounter, this.memTableSize * this.maxMemTableCount, retinaHostName, virtualNodeId);
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
                 TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
@@ -159,38 +177,51 @@ public class PixelsWriterBuffer
         this.idCounter++;
         this.currentMemTableCount = 1;
 
-        // Initialization adds reference counts to all data
+        // initialization adds reference counts to all data
         this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
         this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize, IndexServiceProvider.ServiceMode.local);
 
-        startFlushMinioToDiskScheduler(Long.parseLong(configFactory.getProperty("retina.buffer.flush.interval")));
+        startFlushObjectToFileScheduler(Long.parseLong(configFactory.getProperty("retina.buffer.flush.interval")));
     }
 
     /**
-     * values is all column values, add values and timestamp into buffer
+     * Add all column values and timestamp into the buffer.
      *
      * @param values
      * @param timestamp
-     * @return RowID
+     * @param builder
+     * @return the unique row identifier (rowId) allocated for the added row
      */
     public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
     {
         checkArgument(values.length == this.schema.getChildren().size(),
-                "Column values count does not match schema column count");
+                "Column values count does not match schema column count.");
 
         MemTable currentMemTable = null;
         int rowOffset = -1;
+        long rowId = -1;
         while (rowOffset < 0)
         {
             currentMemTable = this.activeMemTable;
             try
             {
-                rowOffset = currentMemTable.add(values, timestamp);
+                synchronized (rowLock)
+                {
+                    // Ensure rgRowOffset and rowId are allocated synchronously to minimize
+                    // fragmentation after MainIndex flush.
+                    rowOffset = currentMemTable.add(values, timestamp);
+                    rowId = rowIdAllocator.getRowId();
+                }
             } catch (NullPointerException e)
             {
                 continue;
+            } catch (IndexException e)
+            {
+                throw new RetinaException("Fail to get rowId from rowIdAllocator", e);
             }
-            if (rowOffset < 0)  // active memTable is full
+
+            // active memTable is full
+            if (rowOffset < 0)
             {
                 switchMemTable();
             }
@@ -203,16 +234,10 @@ public class PixelsWriterBuffer
         builder.setFileId(activeMemTable.getFileId())
                 .setRgId(0)
                 .setRgRowOffset(rgRowOffset);
-        try
-        {
-            return rowIdAllocator.getRowId();
-        } catch (IndexException e)
-        {
-            throw new RetinaException("Fail to get rowId from rowIdAllocator");
-        }
+        return rowId;
     }
 
-    private void switchMemTable()
+    private void switchMemTable() throws RetinaException
     {
         this.versionLock.writeLock().lock();
         try
@@ -232,10 +257,10 @@ public class PixelsWriterBuffer
                         this.targetOrderedDirPath, this.targetOrderedStorage,
                         this.memTableSize, this.blockSize, this.replication,
                         this.encodingLevel, this.nullsPadding, this.idCounter,
-                        this.memTableSize * this.maxMemTableCount);
+                        this.memTableSize * this.maxMemTableCount, this.retinaHostName, virtualNodeId);
             }
 
-            /**
+            /*
              * For activeMemTable, at initialization the reference count is 2 because of *this and superVersion
              * Here only currentVersion is destroyed, *this is still in use, so only one call to unref() is needed.
              */
@@ -253,31 +278,46 @@ public class PixelsWriterBuffer
             this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
             oldVersion.unref();
 
-            triggerFlushToMinio(oldMemTable);
+            triggerFlushToObject(oldMemTable);
         } catch (Exception e)
         {
-            logger.error("Failed to create switch memTable", e);
-            throw new RuntimeException("Failed to create switch memTable", e);
+            throw new RetinaException("Failed to switch memtable", e);
         } finally
         {
             this.versionLock.writeLock().unlock();
         }
     }
 
-    private void triggerFlushToMinio(MemTable flushMemTable)
+    private void triggerFlushToObject(MemTable flushMemTable)
     {
-        flushMinioExecutor.submit(() -> {
+        flushObjectExecutor.submit(() -> {
             try
             {
-                // put into minio
+                // put into object storage
                 long id = flushMemTable.getId();
-                this.objectStorageManager.write(this.tableId, id, flushMemTable.serialize());
+                this.objectStorageManager.write(this.tableId, virtualNodeId, id, flushMemTable.serialize());
 
                 ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getFileId(),
                         flushMemTable.getStartIndex(), flushMemTable.getLength());
                 objectEntry.ref();
 
-                this.maxObjectKey.updateAndGet(current -> Math.max(current, id));
+                // update watermark
+                synchronized (flushLock)
+                {
+                    long nextId = continuousFlushedId.get() + 1;
+                    if (id == nextId)
+                    {
+                        continuousFlushedId.incrementAndGet();
+                        while (!outOfOrderFlushedIds.isEmpty() && outOfOrderFlushedIds.peek() == continuousFlushedId.get() + 1)
+                        {
+                            outOfOrderFlushedIds.poll();
+                            continuousFlushedId.incrementAndGet();
+                        }
+                    } else
+                    {
+                        outOfOrderFlushedIds.add(id);
+                    }
+                }
 
                 // update SuperVersion
                 versionLock.writeLock().lock();
@@ -295,20 +335,20 @@ public class PixelsWriterBuffer
                 {
                     versionLock.writeLock().unlock();
                 }
+
+                // unref in the end
+                flushMemTable.unref();
             } catch (Exception e)
             {
-                throw new RuntimeException("Failed to flush to minio ", e);
-            } finally
-            {
-                flushMemTable.unref();  // unref in the end
+                // TODO: Retry on failure.
+                logger.error("Failed to flush memTable to shared storage, memTableId={}", flushMemTable.getId(), e);
             }
         });
     }
 
     /**
-     * get current version
-     * caller must call unref()
-     * @return
+     * Get the current version.
+     * Caller must call unref().
      */
     public SuperVersion getCurrentVersion()
     {
@@ -325,19 +365,30 @@ public class PixelsWriterBuffer
 
     /**
      * Determine whether the last data block managed by fileWriterManager has
-     * been written to minio. If it has been written, execute the file write
+     * been written to Object. If it has been written, execute the file write
      * operation and delete the corresponding ObjectEntry in the unified view.
      */
-    private void startFlushMinioToDiskScheduler(long intervalSeconds)
+    private void startFlushObjectToFileScheduler(long intervalSeconds)
     {
-        this.flushDiskFuture = this.flushDiskExecutor.scheduleWithFixedDelay(() -> {
+        this.flushFileFuture = this.flushFileExecutor.scheduleWithFixedDelay(() -> {
             try
             {
+                if(index == null)
+                {
+                    try
+                    {
+                        index = MetadataService.Instance().getPrimaryIndex(tableId);
+                    } catch (MetadataException ignored)
+                    {
+                        logger.warn("There isn't primary index on table {}", tableId);
+                    }
+                }
+
                 Iterator<FileWriterManager> iterator = this.fileWriterManagers.iterator();
                 while (iterator.hasNext())
                 {
                     FileWriterManager fileWriterManager = iterator.next();
-                    if (fileWriterManager.getLastBlockId() <= this.maxObjectKey.get())
+                    if (fileWriterManager.getLastBlockId() <= this.continuousFlushedId.get())
                     {
                         CompletableFuture<Void> finished = fileWriterManager.finish();
                         iterator.remove();
@@ -358,59 +409,69 @@ public class PixelsWriterBuffer
                         this.versionLock.writeLock().unlock();
 
                         finished.get();
+                        if(index != null)
+                        {
+                            IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local)
+                                    .flushIndexEntriesOfFile(tableId, index.getId(), fileWriterManager.getFileId(), true);
+                        }
                         for (ObjectEntry objectEntry : toRemove)
                         {
                             if (objectEntry.unref())
                             {
-                                this.objectStorageManager.delete(this.tableId, objectEntry.getId());
+                                this.objectStorageManager.delete(this.tableId, virtualNodeId, objectEntry.getId());
                             }
                         }
                     }
                 }
             } catch (Exception e)
             {
-                throw new RuntimeException(e);
+                logger.error("Failed to flush data to disk", e);
             }
         }, 0, intervalSeconds, TimeUnit.SECONDS);
     }
 
     /**
-     * collect resources
-     *
-     * @throws RetinaException
+     * Gracefully close the writer buffer, ensuring all in-memory data is persisted.
      */
     public void close() throws RetinaException
     {
         // First, shut down the flush process to prevent changes to the data view.
-        this.flushMinioExecutor.shutdown();
+        this.flushObjectExecutor.shutdown();
         try
         {
-            this.flushMinioExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            if (!this.flushObjectExecutor.awaitTermination(60, TimeUnit.SECONDS))
+            {
+                this.flushObjectExecutor.shutdownNow();
+            }
         } catch (InterruptedException e)
         {
-            logger.error("Failed to shutdown flushMinioExecutor", e);
+            this.flushObjectExecutor.shutdownNow();
             Thread.currentThread().interrupt();
+            throw new RetinaException("Close process was interrupted while waiting for flushObjectExecutor", e);
         }
-        if (this.flushDiskFuture != null)
+        if (this.flushFileFuture != null)
         {
-            this.flushDiskFuture.cancel(false);
+            this.flushFileFuture.cancel(false);
         }
-        this.flushDiskExecutor.shutdown();
+        this.flushFileExecutor.shutdown();
         try
         {
-            this.flushDiskExecutor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            if (!this.flushFileExecutor.awaitTermination(60, TimeUnit.SECONDS))
+            {
+                this.flushFileExecutor.shutdownNow();
+            }
         } catch (InterruptedException e)
         {
-            logger.error("Failed to shutdown flushDiskExecutor", e);
+            this.flushFileExecutor.shutdownNow();
             Thread.currentThread().interrupt();
+            throw new RetinaException("Close process was interrupted while waiting for flushDiskExecutor", e);
         }
 
         SuperVersion sv = getCurrentVersion();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
-
         try
         {
-            long maxObjectKey = this.maxObjectKey.get();
+            long maxObjectKey = this.continuousFlushedId.get();
 
             // process current fileWriterManager
             this.currentFileWriterManager.setLastBlockId(maxObjectKey);
@@ -434,7 +495,7 @@ public class PixelsWriterBuffer
                 firstBlockId = fileWriterManager.getFirstBlockId();
                 long lastBlockId = fileWriterManager.getLastBlockId();
 
-                // all written to minio
+                // all written to object
                 if (lastBlockId <= maxObjectKey)
                 {
                     futures.add(fileWriterManager.finish());
@@ -453,14 +514,23 @@ public class PixelsWriterBuffer
                         }
                     }
 
-                    // elements in minio will be processed in finish() later
+                    // elements in object will be processed in finish() later
                     fileWriterManager.setLastBlockId(maxObjectKey);
                     futures.add(fileWriterManager.finish());
                 }
             }
+
+            CompletableFuture<Void> all = CompletableFuture.allOf(
+                    futures.toArray(new CompletableFuture[0])
+            );
+            all.get(15, TimeUnit.SECONDS);
+        } catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+            throw new RetinaException("Data persistence was interrupted during close", e);
         } catch (Exception e)
         {
-            logger.error("Error in close: ", e);
+            throw new RetinaException("Failed to persist data during close operation. Data may be lost", e);
         } finally
         {
             sv.unref();
@@ -471,21 +541,10 @@ public class PixelsWriterBuffer
                 immutableMemTable.unref();
             }
 
-            CompletableFuture<Void> all = CompletableFuture.allOf(
-                    futures.toArray(new CompletableFuture[0])
-            );
-            try
-            {
-                all.get();
-            } catch (InterruptedException | ExecutionException e)
-            {
-                logger.error("Error in close: ", e);
-            }
-
             for (ObjectEntry objectEntry : sv.getObjectEntries())
             {
                 objectEntry.unref();
-                this.objectStorageManager.delete(this.tableId, objectEntry.getId());
+                this.objectStorageManager.delete(this.tableId, virtualNodeId, objectEntry.getId());
             }
         }
     }

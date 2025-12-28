@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.index;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -66,7 +67,7 @@ public class MainIndexFactory
         }
         if (!providerExists)
         {
-            throw new MainIndexException("no main index provider exists for enabled scheme " + enabledScheme.name());
+            throw new MainIndexException("No main index provider exists for enabled scheme " + enabledScheme.name());
         }
     }
 
@@ -81,7 +82,7 @@ public class MainIndexFactory
                 if (instance == null)
                 {
                     instance = new MainIndexFactory();
-                    Runtime.getRuntime().addShutdownHook(new Thread(() ->
+                    ShutdownHookManager.Instance().registerShutdownHook(MainIndexFactory.class, false, () ->
                     {
                         try
                         {
@@ -91,7 +92,7 @@ public class MainIndexFactory
                             logger.error("Failed to close all main index instances.", e);
                             e.printStackTrace();
                         }
-                    }));
+                    });
                 }
             }
         }
@@ -152,7 +153,7 @@ public class MainIndexFactory
             catch (IOException e)
             {
                 throw new MainIndexException(
-                        "failed to close main index of table " + tableId, e);
+                        "Failed to close main index of table " + tableId, e);
             }
         }
         mainIndexImpls.clear();
@@ -183,7 +184,7 @@ public class MainIndexFactory
             catch (IOException e)
             {
                 throw new MainIndexException(
-                        "failed to close main index of table " + tableId, e);
+                        "Failed to close main index of table " + tableId, e);
             }
         }
     }

@@ -49,8 +49,8 @@ public class TestFlushObject
     {
         try
         {
-            retinaResourceManager.addWriterBuffer(schemaName, tableName_1);
-            retinaResourceManager.addWriterBuffer(schemaName, tableName_2);
+            retinaResourceManager.addWriteBuffer(schemaName, tableName_1);
+            retinaResourceManager.addWriteBuffer(schemaName, tableName_2);
         } catch (RetinaException e)
         {
             throw new RuntimeException("Failed to setup RetinaResourceManager", e);
@@ -103,7 +103,7 @@ public class TestFlushObject
                 try
                 {
                     byte[][] row = rowSupplier.get();
-                    retinaResourceManager.insertRecord(schemaName, tableName, row, 0);
+                    retinaResourceManager.insertRecord(schemaName, tableName, row, 0, 0);
                 } catch (RetinaException e)
                 {
                     System.out.println("Error inserting record into table " + tableName + ": " + e.getMessage());

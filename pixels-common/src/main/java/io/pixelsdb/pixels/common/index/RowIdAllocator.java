@@ -51,8 +51,19 @@ public class RowIdAllocator
         this.indexService = IndexServiceProvider.getService(mode);
     }
 
+    public RowIdAllocator(long tableId, int batchSize, IndexService indexService)
+    {
+        if (batchSize <= 0)
+        {
+            throw new IllegalArgumentException("batchSize must be positive.");
+        }
+        this.tableId = tableId;
+        this.batchSize = batchSize;
+        this.indexService = indexService;
+    }
+
     /**
-     * get a unique rowId
+     * Get a unique rowId.
      * @return
      * @throws IndexException
      */
@@ -80,7 +91,7 @@ public class RowIdAllocator
                 this.tableId, this.batchSize);
         if (newBatch == null || newBatch.getLength() <= 0)
         {
-            throw new IndexException("failed to get row id batch");
+            throw new IndexException("Failed to get row id batch");
         }
         this.currentBatchStart = newBatch.getRowIdStart();
         this.currentBatchLength = newBatch.getLength();

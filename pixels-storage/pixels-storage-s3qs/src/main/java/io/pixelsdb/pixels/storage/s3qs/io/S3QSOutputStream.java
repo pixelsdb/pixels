@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.storage.s3qs.io;
 
 import io.pixelsdb.pixels.common.physical.FixSizedBuffers;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.storage.s3.io.DirectRequestBody;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -71,7 +72,7 @@ public class S3QSOutputStream extends OutputStream
     static
     {
         fixSizedBuffers = new FixSizedBuffers(S3QS_BUFFER_SIZE);
-        Runtime.getRuntime().addShutdownHook(new Thread(fixSizedBuffers::clear));
+        ShutdownHookManager.Instance().registerShutdownHook(S3QSOutputStream.class, true, fixSizedBuffers::clear);
     }
 
     public S3QSOutputStream(S3Client s3Client, String bucket, String key, int bufferSize)

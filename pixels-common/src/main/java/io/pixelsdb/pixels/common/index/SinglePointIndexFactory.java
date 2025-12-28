@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -60,7 +61,7 @@ public class SinglePointIndexFactory
         requireNonNull(value, "enabled.single.point.index.schemes is not configured");
         String[] schemeNames = value.trim().split(",");
         checkArgument(schemeNames.length > 0,
-                "at lease one single point index scheme must be enabled");
+                "at least one single point index scheme must be enabled");
 
         ImmutableMap.Builder<SinglePointIndex.Scheme, SinglePointIndexProvider> providersBuilder = ImmutableMap.builder();
         ServiceLoader<SinglePointIndexProvider> providerLoader = ServiceLoader.load(SinglePointIndexProvider.class);
@@ -98,8 +99,7 @@ public class SinglePointIndexFactory
                 if (instance == null)
                 {
                     instance = new SinglePointIndexFactory();
-                    Runtime.getRuntime().addShutdownHook(new Thread(()->
-                    {
+                    ShutdownHookManager.Instance().registerShutdownHook(SinglePointIndexFactory.class, false, () -> {
                         try
                         {
                             instance.closeAll();
@@ -109,7 +109,7 @@ public class SinglePointIndexFactory
                             logger.error("Failed to close all single point index instances.", e);
                             e.printStackTrace();
                         }
-                    }));
+                    });
                 }
             }
         }

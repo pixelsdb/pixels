@@ -33,14 +33,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-public class TestPixelsWriterBuffer
+public class TestPixelsWriteBuffer
 {
     private List<String> columnNames = new ArrayList<>();
     private List<String> columnTypes = new ArrayList<>();
     private TypeDescription schema;
     Path targetOrderDirPath;
     Path targetCompactDirPath;
-    PixelsWriterBuffer buffer;
+    PixelsWriteBuffer buffer;
     @Before
     public void setup()
     {
@@ -58,7 +58,7 @@ public class TestPixelsWriterBuffer
             columnTypes.add("int");
 
             schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
-            buffer = new PixelsWriterBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath);  // table id get from mysql `TBLS` table
+            buffer = new PixelsWriteBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath, "localhost", 0);  // table id get from mysql `TBLS` table
         } catch (Exception e)
         {
             System.out.println("setup error: " + e);

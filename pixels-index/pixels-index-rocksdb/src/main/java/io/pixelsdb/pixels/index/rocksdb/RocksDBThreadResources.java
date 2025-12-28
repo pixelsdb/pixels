@@ -19,6 +19,8 @@
  */
 package io.pixelsdb.pixels.index.rocksdb;
 
+import io.pixelsdb.pixels.common.index.ThreadId;
+import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import org.rocksdb.ReadOptions;
 
 import java.nio.ByteBuffer;
@@ -55,7 +57,8 @@ final class RocksDBThreadResources
     static
     {
         // Release resources when the process is shutting down.
-        Runtime.getRuntime().addShutdownHook(new Thread(RocksDBThreadResources::release));
+        ShutdownHookManager.Instance().registerShutdownHook(
+                RocksDBThreadResources.class, false, RocksDBThreadResources::release);
     }
 
     private RocksDBThreadResources() { }
@@ -134,13 +137,9 @@ final class RocksDBThreadResources
     static ByteBuffer getValueBuffer()
     {
         ThreadId threadId = threadIds.get();
-        ByteBuffer valueBuffer = threadValueBuffers.get(threadId);
         // no need to add a lock as concurrent threads have unique thread ids
-        if (valueBuffer == null)
-        {
-            valueBuffer = ByteBuffer.allocateDirect(VALUE_LENGTH);
-            threadValueBuffers.put(threadId, valueBuffer);
-        }
+        ByteBuffer valueBuffer = threadValueBuffers.computeIfAbsent(threadId,
+                k -> ByteBuffer.allocateDirect(VALUE_LENGTH));
         valueBuffer.position(0);
         valueBuffer.limit(VALUE_LENGTH);
         return valueBuffer;
@@ -155,34 +154,5 @@ final class RocksDBThreadResources
         threadKeyBuffers2.clear();
         threadKeyBuffers3.clear();
         threadKeyBuffers4.clear();
-    }
-
-    private static class ThreadId implements Comparable<ThreadId>
-    {
-        private final long threadId;
-
-        public ThreadId()
-        {
-            this.threadId = Thread.currentThread().getId();
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            ThreadId that = (ThreadId) obj;
-            return this.threadId == that.threadId;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Long.hashCode(threadId);
-        }
-
-        @Override
-        public int compareTo(ThreadId that)
-        {
-            return Long.compare(this.threadId, that.threadId);
-        }
     }
 }

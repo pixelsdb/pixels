@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.planner.coordinate;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
-import io.pixelsdb.pixels.common.task.Lease;
+import io.pixelsdb.pixels.common.lease.Lease;
 import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -55,12 +55,12 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                                StreamObserver<TurboProto.RegisterWorkerResponse> responseObserver)
     {
         CFWorkerInfo workerInfo = new CFWorkerInfo(request.getWorkerInfo());
-        Lease lease = new Lease(WorkerLeasePeriodMs, System.currentTimeMillis());
+        Lease lease = new Lease(System.currentTimeMillis(), WorkerLeasePeriodMs);
         long workerId = CFWorkerManager.Instance().createWorkerId();
         Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, 0, workerInfo);
         CFWorkerManager.Instance().registerCFWorker(worker);
-        log.debug("register worker, local address: " + workerInfo.getIp() + ", transId: " + workerInfo.getTransId()
-                + ", stageId: " + workerInfo.getStageId() + ", workerId: " + workerId);
+        log.debug("register worker, local address: {}, transId: {}, stageId: {}, workerId: {}",
+                workerInfo.getIp(), workerInfo.getTransId(), workerInfo.getStageId(), workerId);
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
         requireNonNull(planCoordinator, "plan coordinator is not found");
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
@@ -68,7 +68,7 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         stageCoordinator.addWorker(worker);
         TurboProto.RegisterWorkerResponse response = TurboProto.RegisterWorkerResponse.newBuilder()
                 .setErrorCode(SUCCESS).setWorkerId(workerId).setWorkerPortIndex(worker.getWorkerPortIndex()).setLeasePeriodMs(lease.getPeriodMs())
-                .setLeaseStartTimeMs(lease.getStartTimeMs()).build();
+                .setLeaseStartTimeMs(lease.getStartMs()).build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

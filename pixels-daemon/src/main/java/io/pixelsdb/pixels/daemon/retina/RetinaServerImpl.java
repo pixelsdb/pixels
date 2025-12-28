@@ -64,6 +64,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         this.retinaResourceManager = RetinaResourceManager.Instance();
         try
         {
+            logger.info("Pre-loading checkpoints...");
+            this.retinaResourceManager.recoverCheckpoints();
+
             List<Schema> schemas = this.metadataService.getSchemas();
             for (Schema schema : schemas)
             {
@@ -76,7 +79,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     {
                         if (layout.isReadable())
                         {
-                            /**
+                            /*
                              * Issue #946: always add visibility to all files
                              */
                             // add visibility for ordered files
@@ -101,9 +104,10 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         this.retinaResourceManager.addVisibility(filePath);
                     }
 
-                    this.retinaResourceManager.addWriterBuffer(schema.getName(), table.getName());
+                    this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
                 }
             }
+            this.retinaResourceManager.finishRecovery();
         } catch (Exception e)
         {
             logger.error("Error while initializing RetinaServerImpl", e);
@@ -125,6 +129,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .build());
         } catch (RetinaException | IndexException e)
         {
+            logger.error("updateRecord failed for schema={}", request.getSchemaName(), e);
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build())
@@ -159,28 +164,28 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("error processing streaming update (retina): {}", e);
+                    logger.error("Error processing streaming update (retina)", e);
                 } catch (IndexException e)
                 {
                     headerBuilder.setErrorCode(2).setErrorMsg("Index: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("error processing streaming update (index): {}", e);
+                    logger.error("Error processing streaming update (index)", e);
                 } catch (Exception e)
                 {
                     headerBuilder.setErrorCode(3).setErrorMsg("Internal error: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("unexpected error processing streaming update: {}", e);
+                    logger.error("Unexpected error processing streaming update", e);
                 } catch (Throwable t)
                 {
                     headerBuilder.setErrorCode(4).setErrorMsg("Fatal error: " + t.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
-                    logger.error("fatal error processing streaming update: {}", t);
+                    logger.error("Fatal error processing streaming update", t);
                 }
             }
 
@@ -388,7 +393,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                         IndexProto.PrimaryIndexEntry.Builder builder =
                                 this.retinaResourceManager.insertRecord(schemaName, tableName,
-                                        colValuesByteArray, timestamp);
+                                        colValuesByteArray, timestamp, request.getVirtualNodeId());
                         builder.setIndexKey(insertData.getIndexKeys(0));
                         IndexProto.PrimaryIndexEntry entry = builder.build();
                         primaryIndexEntries.add(entry);
@@ -452,7 +457,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                         IndexProto.PrimaryIndexEntry.Builder builder =
                                 this.retinaResourceManager.insertRecord(schemaName, tableName,
-                                        colValuesByteArray, timestamp);
+                                        colValuesByteArray, timestamp, request.getVirtualNodeId());
 
                         builder.setIndexKey(updateData.getIndexKeys(0));
                         IndexProto.PrimaryIndexEntry entry = builder.build();
@@ -529,6 +534,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             long fileId = request.getFileId();
             int[] rgIds = request.getRgIdsList().stream().mapToInt(Integer::intValue).toArray();
             long timestamp = request.getTimestamp();
+            long transId = request.hasTransId() ? request.getTransId() : -1;
 
             RetinaProto.QueryVisibilityResponse.Builder responseBuilder = RetinaProto.QueryVisibilityResponse
                     .newBuilder()
@@ -536,7 +542,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
             for (int rgId : rgIds)
             {
-                long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp);
+                long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp, transId);
                 RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
                         .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
                         .build();
@@ -586,23 +592,23 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     @Override
-    public void addWriterBuffer(RetinaProto.AddWriterBufferRequest request,
-                                StreamObserver<RetinaProto.AddWriterBufferResponse> responseObserver)
+    public void addWriteBuffer(RetinaProto.AddWriteBufferRequest request,
+                                StreamObserver<RetinaProto.AddWriteBufferResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
         try
         {
-            this.retinaResourceManager.addWriterBuffer(request.getSchemaName(), request.getTableName());
+            this.retinaResourceManager.addWriteBuffer(request.getSchemaName(), request.getTableName());
 
-            RetinaProto.AddWriterBufferResponse response = RetinaProto.AddWriterBufferResponse.newBuilder()
+            RetinaProto.AddWriteBufferResponse response = RetinaProto.AddWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.AddWriterBufferResponse.newBuilder()
+            responseObserver.onNext(RetinaProto.AddWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
             responseObserver.onCompleted();
@@ -610,16 +616,16 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     @Override
-    public void getWriterBuffer(RetinaProto.GetWriterBufferRequest request,
-                                StreamObserver<RetinaProto.GetWriterBufferResponse> responseObserver)
+    public void getWriteBuffer(RetinaProto.GetWriteBufferRequest request,
+                                StreamObserver<RetinaProto.GetWriteBufferResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
         try
         {
-            RetinaProto.GetWriterBufferResponse.Builder response = this.retinaResourceManager.getWriterBuffer(
-                    request.getSchemaName(), request.getTableName(), request.getTimestamp());
+            RetinaProto.GetWriteBufferResponse.Builder response = this.retinaResourceManager.getWriteBuffer(
+                    request.getSchemaName(), request.getTableName(), request.getTimestamp(), request.getVirtualNodeId());
             response.setHeader(headerBuilder);
 
             responseObserver.onNext(response.build());
@@ -627,9 +633,59 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         } catch (RetinaException e)
         {
             headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
-            responseObserver.onNext(RetinaProto.GetWriterBufferResponse.newBuilder()
+            responseObserver.onNext(RetinaProto.GetWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void registerOffload(RetinaProto.RegisterOffloadRequest request,
+                                StreamObserver<RetinaProto.RegisterOffloadResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            this.retinaResourceManager.registerOffload(request.getTimestamp());
+            responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } catch (RetinaException e)
+        {
+            logger.error("registerOffload failed for timestamp={}",
+                    request.getTimestamp(), e);
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } finally
+        {
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void unregisterOffload(RetinaProto.UnregisterOffloadRequest request,
+                                  StreamObserver<RetinaProto.UnregisterOffloadResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        try
+        {
+            this.retinaResourceManager.unregisterOffload(request.getTimestamp());
+            responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } catch (Exception e)
+        {
+            logger.error("unregisterOffload failed for timestamp={}",
+                    request.getTimestamp(), e);
+            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
+                    .setHeader(headerBuilder.build()).build());
+        } finally
+        {
             responseObserver.onCompleted();
         }
     }
@@ -639,7 +695,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
      *
      * @param paths the order or compact paths from pixels metadata.
      */
-    public static void validateOrderedOrCompactPaths(List<Path> paths)
+    public static void validateOrderedOrCompactPaths(List<Path> paths) throws RetinaException
     {
         requireNonNull(paths, "paths is null");
         checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
@@ -655,7 +711,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             }
         } catch (Throwable e)
         {
-            throw new RuntimeException("failed to parse storage scheme from paths", e);
+            throw new RetinaException("Failed to parse storage scheme from paths", e);
         }
     }
 
