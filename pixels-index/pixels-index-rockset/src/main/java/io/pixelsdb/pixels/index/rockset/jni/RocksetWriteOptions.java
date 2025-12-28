@@ -9,15 +9,15 @@ public class RocksetWriteOptions extends RocksetHandle
 
     public static RocksetWriteOptions create()
     {
-        return new RocksetWriteOptions(nativeCreate());
+        return new RocksetWriteOptions(newWriteOptions());
     }
 
     @Override
     public void close()
     {
-        nativeRelease(nativeHandle);
+        disposeInternalJni(nativeHandle);
     }
 
-    private static native long nativeCreate();
-    private static native void nativeRelease(long handle);
+    private static native long newWriteOptions();
+    private static native void disposeInternalJni(long handle);
 }

@@ -79,16 +79,25 @@ add_dependencies(RocksDB::rocksdb rocksdb_cloud)
 include_directories(
     ${JNI_INCLUDE_DIRS}              # JNI headers (jni.h, jni_md.h)
     ${ROCKSDB_CLOUD_INCLUDE_DIR}     # RocksDB-Cloud headers
-    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/jni
 )
 
-# 8. Build pixels-index-rockset shared library
-set(SOURCES
-    lib/RocksetJni.cpp
+# 8. Collect all JNI cpp files
+file(GLOB ROCKSET_JNI_SOURCES
+    ${CMAKE_SOURCE_DIR}/lib/jni/*.cpp
 )
-add_library(pixels-index-rockset SHARED ${SOURCES})
 
-# 9. Link RocksDB and its dependencies
+message(STATUS "Rockset JNI sources: ${ROCKSET_JNI_SOURCES}")
+
+
+# 9. Build pixels-index-rockset shared library
+add_library(pixels-index-rockset SHARED
+    ${ROCKSET_JNI_SOURCES}
+)
+
+add_dependencies(pixels-index-rockset rocksdb_cloud)
+
+# 10. ink RocksDB and its dependencies
 target_link_libraries(pixels-index-rockset
     RocksDB::rocksdb
     z
@@ -97,6 +106,6 @@ target_link_libraries(pixels-index-rockset
     dl
 )
 
-# 10. install pixels-index-rockset to ${PIXELS_HOME}/lib
+# 11. Install pixels-index-rockset to ${PIXELS_HOME}/lib
 install(TARGETS pixels-index-rockset
         LIBRARY DESTINATION ${PIXELS_HOME}/lib)

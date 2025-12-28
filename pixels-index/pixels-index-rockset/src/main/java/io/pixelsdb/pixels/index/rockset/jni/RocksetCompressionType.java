@@ -1,6 +1,5 @@
 package io.pixelsdb.pixels.index.rockset.jni;
 
-import org.rocksdb.CompressionType;
 
 public enum RocksetCompressionType {
     NO_COMPRESSION((byte)0, (String)null, "kNoCompression"),

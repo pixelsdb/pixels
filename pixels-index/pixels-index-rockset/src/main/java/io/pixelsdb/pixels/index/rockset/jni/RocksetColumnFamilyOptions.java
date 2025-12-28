@@ -7,10 +7,8 @@ public final class RocksetColumnFamilyOptions implements AutoCloseable
 
     public RocksetColumnFamilyOptions()
     {
-        this.nativeHandle = nativeCreate();
+        this.nativeHandle = newColumnFamilyOptions();
     }
-
-    private static native long nativeCreate();
 
     long handle()
     {
@@ -82,8 +80,12 @@ public final class RocksetColumnFamilyOptions implements AutoCloseable
         return this;
     }
     @Override
-    public native void close();
+    public void close()
+    {
+        disposeInternalJni(this.nativeHandle);
+    }
 
+    private static native long newColumnFamilyOptions();
     private static native void nativeSetWriteBufferSize(long var0, long var2) throws IllegalArgumentException;
     private static native void nativeSetMaxWriteBufferNumber(long var0, int var2);
     private static native void nativeSetMinWriteBufferNumberToMerge(long var0, int var2);
@@ -97,4 +99,5 @@ public final class RocksetColumnFamilyOptions implements AutoCloseable
     private static native void nativeSetCompressionType(long var0, byte var2);
     private static native void nativeSetBottommostCompressionType(long var0, byte var2);
     private static native void nativeSetCompactionStyle(long var0, byte var2);
+    private static native void disposeInternalJni(long var0);
 }

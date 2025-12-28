@@ -9,7 +9,7 @@ public final class RocksetDBOptions extends RocksetHandle
 
     public static RocksetDBOptions create()
     {
-        return new RocksetDBOptions(nativeCreate());
+        return new RocksetDBOptions(newDBOptions());
     }
 
     public RocksetDBOptions setCreateIfMissing(boolean value)
@@ -68,12 +68,11 @@ public final class RocksetDBOptions extends RocksetHandle
 
     public void close()
     {
-        nativeRelease(nativeHandle);
+        disposeInternalJni(nativeHandle);
     }
 
-    private static native long nativeCreate();
-    private static native void nativeRelease(long handle);
-
+    private static native long newDBOptions();
+    private static native void disposeInternalJni(long handle);
     private static native void nativeSetCreateIfMissing(long handle, boolean value);
     private static native void nativeSetCreateMissingColumnFamilies(long handle, boolean value);
     private static native void nativeSetMaxBackgroundFlushes(long handle, int value);
