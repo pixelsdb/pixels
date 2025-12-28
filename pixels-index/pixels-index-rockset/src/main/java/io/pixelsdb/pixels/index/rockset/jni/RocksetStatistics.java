@@ -7,10 +7,11 @@ public final class RocksetStatistics implements AutoCloseable
 
     public RocksetStatistics()
     {
-        this.nativeHandle = nativeCreate();
+        this.nativeHandle = newStatisticsInstance();
     }
 
-    private static native long nativeCreate();
+    private static native long newStatisticsInstance();
+    private static native void disposeInternalJni(long var0);
 
     long handle()
     {
@@ -18,5 +19,8 @@ public final class RocksetStatistics implements AutoCloseable
     }
 
     @Override
-    public native void close();
+    public void close()
+    {
+        disposeInternalJni(nativeHandle);
+    }
 }

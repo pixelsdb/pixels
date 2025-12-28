@@ -1,5 +1,8 @@
 package io.pixelsdb.pixels.index.rockset.jni;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 public class RocksetColumnFamilyHandle extends RocksetHandle
 {
     private final RocksetDB rocksetDB;
@@ -16,17 +19,15 @@ public class RocksetColumnFamilyHandle extends RocksetHandle
         this.rocksetDB = rocksetDB;
     }
 
-//    public static RocksetColumnFamilyHandle create()
-//    {
-//        return new RocksetColumnFamilyHandle(nativeCreate());
-//    }
+    protected final void disposeInternal(long var1) {
+        disposeInternalJni(var1);
+    }
+
+    private static native void disposeInternalJni(long var0);
 
     @Override
     public void close()
     {
-        nativeRelease(nativeHandle);
+        this.disposeInternal(this.nativeHandle);
     }
-
-//    private static native long nativeCreate();
-    private static native void nativeRelease(long handle);
 }

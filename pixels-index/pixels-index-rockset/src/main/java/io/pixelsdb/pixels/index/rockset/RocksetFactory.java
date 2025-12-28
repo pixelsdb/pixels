@@ -15,14 +15,18 @@ import java.util.stream.Collectors;
 
 public class RocksetFactory
 {
-    private static final RocksetFactoryStub stub = new RocksetFactoryStub();
     private static final String dbPath = ConfigFactory.Instance().getProperty("index.rockset.data.path");
     private static final boolean multiCF = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rocksdb.multicf"));
     private static RocksetDB rocksetDB;
-
     private static RocksetCache blockCache;
     private static final long blockCacheCapacity = Long.parseLong(ConfigFactory.Instance().getProperty("index.rocksdb.block.cache.capacity"));
     private static final int blockCacheShardBits = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.block.cache.shard.bits"));
+    private static final String bucketName = ConfigFactory.Instance().getProperty("index.rockset.s3.bucket");
+    private static final String s3Prefix = ConfigFactory.Instance().getProperty("index.rockset.s3.prefix");
+    private static final String localDbPath = ConfigFactory.Instance().getProperty("index.rockset.local.data.path");
+    private static final String persistentCachePath = ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.path");
+    private static final long persistentCacheSizeGB = Long.parseLong(ConfigFactory.Instance().getProperty("index.rockset.persistent.cache.size.gb"));
+    private static final boolean readOnly = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.read.only"));
     /**
      * The reference counter.
      */
@@ -32,13 +36,20 @@ public class RocksetFactory
 
     private RocksetFactory() { }
 
+    private static RocksetEnv createRocksetEnv()
+    {
+        CloudDBOptions dbOptions = new CloudDBOptions().setBucketName(bucketName).setS3Prefix(s3Prefix)
+                .setLocalDbPath(localDbPath).setPersistentCachePath(persistentCachePath)
+                .setPersistentCacheSizeGB(persistentCacheSizeGB).setReadOnly(readOnly);
+        return RocksetEnv.create(dbOptions.getBucketName(),dbOptions.getS3Prefix());
+    }
     private static RocksetDB createRocksetDB()
     {
         // 1. Get existing column families (returns empty list for new database)
         List<byte[]> existingColumnFamilies;
         try
         {
-            existingColumnFamilies = stub.listColumnFamilies0(dbPath);
+            existingColumnFamilies = RocksetDB.listColumnFamilies0(dbPath);
         } catch (Exception e)
         {
             // For new database, return list containing only default column family
@@ -95,8 +106,8 @@ public class RocksetFactory
                     .setStatsDumpPeriodSec(statsInterval)
                     .setDbLogDir(statsPath);
         }
-
-        RocksetDB db = RocksetDB.open(options, dbPath, descriptors, handles);
+        RocksetEnv rocksetEnv = createRocksetEnv();
+        RocksetDB db = RocksetDB.open(rocksetEnv, options, dbPath, descriptors, handles);
 
         // 5. Save handles for reuse
         for (int i = 0; i < descriptors.size(); i++)
@@ -162,7 +173,7 @@ public class RocksetFactory
         }
 
         RocksetDB db = getRocksetDB();
-        RocksetColumnFamilyHandle handle = stub.createColumnFamily(db.handle(), cfName.getBytes(StandardCharsets.UTF_8));
+        RocksetColumnFamilyHandle handle = db.createColumnFamily(cfName.getBytes(StandardCharsets.UTF_8));
         cfHandles.put(cfName, handle);
         return handle;
     }
@@ -193,7 +204,7 @@ public class RocksetFactory
             }
             cfHandles.clear();
             // Add closing logic for your native database
-            stub.closeNativeDatabase(rocksetDB);
+            rocksetDB.close();
             rocksetDB = null;
         }
     }

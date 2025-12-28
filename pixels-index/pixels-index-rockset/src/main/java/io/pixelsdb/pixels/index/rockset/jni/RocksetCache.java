@@ -1,7 +1,7 @@
 package io.pixelsdb.pixels.index.rockset.jni;
 
 
-public abstract class RocksetCache implements AutoCloseable
+public abstract class RocksetCache
 {
     protected final long nativeHandle;
 
@@ -15,6 +15,5 @@ public abstract class RocksetCache implements AutoCloseable
         return nativeHandle;
     }
 
-    @Override
-    public abstract void close();
+    public abstract void close(long var1);
 }

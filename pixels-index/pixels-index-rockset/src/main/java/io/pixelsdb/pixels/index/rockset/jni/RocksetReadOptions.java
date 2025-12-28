@@ -9,16 +9,20 @@ public class RocksetReadOptions extends RocksetHandle
 
     public static RocksetReadOptions create()
     {
-        return new RocksetReadOptions(nativeCreate());
+        return new RocksetReadOptions(newReadOptions());
     }
 
+    public RocksetReadOptions setPrefixSameAsStart(boolean var1) {
+        setPrefixSameAsStart(this.nativeHandle, var1);
+        return this;
+    }
     @Override
     public void close()
     {
-        nativeRelease(nativeHandle);
+        disposeInternalJni(nativeHandle);
     }
 
-    private static native long nativeCreate();
-    private static native void nativeRelease(long handle);
-    public native long setPrefixSameAsStart(boolean isTrue);
+    private static native long newReadOptions();
+    private static native void disposeInternalJni(long var0);
+    private native void setPrefixSameAsStart(long var0, boolean isTrue);
 }
