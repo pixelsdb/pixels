@@ -29,6 +29,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 inline uint64_t makeDeleteIndex(uint8_t rowId, uint64_t ts) {
     return (static_cast<uint64_t>(rowId) << 56 | (ts & 0x00FFFFFFFFFFFFFFULL));
@@ -48,6 +49,41 @@ struct DeleteIndexBlock {
     std::atomic<DeleteIndexBlock *> next{nullptr};
 };
 
+/**
+ * VersionedData - A versioned snapshot of the base state
+ * Used for Copy-on-Write during garbage collection
+ * IMPORTANT: head is part of the version to ensure atomic visibility
+ */
+struct VersionedData {
+    uint64_t baseBitmap[4];
+    uint64_t baseTimestamp;
+    DeleteIndexBlock* head;  // Delete chain head, part of the version
+    
+    VersionedData() : baseTimestamp(0), head(nullptr) {
+        baseBitmap[0] = baseBitmap[1] = baseBitmap[2] = baseBitmap[3] = 0;
+    }
+    
+    VersionedData(uint64_t ts, const uint64_t bitmap[4], DeleteIndexBlock* h)
+        : baseTimestamp(ts), head(h) {
+        baseBitmap[0] = bitmap[0];
+        baseBitmap[1] = bitmap[1];
+        baseBitmap[2] = bitmap[2];
+        baseBitmap[3] = bitmap[3];
+    }
+};
+
+/**
+ * RetiredVersion - Tracks a retired version for epoch-based reclamation
+ */
+struct RetiredVersion {
+    VersionedData* data;
+    DeleteIndexBlock* blocksToDelete;  // Head of the chain to delete
+    uint64_t retireEpoch;
+    
+    RetiredVersion(VersionedData* d, DeleteIndexBlock* b, uint64_t e)
+        : data(d), blocksToDelete(b), retireEpoch(e) {}
+};
+
 class TileVisibility {
   public:
     TileVisibility();
@@ -61,11 +97,12 @@ class TileVisibility {
     TileVisibility(const TileVisibility &) = delete;
     TileVisibility &operator=(const TileVisibility &) = delete;
 
-    uint64_t baseBitmap[4];
-    uint64_t baseTimestamp;
-    std::atomic<DeleteIndexBlock *> head;
+    void reclaimRetiredVersions();
+    
+    std::atomic<VersionedData*> currentVersion;
     std::atomic<DeleteIndexBlock *> tail;
     std::atomic<size_t> tailUsed;
+    std::vector<RetiredVersion> retired;  // Protected by GC (single writer)
 };
 
 #endif // PIXELS_RETINA_TILE_VISIBILITY_H
