@@ -121,8 +121,7 @@ public final class S3QS extends AbstractS3
 
 
     //TODO: GC for files, objects and sqs.
-    //TODO(DONE): can modify the timeout that message keep invisible for other thread
-    //TODO: allow independent invisible time config
+    //TODO: allow separated invisible timeout config
     //producers in a shuffle offer their message to s3qs.
     public PhysicalWriter offer(S3QueueMessage mesg) throws IOException
     {
@@ -190,11 +189,12 @@ public final class S3QS extends AbstractS3
 
     /**
     @return including writer and recipthanle(to sign a mesg in sqs).
-    3 situation :closed(exception) / not ready or timeout or endinput(null) / succeed(writer)
+    3 situation :closed(exception) / not ready or timeout or stopInput(null) / succeed(writer)
      */
     public Map.Entry<String,PhysicalReader> poll(S3QueueMessage mesg, int timeoutSec) throws IOException
     {
         S3Queue queue = PartitionMap.get(mesg.getPartitionNum());
+        // queue close means consumer don't need to listen from it
         if(queue.isClosed()) throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
         if(queue == null) return null;
 
@@ -217,11 +217,6 @@ public final class S3QS extends AbstractS3
             //clean up
         }
 
-//        PhysicalReader reader = pair.getValue();
-//        if(Objects.equals(reader.getPath(), "")) {
-//            queue.stopInput();
-//            return null; //comeback later. Maybe there are some message failed and return queue
-//        }
         queue.addConsumer(mesg.getWorkerNum());
         return pair;
     }
@@ -234,8 +229,6 @@ public final class S3QS extends AbstractS3
         String receiptHandle = mesg.getReceiptHandle();
         S3Queue queue = PartitionMap.get(mesg.getPartitionNum());
 
-        // queue close means consumer don't need to listen from it
-        //if(queue.isClosed()) throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
 
         if(queue == null) {
             //queue not exist: an error, or a timeout worker

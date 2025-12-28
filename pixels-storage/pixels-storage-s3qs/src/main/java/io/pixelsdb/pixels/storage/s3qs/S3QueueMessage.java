@@ -19,7 +19,7 @@ public class S3QueueMessage
         this.timestamp = System.currentTimeMillis();
     }
 
-    // getter 和 setter 方法（JSON 库需要）
+
     public String getObjectPath() {
         return objectPath;
     }

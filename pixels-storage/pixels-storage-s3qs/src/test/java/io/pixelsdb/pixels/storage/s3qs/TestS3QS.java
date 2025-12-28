@@ -39,7 +39,7 @@ public class TestS3QS
 
 
     @Test
-    public void TestReader() throws IOException, InterruptedException, ExecutionException
+    public void TestWriterAndReader() throws IOException, InterruptedException, ExecutionException
     {
         S3QS s3qs = (S3QS) StorageFactory.Instance().getStorage(Storage.Scheme.s3qs);
         Future<?> future = this.executor.submit(() -> {

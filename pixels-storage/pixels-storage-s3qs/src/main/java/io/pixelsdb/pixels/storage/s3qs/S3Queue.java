@@ -78,7 +78,7 @@ public class S3Queue implements Closeable
 
     private boolean closed = false;
 
-    private boolean stopinput = false;
+    private boolean stopInput = false;
 
     private int invisibleTime;
 
@@ -271,12 +271,12 @@ public class S3Queue implements Closeable
 
     public void stopInput()
     {
-        this.stopinput = true;
+        this.stopInput = true;
     }
 
     public boolean getStopInput()
     {
-        return this.stopinput;
+        return this.stopInput;
     }
 
     @Override
