@@ -186,6 +186,7 @@ public class PixelsWriterStreamImpl implements PixelsWriter
         private EncodingLevel builderEncodingLevel = EncodingLevel.EL0;
         private boolean builderPartitioned = false;
         private boolean builderNullsPadding = false;
+        private PhysicalWriter fsWriter = null;
         private Optional<List<Integer>> builderPartKeyColumnIds = Optional.empty();
 
         // added compared to PixelsWriterImpl
@@ -256,6 +257,11 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             this.builderNullsPadding = nullsPadding;
             return this;
         }
+        public Builder setPhysicalWriter(PhysicalWriter fsWriter)
+        {
+            this.fsWriter = fsWriter;
+            return this;
+        }
 
         public Builder setEncodingLevel(EncodingLevel encodingLevel)
         {
@@ -305,16 +311,17 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                             (this.builderPartKeyColumnIds.isPresent() && !this.builderPartKeyColumnIds.get().isEmpty()),
                     "partition column ids are present while partitioned is false, or vice versa");
 
-            PhysicalWriter fsWriter;
-            try
+            PhysicalWriter fsWriter = this.fsWriter;
+            if (fsWriter == null)
             {
-                fsWriter = PhysicalWriterUtil.newPhysicalWriter(
-                        this.builderStorage, this.builderFilePath, null);
-            } catch (IOException e)
-            {
-                LOGGER.error("Failed to create PhysicalWriter");
-                throw new PixelsWriterException(
-                        "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
+                try {
+                    fsWriter = PhysicalWriterUtil.newPhysicalWriter(
+                            this.builderStorage, this.builderFilePath, null);
+                } catch (IOException e) {
+                    LOGGER.error("Failed to create PhysicalWriter");
+                    throw new PixelsWriterException(
+                            "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
+                }
             }
 
             if (fsWriter == null)
