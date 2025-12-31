@@ -362,8 +362,6 @@ public class PixelsWriterImpl implements PixelsWriter
                 }
             }
 
-
-
             return new PixelsWriterImpl(
                     builderSchema,
                     builderHasHiddenColumn,
