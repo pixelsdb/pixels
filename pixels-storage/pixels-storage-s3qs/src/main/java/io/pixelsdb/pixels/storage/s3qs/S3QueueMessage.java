@@ -1,5 +1,10 @@
 package io.pixelsdb.pixels.storage.s3qs;
 
+/**
+ * Unified message format for communication between worker and s3qs.
+ * @author yanhaoting
+ * @create 2025-12-19
+ */
 public class S3QueueMessage
 {
     private String objectPath;
@@ -10,7 +15,6 @@ public class S3QueueMessage
     private long timestamp = System.currentTimeMillis();
     private String metadata = "";
 
-    // 无参构造函数
     public S3QueueMessage() {
     }
 
@@ -18,7 +22,6 @@ public class S3QueueMessage
         this.objectPath = objectPath;
         this.timestamp = System.currentTimeMillis();
     }
-
 
     public String getObjectPath() {
         return objectPath;

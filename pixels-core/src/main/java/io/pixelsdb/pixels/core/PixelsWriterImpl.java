@@ -219,6 +219,7 @@ public class PixelsWriterImpl implements PixelsWriter
         private boolean builderPartitioned = false;
         private boolean builderNullsPadding = false;
         private Optional<List<Integer>> builderPartKeyColumnIds = Optional.empty();
+        private PhysicalWriter builderPhysicalWriter = null;
 
         private Builder()
         {
@@ -227,6 +228,12 @@ public class PixelsWriterImpl implements PixelsWriter
         public Builder setSchema(TypeDescription schema)
         {
             this.builderSchema = requireNonNull(schema);
+            return this;
+        }
+
+        public Builder setPhysicalWriter(PhysicalWriter writer)
+        {
+            this.builderPhysicalWriter = requireNonNull(writer);
             return this;
         }
 
@@ -336,25 +343,26 @@ public class PixelsWriterImpl implements PixelsWriter
         {
             requireNonNull(this.builderStorage, "storage is not set");
             requireNonNull(this.builderFilePath, "file path is not set");
-            PhysicalWriter fsWriter = null;
-            try
-            {
-                fsWriter = PhysicalWriterUtil.newPhysicalWriter(
-                        this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
-                        this.builderBlockPadding, this.builderOverwrite);
-            } catch (IOException e)
-            {
-                LOGGER.error("Failed to create PhysicalWriter");
-                throw new PixelsWriterException(
-                        "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
+
+            if(this.builderPhysicalWriter == null){
+                try {
+                    this.builderPhysicalWriter = PhysicalWriterUtil.newPhysicalWriter(
+                            this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
+                            this.builderBlockPadding, this.builderOverwrite);
+                } catch (IOException e) {
+                    LOGGER.error("Failed to create PhysicalWriter");
+                    throw new PixelsWriterException(
+                            "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
+                }
+                if (this.builderPhysicalWriter == null)
+                {
+                    LOGGER.error("Failed to create PhysicalWriter");
+                    throw new PixelsWriterException(
+                            "Failed to create PixelsWriter due to error of creating PhysicalWriter");
+                }
             }
 
-            if (fsWriter == null)
-            {
-                LOGGER.error("Failed to create PhysicalWriter");
-                throw new PixelsWriterException(
-                        "Failed to create PixelsWriter due to error of creating PhysicalWriter");
-            }
+
 
             return new PixelsWriterImpl(
                     builderSchema,
@@ -364,7 +372,7 @@ public class PixelsWriterImpl implements PixelsWriter
                     builderCompressionKind,
                     builderCompressionBlockSize,
                     builderTimeZone,
-                    fsWriter,
+                    builderPhysicalWriter,
                     builderEncodingLevel,
                     builderNullsPadding,
                     builderPartitioned,

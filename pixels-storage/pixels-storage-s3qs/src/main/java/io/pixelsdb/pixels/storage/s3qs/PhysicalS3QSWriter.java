@@ -119,7 +119,8 @@ public class PhysicalS3QSWriter implements PhysicalWriter
         try
         {
             this.out.close();
-            if (this.queue != null && !this.queue.isClosed()) {
+            if (this.queue != null && !this.queue.isClosed())
+            {
                 this.queue.push(this.pathStr);
             }
         }catch (IOException e){

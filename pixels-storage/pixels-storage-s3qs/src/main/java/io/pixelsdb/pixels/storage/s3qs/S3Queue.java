@@ -184,7 +184,7 @@ public class S3Queue implements Closeable
 
                             String countStr = message.attributes().get(APPROXIMATE_RECEIVE_COUNT);
                             if (countStr == null) {
-                                // 如果没有返回，可能是没有请求该属性或消息不存在该属性
+                                // If no value is returned, it may be because the property was not requested or the message does not contain that property.
                                 throw new TaskErrorException("ApproximateReceiveCount not returned");
                             } else {
                                 int count = Integer.parseInt(countStr);

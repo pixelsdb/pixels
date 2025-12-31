@@ -62,7 +62,6 @@ public final class S3QS extends AbstractS3
     private final HashMap<Integer, S3Queue> PartitionMap;
     private final int invisibleTime;
 
-
     private SqsClient sqs;
 
     public S3QS()
@@ -114,11 +113,11 @@ public final class S3QS extends AbstractS3
 
     public void addProducer(int workerId)
     {
-        if(!(this.producerSet).contains(workerId)){
+        if(!(this.producerSet).contains(workerId))
+        {
             this.producerSet.add(workerId);
         }
     }
-
 
     //TODO: GC for files, objects and sqs.
     //TODO: allow separated invisible timeout config
@@ -131,12 +130,14 @@ public final class S3QS extends AbstractS3
         if(!(this.PartitionSet).contains(mesg.getPartitionNum()))
         {
             String queueUrl = "";
-            try {
+            try
+            {
                 queueUrl = createQueue(sqs,invisibleTime,
                         mesg.getPartitionNum()+"-"+
                                 (String.valueOf(System.currentTimeMillis()))
                 );
-            }catch (SqsException e) {
+            }catch (SqsException e)
+            {
                 //TODO: if name is duplicated in aws try again later
                 throw new IOException(e);
             }
@@ -159,7 +160,6 @@ public final class S3QS extends AbstractS3
 
     private static String createQueue(SqsClient sqsClient,int invisibleTime, String queueName) {
         try {
-            //System.out.println("\nCreate Queue");
 
             CreateQueueRequest createQueueRequest = CreateQueueRequest.builder()
                     .queueName(queueName)
@@ -169,8 +169,6 @@ public final class S3QS extends AbstractS3
                     .build();
 
             sqsClient.createQueue(createQueueRequest);
-
-            //System.out.println("\nGet queue url");
 
             GetQueueUrlResponse getQueueUrlResponse = sqsClient
                     .getQueueUrl(GetQueueUrlRequest.builder().queueName(queueName).build());

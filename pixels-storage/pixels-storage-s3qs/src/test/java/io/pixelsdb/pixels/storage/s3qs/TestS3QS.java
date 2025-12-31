@@ -37,7 +37,6 @@ public class TestS3QS
 {
     private final ExecutorService executor = Executors.newFixedThreadPool(2);
 
-
     @Test
     public void TestWriterAndReader() throws IOException, InterruptedException, ExecutionException
     {
@@ -67,6 +66,7 @@ public class TestS3QS
 
             System.out.println("write finished in " + (System.currentTimeMillis() - startTime) + " ms");
 
+            startTime = System.currentTimeMillis();
             for (int i = 0; i < 3; i++)
             {
                 S3QueueMessage body = new S3QueueMessage()
@@ -105,8 +105,7 @@ public class TestS3QS
                 }
             }
 
-
-            System.out.println("write finished in " + (System.currentTimeMillis() - startTime) + " ms");
+            System.out.println("read finished in " + (System.currentTimeMillis() - startTime) + " ms");
             try
             {
                 s3qs.refresh();
@@ -118,9 +117,8 @@ public class TestS3QS
         });
 
         try {
-            future.get();  // 等待任务完成并获取可能的异常
+            future.get();
         } catch (ExecutionException e) {
-            // 打印真实的异常堆栈
             //e.getCause().printStackTrace();
             throw e;
         }
@@ -128,57 +126,6 @@ public class TestS3QS
         this.executor.shutdown();
         this.executor.awaitTermination(100, TimeUnit.HOURS);
     }
-
-//    @Deprecated
-//    @Test
-//    public void testWriter() throws IOException, InterruptedException, ExecutionException
-//    {
-//        S3QS s3qs = (S3QS) StorageFactory.Instance().getStorage(Storage.Scheme.s3qs);
-//        S3Queue queue = s3qs.openQueue("https://sqs.us-east-2.amazonaws.com/970089764833/pixels-shuffle");
-//
-//        Future<?> future = this.executor.submit(() -> {
-//            byte[] buffer = new byte[8 * 1024 * 1024];
-//            long startTime = System.currentTimeMillis();
-//            for (int i = 0; i < 2; i++)
-//            {
-//                S3QueueMessage body = new S3QueueMessage()
-//                        .setObjectPath("pixels-turbo-intermediate/shuffle/" + i + "/")
-//                        .setPartitionNum(2)
-//                        .setEndwork(false);
-//                try (PhysicalWriter writer = queue.offer(body))
-//                {
-//                    writer.append(buffer);
-//                    System.out.println("Wrote partition " + i);  // 添加日志
-//                }
-//                catch (IOException e)
-//                {
-//                    System.err.println("Error in iteration " + i + ": " + e.getMessage());
-//                    throw new RuntimeException(e);
-//                }
-//            }
-//            System.out.println("write finished in " + (System.currentTimeMillis() - startTime) + " ms");
-//            try
-//            {
-//                queue.close();
-//            }
-//            catch (IOException e)
-//            {
-//                throw new RuntimeException(e);
-//            }
-//        });
-//
-//        try {
-//            future.get();  // 等待任务完成并获取可能的异常
-//        } catch (ExecutionException e) {
-//            // 打印真实的异常堆栈
-//            e.getCause().printStackTrace();
-//            throw e;
-//        }
-//
-//        this.executor.shutdown();
-//        this.executor.awaitTermination(100, TimeUnit.HOURS);
-//    }
-//}
 
     @Test
     public void testWriter() throws IOException, InterruptedException, ExecutionException
@@ -219,9 +166,8 @@ public class TestS3QS
         });
 
         try {
-            future.get();  // 等待任务完成并获取可能的异常
+            future.get();
         } catch (ExecutionException e) {
-            // 打印真实的异常堆栈
             //e.getCause().printStackTrace();
             throw e;
         }
@@ -229,6 +175,7 @@ public class TestS3QS
         this.executor.shutdown();
         this.executor.awaitTermination(100, TimeUnit.HOURS);
     }
+
     @Test
     public void testMultiSQSWriter() throws IOException, InterruptedException, ExecutionException
     {
@@ -259,9 +206,8 @@ public class TestS3QS
         });
 
         try {
-            future.get();  // 等待任务完成并获取可能的异常
+            future.get();
         } catch (ExecutionException e) {
-            // 打印真实的异常堆栈
             e.getCause().printStackTrace();
             throw e;
         }
@@ -277,5 +223,4 @@ public class TestS3QS
         this.executor.shutdown();
         this.executor.awaitTermination(100, TimeUnit.HOURS);
     }
-
 }
