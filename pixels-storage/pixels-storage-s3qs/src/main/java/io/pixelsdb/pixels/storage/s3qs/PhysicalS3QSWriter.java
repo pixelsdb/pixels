@@ -123,7 +123,9 @@ public class PhysicalS3QSWriter implements PhysicalWriter
             {
                 this.queue.push(this.pathStr);
             }
-        }catch (IOException e){
+        }
+        catch (IOException e)
+        {
             throw e;
         }
     }

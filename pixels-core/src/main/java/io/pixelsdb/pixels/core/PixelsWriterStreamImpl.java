@@ -314,10 +314,13 @@ public class PixelsWriterStreamImpl implements PixelsWriter
             PhysicalWriter fsWriter = this.fsWriter;
             if (fsWriter == null)
             {
-                try {
+                try
+                {
                     fsWriter = PhysicalWriterUtil.newPhysicalWriter(
                             this.builderStorage, this.builderFilePath, null);
-                } catch (IOException e) {
+                }
+                catch (IOException e)
+                {
                     LOGGER.error("Failed to create PhysicalWriter");
                     throw new PixelsWriterException(
                             "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
@@ -604,7 +607,8 @@ public class PixelsWriterStreamImpl implements PixelsWriter
                 columnWriters[i] = newColumnWriter(children.get(i), columnWriterOption);
             }
             physicalWriter.flush();
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             LOGGER.error(e.getMessage());
             throw e;
