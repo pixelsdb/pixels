@@ -15,10 +15,12 @@ public class S3QueueMessage
     private long timestamp = System.currentTimeMillis();
     private String metadata = "";
 
-    public S3QueueMessage() {
+    public S3QueueMessage()
+    {
     }
 
-    public S3QueueMessage(String objectPath) {
+    public S3QueueMessage(String objectPath)
+    {
         this.objectPath = objectPath;
         this.timestamp = System.currentTimeMillis();
     }
@@ -27,7 +29,8 @@ public class S3QueueMessage
         return objectPath;
     }
 
-    public S3QueueMessage setObjectPath(String objectPath) {
+    public S3QueueMessage setObjectPath(String objectPath)
+    {
         this.objectPath = objectPath;
         return this;
     }
@@ -36,7 +39,8 @@ public class S3QueueMessage
         return this.workerNum;
     }
 
-    public S3QueueMessage setWorkerNum(int WorkerNum) {
+    public S3QueueMessage setWorkerNum(int WorkerNum)
+    {
         this.workerNum = WorkerNum;
         return this;
     }
@@ -45,7 +49,8 @@ public class S3QueueMessage
         return this.partitionNum;
     }
 
-    public S3QueueMessage setPartitionNum(int PartitionNum) {
+    public S3QueueMessage setPartitionNum(int PartitionNum)
+    {
         this.partitionNum = PartitionNum;
         return this;
     }
@@ -54,7 +59,8 @@ public class S3QueueMessage
         return this.endWork;
     }
 
-    public S3QueueMessage setEndwork(boolean endwork) {
+    public S3QueueMessage setEndwork(boolean endwork)
+    {
         this.endWork = endwork;
         return this;
     }
@@ -63,7 +69,8 @@ public class S3QueueMessage
         return this.receiptHandle;
     }
 
-    public S3QueueMessage setReceiptHandle(String ReceiptHandle) {
+    public S3QueueMessage setReceiptHandle(String ReceiptHandle)
+    {
         this.receiptHandle = ReceiptHandle;
         return this;
     }
@@ -72,7 +79,8 @@ public class S3QueueMessage
         return timestamp;
     }
 
-    public S3QueueMessage setTimestamp(long timestamp) {
+    public S3QueueMessage setTimestamp(long timestamp)
+    {
         this.timestamp = timestamp;
         return this;
     }
@@ -81,7 +89,8 @@ public class S3QueueMessage
         return metadata;
     }
 
-    public S3QueueMessage setMetadata(String metadata) {
+    public S3QueueMessage setMetadata(String metadata)
+    {
         this.metadata = metadata;
         return this;
     }

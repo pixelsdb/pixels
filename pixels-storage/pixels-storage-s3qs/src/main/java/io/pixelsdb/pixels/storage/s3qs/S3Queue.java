@@ -183,10 +183,13 @@ public class S3Queue implements Closeable
                             this.s3PathQueue.add(new AbstractMap.SimpleEntry<>(path, receiptHandle));
 
                             String countStr = message.attributes().get(APPROXIMATE_RECEIVE_COUNT);
-                            if (countStr == null) {
+                            if (countStr == null)
+                            {
                                 // If no value is returned, it may be because the property was not requested or the message does not contain that property.
                                 throw new TaskErrorException("ApproximateReceiveCount not returned");
-                            } else {
+                            }
+                            else
+                            {
                                 int count = Integer.parseInt(countStr);
                                 // because we can only promise two receipts can be handled
                                 if (count > 2) throw new TaskErrorException("Dead message occurred");
@@ -229,7 +232,8 @@ public class S3Queue implements Closeable
             SendMessageRequest request = SendMessageRequest.builder()
                     .queueUrl(queueUrl).messageBody(objectPath).build();
             sqsClient.sendMessage(request);
-        }catch (Exception e)
+        }
+        catch (Exception e)
         {
             throw new IOException("sqs: fail to send message.",e);
         }

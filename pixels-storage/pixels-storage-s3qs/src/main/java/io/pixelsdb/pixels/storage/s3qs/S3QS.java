@@ -136,7 +136,8 @@ public final class S3QS extends AbstractS3
                         mesg.getPartitionNum()+"-"+
                                 (String.valueOf(System.currentTimeMillis()))
                 );
-            }catch (SqsException e)
+            }
+            catch (SqsException e)
             {
                 //TODO: if name is duplicated in aws try again later
                 throw new IOException(e);
@@ -146,7 +147,9 @@ public final class S3QS extends AbstractS3
                 queue = openQueue(queueUrl);
                 PartitionSet.add(mesg.getPartitionNum());
                 PartitionMap.put(mesg.getPartitionNum(), queue);
-            } else{
+            }
+            else
+            {
                 throw new IOException("create new queue failed.");
             }
         }
@@ -159,7 +162,8 @@ public final class S3QS extends AbstractS3
     }
 
     private static String createQueue(SqsClient sqsClient,int invisibleTime, String queueName) {
-        try {
+        try
+        {
 
             CreateQueueRequest createQueueRequest = CreateQueueRequest.builder()
                     .queueName(queueName)
@@ -174,7 +178,9 @@ public final class S3QS extends AbstractS3
                     .getQueueUrl(GetQueueUrlRequest.builder().queueName(queueName).build());
             return getQueueUrlResponse.queueUrl();
 
-        } catch (SqsException e) {
+        }
+        catch (SqsException e)
+        {
             throw new RuntimeException("fail to create sqs queue: " + queueName, e);
         }
     }
@@ -200,18 +206,26 @@ public final class S3QS extends AbstractS3
         //issue: dead message maybe only handle twice, I think that's reasonable
         //TODO(OUT-OF-DATE): once a message dead, push it in dead message queue. when delete a message, delete
         Map.Entry<String,PhysicalReader> pair = null;
-        try{
-            if (queue.getStopInput()) {
+        try
+        {
+            if (queue.getStopInput())
+            {
                 pair = queue.poll(queue.getInvisibleTime());
-                if (pair == null) { // no more message
+                if (pair == null)
+                {
+                    // no more message
                     queue.close(); //logical close, no effect to consumers
                     return null; //come back later and find queue is closed
                 }
-            } else {
+            }
+            else
+            {
                 pair = queue.poll(timeoutSec);
                 if (pair == null) return null; //upstream is working, come back later
             }
-        }catch (TaskErrorException e) {
+        }
+        catch (TaskErrorException e)
+        {
             //clean up
         }
 
@@ -228,13 +242,17 @@ public final class S3QS extends AbstractS3
         S3Queue queue = PartitionMap.get(mesg.getPartitionNum());
 
 
-        if(queue == null) {
+        if(queue == null)
+        {
             //queue not exist: an error, or a timeout worker
             throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
         }
-        try {
+        try
+        {
             queue.deleteMessage(receiptHandle);
-        }catch (SqsException e) {
+        }
+        catch (SqsException e)
+        {
             //TODO: log
             return 2;
         }
@@ -244,14 +262,17 @@ public final class S3QS extends AbstractS3
         // thus, we can check which part of task failed in sqs.
         if(queue.removeConsumer(mesg.getWorkerNum()) && queue.isClosed())
         {
-            try {
+            try
+            {
                 DeleteQueueRequest deleteQueueRequest = DeleteQueueRequest.builder()
                         .queueUrl(queue.getQueueUrl())
                         .build();
 
                 sqs.deleteQueue(deleteQueueRequest);
 
-            } catch (SqsException e) {
+            }
+            catch (SqsException e)
+            {
                 // TODO： log
                 return 1;
             }
@@ -314,7 +335,8 @@ public final class S3QS extends AbstractS3
     @Override
     public void close() throws IOException
     {
-        for (S3Queue queue : PartitionMap.values()){
+        for (S3Queue queue : PartitionMap.values())
+        {
             queue.close();
         }
         this.producerSet.clear();
@@ -332,7 +354,8 @@ public final class S3QS extends AbstractS3
 
     public void refresh() throws IOException
     {
-        for (S3Queue queue : PartitionMap.values()){
+        for (S3Queue queue : PartitionMap.values())
+        {
             queue.close();
         }
         this.producerSet.clear();

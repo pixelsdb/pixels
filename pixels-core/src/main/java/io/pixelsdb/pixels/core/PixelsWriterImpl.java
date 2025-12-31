@@ -344,12 +344,16 @@ public class PixelsWriterImpl implements PixelsWriter
             requireNonNull(this.builderStorage, "storage is not set");
             requireNonNull(this.builderFilePath, "file path is not set");
 
-            if(this.builderPhysicalWriter == null){
-                try {
+            if(this.builderPhysicalWriter == null)
+            {
+                try
+                {
                     this.builderPhysicalWriter = PhysicalWriterUtil.newPhysicalWriter(
                             this.builderStorage, this.builderFilePath, this.builderBlockSize, this.builderReplication,
                             this.builderBlockPadding, this.builderOverwrite);
-                } catch (IOException e) {
+                }
+                catch (IOException e)
+                {
                     LOGGER.error("Failed to create PhysicalWriter");
                     throw new PixelsWriterException(
                             "Failed to create PixelsWriter due to error of creating PhysicalWriter", e);
@@ -361,8 +365,6 @@ public class PixelsWriterImpl implements PixelsWriter
                             "Failed to create PixelsWriter due to error of creating PhysicalWriter");
                 }
             }
-
-
 
             return new PixelsWriterImpl(
                     builderSchema,
