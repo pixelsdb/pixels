@@ -53,7 +53,10 @@ fi
 # Sync retina node
 # ---------------------------
 if [[ -f "$PIXELS_HOME/etc/retina" ]]; then
-    read -r retina home < "$PIXELS_HOME/etc/retina"
-    sync_node_lib "$retina" "$home"
+    while read -r retina home; do
+        # Skip empty lines or comments
+        [[ -z "$retina" || "$retina" =~ ^# ]] && continue
+        sync_node_lib "$retina" "$home"
+    done < "$PIXELS_HOME/etc/retina"
 fi
 
