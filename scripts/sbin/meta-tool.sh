@@ -73,9 +73,9 @@ ETCD_FILE=""
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --etcd-dir) ETCD_DATA_DIR="$2"; shift ;;
-        -e|--etcd-tmp-dir) ETCD_TMP_DIR="$2"; shift ;;
+        --etcd-tmp-dir) ETCD_TMP_DIR="$2"; shift ;;
         -m|--db-file) DB_FILE="$2"; shift ;;
-        --etcd-file) ETCD_FILE="$2"; shift ;;
+        -e|--etcd-file) ETCD_FILE="$2"; shift ;;
         *) echo "Unknown parameter: $1"; exit 1 ;;
     esac
     shift
