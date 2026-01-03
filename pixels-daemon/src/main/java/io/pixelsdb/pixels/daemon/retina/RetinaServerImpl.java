@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.daemon.retina;
 
 import com.google.common.base.Function;
+import com.google.common.util.concurrent.Striped;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.IndexException;
@@ -37,6 +38,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -53,6 +55,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     private final MetadataService metadataService;
     private final IndexService indexService;
     private final RetinaResourceManager retinaResourceManager;
+    private final Striped<Lock> updateLocks = Striped.lock(1024);
 
     /**
      * Initialize the visibility management for all the records.
@@ -111,6 +114,31 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         } catch (Exception e)
         {
             logger.error("Error while initializing RetinaServerImpl", e);
+        }
+    }
+
+    /**
+     * Check if the order or compact paths from pixels metadata is valid.
+     *
+     * @param paths the order or compact paths from pixels metadata.
+     */
+    public static void validateOrderedOrCompactPaths(List<Path> paths) throws RetinaException
+    {
+        requireNonNull(paths, "paths is null");
+        checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
+        try
+        {
+            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths.get(0).getUri());
+            assert firstScheme != null;
+            for (int i = 1; i < paths.size(); ++i)
+            {
+                Storage.Scheme scheme = Storage.Scheme.fromPath(paths.get(i).getUri());
+                checkArgument(firstScheme.equals(scheme),
+                        "all the directories in the paths must have the same storage scheme");
+            }
+        } catch (Throwable e)
+        {
+            throw new RetinaException("Failed to parse storage scheme from paths", e);
         }
     }
 
@@ -205,83 +233,15 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     /**
-     * A memory-efficient, read-only view that represents the transposed version of a list of objects.
-     * This class implements the List interface but does not store the transposed data explicitly.
-     * Instead, it computes the transposed data on-the-fly when accessed.
-     */
-    private static class TransposedIndexKeyView<T> extends AbstractList<List<IndexProto.IndexKey>>
-    {
-        private final List<T> originalData;
-        private final Function<T, List<IndexProto.IndexKey>> indexExtractor;
-        private final int columnCount;
-
-        public TransposedIndexKeyView(List<T> originalData,
-                Function<T, List<IndexProto.IndexKey>> indexExtractor)
-        {
-            this.originalData = originalData;
-            this.indexExtractor = indexExtractor;
-            if (originalData == null || originalData.isEmpty())
-            {
-                this.columnCount = 0;
-            } else
-            {
-                this.columnCount = indexExtractor.apply(originalData.get(0)).size();
-            }
-        }
-
-        @Override
-        public List<IndexProto.IndexKey> get(int columnIndex)
-        {
-            if (columnIndex < 0 || columnIndex >= columnCount)
-            {
-                throw new IndexOutOfBoundsException("Column index out of bounds: " + columnIndex);
-            }
-            return new ColumnView(columnIndex);
-        }
-
-        @Override
-        public int size()
-        {
-            return columnCount;
-        }
-
-        private class ColumnView extends AbstractList<IndexProto.IndexKey>
-        {
-            private final int columnIndex;
-
-            public ColumnView(int columnIndex)
-            {
-                this.columnIndex = columnIndex;
-            }
-
-            @Override
-            public IndexProto.IndexKey get(int rowIndex)
-            {
-                if (rowIndex < 0 || rowIndex >= originalData.size())
-                {
-                    throw new IndexOutOfBoundsException("Row index out of bounds: " + rowIndex);
-                }
-                return indexExtractor.apply(originalData.get(rowIndex)).get(columnIndex);
-            }
-
-            @Override
-            public int size()
-            {
-                return originalData.size();
-            }
-        }
-    }
-
-
-    /**
      * Transpose the index keys from a row set to a column set.
+     *
      * @param dataList
      * @param indexExtractor
-     * @return
      * @param <T>
+     * @return
      */
     private <T> List<List<IndexProto.IndexKey>> transposeIndexKeys(List<T> dataList,
-            Function<T, List<IndexProto.IndexKey>> indexExtractor)
+                                                                   Function<T, List<IndexProto.IndexKey>> indexExtractor)
     {
         if (dataList == null || dataList.isEmpty())
         {
@@ -325,7 +285,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                     boolean allRecordsValid = deleteDataList.stream().allMatch(deleteData ->
                             deleteData.getIndexKeysCount() == indexNum &&
-                            deleteData.getIndexKeys(0).getIndexId() == primaryIndexId);
+                                    deleteData.getIndexKeys(0).getIndexId() == primaryIndexId);
                     if (!allRecordsValid)
                     {
                         throw new RetinaException("Primary index id mismatch or inconsistent index key list size");
@@ -360,6 +320,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 // 2. Process Insert Data
                 // =================================================================
                 List<RetinaProto.InsertData> insertDataList = tableUpdateData.getInsertDataList();
+                int virtualNodeId = request.getVirtualNodeId();
                 if (!insertDataList.isEmpty())
                 {
                     // 2a. Validate the insert data
@@ -371,7 +332,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                     boolean allRecordValid = insertDataList.stream().allMatch(insertData ->
                             insertData.getIndexKeysCount() == indexNum &&
-                            insertData.getIndexKeys(0).getIndexId() == primaryIndexId);
+                                    insertData.getIndexKeys(0).getIndexId() == primaryIndexId);
                     if (!allRecordValid)
                     {
                         throw new RetinaException("Primary index id mismatch or inconsistent index key list size");
@@ -393,7 +354,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                         IndexProto.PrimaryIndexEntry.Builder builder =
                                 this.retinaResourceManager.insertRecord(schemaName, tableName,
-                                        colValuesByteArray, timestamp, request.getVirtualNodeId());
+                                        colValuesByteArray, timestamp, virtualNodeId);
                         builder.setIndexKey(insertData.getIndexKeys(0));
                         IndexProto.PrimaryIndexEntry entry = builder.build();
                         primaryIndexEntries.add(entry);
@@ -435,7 +396,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                     boolean allRecordsValid = updateDataList.stream().allMatch(updateData ->
                             updateData.getIndexKeysCount() == indexNum &&
-                            updateData.getIndexKeys(0).getIndexId() == primaryIndexId);
+                                    updateData.getIndexKeys(0).getIndexId() == primaryIndexId);
                     if (!allRecordsValid)
                     {
                         throw new RetinaException("Primary index id mismatch or inconsistent index key list size");
@@ -457,7 +418,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                         IndexProto.PrimaryIndexEntry.Builder builder =
                                 this.retinaResourceManager.insertRecord(schemaName, tableName,
-                                        colValuesByteArray, timestamp, request.getVirtualNodeId());
+                                        colValuesByteArray, timestamp, virtualNodeId);
 
                         builder.setIndexKey(updateData.getIndexKeys(0));
                         IndexProto.PrimaryIndexEntry entry = builder.build();
@@ -467,8 +428,20 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                     // 3d. Update the primary index entries and get the previous row locations
                     long tableId = primaryIndexEntries.get(0).getIndexKey().getTableId();
-                    List<IndexProto.RowLocation> previousRowLocations = indexService.updatePrimaryIndexEntries
-                            (tableId, primaryIndexId, primaryIndexEntries);
+                    String lockKey = "vnode_" + virtualNodeId + "_idx_" + primaryIndexId;
+                    Lock lock = updateLocks.get(lockKey);
+
+
+                    List<IndexProto.RowLocation> previousRowLocations = null;
+                    lock.lock();
+                    try
+                    {
+                        previousRowLocations = indexService.updatePrimaryIndexEntries
+                                (tableId, primaryIndexId, primaryIndexEntries);
+                    } finally
+                    {
+                        lock.unlock();
+                    }
 
                     // 3e. Delete the previous records
                     for (IndexProto.RowLocation location : previousRowLocations)
@@ -491,6 +464,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         indexService.updateSecondaryIndexEntries(indexKeys.get(0).getTableId(),
                                 indexKeys.get(0).getIndexId(), secondaryIndexEntries);
                     }
+
                 }
             }
         }
@@ -593,7 +567,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
     @Override
     public void addWriteBuffer(RetinaProto.AddWriteBufferRequest request,
-                                StreamObserver<RetinaProto.AddWriteBufferResponse> responseObserver)
+                               StreamObserver<RetinaProto.AddWriteBufferResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -617,7 +591,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
     @Override
     public void getWriteBuffer(RetinaProto.GetWriteBufferRequest request,
-                                StreamObserver<RetinaProto.GetWriteBufferResponse> responseObserver)
+                               StreamObserver<RetinaProto.GetWriteBufferResponse> responseObserver)
     {
         RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
@@ -691,27 +665,70 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     /**
-     * Check if the order or compact paths from pixels metadata is valid.
-     *
-     * @param paths the order or compact paths from pixels metadata.
+     * A memory-efficient, read-only view that represents the transposed version of a list of objects.
+     * This class implements the List interface but does not store the transposed data explicitly.
+     * Instead, it computes the transposed data on-the-fly when accessed.
      */
-    public static void validateOrderedOrCompactPaths(List<Path> paths) throws RetinaException
+    private static class TransposedIndexKeyView<T> extends AbstractList<List<IndexProto.IndexKey>>
     {
-        requireNonNull(paths, "paths is null");
-        checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
-        try
+        private final List<T> originalData;
+        private final Function<T, List<IndexProto.IndexKey>> indexExtractor;
+        private final int columnCount;
+
+        public TransposedIndexKeyView(List<T> originalData,
+                                      Function<T, List<IndexProto.IndexKey>> indexExtractor)
         {
-            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths.get(0).getUri());
-            assert firstScheme != null;
-            for (int i = 1; i < paths.size(); ++i)
+            this.originalData = originalData;
+            this.indexExtractor = indexExtractor;
+            if (originalData == null || originalData.isEmpty())
             {
-                Storage.Scheme scheme = Storage.Scheme.fromPath(paths.get(i).getUri());
-                checkArgument(firstScheme.equals(scheme),
-                        "all the directories in the paths must have the same storage scheme");
+                this.columnCount = 0;
+            } else
+            {
+                this.columnCount = indexExtractor.apply(originalData.get(0)).size();
             }
-        } catch (Throwable e)
+        }
+
+        @Override
+        public List<IndexProto.IndexKey> get(int columnIndex)
         {
-            throw new RetinaException("Failed to parse storage scheme from paths", e);
+            if (columnIndex < 0 || columnIndex >= columnCount)
+            {
+                throw new IndexOutOfBoundsException("Column index out of bounds: " + columnIndex);
+            }
+            return new ColumnView(columnIndex);
+        }
+
+        @Override
+        public int size()
+        {
+            return columnCount;
+        }
+
+        private class ColumnView extends AbstractList<IndexProto.IndexKey>
+        {
+            private final int columnIndex;
+
+            public ColumnView(int columnIndex)
+            {
+                this.columnIndex = columnIndex;
+            }
+
+            @Override
+            public IndexProto.IndexKey get(int rowIndex)
+            {
+                if (rowIndex < 0 || rowIndex >= originalData.size())
+                {
+                    throw new IndexOutOfBoundsException("Row index out of bounds: " + rowIndex);
+                }
+                return indexExtractor.apply(originalData.get(rowIndex)).get(columnIndex);
+            }
+
+            @Override
+            public int size()
+            {
+                return originalData.size();
+            }
         }
     }
 
