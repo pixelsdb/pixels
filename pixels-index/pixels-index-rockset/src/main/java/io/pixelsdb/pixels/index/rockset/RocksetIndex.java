@@ -36,13 +36,36 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.File;
+import java.nio.file.Paths;
 
 import static io.pixelsdb.pixels.index.rockset.RocksetThreadResources.EMPTY_VALUE_BUFFER;
 
 public class RocksetIndex extends CachingSinglePointIndex
 {
-    private static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
+    // load pixels-index-rockset
+    static
+    {
+        String pixelsHome = System.getenv("PIXELS_HOME");
+        if (pixelsHome == null || pixelsHome.isEmpty())
+        {
+            throw new IllegalStateException("Environment variable PIXELS_HOME is not set");
+        }
 
+        String libPath = Paths.get(pixelsHome, "lib/libpixels-index-rockset.so").toString();
+        File libFile = new File(libPath);
+        if (!libFile.exists())
+        {
+            throw new IllegalStateException("libpixels-index-rockset.so not found at " + libPath);
+        }
+        if (!libFile.canRead())
+        {
+            throw new IllegalStateException("libpixels-index-rockset.so is not readable at " + libPath);
+        }
+        System.load(libPath);
+        System.out.println("JNI loaded OK");
+    }
+    private static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
     private static final long TOMBSTONE_ROW_ID = Long.MAX_VALUE;
     private final RocksetDB rocksetDB;
     private final String rocksDBPath;
@@ -54,7 +77,7 @@ public class RocksetIndex extends CachingSinglePointIndex
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean removed = new AtomicBoolean(false);
 
-    public RocksetIndex(long tableId, long indexId, CloudDBOptions options, boolean unique) throws Exception {
+    public RocksetIndex(long tableId, long indexId, boolean unique) throws Exception {
         this.tableId = tableId;
         this.indexId = indexId;
         this.rocksDBPath = RocksetFactory.getDbPath();

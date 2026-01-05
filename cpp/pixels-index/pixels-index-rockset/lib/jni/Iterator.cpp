@@ -23,8 +23,7 @@
 #include "rocksdb/iterator.h"
 #include "rocksdb/slice.h"
 
-#include "rocksjni/jni_util.h"
-#include "rocksjni/rocksjni.h"
+#include "portal.h"
 
 using ROCKSDB_NAMESPACE::Iterator;
 using ROCKSDB_NAMESPACE::Slice;

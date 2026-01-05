@@ -115,10 +115,19 @@ public final class RocksetDB
         return this.nativeHandle == 0;
     }
 
+    public RocksetColumnFamilyHandle createColumnFamily(byte[] name) {
+        try {
+            long handle = createColumnFamily0(this.nativeHandle, name);
+            return new RocksetColumnFamilyHandle(handle);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private static native void closeDatabase(long var0);
     private static native long[] open(long env_handle, long options_handle, String db_path, byte[][] descriptors, long[] cf_handles);
     public static native List<byte[]> listColumnFamilies0(String dbPath);
-    public native RocksetColumnFamilyHandle createColumnFamily(byte[] columnFamilyName) throws Exception;
+    private native long createColumnFamily0(long dbHandle, byte[] columnFamilyName) throws Exception;
     private static native void putDirect(long var0, long var2, ByteBuffer var4, int var5, int var6, ByteBuffer var7, int var8, int var9, long var10) throws RuntimeException;
     private static native void put(long var0, long var2, byte[] var4, int var5, int var6, byte[] var7, int var8, int var9, long var10) throws RuntimeException;
     private static native void write0(long var0, long var2, long var4) throws RuntimeException;

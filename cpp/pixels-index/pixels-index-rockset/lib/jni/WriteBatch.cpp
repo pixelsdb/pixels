@@ -21,10 +21,10 @@
 #include <cassert>
 
 #include "rocksdb/write_batch.h"
-#include "rocksdb/column_family.h"
+#include "cplusplus_to_java_convert.h"
+// #include "rocksdb/column_family.h"
 
-#include "rocksjni/jni_util.h"
-#include "rocksjni/rocksjni.h"
+#include "portal.h"
 
 using ROCKSDB_NAMESPACE::WriteBatch;
 using ROCKSDB_NAMESPACE::ColumnFamilyHandle;
@@ -136,6 +136,7 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetWriteBatch_deleteJni(
 
     if (status != nullptr && !status->ok())
     {
-        ROCKSDB_NAMESPACE::RocksDBExceptionJni::ThrowNew(env, status);
+        jclass ex = env->FindClass("java/lang/RuntimeException");
+        env->ThrowNew(ex, status->ToString().c_str());
     }
 }

@@ -20,6 +20,7 @@
 #include "io_pixelsdb_pixels_index_rockset_jni_RocksetWriteOptions.h"
 #include <cassert>
 #include "rocksdb/options.h"
+#include "cplusplus_to_java_convert.h"
 
 /*
  * Class:     io_pixelsdb_pixels_index_rockset_jni_RocksetWriteOptions

@@ -19,6 +19,7 @@
  */
 #include "io_pixelsdb_pixels_index_rockset_jni_RocksetColumnFamilyOptions.h"
 #include <rocksdb/options.h>
+#include <rocksdb/table.h>
 
 using ROCKSDB_NAMESPACE::ColumnFamilyOptions;
 using ROCKSDB_NAMESPACE::CompressionType;

@@ -33,11 +33,11 @@ JNIEXPORT jobject JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_li
 
 /*
  * Class:     io_pixelsdb_pixels_index_rockset_jni_RocksetDB
- * Method:    createColumnFamily
- * Signature: ([B)Lio/pixelsdb/pixels/index/rockset/jni/RocksetColumnFamilyHandle;
+ * Method:    createColumnFamily0
+ * Signature: (J[B)J
  */
-JNIEXPORT jobject JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily
-  (JNIEnv *, jobject, jbyteArray);
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily0
+  (JNIEnv *, jobject, jlong, jbyteArray);
 
 /*
  * Class:     io_pixelsdb_pixels_index_rockset_jni_RocksetDB

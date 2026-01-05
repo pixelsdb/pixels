@@ -24,6 +24,8 @@
 #include "rocksdb/cloud/db_cloud.h"
 #include "rocksdb/options.h"
 #include "rocksdb/db.h"
+#include "portal.h"
+#include "cplusplus_to_java_convert.h"
 
 /**
  * @author Rolland1944
@@ -44,7 +46,7 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_open(
   auto* options =
       reinterpret_cast<ROCKSDB_NAMESPACE::Options*>(joptions);
   assert(options != nullptr);
-  options.env = reinterpret_cast<Env*>(cloud_env_ptr);
+  options->env = reinterpret_cast<ROCKSDB_NAMESPACE::Env*>(cloud_env_ptr);
 
   // 2. db path
   const char* db_path_chars =
@@ -145,14 +147,15 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_listColumnFamilies0(
   }
   std::string db_path(path_chars);
   env->ReleaseStringUTFChars(jdb_path, path_chars);
-
+  ROCKSDB_NAMESPACE::Options options;
   std::vector<std::string> column_families;
   ROCKSDB_NAMESPACE::Status st =
       ROCKSDB_NAMESPACE::DBCloud::ListColumnFamilies(
           options, db_path, &column_families);
 
   if (!st.ok()) {
-    ROCKSDB_NAMESPACE::RocksDBExceptionJni::ThrowNew(env, st);
+    jclass ex = env->FindClass("java/lang/RuntimeException");
+    env->ThrowNew(ex, st.ToString().c_str());
     return nullptr;
   }
 
@@ -178,17 +181,15 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_listColumnFamilies0(
   return jlist;
 }
 
-JNIEXPORT jobject JNICALL
-Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily(
-    JNIEnv* env, jobject jdb, jbyteArray jcf_name)
+JNIEXPORT jlong JNICALL
+Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily0(
+    JNIEnv* env, jobject jdb, jlong jhandle, jbyteArray jcf_name)
 {
-  auto* db = reinterpret_cast<ROCKSDB_NAMESPACE::DB*>(
-      ROCKSDB_NAMESPACE::JniUtil::getNativeHandle(env, jdb));
-
+  auto* db = reinterpret_cast<ROCKSDB_NAMESPACE::DB*>(jhandle);
   if (db == nullptr) {
-    ROCKSDB_NAMESPACE::RocksDBExceptionJni::ThrowNew(
-        env, "DB is closed");
-    return nullptr;
+    jclass ex = env->FindClass("java/lang/RuntimeException");
+    env->ThrowNew(ex, "DB is closed");
+    return reinterpret_cast<jlong>(nullptr);
   }
 
   jsize len = env->GetArrayLength(jcf_name);
@@ -205,8 +206,9 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily(
       db->CreateColumnFamily(cf_options, cf_name, &cf_handle);
 
   if (!st.ok()) {
-    ROCKSDB_NAMESPACE::RocksDBExceptionJni::ThrowNew(env, st);
-    return nullptr;
+    jclass ex = env->FindClass("java/lang/RuntimeException");
+    env->ThrowNew(ex, st.ToString().c_str());
+    return reinterpret_cast<jlong>(nullptr);
   }
 
   auto* sptr =
@@ -219,9 +221,7 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily(
   jmethodID ctor =
       env->GetMethodID(cf_handle_clz, "<init>", "(J)V");
 
-  return env->NewObject(
-      cf_handle_clz, ctor,
-      reinterpret_cast<jlong>(sptr));
+  return GET_CPLUSPLUS_POINTER(cf_handle);
 }
 
 JNIEXPORT void JNICALL
