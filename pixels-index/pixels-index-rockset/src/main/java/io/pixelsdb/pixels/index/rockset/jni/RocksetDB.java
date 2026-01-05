@@ -1,3 +1,22 @@
+/*
+ * Copyright 2025 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 package io.pixelsdb.pixels.index.rockset.jni;
 
 import java.nio.ByteBuffer;
@@ -14,7 +33,8 @@ public final class RocksetDB
     public static final byte[] DEFAULT_COLUMN_FAMILY;
     final List<RocksetColumnFamilyHandle> ownedColumnFamilyHandles = new ArrayList<>();
 
-    static {
+    static 
+    {
         DEFAULT_COLUMN_FAMILY = "default".getBytes(StandardCharsets.UTF_8);
     }
 
@@ -34,23 +54,28 @@ public final class RocksetDB
         long[] var5 = new long[var2.size()];
         int var6 = -1;
 
-        for(int var7 = 0; var7 < var2.size(); ++var7) {
+        for(int var7 = 0; var7 < var2.size(); ++var7) 
+        {
             RocksetColumnFamilyDescriptor var8 = (RocksetColumnFamilyDescriptor)var2.get(var7);
             var4[var7] = var8.getName();
             var5[var7] = var8.getOptions().handle();
-            if (Arrays.equals(var8.getName(), DEFAULT_COLUMN_FAMILY)) {
+            if (Arrays.equals(var8.getName(), DEFAULT_COLUMN_FAMILY)) 
+            {
                 var6 = var7;
             }
         }
 
-        if (var6 < 0) {
+        if (var6 < 0) 
+        {
             throw new IllegalArgumentException("You must provide the default column family in your columnFamilyDescriptors");
-        } else {
+        } else 
+        {
             long[] var11 = open(env.nativeHandle(), var0.nativeHandle, var1, var4, var5);
             RocksetDB var12 = new RocksetDB(var11[0]);
             var12.storeOptionsInstance(var0);
 
-            for(int var9 = 1; var9 < var11.length; ++var9) {
+            for(int var9 = 1; var9 < var11.length; ++var9) 
+            {
                 RocksetColumnFamilyHandle var10 = new RocksetColumnFamilyHandle(var12, var11[var9]);
                 var3.add(var10);
             }
@@ -62,10 +87,14 @@ public final class RocksetDB
     }
 
     public void put(RocksetColumnFamilyHandle var1, RocksetWriteOptions var2, ByteBuffer var3, ByteBuffer var4) throws RuntimeException {
-        if (var3.isDirect() && var4.isDirect()) {
+        if (var3.isDirect() && var4.isDirect()) 
+        {
             putDirect(this.nativeHandle, var2.nativeHandle, var3, var3.position(), var3.remaining(), var4, var4.position(), var4.remaining(), var1.nativeHandle);
-        } else {
-            if (var3.isDirect() || var4.isDirect()) {
+        } 
+        else 
+        {
+            if (var3.isDirect() || var4.isDirect()) 
+            {
                 throw new RuntimeException("ByteBuffer parameters must all be direct, or must all be indirect");
             }
 
@@ -80,15 +109,18 @@ public final class RocksetDB
         var4.position(var4.limit());
     }
 
-    public void write(RocksetWriteOptions var1, RocksetWriteBatch var2) throws RuntimeException {
+    public void write(RocksetWriteOptions var1, RocksetWriteBatch var2) throws RuntimeException 
+    {
         write0(this.nativeHandle, var1.nativeHandle, var2.nativeHandle);
     }
 
-    private void storeOptionsInstance(RocksetDBOptions var0) {
+    private void storeOptionsInstance(RocksetDBOptions var0) 
+    {
         this.options = var0;
     }
 
-    private void storeDefaultColumnFamilyHandle(RocksetColumnFamilyHandle var1) {
+    private void storeDefaultColumnFamilyHandle(RocksetColumnFamilyHandle var1) 
+    {
         this.defaultColumnFamilyHandle = var1;
     }
 
@@ -104,22 +136,28 @@ public final class RocksetDB
 
     public void close()
     {
-        for(RocksetColumnFamilyHandle var2 : this.ownedColumnFamilyHandles) {
+        for(RocksetColumnFamilyHandle var2 : this.ownedColumnFamilyHandles) 
+        {
             var2.close();
         }
         this.ownedColumnFamilyHandles.clear();
         closeDatabase(nativeHandle);
     }
 
-    public boolean isClosed() {
+    public boolean isClosed() 
+    {
         return this.nativeHandle == 0;
     }
 
-    public RocksetColumnFamilyHandle createColumnFamily(byte[] name) {
-        try {
+    public RocksetColumnFamilyHandle createColumnFamily(byte[] name) 
+    {
+        try 
+        {
             long handle = createColumnFamily0(this.nativeHandle, name);
             return new RocksetColumnFamilyHandle(handle);
-        } catch (Exception e) {
+        } 
+        catch (Exception e) 
+        {
             throw new RuntimeException(e);
         }
     }

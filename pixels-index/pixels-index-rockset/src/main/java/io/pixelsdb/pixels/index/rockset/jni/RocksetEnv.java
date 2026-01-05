@@ -1,23 +1,28 @@
 package io.pixelsdb.pixels.index.rockset.jni;
 
-public final class RocksetEnv implements AutoCloseable {
+public final class RocksetEnv implements AutoCloseable 
+{
     private long nativeHandle;
 
-    private RocksetEnv(long handle) {
+    private RocksetEnv(long handle) 
+    {
         this.nativeHandle = handle;
     }
 
-    public static RocksetEnv create(String bucket, String prefix) {
+    public static RocksetEnv create(String bucket, String prefix) 
+    {
         long h = createCloudFileSystem0(bucket, prefix);
         return new RocksetEnv(h);
     }
 
-    long nativeHandle() {
+    long nativeHandle() 
+    {
         return nativeHandle;
     }
 
     @Override
-    public void close() {
+    public void close() 
+    {
         disposeInternalJni(nativeHandle);
         nativeHandle = 0;
     }

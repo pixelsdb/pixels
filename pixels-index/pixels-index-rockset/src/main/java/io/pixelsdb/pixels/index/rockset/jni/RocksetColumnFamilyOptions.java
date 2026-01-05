@@ -15,67 +15,80 @@ public final class RocksetColumnFamilyOptions implements AutoCloseable
         return nativeHandle;
     }
 
-    public RocksetColumnFamilyOptions setWriteBufferSize(long var1) {
+    public RocksetColumnFamilyOptions setWriteBufferSize(long var1) 
+    {
         nativeSetWriteBufferSize(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setMaxWriteBufferNumber(int var1) {
+    public RocksetColumnFamilyOptions setMaxWriteBufferNumber(int var1) 
+    {
         nativeSetMaxWriteBufferNumber(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setMinWriteBufferNumberToMerge(int var1) {
+    public RocksetColumnFamilyOptions setMinWriteBufferNumberToMerge(int var1) 
+    {
         nativeSetMinWriteBufferNumberToMerge(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setMemtablePrefixBloomSizeRatio(double var1) {
+    public RocksetColumnFamilyOptions setMemtablePrefixBloomSizeRatio(double var1) 
+    {
         nativeSetMemtablePrefixBloomSizeRatio(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setTableFormatConfig(RocksetTableFormatConfig var1) {
+    public RocksetColumnFamilyOptions setTableFormatConfig(RocksetTableFormatConfig var1) 
+    {
         nativeSetTableFactory(this.nativeHandle, var1.newTableFactoryHandle());
         return this;
     }
 
-    public RocksetColumnFamilyOptions setLevel0FileNumCompactionTrigger(int var1) {
+    public RocksetColumnFamilyOptions setLevel0FileNumCompactionTrigger(int var1) 
+    {
         nativeSetLevel0FileNumCompactionTrigger(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setMaxBytesForLevelBase(long var1) {
+    public RocksetColumnFamilyOptions setMaxBytesForLevelBase(long var1) 
+    {
         nativeSetMaxBytesForLevelBase(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setMaxBytesForLevelMultiplier(double var1) {
+    public RocksetColumnFamilyOptions setMaxBytesForLevelMultiplier(double var1) 
+    {
         nativeSetMaxBytesForLevelMultiplier(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setTargetFileSizeBase(long var1) {
+    public RocksetColumnFamilyOptions setTargetFileSizeBase(long var1) 
+    {
         nativeSetTargetFileSizeBase(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setTargetFileSizeMultiplier(int var1) {
+    public RocksetColumnFamilyOptions setTargetFileSizeMultiplier(int var1) 
+    {
         nativeSetTargetFileSizeMultiplier(this.nativeHandle, var1);
         return this;
     }
 
-    public RocksetColumnFamilyOptions setCompressionType(RocksetCompressionType var1) {
+    public RocksetColumnFamilyOptions setCompressionType(RocksetCompressionType var1) 
+    {
         nativeSetCompressionType(this.nativeHandle, var1.getValue());
         return this;
     }
 
-    public RocksetColumnFamilyOptions setBottommostCompressionType(RocksetCompressionType var1) {
+    public RocksetColumnFamilyOptions setBottommostCompressionType(RocksetCompressionType var1) 
+    {
         nativeSetBottommostCompressionType(this.nativeHandle, var1.getValue());
         return this;
     }
 
-    public RocksetColumnFamilyOptions setCompactionStyle(RocksetCompactionStyle var1) {
+    public RocksetColumnFamilyOptions setCompactionStyle(RocksetCompactionStyle var1) 
+    {
         nativeSetCompactionStyle(this.nativeHandle, var1.getValue());
         return this;
     }

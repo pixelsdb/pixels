@@ -1,7 +1,8 @@
 package io.pixelsdb.pixels.index.rockset.jni;
 
 
-public enum RocksetCompressionType {
+public enum RocksetCompressionType 
+{
     NO_COMPRESSION((byte)0, (String)null, "kNoCompression"),
     SNAPPY_COMPRESSION((byte)1, "snappy", "kSnappyCompression"),
     ZLIB_COMPRESSION((byte)2, "z", "kZlibCompression"),
@@ -16,10 +17,14 @@ public enum RocksetCompressionType {
     private final String libraryName_;
     private final String internalName_;
 
-    public static RocksetCompressionType getCompressionType(String var0) {
-        if (var0 != null) {
-            for(RocksetCompressionType var4 : values()) {
-                if (var4.getLibraryName() != null && var4.getLibraryName().equals(var0)) {
+    public static RocksetCompressionType getCompressionType(String var0) 
+    {
+        if (var0 != null) 
+        {
+            for(RocksetCompressionType var4 : values()) 
+            {
+                if (var4.getLibraryName() != null && var4.getLibraryName().equals(var0)) 
+                {
                     return var4;
                 }
             }
@@ -28,19 +33,24 @@ public enum RocksetCompressionType {
         return NO_COMPRESSION;
     }
 
-    public static RocksetCompressionType getCompressionType(byte var0) {
-        for(RocksetCompressionType var4 : values()) {
-            if (var4.getValue() == var0) {
+    public static RocksetCompressionType getCompressionType(byte var0) 
+    {
+        for(RocksetCompressionType var4 : values()) 
+        {
+            if (var4.getValue() == var0) 
+            {
                 return var4;
             }
         }
-
         throw new IllegalArgumentException("Illegal value provided for CompressionType.");
     }
 
-    static RocksetCompressionType getFromInternal(String var0) {
-        for(RocksetCompressionType var4 : values()) {
-            if (var4.internalName_.equals(var0)) {
+    static RocksetCompressionType getFromInternal(String var0) 
+    {
+        for(RocksetCompressionType var4 : values()) 
+        {
+            if (var4.internalName_.equals(var0)) 
+            {
                 return var4;
             }
         }
@@ -48,15 +58,18 @@ public enum RocksetCompressionType {
         throw new IllegalArgumentException("Illegal internalName '" + var0 + " ' provided for CompressionType.");
     }
 
-    public byte getValue() {
+    public byte getValue() 
+    {
         return this.value_;
     }
 
-    public String getLibraryName() {
+    public String getLibraryName() 
+    {
         return this.libraryName_;
     }
 
-    private RocksetCompressionType(byte var3, String var4, String var5) {
+    private RocksetCompressionType(byte var3, String var4, String var5) 
+    {
         this.value_ = var3;
         this.libraryName_ = var4;
         this.internalName_ = var5;

@@ -11,7 +11,8 @@ public final class RocksetLRUCache extends RocksetCache
     private static native void disposeInternalJni(long var0);
 
     @Override
-    public void close(long var1){
+    public void close(long var1)
+    {
         disposeInternalJni(var1);
     }
 }

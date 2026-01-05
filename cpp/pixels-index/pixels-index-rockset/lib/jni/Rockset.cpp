@@ -1,22 +1,3 @@
-/*
- * Copyright 2025 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
 #include "io_pixelsdb_pixels_index_rockset_jni_RocksetDB.h"
 #include <vector>
 #include <string>
@@ -28,6 +9,7 @@
 #include "cplusplus_to_java_convert.h"
 
 /**
+ * This file is modified from RocksDB's own JNI bindings.
  * @author Rolland1944
  * @create 2025-12-22
  */
@@ -40,8 +22,8 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_open(
     jlong joptions,
     jstring jdb_path,
     jobjectArray jcf_names,
-    jlongArray jcf_options_handles) {
-
+    jlongArray jcf_options_handles) 
+{
   // 1. Options*
   auto* options =
       reinterpret_cast<ROCKSDB_NAMESPACE::Options*>(joptions);
@@ -126,8 +108,8 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_open(
 
 JNIEXPORT void JNICALL
 Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_closeDatabase(
-    JNIEnv*, jclass, jlong jdb) {
-
+    JNIEnv*, jclass, jlong jdb) 
+{
   auto* db =
       reinterpret_cast<ROCKSDB_NAMESPACE::DBCloud*>(jdb);
   if (db == nullptr) {
@@ -236,8 +218,8 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_put(
     jbyteArray jval,
     jint voff,
     jint vlen,
-    jlong write_opt_handle) {
-
+    jlong write_opt_handle) 
+{
     auto* db =
         reinterpret_cast<ROCKSDB_NAMESPACE::DBCloud*>(db_handle);
     auto* cf =
@@ -276,8 +258,8 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_putDirect(
     jobject jval,
     jint jval_off,
     jint jval_len,
-    jlong jwrite_options_handle) {
-
+    jlong jwrite_options_handle) 
+{
   auto* db =
       reinterpret_cast<ROCKSDB_NAMESPACE::DBCloud*>(jdb_handle);
   auto* cf_handle =
@@ -327,8 +309,8 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_write0(
     jclass,
     jlong db_handle,
     jlong write_opt_handle,
-    jlong batch_handle) {
-
+    jlong batch_handle) 
+{
     auto* db =
         reinterpret_cast<ROCKSDB_NAMESPACE::DBCloud*>(db_handle);
     auto* wo =
@@ -350,8 +332,8 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_iterator(
     jclass,
     jlong db_handle,
     jlong cf_handle,
-    jlong read_opt_handle) {
-
+    jlong read_opt_handle) 
+{
     auto* db =
         reinterpret_cast<ROCKSDB_NAMESPACE::DBCloud*>(db_handle);
     auto* cf =
