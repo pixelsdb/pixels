@@ -1,35 +1,22 @@
-/*
- * Copyright 2025 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
 #include "io_pixelsdb_pixels_index_rockset_jni_RocksetEnv.h"
 #include "rocksdb/cloud/db_cloud.h"
 #include "rocksdb/cloud/cloud_file_system.h"
 #include <aws/core/Aws.h>
 
+/**
+ * This file is modified from RocksDB's own JNI bindings.
+ * @author Rolland1944
+ * @create 2025-12-22
+ */
+ 
 JNIEXPORT jlong JNICALL
 Java_io_pixelsdb_pixels_index_rockset_jni_RocksetEnv_createCloudFileSystem0(
     JNIEnv* env,
     jclass,
     jstring jbucket_name,
-    jstring js3_prefix) {
-
-  // 1. 检查 AWS 环境变量
+    jstring js3_prefix) 
+{
+  // 1. Check AWS env vars
   if (!getenv("AWS_ACCESS_KEY_ID") ||
       !getenv("AWS_SECRET_ACCESS_KEY") ||
       !getenv("AWS_DEFAULT_REGION")) {
@@ -104,8 +91,8 @@ JNIEXPORT void JNICALL
 Java_io_pixelsdb_pixels_index_rockset_jni_RocksetEnv_disposeInternalJni(
     JNIEnv*,
     jclass,
-    jlong jenv_handle) {
-
+    jlong jenv_handle) 
+{
   if (jenv_handle == 0) {
     return;
   }

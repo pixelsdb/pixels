@@ -41,6 +41,11 @@ import java.nio.file.Paths;
 
 import static io.pixelsdb.pixels.index.rockset.RocksetThreadResources.EMPTY_VALUE_BUFFER;
 
+/**
+ * @author Rolland1944
+ * @create 2025-12-29
+ */
+
 public class RocksetIndex extends CachingSinglePointIndex
 {
     // load pixels-index-rockset

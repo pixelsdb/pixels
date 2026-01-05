@@ -12,7 +12,8 @@ public class RocksetReadOptions extends RocksetHandle
         return new RocksetReadOptions(newReadOptions());
     }
 
-    public RocksetReadOptions setPrefixSameAsStart(boolean var1) {
+    public RocksetReadOptions setPrefixSameAsStart(boolean var1) 
+    {
         setPrefixSameAsStart(this.nativeHandle, var1);
         return this;
     }

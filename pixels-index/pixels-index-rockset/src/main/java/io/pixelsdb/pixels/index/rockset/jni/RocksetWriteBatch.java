@@ -2,23 +2,27 @@ package io.pixelsdb.pixels.index.rockset.jni;
 
 import java.nio.ByteBuffer;
 
-public final class RocksetWriteBatch implements AutoCloseable {
+public final class RocksetWriteBatch implements AutoCloseable 
+{
 
     /**
      * Native handle to rocksdb::WriteBatch
      */
     public long nativeHandle;
 
-    public RocksetWriteBatch(long nativeHandle) {
+    public RocksetWriteBatch(long nativeHandle) 
+    {
         this.nativeHandle = nativeHandle;
     }
 
     /**
      * Create a new empty WriteBatch.
      */
-    public static RocksetWriteBatch create() {
+    public static RocksetWriteBatch create() 
+    {
         long handle = newWriteBatch0();
-        if (handle == 0) {
+        if (handle == 0) 
+        {
             throw new RuntimeException("Failed to create RocksetWriteBatch");
         }
         return new RocksetWriteBatch(handle);
@@ -33,23 +37,28 @@ public final class RocksetWriteBatch implements AutoCloseable {
         var3.position(var3.limit());
     }
 
-    public void delete(RocksetColumnFamilyHandle var1, byte[] var2){
+    public void delete(RocksetColumnFamilyHandle var1, byte[] var2)
+    {
         this.delete(this.nativeHandle, var2, var2.length, var1.nativeHandle);
     }
 
     @Override
-    public void close() {
-        if (nativeHandle != 0) {
+    public void close() 
+    {
+        if (nativeHandle != 0) 
+        {
             disposeInternalJni(nativeHandle);
             nativeHandle = 0;
         }
     }
 
-    final void putDirect(long var1, ByteBuffer var3, int var4, int var5, ByteBuffer var6, int var7, int var8, long var9) {
+    final void putDirect(long var1, ByteBuffer var3, int var4, int var5, ByteBuffer var6, int var7, int var8, long var9) 
+    {
         putDirectJni(var1, var3, var4, var5, var6, var7, var8, var9);
     }
 
-    final void delete(long var1, byte[] var3, int var4, long var5){
+    final void delete(long var1, byte[] var3, int var4, long var5)
+    {
         deleteJni(var1, var3, var4, var5);
     }
 

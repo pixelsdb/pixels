@@ -1,6 +1,5 @@
 package io.pixelsdb.pixels.index.rockset.jni;
 
-
 public class RocksetBlockBasedTableConfig extends RocksetTableFormatConfig
 {
     private Filter filterPolicy;
@@ -8,7 +7,8 @@ public class RocksetBlockBasedTableConfig extends RocksetTableFormatConfig
     private long blockSize;
     private RocksetCache blockCache;
 
-    public RocksetBlockBasedTableConfig() {
+    public RocksetBlockBasedTableConfig() 
+    {
         this.blockCache = null;
         this.blockSize = 4096L;
         this.filterPolicy = null;
@@ -16,39 +16,48 @@ public class RocksetBlockBasedTableConfig extends RocksetTableFormatConfig
     }
 
     @Override
-    protected long newTableFactoryHandle() {
+    protected long newTableFactoryHandle() 
+    {
         long var1;
-        if (this.filterPolicy != null) {
+        if (this.filterPolicy != null) 
+        {
             var1 = this.filterPolicy.nativeHandle;
-        } else {
+        } else 
+        {
             var1 = 0L;
         }
 
         long var3;
-        if (this.blockCache != null) {
+        if (this.blockCache != null) 
+        {
             var3 = this.blockCache.nativeHandle;
-        } else {
+        } else 
+        {
             var3 = 0L;
         }
 
         return newTableFactoryHandle(var3, this.blockSize, var1, this.wholeKeyFiltering);
     }
 
-    public RocksetBlockBasedTableConfig setFilterPolicy(Filter var1) {
+    public RocksetBlockBasedTableConfig setFilterPolicy(Filter var1) 
+    {
         this.filterPolicy = var1;
         return this;
     }
-    public RocksetBlockBasedTableConfig setWholeKeyFiltering(boolean var1) {
+    public RocksetBlockBasedTableConfig setWholeKeyFiltering(boolean var1) 
+    {
         this.wholeKeyFiltering = var1;
         return this;
     }
 
-    public RocksetBlockBasedTableConfig setBlockSize(long var1) {
+    public RocksetBlockBasedTableConfig setBlockSize(long var1) 
+    {
         this.blockSize = var1;
         return this;
     }
 
-    public RocksetBlockBasedTableConfig setBlockCache(RocksetCache var1) {
+    public RocksetBlockBasedTableConfig setBlockCache(RocksetCache var1) 
+    {
         this.blockCache = var1;
         return this;
     }
