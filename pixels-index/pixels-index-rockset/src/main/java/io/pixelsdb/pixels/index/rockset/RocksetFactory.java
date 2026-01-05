@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.index.rockset;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.rockset.jni.*;
-import org.rocksdb.RocksDB;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -72,13 +71,13 @@ public class RocksetFactory
         } catch (Exception e)
         {
             // For new database, return list containing only default column family
-            existingColumnFamilies = Collections.singletonList(RocksDB.DEFAULT_COLUMN_FAMILY);
+            existingColumnFamilies = Collections.singletonList(RocksetDB.DEFAULT_COLUMN_FAMILY);
         }
         // 2. Ensure default column family is included
-        if (!existingColumnFamilies.contains(RocksDB.DEFAULT_COLUMN_FAMILY))
+        if (!existingColumnFamilies.contains(RocksetDB.DEFAULT_COLUMN_FAMILY))
         {
             existingColumnFamilies = new ArrayList<>(existingColumnFamilies);
-            existingColumnFamilies.add(RocksDB.DEFAULT_COLUMN_FAMILY);
+            existingColumnFamilies.add(RocksetDB.DEFAULT_COLUMN_FAMILY);
         }
 
         if (blockCache == null)
