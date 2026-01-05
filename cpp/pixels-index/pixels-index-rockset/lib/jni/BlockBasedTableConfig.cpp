@@ -21,10 +21,11 @@
 
 #include <rocksdb/table.h>
 #include <rocksdb/filter_policy.h>
+#include "cplusplus_to_java_convert.h"
+
 #include <memory>
 using ROCKSDB_NAMESPACE::BlockBasedTableOptions;
 using ROCKSDB_NAMESPACE::NewBlockBasedTableFactory;
-using ROCKSDB_NAMESPACE::TableFactory;
 using ROCKSDB_NAMESPACE::FilterPolicy;
 using ROCKSDB_NAMESPACE::Cache;
 
@@ -71,10 +72,6 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetBlockBasedTableConfig_newTableF
 
 
     // 5. 创建 factory
-    auto factory =
-        NewBlockBasedTableFactory(options);
-
-    // 6. 返回 shared_ptr 句柄（与 RocksDB JNI 一致）
-    return reinterpret_cast<jlong>(
-        new std::shared_ptr<TableFactory>(factory));
+    return GET_CPLUSPLUS_POINTER(
+      ROCKSDB_NAMESPACE::NewBlockBasedTableFactory(options));
 }

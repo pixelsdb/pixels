@@ -18,6 +18,9 @@
  * <https://www.gnu.org/licenses/>.
  */
 #include "io_pixelsdb_pixels_index_rockset_jni_RocksetEnv.h"
+#include "rocksdb/cloud/db_cloud.h"
+#include "rocksdb/cloud/cloud_file_system.h"
+#include <aws/core/Aws.h>
 
 JNIEXPORT jlong JNICALL
 Java_io_pixelsdb_pixels_index_rockset_jni_RocksetEnv_createCloudFileSystem0(
