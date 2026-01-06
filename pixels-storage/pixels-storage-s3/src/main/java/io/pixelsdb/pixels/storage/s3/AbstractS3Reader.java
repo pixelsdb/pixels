@@ -51,8 +51,8 @@ public abstract class AbstractS3Reader implements PhysicalReader
      * The implementations of most methods in this class are from its subclass PhysicalS3Reader.
      */
 
-    protected boolean enableAsync = false;
-    protected boolean useAsyncClient = false;
+    protected boolean enableAsync;
+    protected boolean useAsyncClient;
     protected static final ExecutorService clientService;
 
     static
@@ -125,7 +125,7 @@ public abstract class AbstractS3Reader implements PhysicalReader
     }
 
     @Override
-    public long getFileLength() throws IOException
+    public long getFileLength()
     {
         return length;
     }
@@ -159,7 +159,8 @@ public abstract class AbstractS3Reader implements PhysicalReader
             this.numRequests++;
             this.position += len;
             return response.asByteBuffer();
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             throw new IOException("Failed to read object.", e);
         }
@@ -175,8 +176,16 @@ public abstract class AbstractS3Reader implements PhysicalReader
     public void readFully(byte[] buffer, int off, int len) throws IOException
     {
         ByteBuffer byteBuffer = readFully(len);
-        // This is more efficient than byteBuffer.put(buffer, off, len).
-        System.arraycopy(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(), buffer, off, len);
+        if (byteBuffer.hasArray())
+        {
+            // This is more efficient than byteBuffer.get(buffer, off, len).
+            System.arraycopy(byteBuffer.array(), byteBuffer.arrayOffset() + byteBuffer.position(),
+                    buffer, off, len);
+        }
+        else
+        {
+            byteBuffer.get(buffer, off, len);
+        }
     }
 
     /**
