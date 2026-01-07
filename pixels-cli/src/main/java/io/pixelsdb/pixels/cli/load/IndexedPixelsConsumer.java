@@ -23,12 +23,14 @@
  import com.google.protobuf.ByteString;
  import io.pixelsdb.pixels.common.exception.IndexException;
  import io.pixelsdb.pixels.common.exception.MetadataException;
- import io.pixelsdb.pixels.common.index.IndexService;
- import io.pixelsdb.pixels.common.index.RPCIndexService;
+ import io.pixelsdb.pixels.common.index.IndexOption;
+ import io.pixelsdb.pixels.common.index.service.IndexService;
+ import io.pixelsdb.pixels.common.index.service.RPCIndexService;
  import io.pixelsdb.pixels.common.index.RowIdAllocator;
  import io.pixelsdb.pixels.common.metadata.domain.File;
  import io.pixelsdb.pixels.common.metadata.domain.Path;
  import io.pixelsdb.pixels.common.node.BucketCache;
+ import io.pixelsdb.pixels.common.node.VnodeIdentifier;
  import io.pixelsdb.pixels.common.physical.Storage;
  import io.pixelsdb.pixels.common.physical.StorageFactory;
  import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -60,8 +62,7 @@
  public class IndexedPixelsConsumer extends AbstractPixelsConsumer
  {
 
-     // Map: Retina Host -> Writer state
-     private final Map<String, PerRetinaNodeWriter> retinaWriters = new ConcurrentHashMap<>();
+     private final Map<VnodeIdentifier, PerVirtualNodeWriter> retinaWriters = new ConcurrentHashMap<>();
      private final BucketCache bucketCache = BucketCache.getInstance();
      private final Map<String, IndexService> indexServices = new ConcurrentHashMap<>();
      private final int indexServerPort;
@@ -99,9 +100,8 @@
                  ByteString pkByteString = calculatePrimaryKeyBytes(colsInLine);
                  // Assume BucketCache has the necessary method and configuration
                  int bucketId = RetinaUtils.getBucketIdFromByteBuffer(pkByteString);
-                 String retinaName = RetinaUtils.getRetinaHostNameFromBucketId(bucketId);
-                 // 2. Get/Initialize the Writer for this Bucket
-                 PerRetinaNodeWriter retinaNodeWriter = retinaWriters.computeIfAbsent(retinaName, id ->
+                 VnodeIdentifier vnodeIdentifier = RetinaUtils.getVnodeIdentifierFromBucketId(bucketId);
+                 PerVirtualNodeWriter retinaNodeWriter = retinaWriters.computeIfAbsent(vnodeIdentifier, id ->
                  {
                      try
                      {
@@ -132,7 +132,7 @@
                      {
                          closePixelsFile(retinaNodeWriter);
                          // Remove writer to force re-initialization on next use
-                         retinaWriters.remove(retinaName);
+                         retinaWriters.remove(vnodeIdentifier);
                      }
                  } catch (IndexException e)
                  {
@@ -145,7 +145,7 @@
      @Override
      protected void flushRemainingData() throws IOException, MetadataException
      {
-         for (PerRetinaNodeWriter bucketWriter : retinaWriters.values())
+         for (PerVirtualNodeWriter bucketWriter : retinaWriters.values())
          {
              if (bucketWriter.rowCounter > 0)
              {
@@ -164,11 +164,10 @@
      /**
       * Initializes a new PixelsWriter and associated File/Path for a given bucket ID.
       */
-     private PerRetinaNodeWriter initializeRetinaWriter(int bucketId) throws IOException, MetadataException
+     private PerVirtualNodeWriter initializeRetinaWriter(int bucketId) throws IOException, MetadataException
      {
          // Use the Node Cache to find the responsible Retina Node
          NodeProto.NodeInfo targetNode = bucketCache.getRetinaNodeInfoByBucketId(bucketId);
-
          // Target path selection logic (simple round-robin for the path, but the NodeInfo is bucket-specific)
          int targetPathId = GlobalTargetPathId.getAndIncrement() % targetPaths.size();
          Path currTargetPath = targetPaths.get(targetPathId);
@@ -187,7 +186,7 @@
          File currFile = openTmpFile(targetFileName, currTargetPath);
          tmpFiles.add(currFile);
 
-         return new PerRetinaNodeWriter(pixelsWriter, currFile, currTargetPath, targetNode);
+         return new PerVirtualNodeWriter(pixelsWriter, currFile, currTargetPath, targetNode, targetNode.getVirtualNodeId());
      }
 
      // --- Private Helper Methods ---
@@ -219,7 +218,7 @@
          return ByteString.copyFrom((ByteBuffer) indexKeyBuffer.rewind());
      }
 
-     private void updateIndexEntry(PerRetinaNodeWriter bucketWriter, ByteString pkByteString) throws IndexException
+     private void updateIndexEntry(PerVirtualNodeWriter bucketWriter, ByteString pkByteString) throws IndexException
      {
          IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
          builder.getIndexKeyBuilder()
@@ -237,7 +236,7 @@
          bucketWriter.indexEntries.add(builder.build());
      }
 
-     private void flushRowBatch(PerRetinaNodeWriter bucketWriter) throws IOException, IndexException
+     private void flushRowBatch(PerVirtualNodeWriter bucketWriter) throws IOException, IndexException
      {
          bucketWriter.pixelsWriter.addRowBatch(bucketWriter.rowBatch);
          bucketWriter.rowBatch.reset();
@@ -250,12 +249,12 @@
          }
 
          // Push index entries to the corresponding IndexService (determined by targetNode address)
-         bucketWriter.indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), bucketWriter.indexEntries);
-         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),bucketWriter.currFile.getId(), true);
+         bucketWriter.indexService.putPrimaryIndexEntries(index.getTableId(), index.getId(), bucketWriter.indexEntries, bucketWriter.option);
+         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),bucketWriter.currFile.getId(), true, bucketWriter.option);
          bucketWriter.indexEntries.clear();
      }
 
-     private void closePixelsFile(PerRetinaNodeWriter bucketWriter) throws IOException, IndexException
+     private void closePixelsFile(PerVirtualNodeWriter bucketWriter) throws IOException, IndexException
      {
          // Final flush of remaining rows/indexes
          if (bucketWriter.rowBatch.size != 0)
@@ -266,7 +265,7 @@
          closeWriterAndAddFile(bucketWriter.pixelsWriter, bucketWriter.currFile, bucketWriter.currTargetPath, bucketWriter.targetNode);
      }
 
-     private class PerRetinaNodeWriter
+     private class PerVirtualNodeWriter
      {
          PixelsWriter pixelsWriter;
          File currFile;
@@ -275,13 +274,15 @@
          int rgRowOffset;
          int prevRgId;
          int rowCounter;
+         int vNodeId;
+         IndexOption option;
          NodeProto.NodeInfo targetNode;
          List<IndexProto.PrimaryIndexEntry> indexEntries = new ArrayList<>();
          VectorizedRowBatch rowBatch;
          IndexService indexService;
          RowIdAllocator rowIdAllocator;
 
-         public PerRetinaNodeWriter(PixelsWriter writer, File file, Path path, NodeProto.NodeInfo node)
+         public PerVirtualNodeWriter(PixelsWriter writer, File file, Path path, NodeProto.NodeInfo node, int vNodeId)
          {
              this.pixelsWriter = writer;
              this.currFile = file;
@@ -292,9 +293,19 @@
              this.rgRowOffset = 0;
              this.rowCounter = 0;
              this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
+             this.vNodeId = vNodeId;
              this.indexService = indexServices.computeIfAbsent(node.getAddress(), nodeInfo ->
                      RPCIndexService.CreateInstance(nodeInfo, indexServerPort));
              this.rowIdAllocator = new RowIdAllocator(index.getTableId(), maxRowNum, this.indexService);
+             initIndexOption();
          }
+
+         private void initIndexOption()
+         {
+             this.option = IndexOption.builder()
+                     .vNodeId(this.vNodeId)
+                     .build();
+         }
+
      }
  }

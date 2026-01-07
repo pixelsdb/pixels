@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.common.index;
 
 import io.pixelsdb.pixels.common.exception.IndexException;
+import io.pixelsdb.pixels.common.index.service.IndexService;
+import io.pixelsdb.pixels.common.index.service.IndexServiceProvider;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.concurrent.locks.ReentrantLock;

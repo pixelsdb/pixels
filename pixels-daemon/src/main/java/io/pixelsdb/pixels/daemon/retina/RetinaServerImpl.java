@@ -25,8 +25,9 @@ import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.common.index.IndexService;
-import io.pixelsdb.pixels.common.index.IndexServiceProvider;
+import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.common.index.service.IndexService;
+import io.pixelsdb.pixels.common.index.service.IndexServiceProvider;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -301,6 +302,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     {
         String schemaName = request.getSchemaName();
         List<RetinaProto.TableUpdateData> tableUpdateDataList = request.getTableUpdateDataList();
+        int virtualNodeId = request.getVirtualNodeId();
+        IndexOption indexOption = new IndexOption();
+        indexOption.setVNodeId(virtualNodeId);
         if (!tableUpdateDataList.isEmpty())
         {
             for (RetinaProto.TableUpdateData tableUpdateData : tableUpdateDataList)
@@ -338,7 +342,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     List<IndexProto.IndexKey> primaryIndexKeys = indexKeysList.get(0);
                     long tableId = primaryIndexKeys.get(0).getTableId();
                     List<IndexProto.RowLocation> rowLocations = indexService.deletePrimaryIndexEntries
-                            (tableId, primaryIndexId, primaryIndexKeys);
+                            (tableId, primaryIndexId, primaryIndexKeys, indexOption);
 
                     // 1d. Delete the records
                     for (IndexProto.RowLocation rowLocation : rowLocations)
@@ -351,7 +355,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     {
                         List<IndexProto.IndexKey> indexKeys = indexKeysList.get(i);
                         indexService.deleteSecondaryIndexEntries(indexKeys.get(0).getTableId(),
-                                indexKeys.get(0).getIndexId(), indexKeys);
+                                indexKeys.get(0).getIndexId(), indexKeys, indexOption);
                     }
                 }
 
@@ -359,7 +363,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 // 2. Process Insert Data
                 // =================================================================
                 List<RetinaProto.InsertData> insertDataList = tableUpdateData.getInsertDataList();
-                int virtualNodeId = request.getVirtualNodeId();
                 if (!insertDataList.isEmpty())
                 {
                     // 2a. Validate the insert data
@@ -402,7 +405,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                     // 2d. Put the primary index entries
                     long tableId = primaryIndexEntries.get(0).getIndexKey().getTableId();
-                    indexService.putPrimaryIndexEntries(tableId, primaryIndexId, primaryIndexEntries);
+                    indexService.putPrimaryIndexEntries(tableId, primaryIndexId, primaryIndexEntries, indexOption);
 
                     // 2e. Put the secondary index entries
                     for (int i = 1; i < indexNum; ++i)
@@ -416,7 +419,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                                                 .build())
                                         .collect(Collectors.toList());
                         indexService.putSecondaryIndexEntries(indexKeys.get(0).getTableId(),
-                                indexKeys.get(0).getIndexId(), secondaryIndexEntries);
+                                indexKeys.get(0).getIndexId(), secondaryIndexEntries, indexOption);
                     }
                 }
 
@@ -476,7 +479,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     try
                     {
                         previousRowLocations = indexService.updatePrimaryIndexEntries
-                                (tableId, primaryIndexId, primaryIndexEntries);
+                                (tableId, primaryIndexId, primaryIndexEntries, indexOption);
                     } finally
                     {
                         lock.unlock();
@@ -501,7 +504,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                                         .collect(Collectors.toList());
 
                         indexService.updateSecondaryIndexEntries(indexKeys.get(0).getTableId(),
-                                indexKeys.get(0).getIndexId(), secondaryIndexEntries);
+                                indexKeys.get(0).getIndexId(), secondaryIndexEntries, indexOption);
                     }
 
                 }

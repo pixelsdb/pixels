@@ -90,6 +90,10 @@ message SecondaryIndexEntry {
   // bool unique = 3; // whether this secondary index is unique
 }
 
+message IndexOption {
+  uint32 virtualNodeId = 1;
+}
+
 message AllocateRowIdBatchRequest {
   uint64 tableId = 1;
   uint32 numRowIds = 2; // the number of row ids to allocate
@@ -102,6 +106,7 @@ message AllocateRowIdBatchResponse {
 
 message LookupUniqueIndexRequest {
   IndexKey indexKey = 1;
+  IndexOption indexOption = 2;
 }
 
 message LookupUniqueIndexResponse {
@@ -111,6 +116,7 @@ message LookupUniqueIndexResponse {
 
 message LookupNonUniqueIndexRequest {
   IndexKey indexKey = 1;
+  IndexOption indexOption = 2;
 }
 
 message LookupNonUniqueIndexResponse {
@@ -120,6 +126,7 @@ message LookupNonUniqueIndexResponse {
 
 message PutPrimaryIndexEntryRequest {
   PrimaryIndexEntry indexEntry = 1;
+  IndexOption indexOption = 2;
 }
 
 message PutPrimaryIndexEntryResponse {
@@ -130,6 +137,7 @@ message PutPrimaryIndexEntriesRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   repeated PrimaryIndexEntry indexEntries = 3; // all entries must from the same index
+  IndexOption indexOption = 4;
 }
 
 message PutPrimaryIndexEntriesResponse {
@@ -138,6 +146,7 @@ message PutPrimaryIndexEntriesResponse {
 
 message PutSecondaryIndexEntryRequest {
   SecondaryIndexEntry indexEntry = 1;
+  IndexOption indexOption = 2;
 }
 
 message PutSecondaryIndexEntryResponse {
@@ -148,6 +157,7 @@ message PutSecondaryIndexEntriesRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   repeated SecondaryIndexEntry indexEntries = 3; // all entries must from the same index
+  IndexOption indexOption = 4;
 }
 
 message PutSecondaryIndexEntriesResponse {
@@ -156,6 +166,7 @@ message PutSecondaryIndexEntriesResponse {
 
 message DeletePrimaryIndexEntryRequest {
   IndexKey indexKey = 1;
+  IndexOption indexOption = 2;
 }
 
 message DeletePrimaryIndexEntryResponse {
@@ -167,6 +178,7 @@ message DeletePrimaryIndexEntriesRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   repeated IndexKey indexKeys = 3; // all entries must from the same index
+  IndexOption indexOption = 4;
 }
 
 message DeletePrimaryIndexEntriesResponse {
@@ -176,6 +188,7 @@ message DeletePrimaryIndexEntriesResponse {
 
 message DeleteSecondaryIndexEntryRequest {
   IndexKey indexKey = 1;
+  IndexOption indexOption = 2;
 }
 
 message DeleteSecondaryIndexEntryResponse {
@@ -187,6 +200,7 @@ message DeleteSecondaryIndexEntriesRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   repeated IndexKey indexKeys = 3; // all entries must from the same index
+  IndexOption indexOption = 4;
 }
 
 message DeleteSecondaryIndexEntriesResponse {
@@ -196,6 +210,7 @@ message DeleteSecondaryIndexEntriesResponse {
 
 message UpdatePrimaryIndexEntryRequest {
   PrimaryIndexEntry indexEntry = 1;
+  IndexOption indexOption = 2;
 }
 
 message UpdatePrimaryIndexEntryResponse {
@@ -207,6 +222,7 @@ message UpdatePrimaryIndexEntriesRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   repeated PrimaryIndexEntry indexEntries = 3; // all entries must from the same index
+  IndexOption indexOption = 4;
 }
 
 message UpdatePrimaryIndexEntriesResponse {
@@ -216,6 +232,7 @@ message UpdatePrimaryIndexEntriesResponse {
 
 message UpdateSecondaryIndexEntryRequest {
   SecondaryIndexEntry indexEntry = 1;
+  IndexOption indexOption = 2;
 }
 
 message UpdateSecondaryIndexEntryResponse {
@@ -227,6 +244,7 @@ message UpdateSecondaryIndexEntriesRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   repeated SecondaryIndexEntry indexEntries = 3; // all entries must from the same index
+  IndexOption indexOption = 4;
 }
 
 message UpdateSecondaryIndexEntriesResponse {
@@ -239,6 +257,7 @@ message PurgeIndexEntriesRequest {
   uint64 indexId = 2;
   repeated IndexKey indexKeys = 3; // all entries must from the same index
   bool isPrimary = 4;
+  IndexOption indexOption = 5;
 }
 
 message PurgeIndexEntriesResponse {
@@ -260,6 +279,7 @@ message OpenIndexRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   bool isPrimary = 3;
+  IndexOption indexOption = 4;
 }
 
 message OpenIndexResponse {
@@ -270,6 +290,7 @@ message CloseIndexRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   bool isPrimary = 3;
+  IndexOption indexOption = 4;
 }
 
 message CloseIndexResponse {
@@ -280,6 +301,7 @@ message RemoveIndexRequest {
   uint64 tableId = 1;
   uint64 indexId = 2;
   bool isPrimary = 3;
+  IndexOption indexOption = 4;
 }
 
 message RemoveIndexResponse {

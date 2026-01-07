@@ -46,7 +46,7 @@ import static java.util.Objects.requireNonNull;
 public class SinglePointIndexFactory
 {
     private static final Logger logger = LogManager.getLogger(SinglePointIndexFactory.class);
-    private final Map<TableIndex, SinglePointIndex> singlePointIndexImpls = new ConcurrentHashMap<>();
+    private final Map<TableIndex, Map<Integer, SinglePointIndex>> singlePointIndexImpls = new ConcurrentHashMap<>();
     private final Set<SinglePointIndex.Scheme> enabledSchemes = new ConcurrentSkipListSet<>();
     private final Map<Long, TableIndex> indexIdToTableIndex = new ConcurrentHashMap<>();
     private final Lock lock = new ReentrantLock();
@@ -133,7 +133,7 @@ public class SinglePointIndexFactory
      * @return the single point index instance
      * @throws SinglePointIndexException
      */
-    public SinglePointIndex getSinglePointIndex(long tableId, long indexId) throws SinglePointIndexException
+    public SinglePointIndex getSinglePointIndex(long tableId, long indexId, IndexOption indexOption) throws SinglePointIndexException
     {
         TableIndex tableIndex = this.indexIdToTableIndex.get(indexId);
         if (tableIndex == null)
@@ -163,7 +163,7 @@ public class SinglePointIndexFactory
                 this.lock.unlock();
             }
         }
-        return getSinglePointIndex(tableIndex);
+        return getSinglePointIndex(tableIndex, indexOption);
     }
 
     /**
@@ -172,7 +172,7 @@ public class SinglePointIndexFactory
      * @return the single point index instance
      * @throws SinglePointIndexException
      */
-    public SinglePointIndex getSinglePointIndex(TableIndex tableIndex) throws SinglePointIndexException
+    public SinglePointIndex getSinglePointIndex(TableIndex tableIndex, IndexOption indexOption) throws SinglePointIndexException
     {
         requireNonNull(tableIndex, "tableIndex is null");
         checkArgument(this.enabledSchemes.contains(tableIndex.scheme), "single point index scheme '" +
@@ -180,19 +180,26 @@ public class SinglePointIndexFactory
 
         this.indexIdToTableIndex.putIfAbsent(tableIndex.indexId, tableIndex);
 
-        SinglePointIndex singlePointIndex = this.singlePointIndexImpls.get(tableIndex);
+        Map<Integer, SinglePointIndex> vNodeMap = this.singlePointIndexImpls.computeIfAbsent(
+                tableIndex, k -> new ConcurrentHashMap<>());
+
+        int vNodeId = indexOption.getVNodeId();
+        SinglePointIndex singlePointIndex = vNodeMap.get(vNodeId);
+
         if (singlePointIndex == null)
         {
             this.lock.lock();
             try
             {
                 // double check to avoid redundant creation of singlePointIndex
-                singlePointIndex = this.singlePointIndexImpls.get(tableIndex);
+                singlePointIndex = vNodeMap.get(vNodeId);
                 if (singlePointIndex == null)
                 {
+                    logger.info("Creating SinglePointIndex instance for tableId: {}, indexId: {}, vNodeId: {}",
+                            tableIndex.tableId, tableIndex.indexId, vNodeId);
                     singlePointIndex = this.singlePointIndexProviders.get(tableIndex.getScheme()).createInstance(
-                            tableIndex.tableId, tableIndex.indexId, tableIndex.scheme, tableIndex.isUnique());
-                    this.singlePointIndexImpls.put(tableIndex, singlePointIndex);
+                            tableIndex.tableId, tableIndex.indexId, tableIndex.scheme, tableIndex.isUnique(), indexOption);
+                    vNodeMap.put(vNodeId, singlePointIndex);
                 }
             }
             finally
@@ -212,21 +219,34 @@ public class SinglePointIndexFactory
         this.lock.lock();
         try
         {
-            for (TableIndex tableIndex : this.singlePointIndexImpls.keySet())
+            for (Map.Entry<TableIndex, Map<Integer, SinglePointIndex>> outerEntry : this.singlePointIndexImpls.entrySet())
             {
-                try
+                TableIndex tableIndex = outerEntry.getKey();
+                Map<Integer, SinglePointIndex> vNodeMap = outerEntry.getValue();
+
+                if (vNodeMap != null)
                 {
-                    SinglePointIndex removing = this.singlePointIndexImpls.get(tableIndex);
-                    if (removing != null)
+                    // Iterate through all SinglePointIndex instances for each vNodeId
+                    for (SinglePointIndex indexImpl : vNodeMap.values())
                     {
-                        removing.close();
+                        try
+                        {
+                            if (indexImpl != null)
+                            {
+                                indexImpl.close();
+                            }
+                        }
+                        catch (IOException e)
+                        {
+                            // Note: As per original logic, an exception here stops the closing process
+                            throw new SinglePointIndexException(
+                                    "failed to close single point index with id " + tableIndex.indexId, e);
+                        }
                     }
-                } catch (IOException e)
-                {
-                    throw new SinglePointIndexException(
-                            "failed to close single point index with id " + tableIndex.indexId, e);
                 }
             }
+
+            // Clear all tracking maps after successful closing
             this.singlePointIndexImpls.clear();
             this.indexIdToTableIndex.clear();
         }
@@ -243,57 +263,57 @@ public class SinglePointIndexFactory
      * @param closeAndRemove remove the index storage after closing if true
      * @throws SinglePointIndexException
      */
-    public void closeIndex(long tableId, long indexId, boolean closeAndRemove) throws SinglePointIndexException
+    public void closeIndex(long tableId, long indexId, boolean closeAndRemove, IndexOption indexOption) throws SinglePointIndexException
     {
+        // indexOption is ignored as per requirement to close all vNodes for this index
         this.lock.lock();
         try
         {
+            // 1. Identify the TableIndex
             TableIndex tableIndex = this.indexIdToTableIndex.remove(indexId);
-            if (tableIndex != null)
+            if (tableIndex == null)
             {
-                SinglePointIndex removed = this.singlePointIndexImpls.remove(tableIndex);
-                if (removed != null)
-                {
-                    try
-                    {
-                        if (closeAndRemove)
-                        {
-                            removed.closeAndRemove();
-                        } else
-                        {
-                            removed.close();
-                        }
-                    } catch (IOException e)
-                    {
-                        throw new SinglePointIndexException(
-                                "failed to close single point index with id " + tableIndex.indexId, e);
-                    }
-                } else
-                {
-                    logger.warn("index with id {} once opened but not found", indexId);
-                }
-            } else
+                // Fallback: create a dummy TableIndex if not found in the tracker
+                tableIndex = new TableIndex(tableId, indexId, null, false);
+            }
+
+            // 2. Remove the entire inner map (all vNodes) from the implementation map
+            Map<Integer, SinglePointIndex> vNodeMap = this.singlePointIndexImpls.remove(tableIndex);
+
+            if (vNodeMap != null)
             {
-                TableIndex tableIndex1 = new TableIndex(tableId, indexId, null, false);
-                SinglePointIndex removed = this.singlePointIndexImpls.remove(tableIndex1);
-                if (removed != null)
+                // 3. Iterate through all SinglePointIndex instances for all vNodes
+                for (Map.Entry<Integer, SinglePointIndex> entry : vNodeMap.entrySet())
                 {
-                    try
+                    int vNodeId = entry.getKey();
+                    SinglePointIndex indexImpl = entry.getValue();
+
+                    if (indexImpl != null)
                     {
-                        if (closeAndRemove)
+                        try
                         {
-                            removed.closeAndRemove();
-                        } else
-                        {
-                            removed.close();
+                            if (closeAndRemove)
+                            {
+                                indexImpl.closeAndRemove();
+                            }
+                            else
+                            {
+                                indexImpl.close();
+                            }
                         }
-                    } catch (IOException e)
-                    {
-                        throw new SinglePointIndexException(
-                                "failed to close single point index with id " + tableIndex.indexId, e);
+                        catch (IOException e)
+                        {
+                            // Note: If one vNode fails to close, we still throw to notify the caller,
+                            // but the mappings have already been removed from the factory.
+                            throw new SinglePointIndexException(
+                                    "failed to close single point index with id " + indexId + " for vNode " + vNodeId, e);
+                        }
                     }
-                    logger.warn("index with id {} is found but not opened properly", indexId);
                 }
+            }
+            else
+            {
+                logger.warn("No active index instances found for indexId {} during close operation", indexId);
             }
         }
         finally

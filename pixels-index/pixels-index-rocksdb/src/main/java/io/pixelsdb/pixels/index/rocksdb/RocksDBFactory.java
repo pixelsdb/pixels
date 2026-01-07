@@ -17,7 +17,6 @@
 package io.pixelsdb.pixels.index.rocksdb;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.common.metadata.MetadataCache;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.IndexUtils;
@@ -28,7 +27,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 /**
  * @package: io.pixelsdb.pixels.index.rocksdb
@@ -52,6 +50,8 @@ public class RocksDBFactory
     private static final AtomicInteger reference = new AtomicInteger(0);
     private static final Map<String, ColumnFamilyHandle> cfHandles = new ConcurrentHashMap<>();
     private static final String defaultColumnFamily = new String(RocksDB.DEFAULT_COLUMN_FAMILY, StandardCharsets.UTF_8);
+    private static final Map<Long, Integer> indexKeyLenCache = new ConcurrentHashMap<>();
+    private static final Integer VARIABLE_LEN_SENTINEL = -2;
 
     private RocksDBFactory() { }
 
@@ -203,9 +203,9 @@ public class RocksDBFactory
     /**
      * Get or create a ColumnFamily for (tableId, indexId).
      */
-    public static synchronized ColumnFamilyHandle getOrCreateColumnFamily(long tableId, long indexId) throws RocksDBException
+    public static synchronized ColumnFamilyHandle getOrCreateColumnFamily(long tableId, long indexId, int vNodeId) throws RocksDBException
     {
-        String cfName = getCFName(tableId, indexId);
+        String cfName = getCFName(tableId, indexId, vNodeId);
 
         // Return cached handle if exists
         if (cfHandles.containsKey(cfName))
@@ -234,11 +234,11 @@ public class RocksDBFactory
         return cfHandles;
     }
 
-    private static String getCFName(long tableId, long indexId)
+    private static String getCFName(long tableId, long indexId, int vNodeId)
     {
         if(multiCF)
         {
-            return "t" + tableId + "_i" + indexId;
+            return "t" + tableId + "_i" + indexId + "_v" + vNodeId;
         }
         else
         {
@@ -257,51 +257,78 @@ public class RocksDBFactory
 
         try
         {
-            // Remove the leading 't', then split by '_i'
-            // Example: "t123_i456" -> ["123", "456"]
-            if (name.startsWith("t") && name.contains("_i"))
+            // Expected format: "t{tableId}_i{indexId}_v{vNodeId}"
+            // Example: "t100_i200_v5" -> ["100", "200", "30"]
+            if (name.startsWith("t") && name.contains("_i") && name.contains("_v"))
             {
-                String parts = name.substring(1); // Remove 't'
-                String[] ids = parts.split("_i");
+                // Remove the leading 't'
+                String content = name.substring(1);
 
-                if (ids.length == 2)
+                // Split using regex for multiple delimiters: _i and _v
+                String[] parts = content.split("_i|_v");
+
+                if (parts.length == 3)
                 {
-                    long tableId = Long.parseLong(ids[0]);
-                    long indexId = Long.parseLong(ids[1]);
-                    return new long[]{tableId, indexId};
-                } else
+                    long tableId = Long.parseLong(parts[0]);
+                    long indexId = Long.parseLong(parts[1]);
+                    long vNodeId = Long.parseLong(parts[2]);
+
+                    return new long[]{tableId, indexId, vNodeId};
+                }
+                else
                 {
-                    throw new RocksDBException("Failed to parse CF name: " + name);
+                    throw new RocksDBException("Failed to parse CF name (invalid segments): " + name);
                 }
             }
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             throw new RocksDBException("Failed to parse CF name: " + name);
         }
+
         return null;
     }
 
     private static Integer getIndexKeyLen(long tableId, long indexId) throws MetadataException
     {
+        // Try to retrieve from cache using only indexId
+        Integer cachedLen = indexKeyLenCache.get(indexId);
+        if (cachedLen != null)
+        {
+            return cachedLen.equals(VARIABLE_LEN_SENTINEL) ? null : cachedLen;
+        }
+
+        // Cache miss: Perform the metadata lookup
         List<Column> keyColumns = IndexUtils.extractInfoFromIndex(tableId, indexId);
         TypeDescription keySchema = TypeDescription.createSchemaFromColumns(keyColumns);
+
         int keyLen = 0;
+        Integer result = null;
+
         if (keySchema.getChildren() != null)
         {
-            for(TypeDescription typeDescription: keySchema.getChildren())
+            boolean isFixedLen = true;
+            for (TypeDescription typeDescription : keySchema.getChildren())
             {
                 int colLen = keyLengthOf(typeDescription.getCategory().getExternalJavaType());
-                if(colLen == -1)
+                if (colLen == -1)
                 {
-                    return null;
+                    isFixedLen = false;
+                    break;
                 }
                 keyLen += colLen;
             }
-            return keyLen;
-        } else
-        {
-            return null;
+
+            if (isFixedLen)
+            {
+                result = keyLen;
+            }
         }
+
+        // Update cache (store result or sentinel)
+        indexKeyLenCache.put(indexId, result == null ? VARIABLE_LEN_SENTINEL : result);
+
+        return result;
     }
 
     public static int keyLengthOf(Class<?> clazz) {

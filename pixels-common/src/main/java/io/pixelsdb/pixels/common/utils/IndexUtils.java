@@ -21,14 +21,12 @@
  package io.pixelsdb.pixels.common.utils;
 
  import io.pixelsdb.pixels.common.exception.MetadataException;
- import io.pixelsdb.pixels.common.index.IndexService;
  import io.pixelsdb.pixels.common.metadata.MetadataService;
  import io.pixelsdb.pixels.common.metadata.domain.Column;
  import io.pixelsdb.pixels.common.metadata.domain.Schema;
  import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
  import io.pixelsdb.pixels.common.metadata.domain.Table;
 
- import java.util.ArrayList;
  import java.util.LinkedList;
  import java.util.List;
  import java.util.stream.IntStream;

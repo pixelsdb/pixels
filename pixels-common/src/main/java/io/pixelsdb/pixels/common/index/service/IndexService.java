@@ -17,9 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.index;
+package io.pixelsdb.pixels.common.index.service;
 
 import io.pixelsdb.pixels.common.exception.IndexException;
+import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.index.IndexProto;
 import java.util.List;
 
@@ -41,28 +42,28 @@ public interface IndexService
      * @param key the index key
      * @return the row location or null if the index entry is not found
      */
-    IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key) throws IndexException;
+    IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException;
 
     /**
      * Lookup a non-unique index.
      * @param key the index key
      * @return the row locations or null if the index entry is not found
      */
-    List<IndexProto.RowLocation> lookupNonUniqueIndex(IndexProto.IndexKey key) throws IndexException;
+    List<IndexProto.RowLocation> lookupNonUniqueIndex(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException;
 
     /**
      * Put an index entry into the primary index.
      * @param entry the index entry
      * @return true on success
      */
-    boolean putPrimaryIndexEntry(IndexProto.PrimaryIndexEntry entry) throws IndexException;
+    boolean putPrimaryIndexEntry(IndexProto.PrimaryIndexEntry entry, IndexOption indexOption) throws IndexException;
 
     /**
      * Put an index entry into the secondary index.
      * @param entry the index entry
      * @return true on success
      */
-    boolean putSecondaryIndexEntry(IndexProto.SecondaryIndexEntry entry) throws IndexException;
+    boolean putSecondaryIndexEntry(IndexProto.SecondaryIndexEntry entry, IndexOption indexOption) throws IndexException;
 
     /**
      * Put a batch of index entries into the primary index.
@@ -72,7 +73,7 @@ public interface IndexService
      * @return true on success
      */
     boolean putPrimaryIndexEntries(long tableId, long indexId,
-                                   List<IndexProto.PrimaryIndexEntry> entries) throws IndexException;
+                                   List<IndexProto.PrimaryIndexEntry> entries, IndexOption indexOption) throws IndexException;
 
     /**
      * Put a batch of index entries into the secondary index.
@@ -82,7 +83,7 @@ public interface IndexService
      * @return true on success
      */
     boolean putSecondaryIndexEntries(long tableId, long indexId,
-                                     List<IndexProto.SecondaryIndexEntry> entries) throws IndexException;
+                                     List<IndexProto.SecondaryIndexEntry> entries, IndexOption indexOption) throws IndexException;
 
     /**
      * Delete an entry from the primary index. The deleted index entry is marked as deleted using a tombstone.
@@ -90,7 +91,7 @@ public interface IndexService
      * @return the row location of the deleted index entry
      * @throws IndexException if no existing entry to delete
      */
-    IndexProto.RowLocation deletePrimaryIndexEntry(IndexProto.IndexKey key) throws IndexException;
+    IndexProto.RowLocation deletePrimaryIndexEntry(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException;
 
     /**
      * Delete entry(ies) from the secondary index. Each deleted index entry is marked as deleted using a tombstone.
@@ -98,18 +99,19 @@ public interface IndexService
      * @return the row id(s) of the deleted index entry(ies)
      * @throws IndexException if no existing entry(ies) to delete
      */
-    List<Long> deleteSecondaryIndexEntry(IndexProto.IndexKey key) throws IndexException;
+    List<Long> deleteSecondaryIndexEntry(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException;
 
     /**
      * Delete entries from the primary index. Each deleted index entry is marked as deleted using a tombstone.
      * @param tableId the table id of the index
      * @param indexId the index id of the index
      * @param keys the keys of the entries to delete
+     * @param indexOption the extra option
      * @return the row locations of the deleted index entries
      * @throws IndexException if no existing entry(ies) to delete
      */
     List<IndexProto.RowLocation> deletePrimaryIndexEntries(long tableId, long indexId,
-                                                           List<IndexProto.IndexKey> keys) throws IndexException;
+                                                           List<IndexProto.IndexKey> keys, IndexOption indexOption) throws IndexException;
 
     /**
      * Delete entries from the secondary index. Each deleted index entry is marked as deleted using a tombstone.
@@ -120,7 +122,7 @@ public interface IndexService
      * @throws IndexException if no existing entry(ies) to delete
      */
     List<Long> deleteSecondaryIndexEntries(long tableId, long indexId,
-                                           List<IndexProto.IndexKey> keys) throws IndexException;
+                                           List<IndexProto.IndexKey> keys, IndexOption indexOption) throws IndexException;
 
     /**
      * Update the entry of a primary index.
@@ -128,7 +130,7 @@ public interface IndexService
      * @return the previous row location of the index entry
      * @throws IndexException if no existing entry to update
      */
-    IndexProto.RowLocation updatePrimaryIndexEntry(IndexProto.PrimaryIndexEntry indexEntry) throws IndexException;
+    IndexProto.RowLocation updatePrimaryIndexEntry(IndexProto.PrimaryIndexEntry indexEntry, IndexOption indexOption) throws IndexException;
 
     /**
      * Update the entry of a secondary index.
@@ -136,7 +138,7 @@ public interface IndexService
      * @return the previous row id(s) of the index entry
      * @throws IndexException if no existing entry(ies) to update
      */
-    List<Long> updateSecondaryIndexEntry(IndexProto.SecondaryIndexEntry indexEntry) throws IndexException;
+    List<Long> updateSecondaryIndexEntry(IndexProto.SecondaryIndexEntry indexEntry, IndexOption indexOption) throws IndexException;
 
     /**
      * Update the entries of a primary index.
@@ -147,7 +149,7 @@ public interface IndexService
      * @throws IndexException if no existing entry(ies) to update
      */
     List<IndexProto.RowLocation> updatePrimaryIndexEntries(long tableId, long indexId,
-                                                           List<IndexProto.PrimaryIndexEntry> indexEntries) throws IndexException;
+                                                           List<IndexProto.PrimaryIndexEntry> indexEntries, IndexOption indexOption) throws IndexException;
 
     /**
      * Update the entries of a secondary index.
@@ -158,7 +160,7 @@ public interface IndexService
      * @throws IndexException if no existing entry(ies) to update
      */
     List<Long> updateSecondaryIndexEntries(long tableId, long indexId,
-                                           List<IndexProto.SecondaryIndexEntry> indexEntries) throws IndexException;
+                                           List<IndexProto.SecondaryIndexEntry> indexEntries, IndexOption indexOption) throws IndexException;
 
     /**
      * Purge (remove) the index entries of an index permanently. This should only be done asynchronously by the garbage
@@ -170,7 +172,7 @@ public interface IndexService
      * @return true on success
      */
     boolean purgeIndexEntries(long tableId, long indexId,
-                              List<IndexProto.IndexKey> indexKeys, boolean isPrimary) throws IndexException;
+                              List<IndexProto.IndexKey> indexKeys, boolean isPrimary, IndexOption indexOption) throws IndexException;
 
     /**
      * Flush the index entries of an index corresponding to a buffered Pixels data file.
@@ -184,7 +186,7 @@ public interface IndexService
      * @return true on success
      */
     boolean flushIndexEntriesOfFile(long tableId, long indexId,
-                                    long fileId, boolean isPrimary) throws IndexException;
+                                    long fileId, boolean isPrimary, IndexOption indexOption) throws IndexException;
 
     /**
      * Open an index in the index server. This method is optional and is used to pre-warm an index instance in
@@ -194,7 +196,7 @@ public interface IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    boolean openIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
+    boolean openIndex(long tableId, long indexId, boolean isPrimary, IndexOption indexOption) throws IndexException;
 
     /**
      * Close an index in the index server.
@@ -203,7 +205,7 @@ public interface IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    boolean closeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
+    boolean closeIndex(long tableId, long indexId, boolean isPrimary, IndexOption option) throws IndexException;
 
     /**
      * Close an index and remove its persistent storage content in the index server.
@@ -212,6 +214,6 @@ public interface IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    boolean removeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException;
+    boolean removeIndex(long tableId, long indexId, boolean isPrimary, IndexOption option) throws IndexException;
 }
 

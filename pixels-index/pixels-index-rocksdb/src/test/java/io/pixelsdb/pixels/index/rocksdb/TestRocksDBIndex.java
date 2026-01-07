@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.AfterEach;
@@ -51,8 +52,11 @@ public class TestRocksDBIndex
     @BeforeEach
     public void setUp() throws RocksDBException
     {
-        uniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID, true);
-        nonUniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID + 1, false);
+        IndexOption option = IndexOption.builder()
+                .vNodeId(0)
+                .build();
+        uniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID, true, option);
+        nonUniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID + 1, false, option);
         rocksDB = RocksDBFactory.getRocksDB();
     }
 

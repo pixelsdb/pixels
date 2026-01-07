@@ -23,6 +23,7 @@
 import com.google.common.hash.Hashing;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.node.BucketCache;
+import io.pixelsdb.pixels.common.node.VnodeIdentifier;
 import io.pixelsdb.pixels.common.retina.RetinaService;
 
  public class RetinaUtils
@@ -81,6 +82,11 @@ import io.pixelsdb.pixels.common.retina.RetinaService;
     public static String getRetinaHostNameFromBucketId(int bucketId)
     {
         return BucketCache.getInstance().getRetinaNodeInfoByBucketId(bucketId).getAddress();
+    }
+
+    public static VnodeIdentifier getVnodeIdentifierFromBucketId(int bucketId)
+    {
+        return VnodeIdentifier.fromNodeInfo(BucketCache.getInstance().getRetinaNodeInfoByBucketId(bucketId));
     }
 
     public static RetinaService getRetinaServiceFromBucketId(int bucketId)

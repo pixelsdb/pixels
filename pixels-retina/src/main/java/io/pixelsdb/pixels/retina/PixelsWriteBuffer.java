@@ -22,7 +22,8 @@ package io.pixelsdb.pixels.retina;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
-import io.pixelsdb.pixels.common.index.IndexServiceProvider;
+import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.common.index.service.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
@@ -124,6 +125,7 @@ public class PixelsWriteBuffer
     private String retinaHostName;
     private SinglePointIndex index;
     private final int virtualNodeId;
+    private final IndexOption indexOption;
 
     public PixelsWriteBuffer(long tableId, TypeDescription schema, Path targetOrderedDirPath,
                              Path targetCompactDirPath, String retinaHostName, int virtualNode) throws RetinaException
@@ -131,6 +133,9 @@ public class PixelsWriteBuffer
         this.tableId = tableId;
         this.schema = schema;
         this.virtualNodeId = virtualNode;
+        this.indexOption = IndexOption.builder()
+                .vNodeId(virtualNodeId)
+                .build();
 
         ConfigFactory configFactory = ConfigFactory.Instance();
         this.memTableSize = Integer.parseInt(configFactory.getProperty("retina.buffer.memTable.size"));
@@ -412,7 +417,7 @@ public class PixelsWriteBuffer
                         if(index != null)
                         {
                             IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local)
-                                    .flushIndexEntriesOfFile(tableId, index.getId(), fileWriterManager.getFileId(), true);
+                                    .flushIndexEntriesOfFile(tableId, index.getId(), fileWriterManager.getFileId(), true, indexOption);
                         }
                         for (ObjectEntry objectEntry : toRemove)
                         {
