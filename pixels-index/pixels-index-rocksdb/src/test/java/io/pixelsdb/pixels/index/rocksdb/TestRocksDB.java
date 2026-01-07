@@ -348,7 +348,7 @@ public class TestRocksDB
     @Test
     public void testFullCompaction() throws RocksDBException
     {
-        final String dbPath = "/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina-3/rocksdb";
+        final String dbPath = "/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina/rocksdb";
         try (RocksDB rocksDB = RocksDBFactory.createRocksDB(dbPath))
         {
             System.out.println("Start Full Compaction");
