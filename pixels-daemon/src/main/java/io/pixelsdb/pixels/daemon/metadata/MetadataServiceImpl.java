@@ -246,6 +246,41 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void getSchemaById(MetadataProto.GetSchemaByIdRequest request, StreamObserver<MetadataProto.GetSchemaByIdResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.ResponseHeader header;
+        MetadataProto.GetSchemaByIdResponse response;
+        MetadataProto.Schema schema = schemaDao.getById(request.getSchemaId());
+        if (schema == null)
+        {
+            header = headerBuilder
+                    .setErrorCode(METADATA_SCHEMA_NOT_FOUND) // Constant representing schema error
+                    .setErrorMsg("Metadata server failed to get schema: " + request.getSchemaId())
+                    .build();
+
+            response = MetadataProto.GetSchemaByIdResponse.newBuilder()
+                    .setHeader(header)
+                    .build();
+        }
+        else
+        {
+            header = headerBuilder
+                    .setErrorCode(0)
+                    .setErrorMsg("")
+                    .build();
+            response = MetadataProto.GetSchemaByIdResponse.newBuilder()
+                    .setHeader(header)
+                    .setSchema(schema)
+                    .build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void getSchemas(MetadataProto.GetSchemasRequest request,
                            StreamObserver<MetadataProto.GetSchemasResponse> responseObserver)
     {

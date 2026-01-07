@@ -31,7 +31,7 @@ public class TestRocksetIndex
     {
         RocksetIndex rocksetIndex = (RocksetIndex) SinglePointIndexFactory.Instance().
                 getSinglePointIndex(new SinglePointIndexFactory.TableIndex(
-                        1L, 1L, SinglePointIndex.Scheme.rockset, true));
+                        1L, 1L, SinglePointIndex.Scheme.rockset, true), null);
 
         long dbHandle = 0;
 

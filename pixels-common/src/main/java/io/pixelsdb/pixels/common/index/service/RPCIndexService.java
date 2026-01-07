@@ -17,12 +17,14 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.index;
+package io.pixelsdb.pixels.common.index.service;
 
+import io.grpc.Internal;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.IndexException;
+import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
@@ -142,10 +144,11 @@ public class RPCIndexService implements IndexService
      * @param key the index key
      * @return the row location or null if the index entry is not found.
      */
-    public IndexProto.RowLocation lookupUniqueIndex (IndexProto.IndexKey key) throws IndexException
+    @Override
+    public IndexProto.RowLocation lookupUniqueIndex (IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
         IndexProto.LookupUniqueIndexRequest request = IndexProto.LookupUniqueIndexRequest.newBuilder()
-                .setIndexKey(key).build();
+                .setIndexKey(key).setIndexOption(indexOption.toProto()).build();
 
         IndexProto.LookupUniqueIndexResponse response = stub.lookupUniqueIndex(request);
         if (response.getErrorCode() == ErrorCode.SUCCESS)
@@ -167,9 +170,11 @@ public class RPCIndexService implements IndexService
      * @param key the index key
      * @return the row locations or null if the index entry is not found.
      */
-    public List<IndexProto.RowLocation> lookupNonUniqueIndex (IndexProto.IndexKey key) throws IndexException
+    @Override
+    public List<IndexProto.RowLocation> lookupNonUniqueIndex (IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
         IndexProto.LookupNonUniqueIndexRequest request = IndexProto.LookupNonUniqueIndexRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setIndexKey(key).build();
 
         IndexProto.LookupNonUniqueIndexResponse response = stub.lookupNonUniqueIndex(request);
@@ -192,9 +197,11 @@ public class RPCIndexService implements IndexService
      * @param entry the index entry
      * @return true on success
      */
-    public boolean putPrimaryIndexEntry (IndexProto.PrimaryIndexEntry entry) throws IndexException
+    @Override
+    public boolean putPrimaryIndexEntry (IndexProto.PrimaryIndexEntry entry, IndexOption indexOption) throws IndexException
     {
         IndexProto.PutPrimaryIndexEntryRequest request = IndexProto.PutPrimaryIndexEntryRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setIndexEntry(entry).build();
 
         IndexProto.PutPrimaryIndexEntryResponse response = stub.putPrimaryIndexEntry(request);
@@ -210,9 +217,11 @@ public class RPCIndexService implements IndexService
      * @param entry the index entry
      * @return true on success
      */
-    public boolean putSecondaryIndexEntry (IndexProto.SecondaryIndexEntry entry) throws IndexException
+    @Override
+    public boolean putSecondaryIndexEntry (IndexProto.SecondaryIndexEntry entry, IndexOption indexOption) throws IndexException
     {
         IndexProto.PutSecondaryIndexEntryRequest request = IndexProto.PutSecondaryIndexEntryRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setIndexEntry(entry).build();
 
         IndexProto.PutSecondaryIndexEntryResponse response = stub.putSecondaryIndexEntry(request);
@@ -230,11 +239,14 @@ public class RPCIndexService implements IndexService
      * @param entries the index entries
      * @return true on success
      */
-    public boolean putPrimaryIndexEntries (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> entries)
+    @Override
+    public boolean putPrimaryIndexEntries (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> entries, IndexOption indexOption)
             throws IndexException
     {
         IndexProto.PutPrimaryIndexEntriesRequest request = IndexProto.PutPrimaryIndexEntriesRequest.newBuilder()
-                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(entries).build();
+                .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(entries)
+                .setIndexOption(indexOption.toProto())
+                .build();
 
         IndexProto.PutPrimaryIndexEntriesResponse response = stub.putPrimaryIndexEntries(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
@@ -251,10 +263,12 @@ public class RPCIndexService implements IndexService
      * @param entries the index entries
      * @return true on success
      */
-    public boolean putSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> entries)
+    @Override
+    public boolean putSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> entries, IndexOption indexOption)
             throws IndexException
     {
         IndexProto.PutSecondaryIndexEntriesRequest request = IndexProto.PutSecondaryIndexEntriesRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(entries).build();
 
         IndexProto.PutSecondaryIndexEntriesResponse response = stub.putSecondaryIndexEntries(request);
@@ -270,9 +284,11 @@ public class RPCIndexService implements IndexService
      * @param key the index key
      * @return the row location of the deleted index entry
      */
-    public IndexProto.RowLocation deletePrimaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    @Override
+    public IndexProto.RowLocation deletePrimaryIndexEntry (IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
         IndexProto.DeletePrimaryIndexEntryRequest request = IndexProto.DeletePrimaryIndexEntryRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setIndexKey(key).build();
 
         IndexProto.DeletePrimaryIndexEntryResponse response = stub.deletePrimaryIndexEntry(request);
@@ -288,9 +304,11 @@ public class RPCIndexService implements IndexService
      * @param key the index key
      * @return the row id(s) of the deleted index entry(ies)
      */
-    public List<Long> deleteSecondaryIndexEntry (IndexProto.IndexKey key) throws IndexException
+    @Override
+    public List<Long> deleteSecondaryIndexEntry (IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
         IndexProto.DeleteSecondaryIndexEntryRequest request = IndexProto.DeleteSecondaryIndexEntryRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setIndexKey(key).build();
 
         IndexProto.DeleteSecondaryIndexEntryResponse response = stub.deleteSecondaryIndexEntry(request);
@@ -308,10 +326,12 @@ public class RPCIndexService implements IndexService
      * @param keys the keys of the entries to delete
      * @return the row locations of the deleted index entries
      */
-    public List<IndexProto.RowLocation> deletePrimaryIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> keys)
+    @Override
+    public List<IndexProto.RowLocation> deletePrimaryIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> keys, IndexOption indexOption)
             throws IndexException
     {
         IndexProto.DeletePrimaryIndexEntriesRequest request = IndexProto.DeletePrimaryIndexEntriesRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(keys).build();
 
         IndexProto.DeletePrimaryIndexEntriesResponse response = stub.deletePrimaryIndexEntries(request);
@@ -329,10 +349,12 @@ public class RPCIndexService implements IndexService
      * @param keys the keys of the entries to delete
      * @return the row ids of the deleted index entries
      */
-    public List<Long> deleteSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> keys)
+    @Override
+    public List<Long> deleteSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> keys, IndexOption indexOption)
             throws IndexException
     {
         IndexProto.DeleteSecondaryIndexEntriesRequest request = IndexProto.DeleteSecondaryIndexEntriesRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(keys).build();
 
         IndexProto.DeleteSecondaryIndexEntriesResponse response = stub.deleteSecondaryIndexEntries(request);
@@ -348,9 +370,11 @@ public class RPCIndexService implements IndexService
      * @param indexEntry the index entry to update
      * @return the previous row location of the index entry
      */
-    public IndexProto.RowLocation updatePrimaryIndexEntry (IndexProto.PrimaryIndexEntry indexEntry) throws IndexException
+    @Override
+    public IndexProto.RowLocation updatePrimaryIndexEntry (IndexProto.PrimaryIndexEntry indexEntry, IndexOption indexOption) throws IndexException
     {
         IndexProto.UpdatePrimaryIndexEntryRequest request = IndexProto.UpdatePrimaryIndexEntryRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setIndexEntry(indexEntry).build();
 
         IndexProto.UpdatePrimaryIndexEntryResponse response = stub.updatePrimaryIndexEntry(request);
@@ -366,9 +390,11 @@ public class RPCIndexService implements IndexService
      * @param indexEntry the index entry to update
      * @return the previous row id(s) of the index entry
      */
-    public List<Long> updateSecondaryIndexEntry (IndexProto.SecondaryIndexEntry indexEntry) throws IndexException
+    @Override
+    public List<Long> updateSecondaryIndexEntry (IndexProto.SecondaryIndexEntry indexEntry, IndexOption indexOption) throws IndexException
     {
         IndexProto.UpdateSecondaryIndexEntryRequest request = IndexProto.UpdateSecondaryIndexEntryRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setIndexEntry(indexEntry).build();
 
         IndexProto.UpdateSecondaryIndexEntryResponse response = stub.updateSecondaryIndexEntry(request);
@@ -386,10 +412,12 @@ public class RPCIndexService implements IndexService
      * @param indexEntries the index entries to update
      * @return the previous row locations of the index entries
      */
-    public List<IndexProto.RowLocation> updatePrimaryIndexEntries (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> indexEntries)
+    @Override
+    public List<IndexProto.RowLocation> updatePrimaryIndexEntries (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> indexEntries, IndexOption indexOption)
             throws IndexException
     {
         IndexProto.UpdatePrimaryIndexEntriesRequest request = IndexProto.UpdatePrimaryIndexEntriesRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(indexEntries).build();
 
         IndexProto.UpdatePrimaryIndexEntriesResponse response = stub.updatePrimaryIndexEntries(request);
@@ -407,10 +435,12 @@ public class RPCIndexService implements IndexService
      * @param indexEntries the index entries to update
      * @return the previous row ids of the index entries
      */
-    public List<Long> updateSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> indexEntries)
+    @Override
+    public List<Long> updateSecondaryIndexEntries (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> indexEntries, IndexOption indexOption)
             throws IndexException
     {
         IndexProto.UpdateSecondaryIndexEntriesRequest request = IndexProto.UpdateSecondaryIndexEntriesRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).addAllIndexEntries(indexEntries).build();
 
         IndexProto.UpdateSecondaryIndexEntriesResponse response = stub.updateSecondaryIndexEntries(request);
@@ -430,10 +460,12 @@ public class RPCIndexService implements IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean purgeIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> indexKeys, boolean isPrimary)
+    @Override
+    public boolean purgeIndexEntries (long tableId, long indexId, List<IndexProto.IndexKey> indexKeys, boolean isPrimary, IndexOption indexOption)
             throws IndexException
     {
         IndexProto.PurgeIndexEntriesRequest request = IndexProto.PurgeIndexEntriesRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).addAllIndexKeys(indexKeys).setIsPrimary(isPrimary).build();
 
         IndexProto.PurgeIndexEntriesResponse response = stub.purgeIndexEntries(request);
@@ -455,7 +487,8 @@ public class RPCIndexService implements IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean flushIndexEntriesOfFile (long tableId, long indexId, long fileId, boolean isPrimary) throws IndexException
+    @Override
+    public boolean flushIndexEntriesOfFile (long tableId, long indexId, long fileId, boolean isPrimary, IndexOption indexOption) throws IndexException
     {
         IndexProto.FlushIndexEntriesOfFileRequest request = IndexProto.FlushIndexEntriesOfFileRequest.newBuilder()
                 .setTableId(tableId).setIndexId(indexId).setFileId(fileId).setIsPrimary(isPrimary).build();
@@ -476,9 +509,11 @@ public class RPCIndexService implements IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean openIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
+    @Override
+    public boolean openIndex (long tableId, long indexId, boolean isPrimary, IndexOption indexOption) throws IndexException
     {
         IndexProto.OpenIndexRequest request = IndexProto.OpenIndexRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
 
         IndexProto.OpenIndexResponse response = stub.openIndex(request);
@@ -496,9 +531,11 @@ public class RPCIndexService implements IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean closeIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
+    @Override
+    public boolean closeIndex (long tableId, long indexId, boolean isPrimary, IndexOption indexOption) throws IndexException
     {
         IndexProto.CloseIndexRequest request = IndexProto.CloseIndexRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
 
         IndexProto.CloseIndexResponse response = stub.closeIndex(request);
@@ -516,9 +553,11 @@ public class RPCIndexService implements IndexService
      * @param isPrimary true if the index is a primary index
      * @return true on success
      */
-    public boolean removeIndex (long tableId, long indexId, boolean isPrimary) throws IndexException
+    @Override
+    public boolean removeIndex (long tableId, long indexId, boolean isPrimary, IndexOption indexOption) throws IndexException
     {
         IndexProto.RemoveIndexRequest request = IndexProto.RemoveIndexRequest.newBuilder()
+                .setIndexOption(indexOption.toProto())
                 .setTableId(tableId).setIndexId(indexId).setIsPrimary(isPrimary).build();
 
         IndexProto.RemoveIndexResponse response = stub.removeIndex(request);

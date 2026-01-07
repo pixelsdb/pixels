@@ -20,8 +20,6 @@
 package io.pixelsdb.pixels.cli.load;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.common.index.IndexServiceProvider;
-import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.core.TypeDescription;

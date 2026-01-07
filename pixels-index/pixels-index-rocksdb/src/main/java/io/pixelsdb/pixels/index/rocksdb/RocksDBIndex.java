@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.CachingSinglePointIndex;
+import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.rocksdb.*;
@@ -58,7 +59,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean removed = new AtomicBoolean(false);
 
-    public RocksDBIndex(long tableId, long indexId, boolean unique) throws RocksDBException
+    public RocksDBIndex(long tableId, long indexId, boolean unique, IndexOption indexOption) throws RocksDBException
     {
         super();
         this.tableId = tableId;
@@ -68,7 +69,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
         this.rocksDB = RocksDBFactory.getRocksDB();
         this.unique = unique;
         this.writeOptions = new WriteOptions();
-        this.columnFamilyHandle = RocksDBFactory.getOrCreateColumnFamily(tableId, indexId);
+        this.columnFamilyHandle = RocksDBFactory.getOrCreateColumnFamily(tableId, indexId, indexOption.getVNodeId());
     }
 
     @Override

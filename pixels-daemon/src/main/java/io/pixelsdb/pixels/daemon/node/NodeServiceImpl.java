@@ -197,8 +197,23 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
         {
             node.setVirtualNodeId(i);
             int hashPoint = hash(node.getAddress() + "#" + i) % bucketNum;
-            hashRing.put(hashPoint, node.build());
+            NodeProto.NodeInfo oldNode = hashRing.get(hashPoint);
+            NodeProto.NodeInfo newNode = node.build();
+            if(putNode(oldNode, newNode))
+            {
+                hashRing.put(hashPoint, node.build());
+            }
         }
+    }
+
+    private boolean putNode(NodeProto.NodeInfo oldNode, NodeProto.NodeInfo newNode)
+    {
+        if (oldNode == null)
+        {
+            return true;
+        }
+        int cmp = oldNode.getAddress().compareTo(newNode.getAddress());
+        return (cmp != 0) ? (cmp < 0) : (oldNode.getVirtualNodeId() < newNode.getVirtualNodeId());
     }
 
     /**
