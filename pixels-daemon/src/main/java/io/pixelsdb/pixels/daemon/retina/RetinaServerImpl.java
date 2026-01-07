@@ -30,6 +30,7 @@ import io.pixelsdb.pixels.common.index.IndexServiceProvider;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaResourceManager;
@@ -38,6 +39,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -102,15 +108,48 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                                     .collect(Collectors.toList()));
                         }
                     }
-                    for (String filePath : files)
+
+                    int threadNum = Integer.parseInt
+                            (ConfigFactory.Instance().getProperty("retina.service.init.threads"));
+                    ExecutorService executorService = Executors.newFixedThreadPool(threadNum);
+                    AtomicBoolean success = new AtomicBoolean(true);
+                    AtomicReference<Exception> e = new AtomicReference<>();
+                    try
                     {
-                        this.retinaResourceManager.addVisibility(filePath);
+                        for (String filePath : files)
+                        {
+                            executorService.submit(() ->
+                            {
+                                try
+                                {
+                                    this.retinaResourceManager.addVisibility(filePath);
+                                } catch (Exception ex)
+                                {
+                                    success.set(false);
+                                    e.set(ex);
+                                }
+                            });
+                        }
+                    } finally
+                    {
+                        executorService.shutdown();
+                    }
+
+                    if(success.get())
+                    {
+                        executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+                    }
+
+                    if(!success.get())
+                    {
+                        throw new RetinaException("Can't add visibility", e.get());
                     }
 
                     this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
                 }
             }
             this.retinaResourceManager.finishRecovery();
+            logger.info("Retina service is ready");
         } catch (Exception e)
         {
             logger.error("Error while initializing RetinaServerImpl", e);

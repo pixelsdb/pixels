@@ -26,6 +26,7 @@ import org.rocksdb.util.SizeUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author hank
@@ -342,5 +343,33 @@ public class TestRocksDB
                 System.err.println(e);
             }
         }
+    }
+
+    @Test
+    public void testFullCompaction() throws RocksDBException
+    {
+        final String dbPath = "/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina-3/rocksdb";
+        try (RocksDB rocksDB = RocksDBFactory.createRocksDB(dbPath))
+        {
+            System.out.println("Start Full Compaction");
+            long start = System.currentTimeMillis();
+
+            Map<String, ColumnFamilyHandle> cfHandles = RocksDBFactory.getAllCfHandles();
+            // Iterate through each Column Family and trigger a manual compaction
+            for (Map.Entry<String, ColumnFamilyHandle> entry : cfHandles.entrySet()) {
+                String cfName = entry.getKey();
+                ColumnFamilyHandle handle = entry.getValue();
+                System.out.println("Compacting Column Family: " + cfName);
+                /* * compactRange(handle) triggers a full compaction for the specific CF.
+                 * It processes all levels from 0 to the maximum level.
+                 * This is a synchronous/blocking call.
+                 */
+                rocksDB.compactRange(handle);
+            }
+
+            long end = System.currentTimeMillis();
+            System.out.println("Compaction Duration: " + (end - start) + "ms" + "\tPath:" + dbPath);
+        }
+        // Note: Ensure RocksDBFactory or a 'finally' block handles the closing of ColumnFamilyHandles
     }
 }

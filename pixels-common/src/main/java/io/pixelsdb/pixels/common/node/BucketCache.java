@@ -20,102 +20,100 @@
 
  package io.pixelsdb.pixels.common.node;
 
-import com.google.common.hash.Hashing;
-import com.google.protobuf.ByteString;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.daemon.NodeProto;
+ import io.pixelsdb.pixels.common.utils.ConfigFactory;
+ import io.pixelsdb.pixels.daemon.NodeProto;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+ import java.util.Iterator;
+ import java.util.Map;
+ import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Component responsible for managing the cache of bucketId to RetinaNodeInfo mappings.
- * It uses the Singleton pattern and lazy initialization to ensure a single instance
- * and deferred creation.
- * * NOTE: The cache invalidation logic (when the hash ring changes) needs to be integrated
- * with NodeServiceImpl, which is simplified in this example.
- */
-public class BucketCache
-{
+ /**
+  * Component responsible for managing the cache of bucketId to RetinaNodeInfo mappings.
+  * It uses the Singleton pattern and lazy initialization to ensure a single instance
+  * and deferred creation.
+  * * NOTE: The cache invalidation logic (when the hash ring changes) needs to be integrated
+  * with NodeServiceImpl, which is simplified in this example.
+  */
+ public class BucketCache
+ {
 
-    // Lock object for thread-safe singleton initialization
-    private static final Object lock = new Object();
-    // Lazy-loaded Singleton instance
-    private static volatile BucketCache instance;
-    // Thread-safe map cache: Key: bucketId (0 to bucketNum - 1), Value: RetinaNodeInfo
-    private final Map<Integer, NodeProto.NodeInfo> bucketToNodeMap;
+     private static final Object lock = new Object();
+     // Threshold for triggering eviction
+     private static final int MAX_ENTRIES = 1024 * 1024;
+     private static volatile BucketCache instance;
+     // Using ConcurrentHashMap for thread-safe access
+     private final Map<Integer, NodeProto.NodeInfo> bucketToNodeMap;
+     private final NodeService nodeService;
 
-    // NodeService client stub (would be used for actual RPC calls in a real application)
-    // private final NodeServiceGrpc.NodeServiceBlockingStub nodeServiceStub;
-    // The total number of discrete hash points (M) loaded from configuration
-    private final int bucketNum;
-    private final NodeService nodeService;
+     private BucketCache()
+     {
+         ConfigFactory config = ConfigFactory.Instance();
+         int bucketNum = Integer.parseInt(config.getProperty("node.bucket.num"));
+         // Initialize with initial capacity to reduce resizing
+         this.bucketToNodeMap = new ConcurrentHashMap<>(Math.min(MAX_ENTRIES, bucketNum));
+         this.nodeService = NodeService.Instance();
+     }
 
-    /**
-     * Private constructor to enforce the Singleton pattern.
-     */
-    private BucketCache()
-    {
-        // In a real application, bucketNum should be fetched from ConfigFactory
-        ConfigFactory config = ConfigFactory.Instance();
-        this.bucketNum = Integer.parseInt(config.getProperty("node.bucket.num"));
+     public static BucketCache getInstance()
+     {
+         if (instance == null)
+         {
+             synchronized (lock)
+             {
+                 if (instance == null)
+                 {
+                     instance = new BucketCache();
+                 }
+             }
+         }
+         return instance;
+     }
 
-        // Initialize the cache structure
-        this.bucketToNodeMap = new ConcurrentHashMap<>(bucketNum);
-        this.nodeService = NodeService.Instance();
-    }
+     /**
+      * Retrieves NodeInfo for a given bucketId.
+      * If the cache exceeds MAX_ENTRIES, a random entry is evicted.
+      */
+     public NodeProto.NodeInfo getRetinaNodeInfoByBucketId(int bucketId)
+     {
+         NodeProto.NodeInfo nodeInfo = bucketToNodeMap.get(bucketId);
+         if (nodeInfo != null)
+         {
+             return nodeInfo;
+         }
 
-    /**
-     * Retrieves the singleton instance of BucketToNodeCache. Uses double-checked
-     * locking for thread-safe lazy initialization.
-     * * @return The BucketToNodeCache instance
-     */
-    public static BucketCache getInstance()
-    {
-        if (instance == null)
-        {
-            synchronized (lock)
-            {
-                if (instance == null)
-                {
-                    instance = new BucketCache();
-                }
-            }
-        }
-        return instance;
-    }
+         NodeProto.NodeInfo fetchedNodeInfo = fetchNodeInfoFromNodeService(bucketId);
 
-    /**
-     * Core lookup method: Retrieves the corresponding RetinaNodeInfo for a given bucketId.
-     * Uses a cache-aside strategy (lazy loading) to populate the cache upon miss.
-     * * @param bucketId The hash bucket ID of the data (range 0 to bucketNum - 1)
-     *
-     * @return The corresponding RetinaNodeInfo, or null if lookup fails
-     */
-    public NodeProto.NodeInfo getRetinaNodeInfoByBucketId(int bucketId)
-    {
-        // 1. Try to get from cache
-        NodeProto.NodeInfo nodeInfo = bucketToNodeMap.get(bucketId);
-        if (nodeInfo != null)
-        {
-            return nodeInfo;
-        }
+         if (fetchedNodeInfo != null)
+         {
+             if (bucketToNodeMap.size() >= MAX_ENTRIES)
+             {
+                 evictRandomEntry();
+             }
+             bucketToNodeMap.put(bucketId, fetchedNodeInfo);
+             return fetchedNodeInfo;
+         }
 
-        // 2. Cache miss: Fetch from the authoritative source (NodeService RPC)
-        NodeProto.NodeInfo fetchedNodeInfo = fetchNodeInfoFromNodeService(bucketId);
+         return null;
+     }
 
-        if (fetchedNodeInfo != null)
-        {
-            // 3. Put into cache
-            bucketToNodeMap.put(bucketId, fetchedNodeInfo);
-            return fetchedNodeInfo;
-        }
+     /**
+      * Performs a simple random eviction.
+      * In ConcurrentHashMap, the iterator returns elements in an arbitrary order
+      * based on hash bin distribution, effectively acting as random selection.
+      */
+     private void evictRandomEntry()
+     {
+         // Use the iterator to pick the "first" available element in the current traversal
+         Iterator<Integer> iterator = bucketToNodeMap.keySet().iterator();
+         if (iterator.hasNext())
+         {
+             Integer randomKey = iterator.next();
+             bucketToNodeMap.remove(randomKey);
+         }
+     }
 
-        return null;
-    }
-
-    private NodeProto.NodeInfo fetchNodeInfoFromNodeService(int bucketId)
-    {
-        return nodeService.getRetinaByBucket(bucketId);
-    }
-}
+     private NodeProto.NodeInfo fetchNodeInfoFromNodeService(int bucketId)
+     {
+         return nodeService.getRetinaByBucket(bucketId);
+     }
+ }
