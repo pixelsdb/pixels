@@ -348,13 +348,17 @@ public class TestRocksDB
     @Test
     public void testFullCompaction() throws RocksDBException
     {
+        long openStart = System.currentTimeMillis();
+        System.out.println("Start Open RocksDB");
         final String dbPath = "/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina/rocksdb";
         try (RocksDB rocksDB = RocksDBFactory.createRocksDB(dbPath))
         {
-            System.out.println("Start Full Compaction");
+            long openEnd = System.currentTimeMillis();
+            System.out.println("Open RocksDB Duration: " + (openEnd - openStart) + "ms" + "\tPath:" + dbPath);
             long start = System.currentTimeMillis();
-
+            System.out.println("Start Full Compaction");
             Map<String, ColumnFamilyHandle> cfHandles = RocksDBFactory.getAllCfHandles();
+            System.out.println("Column Family Count:" + cfHandles.size());
             // Iterate through each Column Family and trigger a manual compaction
             for (Map.Entry<String, ColumnFamilyHandle> entry : cfHandles.entrySet()) {
                 String cfName = entry.getKey();

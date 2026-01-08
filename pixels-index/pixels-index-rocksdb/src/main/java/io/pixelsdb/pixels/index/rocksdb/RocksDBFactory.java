@@ -22,10 +22,15 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.IndexUtils;
 import io.pixelsdb.pixels.core.TypeDescription;
 import org.rocksdb.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -36,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class RocksDBFactory
 {
+    private static final Logger logger = LoggerFactory.getLogger(RocksDBFactory.class);
     private static final String dbPath = ConfigFactory.Instance().getProperty("index.rocksdb.data.path");
     private static final boolean multiCF = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rocksdb.multicf"));
     private static RocksDB instance;
@@ -52,6 +58,12 @@ public class RocksDBFactory
     private static final String defaultColumnFamily = new String(RocksDB.DEFAULT_COLUMN_FAMILY, StandardCharsets.UTF_8);
     private static final Map<Long, Integer> indexKeyLenCache = new ConcurrentHashMap<>();
     private static final Integer VARIABLE_LEN_SENTINEL = -2;
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable ->
+    {
+        Thread thread = new Thread(runnable, "RocksDB-Metrics-Logger");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private RocksDBFactory() { }
 
@@ -127,16 +139,19 @@ public class RocksDBFactory
 
         if(enableRocksDBStats)
         {
-            String statsPath = ConfigFactory.Instance().getProperty("index.rocksdb.stats.path");
             int statsInterval = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.stats.interval"));
+            String statsPath = ConfigFactory.Instance().getProperty("index.rocksdb.stats.path");
             Statistics stats = new Statistics();
             dbOptions.setStatistics(stats)
                     .setStatsDumpPeriodSec(statsInterval)
                     .setDbLogDir(statsPath);
+
         }
-
         RocksDB db = RocksDB.open(dbOptions, rocksDBPath, descriptors, handles);
-
+        if(enableRocksDBStats)
+        {
+            startRocksDBLogThread(db);
+        }
         // 5. Save handles for reuse
         for (int i = 0; i < descriptors.size(); i++)
         {
@@ -370,5 +385,53 @@ public class RocksDBFactory
     public static synchronized String getDbPath()
     {
         return dbPath;
+    }
+
+    private static void startRocksDBLogThread(RocksDB db)
+    {
+        int logInterval = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.log.interval"));
+        List<RocksDB> dbList = Collections.singletonList(db);
+
+        scheduler.scheduleAtFixedRate(() ->
+        {
+            try
+            {
+                // 1. Get RocksDB Native Metrics
+                Map<MemoryUsageType, Long> memoryUsage = MemoryUtil.getApproximateMemoryUsageByType(dbList, null);
+                long tableReaders = memoryUsage.getOrDefault(MemoryUsageType.kTableReadersTotal, 0L);
+                long memTable = memoryUsage.getOrDefault(MemoryUsageType.kMemTableTotal, 0L);
+                long blockCacheOnly = db.getLongProperty("rocksdb.block-cache-usage");
+                long indexFilterOnly = Math.max(0, tableReaders - blockCacheOnly);
+                long totalNativeBytes = tableReaders + memTable;
+
+                // 2. Get JVM Heap Metrics
+                Runtime runtime = Runtime.getRuntime();
+                long heapMax = runtime.maxMemory();
+                long heapCommitted = runtime.totalMemory();
+                long heapUsed = heapCommitted - runtime.freeMemory();
+
+                // 3. Format string with both RocksDB and JVM data
+                // We use GiB for all units to keep the Shell script calculations simple
+                double GiB = 1024.0 * 1024.0 * 1024.0;
+
+                String formattedMetrics = String.format(
+                        "TotalNative≈%.4f GiB (MemTable=%.4f GiB, BlockCache=%.4f GiB, IndexFilter=%.4f GiB) " +
+                                "JVMHeap (Used=%.4f GiB, Committed=%.4f GiB, Max=%.4f GiB)",
+                        totalNativeBytes / GiB,
+                        memTable / GiB,
+                        blockCacheOnly / GiB,
+                        indexFilterOnly / GiB,
+                        heapUsed / GiB,
+                        heapCommitted / GiB,
+                        heapMax / GiB
+                );
+
+                logger.info("[RocksDB Metrics] {}", formattedMetrics);
+            }
+            catch (Exception e)
+            {
+                logger.error("Error occurred during RocksDB metrics collection", e);
+            }
+        }, 0, logInterval, TimeUnit.SECONDS);
     }
 }
