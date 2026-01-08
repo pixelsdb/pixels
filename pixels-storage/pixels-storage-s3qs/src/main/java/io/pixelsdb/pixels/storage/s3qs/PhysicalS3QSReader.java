@@ -74,7 +74,8 @@ public class PhysicalS3QSReader implements PhysicalReader
             this.buffer = responseBytes.asByteArrayUnsafe();
             this.length = this.buffer.length;
             this.position = 0;
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
             this.position = 0;
             throw new IOException("Failed to read object.", e);

@@ -26,9 +26,8 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.concurrent.*;
 
 /**
  * @author hank
@@ -39,66 +38,209 @@ public class TestS3QS
     private final ExecutorService executor = Executors.newFixedThreadPool(2);
 
     @Test
-    public void startReader() throws IOException, InterruptedException
+    public void TestWriterAndReader() throws IOException, InterruptedException, ExecutionException
     {
         S3QS s3qs = (S3QS) StorageFactory.Instance().getStorage(Storage.Scheme.s3qs);
-        S3Queue queue = s3qs.openQueue("https://sqs.us-east-2.amazonaws.com/970089764833/pixels-shuffle");
-        this.executor.submit(() -> {
+        Future<?> future = this.executor.submit(() -> {
+            byte[] buffer = new byte[8 * 1024 * 1024];
             long startTime = System.currentTimeMillis();
+            s3qs.addProducer(0); s3qs.addProducer(1);
             for (int i = 0; i < 2; i++)
             {
-                try (PhysicalReader reader = queue.poll(20))
+                S3QueueMessage body = new S3QueueMessage()
+                        .setObjectPath("pixels-turbo-intermediate/shuffle/")
+                        .setWorkerNum(i)
+                        .setPartitionNum(99)
+                        .setEndwork(true);
+                try (PhysicalWriter writer = s3qs.offer(body))
                 {
-                    reader.readFully(8 * 1024 * 1024);
+                    writer.append(buffer);
+                    System.out.println("Wrote partition " + i);  // 添加日志
                 }
                 catch (IOException e)
                 {
+                    System.err.println("Error in iteration " + i + ": " + e.getMessage());
                     throw new RuntimeException(e);
                 }
             }
+
+            System.out.println("write finished in " + (System.currentTimeMillis() - startTime) + " ms");
+
+            startTime = System.currentTimeMillis();
+            for (int i = 0; i < 3; i++)
+            {
+                S3QueueMessage body = new S3QueueMessage()
+                        .setObjectPath("pixels-turbo-intermediate/shuffle/")
+                        .setPartitionNum(99)
+                        .setWorkerNum(2+i);
+                PhysicalReader reader = null;
+                String receiptHandle = null;
+                try
+                {
+                    HashMap.Entry<String,PhysicalReader>  pair = s3qs.poll(body,20);
+                    if(pair != null)
+                    {
+                        reader = pair.getValue();
+                        receiptHandle = pair.getKey();
+                        body.setReceiptHandle(receiptHandle);
+                        System.out.println("read object " + reader.getPath());  // 添加日志
+                    }
+                }
+                catch (IOException e)
+                {
+                    System.err.println("Error in iteration " + i + ": " + e.getMessage());
+                    throw new RuntimeException(e);
+                }
+                finally
+                {
+                    if(reader != null)
+                    {
+                        try
+                        {
+                            reader.close();
+                        }
+                        catch (IOException e)
+                        {
+                                throw new RuntimeException(e);
+                        }
+                        try
+                        {
+                            s3qs.finishWork(body);
+                        }
+                        catch (IOException e)
+                        {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            }
+
             System.out.println("read finished in " + (System.currentTimeMillis() - startTime) + " ms");
             try
             {
-                queue.close();
+                s3qs.refresh();
             }
             catch (IOException e)
             {
                 throw new RuntimeException(e);
             }
         });
+
+        try
+        {
+            future.get();
+        }
+        catch (ExecutionException e)
+        {
+            //e.getCause().printStackTrace();
+            throw e;
+        }
+
         this.executor.shutdown();
         this.executor.awaitTermination(100, TimeUnit.HOURS);
     }
 
     @Test
-    public void testWriter() throws IOException, InterruptedException
+    public void testWriter() throws IOException, InterruptedException, ExecutionException
     {
         S3QS s3qs = (S3QS) StorageFactory.Instance().getStorage(Storage.Scheme.s3qs);
-        S3Queue queue = s3qs.openQueue("https://sqs.us-east-2.amazonaws.com/970089764833/pixels-shuffle");
-        this.executor.submit(() -> {
+        //S3Queue queue = s3qs.openQueue("https://sqs.us-east-2.amazonaws.com/970089764833/pixels-shuffle");
+
+        Future<?> future = this.executor.submit(() ->
+        {
             byte[] buffer = new byte[8 * 1024 * 1024];
             long startTime = System.currentTimeMillis();
             for (int i = 0; i < 2; i++)
             {
-                try (PhysicalWriter writer = queue.offer("pixels-turbo-intermediate/shuffle/" + i))
+                S3QueueMessage body = new S3QueueMessage()
+                        .setObjectPath("pixels-turbo-intermediate/shuffle/" + i + "/")
+                        .setPartitionNum(2)
+                        .setEndwork(false);
+                try (PhysicalWriter writer = s3qs.offer(body))
                 {
                     writer.append(buffer);
+                    System.out.println("Wrote partition " + i);  // 添加日志
                 }
                 catch (IOException e)
                 {
+                    System.err.println("Error in iteration " + i + ": " + e.getMessage());
                     throw new RuntimeException(e);
                 }
             }
             System.out.println("write finished in " + (System.currentTimeMillis() - startTime) + " ms");
+
             try
             {
-                queue.close();
+                s3qs.refresh();
             }
             catch (IOException e)
             {
                 throw new RuntimeException(e);
             }
         });
+
+        try
+        {
+            future.get();
+        }
+        catch (ExecutionException e)
+        {
+            //e.getCause().printStackTrace();
+            throw e;
+        }
+
+        this.executor.shutdown();
+        this.executor.awaitTermination(100, TimeUnit.HOURS);
+    }
+
+    @Test
+    public void testMultiSQSWriter() throws IOException, InterruptedException, ExecutionException
+    {
+        S3QS s3qs = (S3QS) StorageFactory.Instance().getStorage(Storage.Scheme.s3qs);
+
+        Future<?> future = this.executor.submit(() ->
+        {
+            byte[] buffer = new byte[8 * 1024 * 1024];
+            long startTime = System.currentTimeMillis();
+            for (int i = 0; i < 2; i++)
+            {
+                S3QueueMessage body = new S3QueueMessage()
+                        .setObjectPath("pixels-turbo-intermediate/shuffle/" + 9 + "/")
+                        .setPartitionNum(9)
+                        .setEndwork(false);
+                try (PhysicalWriter writer = s3qs.offer(body))
+                {
+                    writer.append(buffer);
+                    System.out.println("Wrote partition " + i);  // 添加日志
+                }
+                catch (IOException e)
+                {
+                    System.err.println("Error in iteration " + i + ": " + e.getMessage());
+                    throw new RuntimeException(e);
+                }
+            }
+            System.out.println("write finished in " + (System.currentTimeMillis() - startTime) + " ms");
+
+        });
+
+        try
+        {
+            future.get();
+        }
+        catch (ExecutionException e)
+        {
+            e.getCause().printStackTrace();
+            throw e;
+        }
+        try
+        {
+            s3qs.close();
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException(e);
+        }
+
         this.executor.shutdown();
         this.executor.awaitTermination(100, TimeUnit.HOURS);
     }
