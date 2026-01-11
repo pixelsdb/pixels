@@ -115,7 +115,9 @@ public class RetinaService
             assert (host != null);
             assert (port > 0 && port <= 65535);
             this.channel = ManagedChannelBuilder.forAddress(host, port).
-                    usePlaintext().build();
+                    usePlaintext()
+                    .maxInboundMessageSize(1024 * 1024 * 64)
+                    .build();
             this.stub = RetinaWorkerServiceGrpc.newBlockingStub(this.channel);
             this.asyncStub = RetinaWorkerServiceGrpc.newStub(this.channel);
         } else

@@ -349,8 +349,8 @@ public class TestRocksDB
     public void testFullCompaction() throws RocksDBException
     {
         long openStart = System.currentTimeMillis();
-        System.out.println("Start Open RocksDB");
-        final String dbPath = "/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina/rocksdb";
+        final String dbPath = "/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina-2/rocksdb";
+        System.out.println("Start Open RocksDB: " + dbPath);
         try (RocksDB rocksDB = RocksDBFactory.createRocksDB(dbPath))
         {
             long openEnd = System.currentTimeMillis();
