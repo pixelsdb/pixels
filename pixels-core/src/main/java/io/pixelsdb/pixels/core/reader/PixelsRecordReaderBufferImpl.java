@@ -59,12 +59,12 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     private final TypeDescription typeDescription;
     private final int colNum;
     private final int typeMode = TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT;
-    private final ExecutorService prefetchExecutor; // Thread pool for I/O and deserialization
+    private static ExecutorService prefetchExecutor; // Thread pool for I/O and deserialization
     private final BlockingQueue<VectorizedRowBatch> prefetchQueue; // Queue for completed batches
     private final AtomicInteger pendingTasks = new AtomicInteger(0); // Counter for submitted but unfinished tasks
     private final AtomicBoolean initialMemtableSubmitted = new AtomicBoolean(false); // Flag for active memtable
-    private final int maxPrefetchTasks; // Max concurrent tasks
-    private final int prefetchQueueCapacity; // Queue capacity
+    private static int maxPrefetchTasks;
+    private static final int prefetchQueueCapacity = DEFAULT_QUEUE_CAPACITY; // Queue capacity
     private final boolean shouldReadHiddenColumn;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final List<RetinaProto.VisibilityBitmap> visibilityBitmap;
@@ -127,19 +127,27 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         this.includedColumnTypes = new ArrayList<>();
         this.everRead = false;
         this.vNodeId = vNodeId;
-        this.maxPrefetchTasks = Integer.parseInt(configFactory.getProperty("retina.reader.prefetch.threads"));
-        this.prefetchQueueCapacity = DEFAULT_QUEUE_CAPACITY;
-
-        this.prefetchExecutor = Executors.newFixedThreadPool(maxPrefetchTasks, r ->
-        {
-            Thread t = Executors.defaultThreadFactory().newThread(r);
-            t.setName("Pixels-Buffer-Reader-Prefetch");
-            t.setDaemon(true);
-            return t;
-        });
         this.prefetchQueue = new LinkedBlockingQueue<>(prefetchQueueCapacity);
-
+        initInternalExecutor();
         checkBeforeRead();
+    }
+
+    private static synchronized void initInternalExecutor()
+    {
+        if (prefetchExecutor == null)
+        {
+            ConfigFactory configFactory = ConfigFactory.Instance();
+            String threadProp = configFactory.getProperty("retina.reader.prefetch.threads");
+            maxPrefetchTasks = (threadProp != null) ? Integer.parseInt(threadProp) : DEFAULT_QUEUE_CAPACITY;
+            prefetchExecutor = Executors.newFixedThreadPool(maxPrefetchTasks, r ->
+            {
+                Thread t = new Thread(r);
+                t.setName("Pixels-Buffer-Reader-Prefetch-Shared");
+                t.setDaemon(true);
+                return t;
+            });
+            LOGGER.info("Initialized shared Pixels-Buffer-Reader-Prefetch pool with {} threads", maxPrefetchTasks);
+        }
     }
 
     private static boolean checkBit(RetinaProto.VisibilityBitmap bitmap, int k)
@@ -351,6 +359,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         {
             return createEmptyRowBatch(0);
         }
+        memoryUsage.addAndGet(-curRowBatch.getMemoryUsage());
 
         LongColumnVector hiddenTimestampVector = (LongColumnVector) curRowBatch.cols[this.colNum - 1];
         /**
@@ -439,7 +448,12 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     @Override
     public void close() throws IOException
     {
-        prefetchExecutor.shutdownNow();
+        List<VectorizedRowBatch> remaining = new ArrayList<>();
+        prefetchQueue.drainTo(remaining);
+        for (VectorizedRowBatch b : remaining)
+        {
+            memoryUsage.addAndGet(-b.getMemoryUsage());
+        }
     }
 
     private String getRetinaBufferStoragePathFromId(long entryId, int virtualId)
