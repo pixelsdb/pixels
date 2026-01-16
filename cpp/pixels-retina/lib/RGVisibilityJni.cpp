@@ -17,6 +17,8 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
+
+#include "RetinaMemory.h"
 #include "RGVisibilityJni.h"
 #include "RGVisibility.h"
 #include <stdexcept>
@@ -48,7 +50,7 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNative
         jsize len = env->GetArrayLength(bitmap);
         jlong *body = env->GetLongArrayElements(bitmap, nullptr);
 
-        std::vector<uint64_t> bitmapData;
+        std::vector<uint64_t, pixels::Allocator<uint64_t>> bitmapData;
         bitmapData.reserve(len);
         for (int i = 0; i < len; i++) {
             bitmapData.push_back((uint64_t)body[i]);
@@ -108,10 +110,10 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
         uint64_t bitmapSize = rgVisibility->getBitmapSize();
         jlongArray result = env->NewLongArray(bitmapSize);
         env->SetLongArrayRegion(result, 0, bitmapSize, reinterpret_cast<const jlong*>(bitmap));
-        delete[] bitmap;
+        pixels::free(bitmap);
         return result;
     } catch (const std::exception& e) {
-        delete[] bitmap;
+        pixels::free(bitmap);
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
         return nullptr;
     }
@@ -130,4 +132,26 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollec
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
     }
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    getNativeMemoryUsage
+ * Returns the total bytes allocated specifically by the Retina library.
+ */
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getNativeMemoryUsage
+  (JNIEnv* env, jclass) {
+    // Pure manual staking: always return the atomic counter value
+    return static_cast<jlong>(pixels::get_total_allocated());
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    getNativeResidentMemory
+ * RSS is an OS-level metric. Manual staking cannot track physical residency.
+ */
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getNativeResidentMemory
+  (JNIEnv* env, jclass) {
+    // Return -1 as manual tracking only covers virtual allocation size
+    return -1;
 }

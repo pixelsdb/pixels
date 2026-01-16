@@ -18,6 +18,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
+#include "RetinaMemory.h"
 #include "TileVisibility.h"
 #include "EpochManager.h"
 
@@ -185,7 +186,7 @@ void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4])
     }
 
     DeleteIndexBlock *blk = ver->head;
-#ifdef RETINA_SIMD
+#if defined(RETINA_SIMD) && !defined(DISABLE_RETINA_SIMD)
     const __m256i signBit = _mm256_set1_epi64x(0x8000000000000000ULL);
     const __m256i vThrFlip = _mm256_xor_si256(_mm256_set1_epi64x(ts), signBit);
     const __m256i tsMask = _mm256_set1_epi64x(0x00FFFFFFFFFFFFFFULL);
@@ -201,7 +202,7 @@ void TileVisibility::getTileVisibilityBitmap(uint64_t ts, uint64_t outBitmap[4])
             continue; // retry get count
         }
         uint64_t start_blk_offset = 0;
-#ifdef RETINA_SIMD
+#if defined(RETINA_SIMD) && !defined(DISABLE_RETINA_SIMD)
         if (count == DeleteIndexBlock::BLOCK_CAPACITY) {
             process_bitmap_block_256(blk, 0, outBitmap, vThrFlip, tsMask, signBit);
             process_bitmap_block_256(blk, 4, outBitmap, vThrFlip, tsMask, signBit);

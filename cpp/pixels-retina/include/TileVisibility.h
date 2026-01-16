@@ -25,6 +25,7 @@
     ((bitmap)[(rowId) / 64] |= (1ULL << ((rowId) % 64)))
 #endif
 
+#include "RetinaMemory.h"
 #include <atomic>
 #include <cassert>
 #include <cstddef>
@@ -43,7 +44,7 @@ inline uint64_t extractTimestamp(uint64_t raw) {
     return (raw & 0x00FFFFFFFFFFFFFFULL);
 }
 
-struct DeleteIndexBlock {
+struct DeleteIndexBlock : public pixels::RetinaBase {
     static constexpr size_t BLOCK_CAPACITY = 8;
     uint64_t items[BLOCK_CAPACITY] = {0};
     std::atomic<DeleteIndexBlock *> next{nullptr};
@@ -54,7 +55,7 @@ struct DeleteIndexBlock {
  * Used for Copy-on-Write during garbage collection
  * IMPORTANT: head is part of the version to ensure atomic visibility
  */
-struct VersionedData {
+struct VersionedData : public pixels::RetinaBase {
     uint64_t baseBitmap[4];
     uint64_t baseTimestamp;
     DeleteIndexBlock* head;  // Delete chain head, part of the version
@@ -75,7 +76,7 @@ struct VersionedData {
 /**
  * RetiredVersion - Tracks a retired version for epoch-based reclamation
  */
-struct RetiredVersion {
+struct RetiredVersion : public pixels::RetinaBase {
     VersionedData* data;
     DeleteIndexBlock* blocksToDelete;  // Head of the chain to delete
     uint64_t retireEpoch;
@@ -84,7 +85,7 @@ struct RetiredVersion {
         : data(d), blocksToDelete(b), retireEpoch(e) {}
 };
 
-class TileVisibility {
+class TileVisibility : public pixels::RetinaBase {
   public:
     TileVisibility();
     TileVisibility(uint64_t ts, const uint64_t bitmap[4]);
@@ -102,7 +103,7 @@ class TileVisibility {
     std::atomic<VersionedData*> currentVersion;
     std::atomic<DeleteIndexBlock *> tail;
     std::atomic<size_t> tailUsed;
-    std::vector<RetiredVersion> retired;  // Protected by GC (single writer)
+    std::vector<RetiredVersion, pixels::Allocator<RetiredVersion>> retired;  // Protected by GC (single writer)
 };
 
 #endif // PIXELS_RETINA_TILE_VISIBILITY_H
