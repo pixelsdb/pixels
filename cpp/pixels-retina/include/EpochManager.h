@@ -20,7 +20,6 @@
 #ifndef PIXELS_RETINA_EPOCH_MANAGER_H
 #define PIXELS_RETINA_EPOCH_MANAGER_H
 
-#include "RetinaMemory.h"
 #include <atomic>
 #include <thread>
 #include <mutex>
@@ -77,7 +76,7 @@ private:
     EpochManager(const EpochManager&) = delete;
     EpochManager& operator=(const EpochManager&) = delete;
 
-    struct ThreadInfo : public pixels::RetinaBase {
+    struct ThreadInfo {
         std::atomic<uint64_t> localEpoch{0};  // 0 means not in critical section
         std::atomic<bool> active{true};
         std::thread::id threadId;

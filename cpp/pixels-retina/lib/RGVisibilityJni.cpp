@@ -50,7 +50,7 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNative
         jsize len = env->GetArrayLength(bitmap);
         jlong *body = env->GetLongArrayElements(bitmap, nullptr);
 
-        std::vector<uint64_t, pixels::Allocator<uint64_t>> bitmapData;
+        std::vector<uint64_t> bitmapData;
         bitmapData.reserve(len);
         for (int i = 0; i < len; i++) {
             bitmapData.push_back((uint64_t)body[i]);
@@ -110,10 +110,10 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
         uint64_t bitmapSize = rgVisibility->getBitmapSize();
         jlongArray result = env->NewLongArray(bitmapSize);
         env->SetLongArrayRegion(result, 0, bitmapSize, reinterpret_cast<const jlong*>(bitmap));
-        pixels::free(bitmap);
+        delete[] bitmap;
         return result;
     } catch (const std::exception& e) {
-        pixels::free(bitmap);
+        delete[] bitmap;
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
         return nullptr;
     }
@@ -137,21 +137,32 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollec
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    getNativeMemoryUsage
- * Returns the total bytes allocated specifically by the Retina library.
+ * Returns the total bytes currently allocated by the process as tracked by jemalloc.
  */
 JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getNativeMemoryUsage
   (JNIEnv* env, jclass) {
-    // Pure manual staking: always return the atomic counter value
-    return static_cast<jlong>(pixels::get_total_allocated());
-}
+#ifdef ENABLE_JEMALLOC
+    size_t allocated = 0;
+    size_t sz = sizeof(size_t);
+    uint64_t epoch = 1;
 
-/*
- * Class:     io_pixelsdb_pixels_retina_RGVisibility
- * Method:    getNativeResidentMemory
- * RSS is an OS-level metric. Manual staking cannot track physical residency.
- */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getNativeResidentMemory
-  (JNIEnv* env, jclass) {
-    // Return -1 as manual tracking only covers virtual allocation size
+    /**
+     * In jemalloc, statistics are cached for performance.
+     * To get the most recent data, we must first update the 'epoch'.
+     */
+    mallctl("epoch", NULL, NULL, &epoch, sizeof(uint64_t));
+
+    /**
+     * "stats.allocated" returns the total number of bytes currently allocated
+     * by the application.
+     */
+    if (mallctl("stats.allocated", &allocated, &sz, NULL, 0) == 0) {
+        return static_cast<jlong>(allocated);
+    }
+
+    // Fallback if mallctl fails
     return -1;
-}
+#else
+    // If jemalloc is not linked, we cannot provide accurate stats via this method
+    return 0;
+#endif

@@ -17,8 +17,6 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-
-#include "RetinaMemory.h"
 #include "RGVisibility.h"
 #include <stdexcept>
 #include <cstring>
@@ -26,22 +24,21 @@
 
 RGVisibility::RGVisibility(uint64_t rgRecordNum)
     : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
-    void* rawMemory = pixels::alloc(tileCount * sizeof(TileVisibility));
+    void* rawMemory = operator new[](tileCount * sizeof(TileVisibility));
     tileVisibilities = static_cast<TileVisibility*>(rawMemory);
     for (uint64_t i = 0; i < tileCount; ++i) {
         new (&tileVisibilities[i]) TileVisibility();
     }
 }
 
-RGVisibility::RGVisibility(uint64_t rgRecordNum, uint64_t timestamp,
-    const std::vector<uint64_t, pixels::Allocator<uint64_t>>& initialBitmap)
+RGVisibility::RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap)
     : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
-    void* rawMemory = pixels::alloc(tileCount * sizeof(TileVisibility));
+    void* rawMemory = operator new[](tileCount * sizeof(TileVisibility));
     tileVisibilities = static_cast<TileVisibility*>(rawMemory);
     
     // Ensure bitmap size matches
     if (initialBitmap.size() < tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY) {
-        pixels::free(tileVisibilities);
+        operator delete[](rawMemory);
         throw std::runtime_error("Initial bitmap size is too small for the given record number.");
     }
 
@@ -57,7 +54,7 @@ RGVisibility::~RGVisibility() {
     for (uint64_t i = 0; i < tileCount; ++i) {
         tileVisibilities[i].~TileVisibility();
     }
-    pixels::free(tileVisibilities);
+    operator delete[](tileVisibilities);
 }
 
 void RGVisibility::collectRGGarbage(uint64_t timestamp) {
@@ -83,8 +80,7 @@ void RGVisibility::deleteRGRecord(uint32_t rowId, uint64_t timestamp) {
 
 uint64_t* RGVisibility::getRGVisibilityBitmap(uint64_t timestamp) {
     // TileVisibility::getTileVisibilityBitmap uses Epoch protection internally
-    size_t size = tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
-    uint64_t* bitmap = static_cast<uint64_t*>(pixels::alloc(size));
+    uint64_t* bitmap = new uint64_t[tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY];
     memset(bitmap, 0, tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY * sizeof(uint64_t));
 
     for (uint64_t i = 0; i < tileCount; i++) {

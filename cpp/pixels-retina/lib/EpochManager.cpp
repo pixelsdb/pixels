@@ -18,7 +18,6 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-#include "RetinaMemory.h"
 #include "EpochManager.h"
 
 // Thread-local storage for thread info
