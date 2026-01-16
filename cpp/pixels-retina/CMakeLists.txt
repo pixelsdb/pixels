@@ -14,11 +14,10 @@ find_package(Java REQUIRED)
 find_package(JNI REQUIRED)
 
 # --- Jemalloc Configuration (Shared with Prefix) ---
-option(ENABLE_JEMALLOC "Enable jemalloc with pixels_ prefix" OFF)
+option(ENABLE_JEMALLOC "Enable jemalloc with pixels_ prefix" ON)
 include(ExternalProject)
 
 if(ENABLE_JEMALLOC)
-    add_definitions(-DDISABLE_RETINA_SIMD)
     set(JEMALLOC_INSTALL_DIR "${CMAKE_BINARY_DIR}/jemalloc_install")
     set(JEMALLOC_LIB_PATH "${JEMALLOC_INSTALL_DIR}/lib/libjemalloc.so")
     set(JEMALLOC_INCLUDE_DIR "${JEMALLOC_INSTALL_DIR}/include")
@@ -31,7 +30,6 @@ if(ENABLE_JEMALLOC)
             URL https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
             CONFIGURE_COMMAND <SOURCE_DIR>/configure
             --prefix=${JEMALLOC_INSTALL_DIR}
-            --with-jemalloc-prefix=pixels_
             --enable-prof
             --enable-stats
             --enable-shared
@@ -82,6 +80,7 @@ set(SOURCES
         lib/TileVisibility.cpp
         lib/RGVisibility.cpp
         lib/RGVisibilityJni.cpp
+        lib/RetinaBase.cpp
 )
 
 # Create shared library

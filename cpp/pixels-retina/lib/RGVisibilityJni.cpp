@@ -18,7 +18,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-#include "RetinaMemory.h"
+#include "RetinaBase.h"
 #include "RGVisibilityJni.h"
 #include "RGVisibility.h"
 #include <stdexcept>
@@ -104,15 +104,23 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_deleteRecord
 JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisibilityBitmap
   (JNIEnv* env, jobject, jlong timestamp, jlong handle) {
     uint64_t* bitmap = nullptr;
+    uint64_t bitmapSize = 0;
     try {
         auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
         bitmap = rgVisibility->getRGVisibilityBitmap(timestamp);
-        uint64_t bitmapSize = rgVisibility->getBitmapSize();
+        bitmapSize = rgVisibility->getBitmapSize();
         jlongArray result = env->NewLongArray(bitmapSize);
         env->SetLongArrayRegion(result, 0, bitmapSize, reinterpret_cast<const jlong*>(bitmap));
+        size_t byteSize = bitmapSize * sizeof(uint64_t);
+        pixels::g_retina_tracked_memory.fetch_sub(byteSize, std::memory_order_relaxed);
         delete[] bitmap;
         return result;
     } catch (const std::exception& e) {
+        if (bitmap) {
+            size_t byteSize = bitmapSize * sizeof(uint64_t);
+            pixels::g_retina_tracked_memory.fetch_sub(byteSize, std::memory_order_relaxed);
+            delete[] bitmap;
+        }
         delete[] bitmap;
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
         return nullptr;
@@ -146,23 +154,43 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getNativeMem
     size_t sz = sizeof(size_t);
     uint64_t epoch = 1;
 
-    /**
-     * In jemalloc, statistics are cached for performance.
-     * To get the most recent data, we must first update the 'epoch'.
-     */
-    mallctl("epoch", NULL, NULL, &epoch, sizeof(uint64_t));
-
-    /**
-     * "stats.allocated" returns the total number of bytes currently allocated
-     * by the application.
-     */
-    if (mallctl("stats.allocated", &allocated, &sz, NULL, 0) == 0) {
-        return static_cast<jlong>(allocated);
+    // 1. Try to refresh jemalloc epoch to ensure stats are current.
+    // Return -2 if this fails, as defined in Java's handleMemoryMetric.
+    if (mallctl("epoch", NULL, NULL, &epoch, sizeof(uint64_t)) != 0) {
+        return -2;
     }
 
-    // Fallback if mallctl fails
-    return -1;
+    // 2. Try to read the actual allocated bytes.
+    // Return -3 if this fails, which often implies a config/prefix mismatch.
+    if (mallctl("stats.allocated", &allocated, &sz, NULL, 0) != 0) {
+        return -3;
+    }
+
+    // Success: return the positive value
+    return static_cast<jlong>(allocated);
 #else
-    // If jemalloc is not linked, we cannot provide accurate stats via this method
-    return 0;
+    // -1 triggers the "monitoring is disabled" message in Java
+    return -1;
 #endif
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    getRetinaTrackedMemoryUsage
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getRetinaTrackedMemoryUsage
+  (JNIEnv *env, jclass clazz) {
+    // Read the current value from the atomic counter using relaxed memory order
+    // as this is a simple statistic and doesn't require strict synchronization.
+    return static_cast<jlong>(pixels::g_retina_tracked_memory.load(std::memory_order_relaxed));
+}
+
+/*
+ * Implementation for tracking the number of active objects.
+ */
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getRetinaObjectCount
+  (JNIEnv *env, jclass clazz) {
+    // Read the atomic object counter from RetinaBase namespace
+    return static_cast<jlong>(pixels::g_retina_object_count.load(std::memory_order_relaxed));
+}

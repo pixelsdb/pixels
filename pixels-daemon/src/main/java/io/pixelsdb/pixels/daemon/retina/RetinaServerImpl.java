@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.daemon.retina;
 import com.google.common.base.Function;
 import com.google.common.util.concurrent.Striped;
 import com.google.protobuf.ByteString;
+import com.sun.management.OperatingSystemMXBean;
 import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
@@ -33,15 +34,19 @@ import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
+import io.pixelsdb.pixels.retina.RGVisibility;
 import io.pixelsdb.pixels.retina.RetinaProto;
 import io.pixelsdb.pixels.retina.RetinaResourceManager;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
+import java.lang.management.ManagementFactory;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -72,6 +77,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         this.metadataService = MetadataService.Instance();
         this.indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
         this.retinaResourceManager = RetinaResourceManager.Instance();
+        startRetinaMetricsLogThread();
         try
         {
             logger.info("Pre-loading checkpoints...");
@@ -774,4 +780,113 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
     }
 
+    /**
+     * Start a background thread to log Retina-specific metrics including CPU,
+     * Native Memory (via jemalloc), and JVM Heap.
+     */
+    private void startRetinaMetricsLogThread()
+    {
+        // Read interval from config, default to 60 seconds to match MetricsServer style
+        int logInterval = Integer.parseInt(
+                ConfigFactory.Instance().getProperty("retina.metrics.log.interval")
+        );
+
+        if(logInterval <= 0)
+        {
+            logger.info("Retina metrics is disabled");
+            return;
+        }
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable ->
+        {
+            Thread thread = new Thread(runnable, "RetinaMetricsLogger");
+            thread.setDaemon(true);
+            return thread;
+        });
+
+        // Cast to com.sun.management.OperatingSystemMXBean to get precise CPU load
+        final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+
+        scheduler.scheduleAtFixedRate(() ->
+        {
+            try
+            {
+                // Collect JVM Heap Metrics
+                String formattedMetrics = getRetinaMetrics(osBean);
+
+                logger.info("[Retina Metrics] {}", formattedMetrics);
+
+            }
+            catch (Exception e)
+            {
+                logger.error("Unexpected error in Retina metrics collection", e);
+            }
+        }, 0, logInterval, TimeUnit.SECONDS);
+    }
+
+    @NotNull
+    private static String getRetinaMetrics(OperatingSystemMXBean osBean)
+    {
+        /* Get basic runtime and resource info */
+        Runtime runtime = Runtime.getRuntime();
+        int availableProcessors = runtime.availableProcessors();
+        double GiB = 1024.0 * 1024.0 * 1024.0;
+        long timestamp = System.currentTimeMillis();
+
+        /* Collect Retina Native Metrics */
+        long nativeAllocated = 0;
+        long trackedMem = 0;
+        long objectCount = 0;
+        try
+        {
+            nativeAllocated = RGVisibility.getMemoryUsage();
+            trackedMem = RGVisibility.getTrackedMemoryUsage();
+            objectCount = RGVisibility.getRetinaTrackedObjectCount();
+        } catch (Exception e)
+        {
+            logger.warn("Failed to retrieve Retina native metrics: {}", e.getMessage());
+        }
+
+        /* Calculate memory minus the monitoring overhead (vptr) */
+        long vptrOverhead = objectCount * 8;
+        long pureTracked = Math.max(0, trackedMem - vptrOverhead);
+
+        /* Collect JVM Heap Metrics */
+        long heapCommitted = runtime.totalMemory();
+        long heapUsed = heapCommitted - runtime.freeMemory();
+        long heapMax = runtime.maxMemory();
+
+        /* Fix CPU Metrics:
+           osBean.getProcessCpuLoad() is non-blocking and calculates the delta since the last call.
+           Calling it twice in the same method (especially in the format string) causes the
+           second call to return near-zero or -1 because the time delta is too small.
+        */
+        double rawProcessLoad = osBean.getProcessCpuLoad();
+        double rawSystemLoad = osBean.getSystemCpuLoad();
+
+        /* Handle cases where the bean is not yet initialized (-1.0) */
+        double processLoadVal = (rawProcessLoad < 0) ? 0.0 : rawProcessLoad;
+        double systemLoadVal = (rawSystemLoad < 0) ? 0.0 : rawSystemLoad;
+
+        /* Calculate percentage consistent with 'top' command (100% per core) */
+        double processCpuPercentage = processLoadVal * availableProcessors * 100.0;
+        double systemCpuPercentage = systemLoadVal * 100.0;
+
+        /* Format final log output */
+        return String.format(
+                "Timestamp=%d CPU_Usage[Process: %.4f%%, System: %.4f%%] " +
+                        "Retina_Mem[Allocated: %.4f GiB (%d Bytes), Tracked: %d Bytes, Objects: %d, Pure_Tracked: %d Bytes] " +
+                        "JVM_Heap[Used: %.4f GiB, Committed: %.4f GiB, Max: %.4f GiB]",
+                timestamp,
+                processCpuPercentage,
+                systemCpuPercentage,
+                nativeAllocated / GiB, nativeAllocated,
+                trackedMem,
+                objectCount,
+                pureTracked,
+                heapUsed / GiB,
+                heapCommitted / GiB,
+                heapMax / GiB
+        );
+    }
 }

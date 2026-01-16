@@ -20,16 +20,15 @@
 #ifndef RG_VISIBILITY_H
 #define RG_VISIBILITY_H
 
+#include "RetinaBase.h"
 #include "TileVisibility.h"
-#include <memory>
-#include <atomic>
 #include <vector>
 
-class RGVisibility {
+class RGVisibility : public pixels::RetinaBase<RGVisibility> {
 public:
     explicit RGVisibility(uint64_t rgRecordNum);
     explicit RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap);
-    ~RGVisibility();
+    ~RGVisibility() override;
 
     void deleteRGRecord(uint32_t rowId, uint64_t timestamp);
     uint64_t* getRGVisibilityBitmap(uint64_t timestamp);
