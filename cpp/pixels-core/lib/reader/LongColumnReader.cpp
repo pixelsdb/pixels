@@ -23,6 +23,7 @@
  */
 
 #include "reader/LongColumnReader.h"
+#include "vector/LongColumnVector.h"
 
 LongColumnReader::LongColumnReader(std::shared_ptr<TypeDescription> type)
     : ColumnReader(type)
@@ -36,10 +37,10 @@ void LongColumnReader::close()
 }
 
 void LongColumnReader::read(std::shared_ptr<ByteBuffer> input,
-                            pixels::proto::ColumnEncoding &encoding, int offset,
+                            const pixels::fb::ColumnEncoding *encoding, int offset,
                             int size, int pixelStride, int vectorIndex,
                             std::shared_ptr<ColumnVector> vector,
-                            pixels::proto::ColumnChunkIndex &chunkIndex,
+                            const pixels::fb::ColumnChunkIndex *chunkIndex,
                             std::shared_ptr<PixelsBitMask> filterMask)
 {
   std::shared_ptr<LongColumnVector> columnVector =
@@ -53,14 +54,14 @@ void LongColumnReader::read(std::shared_ptr<ByteBuffer> input,
   {
     decoder = std::make_shared<RunLenIntDecoder>(input, true);
     ColumnReader::elementIndex = 0;
-    isNullOffset = chunkIndex.isnulloffset();
+    isNullOffset = chunkIndex->isNullOffset();
   }
 
   int pixelId = elementIndex / pixelStride;
-  bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+  bool hasNull = chunkIndex->pixelStatistics()->Get(pixelId)->statistic()->hasNull();
   setValid(input, pixelStride, vector, pixelId, hasNull);
 
-  if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_RUNLENGTH)
+  if (encoding->kind() == pixels::fb::EncodingKind_RUNLENGTH)
   {
     for (int i = 0; i < size; i++)
     {

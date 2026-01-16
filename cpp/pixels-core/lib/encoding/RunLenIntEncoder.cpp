@@ -92,12 +92,10 @@ void RunLenIntEncoder::encode(long *values, int offset, int length, byte *result
 {
     for (int i = 0; i < length; ++i)
     {
-        // std::cout << encodingType << " value : " << values[i + offset] << std::endl;
+        std::cout << encodingType << " value : " << values[i + offset] << std::endl;
         this->write(values[i + offset]);
     }
     flush();
-    // std::cout << "length: " << length << std::endl;
-    // std::cout << "buffer end: " << outputStream->getWritePos() << std::endl;
     resLen = outputStream->getWritePos();
     outputStream->getBytes(results, resLen);
     outputStream->resetPosition();

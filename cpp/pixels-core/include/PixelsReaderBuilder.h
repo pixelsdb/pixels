@@ -27,7 +27,8 @@
 
 #include "PixelsReaderImpl.h"
 #include "physical/PhysicalReaderUtil.h"
-#include "pixels-common/pixels.pb.h"
+#include "pixels_generated.h"
+#include "pixels_generated.h"
 #include "PixelsVersion.h"
 #include "PixelsFooterCache.h"
 #include "exception/PixelsReaderException.h"

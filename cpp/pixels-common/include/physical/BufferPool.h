@@ -33,6 +33,7 @@
 #include "exception/InvalidArgumentException.h"
 #include "utils/ColumnSizeCSVReader.h"
 #include <map>
+#include <cassert>
 
 // when allocating buffer pool, we use the size of the first pxl file. Consider that
 // the remaining pxl file has larger size than the first file, we allocate some extra

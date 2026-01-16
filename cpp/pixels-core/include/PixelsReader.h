@@ -38,14 +38,15 @@
 #include "reader/PixelsRecordReader.h"
 #include "reader/PixelsReaderOption.h"
 #include "PixelsVersion.h"
+#include "pixels_generated.h"
 
-typedef ::google::protobuf::RepeatedPtrField<::pixels::proto::ColumnStatistic>
+typedef flatbuffers::Vector<flatbuffers::Offset<pixels::fb::ColumnStatistic>>
         ColumnStatisticList;
 
-typedef ::google::protobuf::RepeatedPtrField<::pixels::proto::RowGroupInformation>
+typedef flatbuffers::Vector<flatbuffers::Offset<pixels::fb::RowGroupInformation>>
         RowGroupInfoList;
 
-typedef ::google::protobuf::RepeatedPtrField<::pixels::proto::RowGroupStatistic>
+typedef flatbuffers::Vector<flatbuffers::Offset<pixels::fb::RowGroupStatistic>>
         RowGroupStatList;
 
 class PixelsReader
@@ -64,7 +65,7 @@ public:
 
     virtual long getNumberOfRows() = 0;
 
-    virtual pixels::proto::CompressionKind getCompressionKind() = 0;
+    virtual pixels::fb::CompressionKind getCompressionKind() = 0;
 
     virtual long getCompressionBlockSize() = 0;
 
@@ -76,17 +77,17 @@ public:
 
     virtual bool isPartitioned() = 0;
 
-    virtual ColumnStatisticList getColumnStats() = 0;
+    virtual const ColumnStatisticList* getColumnStats() = 0;
 
-    virtual pixels::proto::ColumnStatistic getColumnStat(std::string columnName) = 0;
+    virtual const pixels::fb::ColumnStatistic* getColumnStat(std::string columnName) = 0;
 
-    virtual RowGroupInfoList getRowGroupInfos() = 0;
+    virtual const RowGroupInfoList* getRowGroupInfos() = 0;
 
-    virtual pixels::proto::RowGroupInformation getRowGroupInfo(int rowGroupId) = 0;
+    virtual const pixels::fb::RowGroupInformation* getRowGroupInfo(int rowGroupId) = 0;
 
-    virtual pixels::proto::RowGroupStatistic getRowGroupStat(int rowGroupId) = 0;
+    virtual const pixels::fb::RowGroupStatistic* getRowGroupStat(int rowGroupId) = 0;
 
-    virtual RowGroupStatList getRowGroupStats() = 0;
+    virtual const RowGroupStatList* getRowGroupStats() = 0;
 
     virtual void close() = 0;
 

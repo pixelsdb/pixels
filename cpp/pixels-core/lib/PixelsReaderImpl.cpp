@@ -26,7 +26,7 @@
 
 PixelsReaderImpl::PixelsReaderImpl(std::shared_ptr <TypeDescription> fileSchema,
                                    std::shared_ptr <PhysicalReader> reader,
-                                   std::shared_ptr <pixels::proto::FileTail> fileTail,
+                                   const pixels::fb::FileTail* fileTail,
                                    std::shared_ptr <PixelsFooterCache> footerCache)
 {
     this->fileSchema = fileSchema;
@@ -62,50 +62,50 @@ std::shared_ptr <TypeDescription> PixelsReaderImpl::getFileSchema()
 
 PixelsVersion::Version PixelsReaderImpl::getFileVersion()
 {
-    return PixelsVersion::from(postScript.version());
+    return PixelsVersion::from(postScript->version());
 }
 
 long PixelsReaderImpl::getNumberOfRows()
 {
-    return postScript.numberofrows();
+    return postScript->numberOfRows();
 }
 
-pixels::proto::CompressionKind PixelsReaderImpl::getCompressionKind()
+pixels::fb::CompressionKind PixelsReaderImpl::getCompressionKind()
 {
-    return postScript.compression();
+    return postScript->compression();
 }
 
 long PixelsReaderImpl::getCompressionBlockSize()
 {
-    return postScript.compressionblocksize();
+    return postScript->compressionBlockSize();
 }
 
 long PixelsReaderImpl::getPixelStride()
 {
-    return postScript.pixelstride();
+    return postScript->pixelStride();
 }
 
 std::string PixelsReaderImpl::getWriterTimeZone()
 {
-    return postScript.writertimezone();
+    return postScript->writerTimezone()->str();
 }
 
 int PixelsReaderImpl::getRowGroupNum()
 {
-    return footer.rowgroupinfos_size();
+    return footer->rowGroupInfos()->size();
 }
 
 bool PixelsReaderImpl::isPartitioned()
 {
-    return postScript.has_partitioned() && postScript.partitioned();
+    return postScript->partitioned();
 }
 
-ColumnStatisticList PixelsReaderImpl::getColumnStats()
+const ColumnStatisticList* PixelsReaderImpl::getColumnStats()
 {
-    return footer.columnstats();
+    return footer->columnStats();
 }
 
-pixels::proto::ColumnStatistic PixelsReaderImpl::getColumnStat(std::string columnName)
+const pixels::fb::ColumnStatistic* PixelsReaderImpl::getColumnStat(std::string columnName)
 {
     auto fieldNames = fileSchema->getFieldNames();
     auto fieldIter = std::find(fieldNames.begin(), fieldNames.end(), columnName);
@@ -115,35 +115,35 @@ pixels::proto::ColumnStatistic PixelsReaderImpl::getColumnStat(std::string colum
                                        columnName + " is not the field name!");
     }
     int fieldId = fieldIter - fieldNames.begin();
-    return footer.columnstats().Get(fieldId);
+    return footer->columnStats()->Get(fieldId);
 }
 
-RowGroupInfoList PixelsReaderImpl::getRowGroupInfos()
+const RowGroupInfoList* PixelsReaderImpl::getRowGroupInfos()
 {
-    return footer.rowgroupinfos();
+    return footer->rowGroupInfos();
 }
 
-pixels::proto::RowGroupInformation PixelsReaderImpl::getRowGroupInfo(int rowGroupId)
+const pixels::fb::RowGroupInformation* PixelsReaderImpl::getRowGroupInfo(int rowGroupId)
 {
-    if (rowGroupId < 0 || rowGroupId >= footer.columnstats_size())
+    if (rowGroupId < 0 || rowGroupId >= footer->columnStats()->size())
     {
         throw InvalidArgumentException("row group id is out of bound.");
     }
-    return footer.rowgroupinfos().Get(rowGroupId);
+    return footer->rowGroupInfos()->Get(rowGroupId);
 }
 
-pixels::proto::RowGroupStatistic PixelsReaderImpl::getRowGroupStat(int rowGroupId)
+const pixels::fb::RowGroupStatistic* PixelsReaderImpl::getRowGroupStat(int rowGroupId)
 {
-    if (rowGroupId < 0 || rowGroupId >= footer.columnstats_size())
+    if (rowGroupId < 0 || rowGroupId >= footer->columnStats()->size())
     {
         throw InvalidArgumentException("row group id is out of bound.");
     }
-    return footer.rowgroupstats().Get(rowGroupId);
+    return footer->rowGroupStats()->Get(rowGroupId);
 }
 
-RowGroupStatList PixelsReaderImpl::getRowGroupStats()
+const RowGroupStatList* PixelsReaderImpl::getRowGroupStats()
 {
-    return footer.rowgroupstats();
+    return footer->rowGroupStats();
 }
 
 PixelsReaderImpl::~PixelsReaderImpl()

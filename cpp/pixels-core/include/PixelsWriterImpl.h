@@ -31,11 +31,20 @@
 #include "writer/ColumnWriter.h"
 #include "utils/ConfigFactory.h"
 #include "stats/StatsRecorder.h"
-#include "pixels-common/pixels.pb.h"
+#include "pixels_generated.h"
 #include "vector/VectorizedRowBatch.h"
 #include <unicode/timezone.h>
 #include <unicode/unistr.h>
 #include <unicode/locid.h>
+
+// temp metadata store in memory
+struct RowGroupNative {
+    uint64_t footerOffset;
+    uint32_t dataLength;
+    uint32_t footerLength;
+    uint32_t numberOfRows;
+};
+
 
 class PixelsWriterImpl : public PixelsWriter
 {
@@ -49,6 +58,14 @@ public:
     void writeColumnVectors(std::vector <std::shared_ptr<ColumnVector>> &columnVectors, int rowBatchSize);
 
     void writeRowGroup();
+    // Split into four functions
+    int prepareRowGroup();
+
+    void writeRowGroupData(uint32_t totalLength);
+
+    int writeRowGroupFooter();
+
+    void recordRowGroupMetadata(int rowGroupDataLength);
 
     void writeFileTail();
 
@@ -66,25 +83,30 @@ private:
 
     std::shared_ptr <TypeDescription> schema;
     int rowGroupSize;
-    pixels::proto::CompressionKind compressionKind;
     int compressionBlockSize;
     // std::unique_ptr<icu::TimeZone> timeZone;
     std::shared_ptr <PixelsWriterOption> columnWriterOption;
     std::vector <std::shared_ptr<ColumnWriter>> columnWriters;
     std::vector <StatsRecorder> fileColStatRecorders;
-    std::int64_t fileContentLength;
-    int fileRowNum;
+    std::int64_t fileContentLength = 0 ;
+    int fileRowNum = 0;
     std::int64_t writtenBytes = 0;
     std::int64_t curRowGroupOffset = 0;
-    std::int64_t curRowGroupFooterOffset = 0;
     std::int64_t curRowGroupNumOfRows = 0;
     int curRowGroupDataLength = 0;
     bool haseValueIsSet = false;
     int currHashValue = 0;
     bool partitioned;
-    std::vector <pixels::proto::RowGroupInformation> rowGroupInfoList;
-    std::vector <pixels::proto::RowGroupStatistic> rowGroupStatisticList;
     std::shared_ptr <PhysicalWriter> physicalWriter;
     std::vector <std::shared_ptr<TypeDescription>> children;
+
+    // flatbuffers
+    // global fFlatBuffe
+    flatbuffers::FlatBufferBuilder fbb;
+    pixels::fb::CompressionKind compressionKind;
+    std::vector<flatbuffers::Offset<pixels::fb::RowGroupInformation>> rowGroupInfoList;
+    std::vector<flatbuffers::Offset<pixels::fb::RowGroupStatistic>> rowGroupStatisticList;
+
+    std::vector<RowGroupNative> rowGroupMetadataList;
 };
 #endif //PIXELS_PIXELSWRITERIMPL_H

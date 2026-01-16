@@ -139,61 +139,61 @@ TypeDescription::TypeDescription(Category c)
 }
 
 std::shared_ptr <TypeDescription>
-TypeDescription::createSchema(const std::vector <std::shared_ptr<pixels::proto::Type>> &types)
+TypeDescription::createSchema(std::span<const pixels::fb::Type*> types)
 {
     std::shared_ptr <TypeDescription> schema = createStruct();
-    for (const auto &type: types)
+    for (const auto type: types)
     {
-        const std::string &fieldName = type->name();
+        const std::string &fieldName = type->name()->str();
         std::shared_ptr <TypeDescription> fieldType;
         switch (type->kind())
         {
-            case pixels::proto::Type_Kind_BOOLEAN:
+            case pixels::fb::TypeKind_BOOLEAN:
                 fieldType = TypeDescription::createBoolean();
                 break;
-            case pixels::proto::Type_Kind_LONG:
+            case pixels::fb::TypeKind_LONG:
                 fieldType = TypeDescription::createLong();
                 break;
-            case pixels::proto::Type_Kind_INT:
+            case pixels::fb::TypeKind_INT:
                 fieldType = TypeDescription::createInt();
                 break;
-            case pixels::proto::Type_Kind_SHORT:
+            case pixels::fb::TypeKind_SHORT:
                 fieldType = TypeDescription::createShort();
                 break;
-            case pixels::proto::Type_Kind_BYTE:
+            case pixels::fb::TypeKind_BYTE:
                 fieldType = TypeDescription::createByte();
                 break;
-            case pixels::proto::Type_Kind_FLOAT:
+            case pixels::fb::TypeKind_FLOAT:
                 fieldType = TypeDescription::createFloat();
                 break;
-            case pixels::proto::Type_Kind_DOUBLE:
+            case pixels::fb::TypeKind_DOUBLE:
                 fieldType = TypeDescription::createDouble();
                 break;
-            case pixels::proto::Type_Kind_DECIMAL:
+            case pixels::fb::TypeKind_DECIMAL:
                 fieldType = TypeDescription::createDecimal(type->precision(), type->scale());
                 break;
-            case pixels::proto::Type_Kind_VARCHAR:
+            case pixels::fb::TypeKind_VARCHAR:
                 fieldType = TypeDescription::createVarchar();
-                fieldType->maxLength = type->maximumlength();
+                fieldType->maxLength = type->maximumLength();
                 break;
-            case pixels::proto::Type_Kind_CHAR:
+            case pixels::fb::TypeKind_CHAR:
                 fieldType = TypeDescription::createChar();
-                fieldType->maxLength = type->maximumlength();
+                fieldType->maxLength = type->maximumLength();
                 break;
-            case pixels::proto::Type_Kind_STRING:
+            case pixels::fb::TypeKind_STRING:
                 fieldType = TypeDescription::createString();
                 break;
-            case pixels::proto::Type_Kind_DATE:
+            case pixels::fb::TypeKind_DATE:
                 fieldType = TypeDescription::createDate();
                 break;
-            case pixels::proto::Type_Kind_TIME:
+            case pixels::fb::TypeKind_TIME:
                 fieldType = TypeDescription::createTime();
                 break;
-            case pixels::proto::Type_Kind_TIMESTAMP:
+            case pixels::fb::TypeKind_TIMESTAMP:
                 fieldType = TypeDescription::createTimestamp();
                 break;
             default:
-                throw InvalidArgumentException("TypeDescription::createSchema: Unknown type: " + type->name());
+                throw InvalidArgumentException("TypeDescription::createSchema: Unknown type: " + type->name()->str());
         }
         schema->addField(fieldName, fieldType);
     }
@@ -761,90 +761,84 @@ TypeDescription TypeDescription::withMaxLength(int maxLength)
     return *this;
 }
 
-void TypeDescription::writeTypes(std::shared_ptr <pixels::proto::Footer> footer)
+std::vector<flatbuffers::Offset<pixels::fb::Type>> TypeDescription::writeTypes(flatbuffers::FlatBufferBuilder& fbb)
 {
-    std::vector <std::shared_ptr<TypeDescription>> children = this->getChildren();
-    std::vector <std::string> names = this->getFieldNames();
+    std::vector<std::shared_ptr<TypeDescription>> children = this->getChildren();
+    std::vector<std::string> names = this->getFieldNames();
+    std::vector<flatbuffers::Offset<pixels::fb::Type>> typeVector;
+
     if (children.empty())
     {
-        return;
+        return typeVector;
     }
+
     for (int i = 0; i < children.size(); i++)
     {
-        std::shared_ptr <TypeDescription> child = children.at(i);
-        std::shared_ptr <pixels::proto::Type> tmpType = std::make_shared<pixels::proto::Type>();
-        tmpType->set_name(names.at(i));
+        std::shared_ptr<TypeDescription> child = children.at(i);
+
+        // 1. get and create FlatBuffers strin offset
+        flatbuffers::Offset<flatbuffers::String> fbName = 0;
+        if (i < names.size()) {
+            fbName = fbb.CreateString(names.at(i));
+        }
+
         switch (child->getCategory())
         {
             case TypeDescription::Category::BOOLEAN:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BOOLEAN);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_BOOLEAN, fbName));
                 break;
             case TypeDescription::Category::BYTE:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BYTE);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_BYTE, fbName));
                 break;
             case TypeDescription::Category::SHORT:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_SHORT);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_SHORT, fbName));
                 break;
             case TypeDescription::Category::INT:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_INT);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_INT, fbName));
                 break;
             case TypeDescription::Category::LONG:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_LONG);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_LONG, fbName));
                 break;
             case TypeDescription::Category::FLOAT:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_FLOAT);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_FLOAT, fbName));
                 break;
             case TypeDescription::Category::DOUBLE:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DOUBLE);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_DOUBLE, fbName));
                 break;
             case TypeDescription::Category::DECIMAL:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DECIMAL);
-                tmpType->set_precision(child->getPrecision());
-                tmpType->set_scale(child->getScale());
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_DECIMAL, fbName, 0, 0, child->getPrecision(), child->getScale()));
                 break;
             case TypeDescription::Category::STRING:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_STRING);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_STRING, fbName));
                 break;
             case TypeDescription::Category::CHAR:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_CHAR);
-                tmpType->set_maximumlength(child->getMaxLength());
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_CHAR, fbName, 0, child->getMaxLength()));
                 break;
             case TypeDescription::Category::VARCHAR:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VARCHAR);
-                tmpType->set_maximumlength(child->getMaxLength());
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_VARCHAR, fbName, 0, child->getMaxLength()));
                 break;
             case TypeDescription::Category::BINARY:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_BINARY);
-                tmpType->set_maximumlength(child->getMaxLength());
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_BINARY, fbName, 0, child->getMaxLength()));
                 break;
             case TypeDescription::Category::VARBINARY:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VARBINARY);
-                tmpType->set_maximumlength(child->getMaxLength());
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_VARBINARY, fbName, 0, child->getMaxLength()));
                 break;
             case TypeDescription::Category::TIMESTAMP:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_TIMESTAMP);
-                tmpType->set_precision(child->getPrecision());
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_TIMESTAMP, fbName, 0, 0, child->getPrecision()));
                 break;
             case TypeDescription::Category::DATE:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_DATE);
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_DATE, fbName));
                 break;
             case TypeDescription::Category::TIME:
-                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_TIME);
-                tmpType->set_precision(child->getPrecision());
+                typeVector.push_back(pixels::fb::CreateType(fbb, pixels::fb::TypeKind_TIME, fbName, 0, 0, child->getPrecision()));
                 break;
-//            case TypeDescription::Category::VECTOR:
-//                tmpType->set_kind(pixels::proto::Type_Kind::Type_Kind_VECTOR);
-//                tmpType->set_dimension(child->getDimension());
-//                break;
             default:
             {
                 std::string errorMsg = "Unknown category: ";
-                errorMsg += static_cast<std::underlying_type_t <Category>>(this->getCategory());
+                errorMsg += std::to_string(static_cast<std::underlying_type_t<Category>>(child->getCategory()));
                 throw std::runtime_error(errorMsg);
             }
-
-
         }
-        *(footer->add_types()) = *tmpType;
     }
+    return typeVector;
 }

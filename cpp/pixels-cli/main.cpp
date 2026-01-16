@@ -110,7 +110,9 @@ int main()
                     ("encoding_level,e", bpo::value<int>()->default_value(2),
                      "specify the encoding level for data loading")
                     ("nulls_padding,p", bpo::value<bool>()->default_value(false),
-                     "specify whether nulls padding is enabled");
+                     "specify whether nulls padding is enabled")
+                    ("concurrency,c", bpo::value<int>()->default_value(1),
+                     "specify the number of threads for data loading");
 
             bpo::variables_map vm;
             try
@@ -127,10 +129,8 @@ int main()
             {
                 std::cerr << "Error parsing options: " << e.what() << "\n";
             }
-            // try {
-            LoadExecutor *loadExecutor = new LoadExecutor();
+            std::unique_ptr<LoadExecutor> loadExecutor = std::make_unique<LoadExecutor>();
             loadExecutor->execute(vm, command);
-            // } catch
         }
         else if (command == "QUERY")
         {
@@ -160,6 +160,7 @@ int main()
         {
             std::cout << "Command " << command << " not found" << std::endl;
         }
+        for (char* p : argv) free(p);
     } // end of while loop
     return 0;
 }

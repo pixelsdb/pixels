@@ -27,6 +27,7 @@
 
 #include <vector>
 #include <string>
+#include <mutex>
 #include <load/Parameters.h>
 
 class PixelsConsumer
@@ -39,6 +40,7 @@ public:
 
 private:
     static int GlobalTargetPathId;
+    static std::mutex globalMutex;  // Mutex to protect GlobalTargetPathId
     std::vector <std::string> queue;
     Parameters parameters;
     std::vector <std::string> loadedFiles;

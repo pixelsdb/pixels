@@ -29,7 +29,7 @@
 #include "reader/PixelsRecordReaderImpl.h"
 #include <iostream>
 #include <vector>
-#include "pixels-common/pixels.pb.h"
+#include "pixels_generated.h"
 #include "PixelsFooterCache.h"
 #include "reader/PixelsReaderOption.h"
 
@@ -43,7 +43,7 @@ public:
 
     PixelsReaderImpl(std::shared_ptr <TypeDescription> fileSchema,
                      std::shared_ptr <PhysicalReader> reader,
-                     std::shared_ptr <pixels::proto::FileTail> fileTail,
+                     const pixels::fb::FileTail* fileTail,
                      std::shared_ptr <PixelsFooterCache> footerCache);
 
     ~PixelsReaderImpl();
@@ -54,7 +54,7 @@ public:
 
     long getNumberOfRows() override;
 
-    pixels::proto::CompressionKind getCompressionKind() override;
+    pixels::fb::CompressionKind getCompressionKind() override;
 
     long getCompressionBlockSize() override;
 
@@ -66,17 +66,17 @@ public:
 
     bool isPartitioned() override;
 
-    ColumnStatisticList getColumnStats() override;
+    const ColumnStatisticList* getColumnStats() override;
 
-    pixels::proto::ColumnStatistic getColumnStat(std::string columnName) override;
+    const pixels::fb::ColumnStatistic* getColumnStat(std::string columnName) override;
 
-    RowGroupInfoList getRowGroupInfos() override;
+    const RowGroupInfoList* getRowGroupInfos() override;
 
-    pixels::proto::RowGroupInformation getRowGroupInfo(int rowGroupId) override;
+    const pixels::fb::RowGroupInformation* getRowGroupInfo(int rowGroupId) override;
 
-    pixels::proto::RowGroupStatistic getRowGroupStat(int rowGroupId) override;
+    const pixels::fb::RowGroupStatistic* getRowGroupStat(int rowGroupId) override;
 
-    RowGroupStatList getRowGroupStats() override;
+    const RowGroupStatList* getRowGroupStats() override;
 
     void close() override;
 
@@ -85,8 +85,8 @@ private:
     std::shared_ptr <TypeDescription> fileSchema;
     std::shared_ptr <PhysicalReader> physicalReader;
     std::shared_ptr <PixelsFooterCache> pixelsFooterCache;
-    pixels::proto::PostScript postScript;
-    pixels::proto::Footer footer;
+    const pixels::fb::Footer* footer;
+    const pixels::fb::PostScript* postScript;
     bool closed;
 };
 

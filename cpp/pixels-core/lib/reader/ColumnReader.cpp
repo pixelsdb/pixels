@@ -73,9 +73,9 @@ std::shared_ptr <ColumnReader> ColumnReader::newColumnReader(std::shared_ptr <Ty
 }
 
 void
-ColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset, int size,
+ColumnReader::read(std::shared_ptr <ByteBuffer> input,const pixels::fb::ColumnEncoding* encoding, int offset, int size,
                    int pixelStride, int vectorIndex, std::shared_ptr <ColumnVector> vector,
-                   pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
+                   const pixels::fb::ColumnChunkIndex* chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
 {
 }
 

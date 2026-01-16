@@ -1,0 +1,1 @@
+struct<id:int,index:long,name:string,birth:date,updated:timestamp,price:decimal(15,2)>
