@@ -48,7 +48,10 @@ int DateColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
         if (columnVector->isNull[i])
         {
             hasNull = true;
-            encodingUtils.writeIntLE(outputStream, 0);
+            if (nullsPadding)
+            {
+                encodingUtils.writeIntLE(outputStream, 0);
+            }
         } else
         {
             if (byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN)

@@ -27,8 +27,7 @@
 
 #include "TypeDescription.h"
 #include "physical/natives/ByteBuffer.h"
-#include "pixels-common/pixels.pb.h"
-#include <cmath>
+#include "pixels_generated.h"
 #include <cmath>
 #include "duckdb.h"
 #include "duckdb/common/types/vector.hpp"
@@ -54,11 +53,9 @@ public:
 
     virtual bool decideNullsPadding(std::shared_ptr <PixelsWriterOption> writerOption) = 0;
 
-    virtual pixels::proto::ColumnChunkIndex getColumnChunkIndex();
+    virtual const flatbuffers::Offset<pixels::fb::ColumnChunkIndex> getColumnChunkIndex();
 
-    virtual std::shared_ptr <pixels::proto::ColumnChunkIndex> getColumnChunkIndexPtr();
-
-    virtual pixels::proto::ColumnEncoding getColumnChunkEncoding() const;
+    virtual const flatbuffers::Offset<pixels::fb::ColumnEncoding> getColumnChunkEncoding(flatbuffers::FlatBufferBuilder& fbb) const;
 
     virtual void reset();
 
@@ -69,12 +66,24 @@ public:
     // virtual
     virtual void newPixel();
 
+    virtual flatbuffers::Offset<pixels::fb::ColumnChunkIndex> buildColumnChunkIndex(flatbuffers::FlatBufferBuilder& fbb, uint64_t chunkOffset, uint32_t chunkLength,bool littleEndian);
+
 private:
     static const int ISNULL_ALIGNMENT;
     static const std::vector <uint8_t> ISNULL_PADDING_BUFFER;
 
-    std::shared_ptr <pixels::proto::ColumnChunkIndex> columnChunkIndex{};
-    std::shared_ptr <pixels::proto::ColumnStatistic> columnChunkStat{};
+    // Structure to hold pixel statistics data for delayed serialization
+    struct PixelStatSnapshot {
+        std::unique_ptr<pixels::fb::ColumnStatisticT> colStatObj;
+    };
+
+    // Accumulated data for building ColumnChunkIndex
+    std::vector<uint32_t> pixelPositions;
+    std::vector<PixelStatSnapshot> pixelStatSnapshots;  // Changed from pixelStatistics
+    
+    // Built flatbuffers objects
+    flatbuffers::Offset<pixels::fb::ColumnChunkIndex> columnChunkIndex;
+    const pixels::fb::ColumnStatistic* columnChunkStat;
 
     int lastPixelPosition = 0;
     int curPixelPosition = 0;
@@ -94,5 +103,6 @@ protected:
     int curPixelVectorIndex = 0;
     const ByteOrder byteOrder;
     std::vector<bool> isNull{};
+    int isNullOffset =0;
 };
 #endif //PIXELS_COLUMNWRITER_H

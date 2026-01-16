@@ -159,6 +159,10 @@ public:
 
     void printPosition();
 
+    // for auto-resize
+
+    void ensureCapacity(uint32_t minCapacity);
+
 protected:
     uint32_t wpos;
     mutable uint32_t rpos;
@@ -197,10 +201,11 @@ private:
     {
         uint32_t s = sizeof(data);
 
-        if (size() < (wpos + s))
-        {
-            throw std::runtime_error("Append exceeds the size of buffer");
-        }
+        // if (size() < (wpos + s))
+        // {
+        //     throw std::runtime_error("Append exceeds the size of buffer");
+        // }
+        ensureCapacity(wpos + s);
         memcpy(&buf[wpos], (uint8_t * ) & data, s);
         //printf("writing %c to %i\n", (uint8_t)data, wpos);
 
@@ -210,14 +215,17 @@ private:
     template<typename T>
     void insert(T data, uint32_t index)
     {
-        if ((index + sizeof(data)) > size())
-        {
-            throw std::runtime_error("Insert exceeds the size of buffer");
-        }
+        // if ((index + sizeof(data)) > size())
+        // {
+        //     throw std::runtime_error("Insert exceeds the size of buffer");
+        // }
+        uint32_t s = sizeof(data);
 
+        // 确保 index 处的写入不会越界
+        ensureCapacity(index + s);
         memcpy(&buf[index], (uint8_t * ) & data, sizeof(data));
 
-        wpos = index + sizeof(data);
+        wpos = index + s;
     }
 };
 

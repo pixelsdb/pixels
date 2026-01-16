@@ -49,11 +49,11 @@ void IntColumnVector::close()
 
 void IntColumnVector::print(int rowCount)
 {
-    throw InvalidArgumentException ("not support print longcolumnvector.");
-    //    for(int i = 0; i < rowCount; i++) {
-    //        std::cout<<longVector[i]<<std::endl;
-    //		std::cout<<intVector[i]<<std::endl;
-    //    }
+    // throw InvalidArgumentException ("not support print longcolumnvector.");
+        for(int i = 0; i < rowCount; i++) {
+            // std::cout<<longVector[i]<<std::endl;
+    		std::cout<<intVector[i]<<std::endl;
+        }
 }
 
 IntColumnVector::~IntColumnVector()

@@ -27,8 +27,8 @@
 #include "profiler/CountProfiler.h"
 
 PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> reader,
-                                               const pixels::proto::PostScript &pixelsPostScript,
-                                               const pixels::proto::Footer &pixelsFooter,
+                                               const pixels::fb::PostScript* pixelsPostScript,
+                                               const pixels::fb::Footer* pixelsFooter,
                                                const PixelsReaderOption &opt,
                                                std::shared_ptr <PixelsFooterCache> pixelsFooterCache)
 {
@@ -72,11 +72,11 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> 
 void PixelsRecordReaderImpl::checkBeforeRead()
 {
     // get file schema
-    auto fileColTypesFooterTypes = footer.types();
-    auto fileColTypes = std::vector < std::shared_ptr < pixels::proto::Type >> {};
-    for (const auto &type: fileColTypesFooterTypes)
+    auto fileColTypesFooterTypes = footer->types();
+    auto fileColTypes = std::vector<const pixels::fb::Type*>{};
+    for (int i = 0; i < fileColTypesFooterTypes->size(); i++)
     {
-        fileColTypes.emplace_back(std::make_shared<::pixels::proto::Type>(type));
+        fileColTypes.emplace_back(fileColTypesFooterTypes->Get(i));
     }
     // TODO: if fileCOlTypes == null
     fileSchema = TypeDescription::createSchema(fileColTypes);
@@ -93,7 +93,7 @@ void PixelsRecordReaderImpl::checkBeforeRead()
     {
         for (int j = 0; j < fileColTypes.size(); j++)
         {
-            if (icompare(col, fileColTypes.at(j)->name()))
+            if (icompare(col, fileColTypes.at(j)->name()->str()))
             {
                 optionColsIndices.emplace_back(j);
                 includedColumns.at(j) = true;
@@ -151,7 +151,7 @@ void PixelsRecordReaderImpl::checkBeforeRead()
 void PixelsRecordReaderImpl::UpdateRowGroupInfo()
 {
     // if not end of file, update row count
-    curRGRowCount = (int) footer.rowgroupinfos(targetRGs.at(curRGIdx)).numberofrows();
+    curRGRowCount = (int) footer->rowGroupInfos()->Get(targetRGs.at(curRGIdx))->numberOfRows();
 
     if (enabledFilterPushDown)
     {
@@ -161,22 +161,20 @@ void PixelsRecordReaderImpl::UpdateRowGroupInfo()
 
     curRGFooter = rowGroupFooters.at(curRGIdx);
     // refresh resultColumnsEncoded for reading the column vectors in the next row group.
-    const pixels::proto::RowGroupEncoding &rgEncoding = rowGroupFooters.at(curRGIdx)->rowgroupencoding();
+    const pixels::fb::RowGroupEncoding* rgEncoding = rowGroupFooters.at(curRGIdx)->rowGroupEncoding();
     for (int i = 0; i < includedColumnNum; i++)
     {
         resultColumnsEncoded.at(i) =
-                rgEncoding.columnchunkencodings(resultColumns.at(i))
-                        .kind() != pixels::proto::ColumnEncoding_Kind_NONE
+                rgEncoding->columnChunkEncodings()->Get(resultColumns.at(i))
+                        ->kind() != pixels::fb::EncodingKind_NONE
                 && enableEncodedVector;
     }
     for (int i = 0; i < resultColumns.size(); i++)
     {
-        curEncoding.at(i) = std::make_shared<pixels::proto::ColumnEncoding>(
-                rgEncoding.columnchunkencodings(resultColumns.at(i)));
+        curEncoding.at(i) = rgEncoding->columnChunkEncodings()->Get(resultColumns.at(i));
         curChunkBufferIndex.at(i) = resultColumns.at(i);
-        curChunkIndex.at(i) = std::make_shared<pixels::proto::ColumnChunkIndex>(curRGFooter->rowgroupindexentry()
-                                                                                        .columnchunkindexentries(
-                                                                                                resultColumns.at(i)));
+        curChunkIndex.at(i) = curRGFooter->rowGroupIndexEntry()
+                                     ->columnChunkIndexEntries()->Get(resultColumns.at(i));
     }
     // This flag makes sure that each row group invokes read()
     everRead = false;
@@ -245,9 +243,9 @@ std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reus
             int index = curChunkBufferIndex.at(i);
             auto &encoding = curEncoding.at(i);
             auto &chunkIndex = curChunkIndex.at(i);
-            readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
-                                postScript.pixelstride(), resultRowBatch->rowCount,
-                                columnVectors.at(i), *chunkIndex, filterMask);
+            readers.at(i)->read(chunkBuffers.at(index), encoding, curRowInRG, curBatchSize,
+                                postScript->pixelStride(), resultRowBatch->rowCount,
+                                columnVectors.at(i), chunkIndex, filterMask);
             filterColumnIndex.emplace_back(index);
             PixelsFilter::ApplyFilter(columnVectors.at(i), *filterCol.second, *filterMask,
                                       resultSchema->getChildren().at(i));
@@ -271,9 +269,9 @@ std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reus
         }
         auto &encoding = curEncoding.at(i);
         auto &chunkIndex = curChunkIndex.at(i);
-        readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
-                            postScript.pixelstride(), resultRowBatch->rowCount,
-                            columnVectors.at(i), *chunkIndex, filterMask);
+        readers.at(i)->read(chunkBuffers.at(index), encoding, curRowInRG, curBatchSize,
+                            postScript->pixelStride(), resultRowBatch->rowCount,
+                            columnVectors.at(i), chunkIndex, filterMask);
     }
 
     // update current row index in the row group
@@ -310,7 +308,7 @@ void PixelsRecordReaderImpl::prepareRead()
     for (int i = 0; i < RGLen; i++)
     {
         includedRGs.at(i) = true;
-        includedRowNum += footer.rowgroupinfos(RGStart + i).numberofrows();
+        includedRowNum += footer->rowGroupInfos()->Get(RGStart + i)->numberOfRows();
     }
     targetRGs.clear();
     targetRGs.resize(RGLen);
@@ -357,9 +355,9 @@ void PixelsRecordReaderImpl::prepareRead()
         else
         {
             // cache miss, read from disk and put it into cache
-            const pixels::proto::RowGroupInformation &rowGroupInformation = footer.rowgroupinfos(rgId);
-            uint64_t footerOffset = rowGroupInformation.footeroffset();
-            uint64_t footerLength = rowGroupInformation.footerlength();
+            const pixels::fb::RowGroupInformation* rowGroupInformation = footer->rowGroupInfos()->Get(rgId);
+            uint64_t footerOffset = rowGroupInformation->footerOffset();
+            uint64_t footerLength = rowGroupInformation->footerLength();
             fis.push_back(i);
             requestBatch.add(queryId, (int) footerOffset, (int) footerLength);
             rowGroupFooterCacheHit.at(i) = false;
@@ -373,8 +371,8 @@ void PixelsRecordReaderImpl::prepareRead()
     {
         if (!rowGroupFooterCacheHit.at(i))
         {
-            auto parsed = std::make_shared<pixels::proto::RowGroupFooter>();
-            parsed->ParseFromArray(bbs[i]->getPointer(), (int) bbs[i]->size());
+            const pixels::fb::RowGroupFooter* parsed = 
+                flatbuffers::GetRoot<pixels::fb::RowGroupFooter>((bbs[i]->getPointer()));
             rowGroupFooters.at(fis[i]) = parsed;
             if (footerCache != nullptr)
             {
@@ -439,17 +437,17 @@ bool PixelsRecordReaderImpl::read()
 
     // TODO: support cache read
 
-    const pixels::proto::RowGroupIndex &rowGroupIndex =
-            rowGroupFooters[curRGIdx]->rowgroupindexentry();
+    const pixels::fb::RowGroupIndex* rowGroupIndex =
+            rowGroupFooters[curRGIdx]->rowGroupIndexEntry();
     for (int colId: targetColumns)
     {
-        const pixels::proto::ColumnChunkIndex &chunkIndex =
-                rowGroupIndex.columnchunkindexentries(colId);
-        if (!chunkIndex.littleendian())
+        const pixels::fb::ColumnChunkIndex* chunkIndex =
+                rowGroupIndex->columnChunkIndexEntries()->Get(colId);
+        if (!chunkIndex->littleEndian())
         {
             throw InvalidArgumentException("Pixels C++ reader only supports little endianness. ");
         }
-        ChunkId chunk(curRGIdx, colId, chunkIndex.chunkoffset(), chunkIndex.chunklength());
+        ChunkId chunk(curRGIdx, colId, chunkIndex->chunkOffset(), chunkIndex->chunkLength());
         diskChunks.emplace_back(chunk);
     }
 
@@ -466,8 +464,13 @@ bool PixelsRecordReaderImpl::read()
             requestBatch.add(queryId, chunk.offset, (int) chunk.length, ::BufferPool::GetBufferId(i));
             colIds.emplace_back(chunk.columnId);
             bytes.emplace_back(chunk.length);
+
+            // std::cout << "[DEBUG] Reading RowGroup. Offset: " << chunk.offset
+            //           << ", Length: " << chunk.length << std::endl;
         }
+        ::DirectUringRandomAccessFile::Initialize();
         ::BufferPool::Initialize(colIds, bytes, fileSchema->getFieldNames());
+
         ::DirectUringRandomAccessFile::RegisterBufferFromPool(colIds);
         std::vector <std::shared_ptr<ByteBuffer>> originalByteBuffers;
         for (int i = 0; i < colIds.size(); i++)
@@ -519,7 +522,7 @@ std::shared_ptr <TypeDescription> PixelsRecordReaderImpl::getResultSchema()
 std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::createEmptyEOFRowBatch(int size)
 {
     auto emptySchema = TypeDescription::createSchema(
-            std::vector < std::shared_ptr < pixels::proto::Type >> ());
+            std::span<const pixels::fb::Type*>());
     auto emptyRowBatch = emptySchema->createRowBatch(0);
     emptyRowBatch->rowCount = 0;
     return emptyRowBatch;
@@ -547,4 +550,3 @@ void PixelsRecordReaderImpl::close()
     includedColumnTypes.clear();
     endOfFile = true;
 }
-

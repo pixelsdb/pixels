@@ -35,8 +35,10 @@
 #include <fstream>
 #include <sstream>
 #include <chrono>
+#include <mutex>
 
 int PixelsConsumer::GlobalTargetPathId = 0;
+std::mutex PixelsConsumer::globalMutex;
 
 PixelsConsumer::PixelsConsumer(const std::vector <std::string> &queue, const Parameters &parameters,
                                const std::vector <std::string> &loadedFiles)
@@ -106,8 +108,13 @@ void PixelsConsumer::run()
                 if (initPixelsFile)
                 {
                     LocalFS targetStorage;
+                    int fileId;
+                    {
+                        std::lock_guard<std::mutex> lock(globalMutex);
+                        fileId = GlobalTargetPathId++;
+                    }
                     targetFileName = std::to_string(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())) + \
-                                         "_" + std::to_string(this->loadedFiles.size()) + ".pxl";
+                                         "_" + std::to_string(fileId) + ".pxl";
                     targetFilePath = targetPath + targetFileName;
                     pixelsWriter = std::make_shared<PixelsWriterImpl>(schema, pixelsStride, rowGroupSize,
                                                                       targetFilePath, blockSize,
@@ -137,10 +144,7 @@ void PixelsConsumer::run()
 
                 if (rowBatch->rowCount == rowBatch->getMaxSize())
                 {
-                    std::cout << "writing row group to file: " << targetFilePath << " rowCount:" << rowBatch->rowCount
-                              << std::endl;
                     pixelsWriter->addRowBatch(rowBatch);
-
                     rowBatch->reset();
                 }
 

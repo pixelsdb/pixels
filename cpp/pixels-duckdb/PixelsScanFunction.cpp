@@ -447,7 +447,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
   vectorizedRowBatch->increment(thisOutputChunkRows);
 }
 
-bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const PixelsReadBindData &bind_data,
+bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsReadBindData &bind_data,
                                                  PixelsReadLocalState &scan_data,
                                                  PixelsReadGlobalState &parallel_state,
                                                  bool is_init_state)
@@ -485,7 +485,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, const P
     parallel_lock.unlock();
     return false;
     }
-
+  bind_data.curFileId++;
   scan_data.curr_file_index = scan_data.next_file_index;
   scan_data.curr_batch_index = scan_data.next_batch_index;
   scan_data.next_file_index = parallel_state.file_index.at(scan_data.deviceID);

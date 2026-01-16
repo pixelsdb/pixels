@@ -27,7 +27,8 @@
 #define PIXELS_STATSRECODER_H
 
 #include "TypeDescription.h"
-#include "pixels-common/pixels.pb.h"
+#include "pixels_generated.h"
+#include "pixels_generated.h"
 
 class StatsRecorder
 {
@@ -38,7 +39,7 @@ protected:
 public:
     StatsRecorder();
 
-    explicit StatsRecorder(const pixels::proto::ColumnStatistic &statistic);
+    explicit StatsRecorder(const pixels::fb::ColumnStatistic* statistic);
 
     virtual ~StatsRecorder();
 
@@ -80,14 +81,14 @@ public:
 
     bool hasNullValue() const;
 
-    virtual pixels::proto::ColumnStatistic serialize() const;
+    virtual flatbuffers::Offset<pixels::fb::ColumnStatistic> serialize(flatbuffers::FlatBufferBuilder& builder) const;
 
     static std::unique_ptr <StatsRecorder> create(TypeDescription type);
 
     static std::unique_ptr <StatsRecorder>
-    create(TypeDescription type, const pixels::proto::ColumnStatistic &statistic);
+    create(TypeDescription type, const pixels::fb::ColumnStatistic* statistic);
 
     static std::unique_ptr <StatsRecorder>
-    create(TypeDescription::Category category, const pixels::proto::ColumnStatistic &statistic);
+    create(TypeDescription::Category category, const pixels::fb::ColumnStatistic* statistic);
 };
 #endif // PIXELS_STATSRECODER_H

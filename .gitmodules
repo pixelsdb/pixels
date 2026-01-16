@@ -10,3 +10,6 @@
 [submodule "cpp/FlameGraph"]
 	path = cpp/FlameGraph
 	url = git@github.com:brendangregg/FlameGraph.git
+[submodule "cpp/third-party/flatbuffers"]
+	path = cpp/third-party/flatbuffers
+	url = https://github.com/google/flatbuffers.git

@@ -27,7 +27,7 @@
 
 #include "TypeDescription.h"
 #include "physical/natives/ByteBuffer.h"
-#include "pixels-common/pixels.pb.h"
+#include "pixels_generated.h"
 #include "math.h"
 #include "duckdb.h"
 #include "duckdb/common/types/vector.hpp"
@@ -61,10 +61,10 @@ public:
      * @param chunkIndex the metadata of the column chunk to read.
      */
     virtual void read(std::shared_ptr <ByteBuffer> input,
-                      pixels::proto::ColumnEncoding &encoding,
+                      const pixels::fb::ColumnEncoding* encoding,
                       int offset, int size, int pixelStride,
                       int vectorIndex, std::shared_ptr <ColumnVector> vector,
-                      pixels::proto::ColumnChunkIndex &chunkIndex,
+                      const pixels::fb::ColumnChunkIndex* chunkIndex,
                       std::shared_ptr <PixelsBitMask> filterMask);
 
     void setValid(const std::shared_ptr <ByteBuffer> &input, int pixelStride,

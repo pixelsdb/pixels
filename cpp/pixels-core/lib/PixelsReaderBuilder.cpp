@@ -60,7 +60,7 @@ std::shared_ptr<PixelsReader> PixelsReaderBuilder::build()
             PhysicalReaderUtil::newPhysicalReader (builderStorage, builderPath);
     // try to get file tail from cache
     std::string fileName = fsReader->getName ();
-    std::shared_ptr<pixels::proto::FileTail> fileTail;
+    const pixels::fb::FileTail* fileTail;
     if (builderPixelsFooterCache != nullptr && builderPixelsFooterCache->containsFileTail (fileName))
     {
         fileTail = builderPixelsFooterCache->getFileTail (fileName);
@@ -85,11 +85,10 @@ std::shared_ptr<PixelsReader> PixelsReaderBuilder::build()
         int fileTailLength = (int) (fileLen - fileTailOffset - sizeof (long));
         fsReader->seek (fileTailOffset);
         std::shared_ptr<ByteBuffer> fileTailBuffer = fsReader->readFully (fileTailLength);
-        fileTail = std::make_shared<pixels::proto::FileTail> ();
-        if (!fileTail->ParseFromArray (fileTailBuffer->getPointer (),
-                                       fileTailLength))
+        fileTail = pixels::fb::GetFileTail(fileTailBuffer->getPointer());
+        if (fileTail == nullptr)
         {
-            throw InvalidArgumentException ("PixelsReaderBuilder::build: paring FileTail error!");
+            throw InvalidArgumentException ("PixelsReaderBuilder::build: parsing FileTail error!");
         }
         if (builderPixelsFooterCache != nullptr)
         {
@@ -98,9 +97,9 @@ std::shared_ptr<PixelsReader> PixelsReaderBuilder::build()
     }
 
     // check file MAGIC and file version
-    pixels::proto::PostScript postScript = fileTail->postscript ();
-    uint32_t fileVersion = postScript.version ();
-    const std::string &fileMagic = postScript.magic ();
+    const pixels::fb::PostScript* postScript = fileTail->postscript();
+    uint32_t fileVersion = postScript->version();
+    const std::string fileMagic = postScript->magic()->str();
     if (PixelsVersion::currentVersion () != fileVersion)
     {
         throw PixelsFileVersionInvalidException (fileVersion);
@@ -110,10 +109,10 @@ std::shared_ptr<PixelsReader> PixelsReaderBuilder::build()
         throw PixelsFileMagicInvalidException (fileMagic);
     }
 
-    auto fileColTypes = std::vector<std::shared_ptr<pixels::proto::Type >>{};
-    for (const auto &type: fileTail->footer ().types ())
+    auto fileColTypes = std::vector<const pixels::fb::Type*>{};
+    for (int i = 0; i < fileTail->footer()->types()->size(); i++)
     {
-        fileColTypes.emplace_back (std::make_shared<pixels::proto::Type> (type));
+        fileColTypes.emplace_back(fileTail->footer()->types()->Get(i));
     }
     builderSchema = TypeDescription::createSchema (fileColTypes);
 
@@ -122,5 +121,3 @@ std::shared_ptr<PixelsReader> PixelsReaderBuilder::build()
     return std::make_shared<PixelsReaderImpl> (builderSchema, fsReader, fileTail,
                                                builderPixelsFooterCache);
 }
-
-

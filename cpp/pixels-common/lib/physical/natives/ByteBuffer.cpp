@@ -402,6 +402,30 @@ void ByteBuffer::printPosition()
               << wpos << std::endl;
 }
 
+/**
+ * ensure enough space
+ * @param minCapacity
+ */
+void ByteBuffer::ensureCapacity(uint32_t minCapacity) {
+    if (minCapacity > bufSize) {
+        uint32_t newSize = bufSize * 2;
+        if (newSize < minCapacity) {
+            newSize = minCapacity;
+        }
+
+        uint8_t* newBuf = new uint8_t[newSize];
+
+        if (buf != nullptr) {
+            memcpy(newBuf, buf, bufSize);
+            delete[] buf;
+        }
+
+        buf = newBuf;
+        bufSize = newSize;
+    }
+}
+
+
 ByteBuffer::~ByteBuffer()
 {
     if (!fromOtherBB)

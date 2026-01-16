@@ -30,7 +30,7 @@
 #include "vector/VectorizedRowBatch.h"
 #include "physical/Scheduler.h"
 #include "physical/SchedulerFactory.h"
-#include "pixels-common/pixels.pb.h"
+#include "pixels_generated.h"
 #include "PixelsFooterCache.h"
 #include "reader/PixelsReaderOption.h"
 #include "utils/String.h"
@@ -65,8 +65,8 @@ class PixelsRecordReaderImpl : public PixelsRecordReader
 {
 public:
     explicit PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> reader,
-                                    const pixels::proto::PostScript &pixelsPostScript,
-                                    const pixels::proto::Footer &pixelsFooter,
+                                    const pixels::fb::PostScript* pixelsPostScript,
+                                    const pixels::fb::Footer* pixelsFooter,
                                     const PixelsReaderOption &opt,
                                     std::shared_ptr <PixelsFooterCache> pixelsFooterCache
     );
@@ -99,8 +99,8 @@ private:
     void UpdateRowGroupInfo();
 
     std::shared_ptr <PhysicalReader> physicalReader;
-    pixels::proto::Footer footer;
-    pixels::proto::PostScript postScript;
+    const pixels::fb::Footer* footer;
+    const pixels::fb::PostScript* postScript;
     std::shared_ptr <PixelsFooterCache> footerCache;
     PixelsReaderOption option;
     duckdb::TableFilterSet *filter;
@@ -119,10 +119,10 @@ private:
     int curRGRowCount;
     bool enabledFilterPushDown;
     std::shared_ptr <PixelsBitMask> filterMask;
-    std::shared_ptr <pixels::proto::RowGroupFooter> curRGFooter;
-    std::vector <std::shared_ptr<pixels::proto::ColumnEncoding>> curEncoding;
+    const pixels::fb::RowGroupFooter* curRGFooter;
+    std::vector<const pixels::fb::ColumnEncoding*> curEncoding;
     std::vector<int> curChunkBufferIndex;
-    std::vector <std::shared_ptr<pixels::proto::ColumnChunkIndex>> curChunkIndex;
+    std::vector<const pixels::fb::ColumnChunkIndex*> curChunkIndex;
     /**
      * Columns included by reader option; if included, set true
      */
@@ -141,10 +141,10 @@ private:
     std::vector <uint32_t> resultColumns;
     std::vector<bool> resultColumnsEncoded;
     bool enableEncodedVector;
-    std::vector <std::shared_ptr<pixels::proto::RowGroupFooter>> rowGroupFooters;
+    std::vector<const pixels::fb::RowGroupFooter*> rowGroupFooters;
 
     int includedColumnNum; // the number of columns to read
-    std::vector <std::shared_ptr<pixels::proto::Type>> includedColumnTypes;
+    std::vector<const pixels::fb::Type*> includedColumnTypes;
 
     std::shared_ptr <TypeDescription> fileSchema;
     std::shared_ptr <TypeDescription> resultSchema;
