@@ -382,6 +382,11 @@ public class RocksDBFactory
         }
     }
 
+    static synchronized void clearCFHandles()
+    {
+        cfHandles.clear();
+    }
+
     public static synchronized String getDbPath()
     {
         return dbPath;

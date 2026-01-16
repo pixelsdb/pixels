@@ -23,10 +23,12 @@ import org.junit.Test;
 import org.rocksdb.*;
 import org.rocksdb.util.SizeUnit;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 /**
  * @author hank
@@ -348,32 +350,88 @@ public class TestRocksDB
     @Test
     public void testFullCompaction() throws RocksDBException
     {
-        long openStart = System.currentTimeMillis();
-        final String dbPath = "/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina-2/rocksdb";
-        System.out.println("Start Open RocksDB: " + dbPath);
-        try (RocksDB rocksDB = RocksDBFactory.createRocksDB(dbPath))
+        // Define the list of RocksDB paths
+        List<String> dbPaths = new ArrayList<>();
+        dbPaths.add("/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina/" + "/rocksdb");
+        for (int i = 2; i <= 8; i++)
         {
-            long openEnd = System.currentTimeMillis();
-            System.out.println("Open RocksDB Duration: " + (openEnd - openStart) + "ms" + "\tPath:" + dbPath);
-            long start = System.currentTimeMillis();
-            System.out.println("Start Full Compaction");
-            Map<String, ColumnFamilyHandle> cfHandles = RocksDBFactory.getAllCfHandles();
-            System.out.println("Column Family Count:" + cfHandles.size());
-            // Iterate through each Column Family and trigger a manual compaction
-            for (Map.Entry<String, ColumnFamilyHandle> entry : cfHandles.entrySet()) {
-                String cfName = entry.getKey();
-                ColumnFamilyHandle handle = entry.getValue();
-                System.out.println("Compacting Column Family: " + cfName);
-                /* * compactRange(handle) triggers a full compaction for the specific CF.
-                 * It processes all levels from 0 to the maximum level.
-                 * This is a synchronous/blocking call.
-                 */
-                rocksDB.compactRange(handle);
-            }
-
-            long end = System.currentTimeMillis();
-            System.out.println("Compaction Duration: " + (end - start) + "ms" + "\tPath:" + dbPath);
+            dbPaths.add(
+                    "/home/ubuntu/disk6/collected_indexes/realtime-pixels-retina-" + i + "/rocksdb"
+            );
         }
-        // Note: Ensure RocksDBFactory or a 'finally' block handles the closing of ColumnFamilyHandles
+
+        long totalStart = System.currentTimeMillis();
+        System.out.println("Starting parallel compaction for " + dbPaths.size() + " databases.");
+        // Define parallelism level (e.g., number of disks or cores)
+        int parallelism = 4;
+        ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+        try
+        {
+            List<CompletableFuture<Void>> futures = dbPaths.stream()
+                    .map(dbPath -> CompletableFuture.runAsync(() ->
+                    {
+                        try
+                        {
+                            executeSingleDbCompaction(dbPath);
+                        } catch (RocksDBException e)
+                        {
+                            throw new RuntimeException(e);
+                        }
+                    }, executor))
+                    .collect(Collectors.toList());
+
+            // Block until all compaction tasks are complete
+            for(CompletableFuture<Void> future: futures)
+            {
+                future.get();
+            }
+        } catch (ExecutionException e)
+        {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e)
+        {
+            throw new RuntimeException(e);
+        } finally
+        {
+            executor.shutdown();
+        }
+
+        long totalEnd = System.currentTimeMillis();
+        System.out.println("All compactions finished. Total Duration: " + (totalEnd - totalStart) + "ms");
+    }
+
+    private void executeSingleDbCompaction(String dbPath) throws RocksDBException
+    {
+        long openStart = System.currentTimeMillis();
+        System.out.println("Thread [" + Thread.currentThread().getName() + "] Start Open: " + dbPath);
+        RocksDB rocksDB;
+        Map<String, ColumnFamilyHandle> cfHandles;
+
+        long start = System.currentTimeMillis();
+        synchronized (this)
+        {
+            rocksDB = RocksDBFactory.createRocksDB(dbPath);
+            long openEnd = System.currentTimeMillis();
+            System.out.println("Open Duration: " + (openEnd - openStart) + "ms\tPath: " + dbPath);
+            cfHandles = new HashMap<>(RocksDBFactory.getAllCfHandles());
+            RocksDBFactory.clearCFHandles();
+        }
+
+        System.out.println("Path: " + dbPath + " | Column Family Count: " + cfHandles.size());
+        // Iterate through each Column Family for manual compaction
+        for (Map.Entry<String, ColumnFamilyHandle> entry : cfHandles.entrySet())
+        {
+            String cfName = entry.getKey();
+            ColumnFamilyHandle handle = entry.getValue();
+
+            System.out.println("Compacting CF [" + cfName + "] in " + dbPath);
+
+            // This is a blocking call per Column Family
+            rocksDB.compactRange(handle);
+            handle.close();
+        }
+        long end = System.currentTimeMillis();
+        System.out.println("SUCCESS: Compaction Duration: " + (end - start) + "ms\tPath: " + dbPath);
+        rocksDB.close();
     }
 }
