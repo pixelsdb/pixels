@@ -25,21 +25,24 @@ import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.node.BucketCache;
 import io.pixelsdb.pixels.common.node.VnodeIdentifier;
 import io.pixelsdb.pixels.common.retina.RetinaService;
+import io.pixelsdb.pixels.daemon.NodeProto;
 
  public class RetinaUtils
 {
     private static volatile RetinaUtils instance;
     private final int bucketNum;
     private final int defaultRetinaPort;
-
+    private final VnodeIdentifier defaultVnodeIdentifier;
     private RetinaUtils()
     {
         ConfigFactory config = ConfigFactory.Instance();
         this.bucketNum = Integer.parseInt(config.getProperty("node.bucket.num"));
+        String defaultRetinaHost = config.getProperty("retina.server.host");
+        this.defaultVnodeIdentifier = new VnodeIdentifier(defaultRetinaHost, 0);
         this.defaultRetinaPort = Integer.parseInt(config.getProperty("retina.server.port"));
     }
 
-    private static RetinaUtils getInstance()
+    public static RetinaUtils getInstance()
     {
         if (instance == null)
         {
@@ -84,9 +87,14 @@ import io.pixelsdb.pixels.common.retina.RetinaService;
         return BucketCache.getInstance().getRetinaNodeInfoByBucketId(bucketId).getAddress();
     }
 
-    public static VnodeIdentifier getVnodeIdentifierFromBucketId(int bucketId)
+    public VnodeIdentifier getVnodeIdentifierFromBucketId(int bucketId)
     {
-        return VnodeIdentifier.fromNodeInfo(BucketCache.getInstance().getRetinaNodeInfoByBucketId(bucketId));
+        NodeProto.NodeInfo retinaNodeInfoByBucketId = BucketCache.getInstance().getRetinaNodeInfoByBucketId(bucketId);
+        if(retinaNodeInfoByBucketId == null)
+        {
+            return defaultVnodeIdentifier;
+        }
+        return VnodeIdentifier.fromNodeInfo(retinaNodeInfoByBucketId);
     }
 
     public static RetinaService getRetinaServiceFromBucketId(int bucketId)

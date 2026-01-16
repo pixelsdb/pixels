@@ -43,6 +43,7 @@
  import io.pixelsdb.pixels.index.IndexProto;
 
  import java.io.BufferedReader;
+ import java.io.DataInputStream;
  import java.io.IOException;
  import java.io.InputStreamReader;
  import java.nio.ByteBuffer;
@@ -79,9 +80,11 @@
      protected void processSourceFile(String originalFilePath) throws IOException, MetadataException
      {
          Storage originStorage = StorageFactory.Instance().getStorage(originalFilePath);
-         try (BufferedReader reader = new BufferedReader(new InputStreamReader(originStorage.open(originalFilePath))))
+         Pattern SPLIT_PATTERN = Pattern.compile(Pattern.quote(regex));
+         try (
+                 DataInputStream dataInputStream = originStorage.open(originalFilePath);
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(dataInputStream)))
          {
-
              System.out.println("loading indexed data from: " + originalFilePath);
              long timestamp = parameters.getTimestamp();
              String line;
@@ -94,13 +97,13 @@
                      continue;
                  }
 
-                 String[] colsInLine = line.split(Pattern.quote(regex));
+                 String[] colsInLine = SPLIT_PATTERN.split(line);
 
                  // 1. Calculate Primary Key and Bucket ID
                  ByteString pkByteString = calculatePrimaryKeyBytes(colsInLine);
                  // Assume BucketCache has the necessary method and configuration
                  int bucketId = RetinaUtils.getBucketIdFromByteBuffer(pkByteString);
-                 VnodeIdentifier vnodeIdentifier = RetinaUtils.getVnodeIdentifierFromBucketId(bucketId);
+                 VnodeIdentifier vnodeIdentifier = RetinaUtils.getInstance().getVnodeIdentifierFromBucketId(bucketId);
                  PerVirtualNodeWriter retinaNodeWriter = retinaWriters.computeIfAbsent(vnodeIdentifier, id ->
                  {
                      try
@@ -140,6 +143,7 @@
                  }
              }
          }
+         originStorage.close();
      }
 
      @Override
