@@ -308,6 +308,9 @@ public class Main
                             .help("specify the schema name");
                     argumentParser.addArgument("-t", "--table").required(true)
                             .help("specify the table name");
+                    argumentParser.addArgument("-c", "--concurrency")
+                            .setDefault("4").required(false)
+                            .help("specify the number of threads used for data stat");
 
                     Namespace ns;
                     try

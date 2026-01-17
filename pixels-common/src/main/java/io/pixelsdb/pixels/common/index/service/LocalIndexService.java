@@ -17,12 +17,13 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common.index;
+package io.pixelsdb.pixels.common.index.service;
 
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.index.*;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.ArrayList;
@@ -53,14 +54,14 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key) throws IndexException
+    public IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
         try
         {
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             long rowId = singlePointIndex.getUniqueRowId(key);
             if (rowId >= 0)
             {
@@ -86,14 +87,14 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public List<IndexProto.RowLocation> lookupNonUniqueIndex(IndexProto.IndexKey key) throws IndexException
+    public List<IndexProto.RowLocation> lookupNonUniqueIndex(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
         try
         {
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // Get all row IDs for the given index key
             List<Long> rowIds = singlePointIndex.getRowIds(key);
             List<IndexProto.RowLocation> rowLocations = new ArrayList<>();
@@ -127,7 +128,7 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean putPrimaryIndexEntry(IndexProto.PrimaryIndexEntry entry) throws IndexException
+    public boolean putPrimaryIndexEntry(IndexProto.PrimaryIndexEntry entry, IndexOption indexOption) throws IndexException
     {
         try
         {
@@ -135,7 +136,7 @@ public class LocalIndexService implements IndexService
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // Insert into single point index
             boolean spSuccess = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
             if (!spSuccess)
@@ -161,11 +162,11 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean putPrimaryIndexEntries(long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
+    public boolean putPrimaryIndexEntries(long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> entries, IndexOption indexOption) throws IndexException
     {
         try
         {
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // Batch insert into single point index
             boolean success = singlePointIndex.putPrimaryEntries(entries);
             if (!success)
@@ -197,14 +198,14 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean putSecondaryIndexEntry(IndexProto.SecondaryIndexEntry entry) throws IndexException
+    public boolean putSecondaryIndexEntry(IndexProto.SecondaryIndexEntry entry, IndexOption indexOption) throws IndexException
     {
         try
         {
             IndexProto.IndexKey key = entry.getIndexKey();
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // Insert into secondary index
             boolean success = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
             if (!success)
@@ -220,11 +221,11 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean putSecondaryIndexEntries(long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> entries) throws IndexException
+    public boolean putSecondaryIndexEntries(long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> entries, IndexOption indexOption) throws IndexException
     {
         try
         {
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             boolean success = singlePointIndex.putSecondaryEntries(entries);
             if (!success)
             {
@@ -239,14 +240,14 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public IndexProto.RowLocation deletePrimaryIndexEntry(IndexProto.IndexKey key) throws IndexException
+    public IndexProto.RowLocation deletePrimaryIndexEntry(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
         try
         {
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             long prevRowId = singlePointIndex.deleteUniqueEntry(key);
             if (prevRowId < 0)
             {
@@ -268,12 +269,12 @@ public class LocalIndexService implements IndexService
 
     @Override
     public List<IndexProto.RowLocation> deletePrimaryIndexEntries(
-            long tableId, long indexId, List<IndexProto.IndexKey> keys) throws IndexException
+            long tableId, long indexId, List<IndexProto.IndexKey> keys, IndexOption indexOption) throws IndexException
     {
         try
         {
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             List<Long> prevRowIds = singlePointIndex.deleteEntries(keys);
             if (prevRowIds == null || prevRowIds.isEmpty())
             {
@@ -295,13 +296,13 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public List<Long> deleteSecondaryIndexEntry(IndexProto.IndexKey key) throws IndexException
+    public List<Long> deleteSecondaryIndexEntry(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
         try
         {
             long tableId = key.getTableId();
             long indexId = key.getIndexId();
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             List<Long> prevRowIds = singlePointIndex.deleteEntry(key);
             if (prevRowIds == null || prevRowIds.isEmpty())
             {
@@ -316,11 +317,11 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public List<Long> deleteSecondaryIndexEntries(long tableId, long indexId, List<IndexProto.IndexKey> keys) throws IndexException
+    public List<Long> deleteSecondaryIndexEntries(long tableId, long indexId, List<IndexProto.IndexKey> keys, IndexOption indexOption) throws IndexException
     {
         try
         {
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             List<Long> prevRowIds = singlePointIndex.deleteEntries(keys);
             if (prevRowIds == null || prevRowIds.isEmpty())
             {
@@ -336,7 +337,7 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public IndexProto.RowLocation updatePrimaryIndexEntry(IndexProto.PrimaryIndexEntry indexEntry) throws IndexException
+    public IndexProto.RowLocation updatePrimaryIndexEntry(IndexProto.PrimaryIndexEntry indexEntry, IndexOption indexOption) throws IndexException
     {
         IndexProto.IndexKey key = indexEntry.getIndexKey();
         long tableId = key.getTableId();
@@ -344,7 +345,7 @@ public class LocalIndexService implements IndexService
         try
         {
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // update the entry in the single point index and get the previous row ID
             long prevRowId = singlePointIndex.updatePrimaryEntry(key, indexEntry.getRowId());
             IndexProto.RowLocation prevLocation;
@@ -381,12 +382,13 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public List<IndexProto.RowLocation> updatePrimaryIndexEntries(long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> indexEntries) throws IndexException
+    public List<IndexProto.RowLocation> updatePrimaryIndexEntries
+            (long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> indexEntries, IndexOption indexOption) throws IndexException
     {
         try
         {
             MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // update multiple entries in the single point index, returning previous row IDs
             List<Long> prevRowIds = singlePointIndex.updatePrimaryEntries(indexEntries);
             if (prevRowIds == null || prevRowIds.isEmpty())
@@ -420,7 +422,7 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public List<Long> updateSecondaryIndexEntry(IndexProto.SecondaryIndexEntry indexEntry) throws IndexException
+    public List<Long> updateSecondaryIndexEntry(IndexProto.SecondaryIndexEntry indexEntry, IndexOption indexOption) throws IndexException
     {
         IndexProto.IndexKey key = indexEntry.getIndexKey();
         long tableId = key.getTableId();
@@ -428,7 +430,7 @@ public class LocalIndexService implements IndexService
         try
         {
             // get the single point index for the table and index ID
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // update the secondary index entry and return previous row IDs
             List<Long> prevRowIds = singlePointIndex.updateSecondaryEntry(key, indexEntry.getRowId());
             if (prevRowIds == null || prevRowIds.isEmpty())
@@ -445,12 +447,13 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public List<Long> updateSecondaryIndexEntries(long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> indexEntries) throws IndexException
+    public List<Long> updateSecondaryIndexEntries
+            (long tableId, long indexId, List<IndexProto.SecondaryIndexEntry> indexEntries, IndexOption indexOption) throws IndexException
     {
         try
         {
             // get the single point index for the table and index ID
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // update all secondary index entries and return previous row IDs
             List<Long> prevRowIds = singlePointIndex.updateSecondaryEntries(indexEntries);
             if (prevRowIds == null || prevRowIds.isEmpty())
@@ -467,12 +470,13 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean purgeIndexEntries(long tableId, long indexId, List<IndexProto.IndexKey> indexKeys, boolean isPrimary) throws IndexException
+    public boolean purgeIndexEntries
+            (long tableId, long indexId, List<IndexProto.IndexKey> indexKeys, boolean isPrimary, IndexOption indexOption) throws IndexException
     {
         try
         {
             // get the single point index for the table and index
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // purge the entries from the index
             List<Long> rowIds = singlePointIndex.purgeEntries(indexKeys);
             if (rowIds == null || rowIds.isEmpty())
@@ -514,7 +518,8 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean flushIndexEntriesOfFile(long tableId, long indexId, long fileId, boolean isPrimary) throws IndexException
+    public boolean flushIndexEntriesOfFile
+            (long tableId, long indexId, long fileId, boolean isPrimary, IndexOption indexOption) throws IndexException
     {
         try
         {
@@ -539,12 +544,12 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean openIndex(long tableId, long indexId, boolean isPrimary) throws IndexException
+    public boolean openIndex(long tableId, long indexId, boolean isPrimary, IndexOption indexOption) throws IndexException
     {
         try
         {
             // get the single-point index
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId);
+            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             if (singlePointIndex == null)
             {
                 throw new IndexException("Failed to open single-point index for tableId=" + tableId + ", indexId=" + indexId);
@@ -567,12 +572,12 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean closeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException
+    public boolean closeIndex(long tableId, long indexId, boolean isPrimary, IndexOption option) throws IndexException
     {
         try
         {
             // close the single-point index
-            SinglePointIndexFactory.Instance().closeIndex(tableId, indexId, false);
+            SinglePointIndexFactory.Instance().closeIndex(tableId, indexId, false, option);
             // if it's a primary index, also close the main index
             if (isPrimary)
             {
@@ -587,12 +592,12 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean removeIndex(long tableId, long indexId, boolean isPrimary) throws IndexException
+    public boolean removeIndex(long tableId, long indexId, boolean isPrimary, IndexOption option) throws IndexException
     {
         try
         {
             // close and remove the single-point index completely
-            SinglePointIndexFactory.Instance().closeIndex(tableId, indexId, true);
+            SinglePointIndexFactory.Instance().closeIndex(tableId, indexId, true, option);
             // if it's a primary index, also remove the main index completely
             if (isPrimary)
             {

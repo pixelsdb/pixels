@@ -21,8 +21,9 @@ package io.pixelsdb.pixels.index.rocksdb;
 
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.IndexException;
-import io.pixelsdb.pixels.common.index.IndexService;
-import io.pixelsdb.pixels.common.index.IndexServiceProvider;
+import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.common.index.service.IndexService;
+import io.pixelsdb.pixels.common.index.service.IndexServiceProvider;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -75,6 +76,7 @@ public class TestRetinaTrace
 
     private static final IndexService indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
 
+    private static IndexOption indexOption;
     /**
      * Load the initial data into the index
      */
@@ -82,6 +84,7 @@ public class TestRetinaTrace
     public static void prepare()
     {
         System.out.println("Preparing data from loadPath into index...");
+        indexOption = IndexOption.builder().vNodeId(0).build();
         long count = 0;
         try (BufferedReader reader = Files.newBufferedReader(Paths.get(loadPath)))
         {
@@ -92,7 +95,7 @@ public class TestRetinaTrace
                 String[] parts = line.split("\\t");
                 PutOperation putOperation = new PutOperation(parts);
                 IndexProto.PrimaryIndexEntry entry = (IndexProto.PrimaryIndexEntry) putOperation.toProto();
-                indexService.putPrimaryIndexEntry(entry);
+                indexService.putPrimaryIndexEntry(entry, indexOption);
             }
         } catch (IOException e)
         {
@@ -223,10 +226,10 @@ public class TestRetinaTrace
                 {
                     if (proto instanceof IndexProto.PrimaryIndexEntry)
                     {
-                        indexService.putPrimaryIndexEntry((IndexProto.PrimaryIndexEntry) proto);
+                        indexService.putPrimaryIndexEntry((IndexProto.PrimaryIndexEntry) proto, indexOption);
                     } else
                     {
-                        indexService.deletePrimaryIndexEntry((IndexProto.IndexKey) proto);
+                        indexService.deletePrimaryIndexEntry((IndexProto.IndexKey) proto, indexOption);
                     }
                 }
             } catch (IndexException e)

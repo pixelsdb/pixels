@@ -147,6 +147,34 @@ public class MetadataService
         return true;
     }
 
+    public Schema getSchemaById(long schemaId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetSchemaByIdRequest request = MetadataProto.GetSchemaByIdRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token).build())
+                .setSchemaId(schemaId).build();
+        Schema schema = null;
+        try
+        {
+            MetadataProto.GetSchemaByIdResponse response = this.stub.getSchemaById(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            schema = new Schema(response.getSchema());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get tables from metadata", e);
+        }
+        return schema;
+    }
+
     public List<Schema> getSchemas() throws MetadataException
     {
         List<Schema> schemas = new ArrayList<>();

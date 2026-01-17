@@ -37,6 +37,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 import static io.pixelsdb.pixels.common.error.ErrorCode.*;
 
@@ -246,6 +250,41 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void getSchemaById(MetadataProto.GetSchemaByIdRequest request, StreamObserver<MetadataProto.GetSchemaByIdResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.ResponseHeader header;
+        MetadataProto.GetSchemaByIdResponse response;
+        MetadataProto.Schema schema = schemaDao.getById(request.getSchemaId());
+        if (schema == null)
+        {
+            header = headerBuilder
+                    .setErrorCode(METADATA_SCHEMA_NOT_FOUND) // Constant representing schema error
+                    .setErrorMsg("Metadata server failed to get schema: " + request.getSchemaId())
+                    .build();
+
+            response = MetadataProto.GetSchemaByIdResponse.newBuilder()
+                    .setHeader(header)
+                    .build();
+        }
+        else
+        {
+            header = headerBuilder
+                    .setErrorCode(0)
+                    .setErrorMsg("")
+                    .build();
+            response = MetadataProto.GetSchemaByIdResponse.newBuilder()
+                    .setHeader(header)
+                    .setSchema(schema)
+                    .build();
+        }
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void getSchemas(MetadataProto.GetSchemasRequest request,
                            StreamObserver<MetadataProto.GetSchemasResponse> responseObserver)
     {
@@ -360,21 +399,46 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
                                             NodeService nodeService = NodeService.Instance();
                                             List<NodeProto.NodeInfo> retinaList = nodeService.getRetinaList();
                                             int retinaPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
-                                            for(NodeProto.NodeInfo retinaNode : retinaList)
-                                            {
-                                                RetinaService retinaService = RetinaService.CreateInstance(retinaNode.getAddress(), retinaPort);
-                                                if (retinaService.isEnabled())
+                                            ExecutorService executor = Executors.newCachedThreadPool();
+                                            List<CompletableFuture<Boolean>> futures = retinaList.stream()
+                                                    .map(retinaNode -> CompletableFuture.supplyAsync(() ->
+                                                    {
+                                                        try
+                                                        {
+                                                            RetinaService retinaService = RetinaService.CreateInstance(retinaNode.getAddress(), retinaPort);
+                                                            if (retinaService.isEnabled())
+                                                            {
+                                                                return retinaService.addWriteBuffer(request.getSchemaName(), request.getTableName());
+                                                            }
+                                                            return true;
+                                                        } catch (Exception e)
+                                                        {
+                                                            log.error("Error connecting to retina node: " + retinaNode.getAddress(), e);
+                                                            return false;
+                                                        }
+                                                    }, executor))
+                                                    .collect(Collectors.toList());
+
+                                            CompletableFuture<Void> allOf = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+
+                                            try {
+                                                allOf.join();
+                                                boolean retinaAllSuccess = futures.stream()
+                                                        .allMatch(CompletableFuture::join);
+
+                                                if (!retinaAllSuccess)
                                                 {
-                                                    if (!retinaService.addWriteBuffer(request.getSchemaName(), request.getTableName()))
-                                                    {
-                                                        headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
-                                                                .setErrorMsg("failed to add retina's writer buffer for table '" +
-                                                                        request.getSchemaName() + "." + request.getTableName() + "'");
-                                                    } else
-                                                    {
-                                                        headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
-                                                    }
+                                                    headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
+                                                            .setErrorMsg("failed to add retina's writer buffer for table '" +
+                                                                    request.getSchemaName() + "." + request.getTableName() + "'");
+                                                } else
+                                                {
+                                                    headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
                                                 }
+                                            } catch (Exception e)
+                                            {
+                                                headerBuilder.setErrorCode(METADATA_ADD_RETINA_BUFFER_FAILED)
+                                                        .setErrorMsg("Exception occurred during concurrent retina update: " + e.getMessage());
                                             }
                                         } else
                                         {

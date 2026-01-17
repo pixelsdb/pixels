@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core;
 
 import com.google.common.collect.ImmutableSet;
+import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.core.utils.Decimal;
 import io.pixelsdb.pixels.core.vector.*;
 import org.apache.logging.log4j.LogManager;
@@ -36,6 +37,7 @@ import java.sql.Timestamp;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.core.utils.DatetimeUtils.*;
@@ -454,6 +456,12 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         return schema;
     }
 
+    public static TypeDescription createSchemaFromColumns(List<Column> columns)
+    {
+        List<String> columnNames = columns.stream().map(Column::getName).collect(Collectors.toList());
+        List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
+        return createSchemaFromStrings(columnNames, columnTypes);
+    }
     /**
      * Based on the column type, create the corresponding schema.
      * Column types are represented as string types, e.g. "decimal(15, 2)", "varchar(10)".

@@ -21,8 +21,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.common.index.IndexService;
-import io.pixelsdb.pixels.common.index.IndexServiceProvider;
+import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.common.index.service.IndexService;
+import io.pixelsdb.pixels.common.index.service.IndexServiceProvider;
 import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
@@ -61,7 +62,7 @@ public class TestIndexServicePerf
     private static final List<RowIdAllocator> rowIdAllocators = new ArrayList<>();
     private static Config config;
     private static AtomicBoolean running = new AtomicBoolean(true);
-
+    private static IndexOption indexOption;
 
     private static class Config
     {
@@ -90,6 +91,7 @@ public class TestIndexServicePerf
     {
         dropSchema();
         config = new Config();
+        indexOption = IndexOption.builder().vNodeId(0).build();
         List<Schema> schemas = metadataService.getSchemas();
         boolean exists = schemas.stream()
                 .anyMatch(schema -> schema.getName().equals(testSchemaName));
@@ -245,7 +247,7 @@ public class TestIndexServicePerf
                     try
                     {
                         currentRowWrite.incrementAndGet();
-                        indexService.putPrimaryIndexEntry(primaryIndexEntry);
+                        indexService.putPrimaryIndexEntry(primaryIndexEntry, indexOption);
                     } catch (IndexException e)
                     {
                         throw new RuntimeException(e);
@@ -452,7 +454,7 @@ public class TestIndexServicePerf
                     try
                     {
                         currentRowWrite.incrementAndGet();
-                        indexService.updatePrimaryIndexEntry(primaryIndexEntry);
+                        indexService.updatePrimaryIndexEntry(primaryIndexEntry, indexOption);
                     } catch (IndexException e)
                     {
                         throw new RuntimeException(e);

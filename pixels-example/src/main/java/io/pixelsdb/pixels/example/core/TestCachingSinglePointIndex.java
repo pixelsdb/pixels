@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.example.core;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.CachingSinglePointIndex;
+import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.index.rocksdb.RocksDBIndex;
 
@@ -70,7 +71,10 @@ public class TestCachingSinglePointIndex
     public void testRocksDBIndex() throws Exception
     {
         System.out.println("\n-- Starting benchmark for [RocksDBIndex] --");
-        this.index = new RocksDBIndex(0, 0, true);
+        IndexOption option = IndexOption.builder()
+                .vNodeId(0)
+                .build();
+        this.index = new RocksDBIndex(0, 0, true, option);
         loadData();
         updateData();
     }

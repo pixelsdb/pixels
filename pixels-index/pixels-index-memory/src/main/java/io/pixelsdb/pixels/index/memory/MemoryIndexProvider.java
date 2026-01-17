@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.index.memory;
 
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
+import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.SinglePointIndexProvider;
 
@@ -33,7 +34,7 @@ public class MemoryIndexProvider implements SinglePointIndexProvider
 {
     @Override
     public SinglePointIndex createInstance(long tableId, long indexId, @Nonnull SinglePointIndex.Scheme scheme,
-                                           boolean unique) throws SinglePointIndexException
+                                           boolean unique, IndexOption indexOption) throws SinglePointIndexException
     {
         if (scheme == SinglePointIndex.Scheme.memory)
         {

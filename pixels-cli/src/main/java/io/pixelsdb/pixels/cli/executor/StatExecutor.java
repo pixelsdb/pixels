@@ -33,8 +33,16 @@ import io.pixelsdb.pixels.core.stats.StatsRecorder;
 import io.trino.jdbc.TrinoDriver;
 import net.sourceforge.argparse4j.inf.Namespace;
 
+import java.io.IOException;
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -49,6 +57,7 @@ public class StatExecutor implements CommandExecutor
     {
         String schemaName = ns.getString("schema");
         String tableName = ns.getString("table");
+        int concurrency = Integer.parseInt(ns.getString("concurrency"));
         boolean orderedEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.ordered.layout.enabled"));
         boolean compactEnabled = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.compact.layout.enabled"));
 
@@ -81,7 +90,7 @@ public class StatExecutor implements CommandExecutor
 
         List<Column> columns = metadataService.getColumns(schemaName, tableName, true);
         Map<String, Column> columnMap = new HashMap<>(columns.size());
-        Map<String, StatsRecorder> columnStatsMap = new HashMap<>(columns.size());
+        Map<String, StatsRecorder> columnStatsMap = new ConcurrentHashMap<>(columns.size());
 
         for (Column column : columns)
         {
@@ -90,51 +99,28 @@ public class StatExecutor implements CommandExecutor
             columnMap.put(column.getName(), column);
         }
 
-        int rowGroupCount = 0;
-        long rowCount = 0;
-        for (String filePath : files)
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+        AtomicInteger totalRowGroupCount = new AtomicInteger(0);
+        AtomicLong totalRowCount = new AtomicLong(0L);
+        System.out.println("Read File Count: " + files.size() + "\tConcurrency: "+ concurrency);
+        CompletableFuture.allOf(files.stream().map(filePath ->
+                CompletableFuture.runAsync(() ->
+                {
+                    try
+                    {
+                        processFile(filePath, columnMap, columnStatsMap, totalRowGroupCount, totalRowCount);
+                    }
+                    catch (Exception e)
+                    {
+                        System.err.println("Error processing file: " + filePath);
+                        e.printStackTrace();
+                    }
+                }, executor)
+        ).toArray(CompletableFuture[]::new)).join();
+        executor.shutdown();
         {
-            Storage storage = StorageFactory.Instance().getStorage(filePath);
-            PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
-                    .setPath(filePath).setStorage(storage).setEnableCache(false)
-                    .setCacheOrder(ImmutableList.of()).setPixelsCacheReader(null)
-                    .setPixelsFooterCache(new PixelsFooterCache()).build();
-            PixelsProto.Footer fileFooter = pixelsReader.getFooter();
-            int numRowGroup = pixelsReader.getRowGroupNum();
-            rowGroupCount += numRowGroup;
-            rowCount += pixelsReader.getNumberOfRows();
-            List<PixelsProto.Type> types = fileFooter.getTypesList();
-            for (int i = 0; i < numRowGroup; ++i)
-            {
-                PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
-                List<PixelsProto.ColumnChunkIndex> chunkIndices =
-                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntriesList();
-                for (int j = 0; j < types.size(); ++j)
-                {
-                    Column column = columnMap.get(types.get(j).getName());
-                    long chunkLength = chunkIndices.get(j).getChunkLength();
-                    column.setSize(chunkLength + column.getSize());
-                }
-            }
-            List<TypeDescription> fields = pixelsReader.getFileSchema().getChildren();
-            checkArgument(fields.size() == types.size(),
-                    "types.size and fields.size are not consistent");
-            for (int i = 0; i < fields.size(); ++i)
-            {
-                TypeDescription field = fields.get(i);
-                PixelsProto.Type type = types.get(i);
-                StatsRecorder statsRecorder = columnStatsMap.get(type.getName());
-                if (statsRecorder == null)
-                {
-                    columnStatsMap.put(type.getName(),
-                            StatsRecorder.create(field, fileFooter.getColumnStats(i)));
-                }
-                else
-                {
-                    statsRecorder.merge(StatsRecorder.create(field, fileFooter.getColumnStats(i)));
-                }
-            }
-            pixelsReader.close();
+            long readFileEndTime = System.currentTimeMillis();
+            System.out.println("Read File Elapsed time: " + (readFileEndTime - startTime) / 1000.0 + "s.");
         }
 
         ConfigFactory instance = ConfigFactory.Instance();
@@ -158,7 +144,7 @@ public class StatExecutor implements CommandExecutor
 
         for (Column column : columns)
         {
-            column.setChunkSize(column.getSize() / rowGroupCount);
+            column.setChunkSize(column.getSize() / totalRowGroupCount.get());
             column.setRecordStats(columnStatsMap.get(column.getName())
                     .serialize().build().toByteString().asReadOnlyByteBuffer());
             column.getRecordStats().mark();
@@ -166,7 +152,7 @@ public class StatExecutor implements CommandExecutor
             column.getRecordStats().reset();
         }
 
-        metadataService.updateRowCount(schemaName, tableName, rowCount);
+        metadataService.updateRowCount(schemaName, tableName, totalRowCount.get());
 
         /* Set cardinality and null_fraction after the chunk size and column size,
          * because chunk size and column size must exist in the metadata when calculating
@@ -188,7 +174,7 @@ public class StatExecutor implements CommandExecutor
                 if (resultSet.next())
                 {
                     long cardinality = resultSet.getLong("cardinality");
-                    double nullFraction = resultSet.getLong("null_count") / (double) rowCount;
+                    double nullFraction = resultSet.getLong("null_count") / (double) totalRowCount.get();
                     System.out.println(column.getName() + " cardinality: " + cardinality +
                             ", null fraction: " + nullFraction);
                     column.setCardinality(cardinality);
@@ -206,5 +192,61 @@ public class StatExecutor implements CommandExecutor
 
         long endTime = System.currentTimeMillis();
         System.out.println("Elapsed time: " + (endTime - startTime) / 1000.0 + "s.");
+    }
+
+    private void processFile(String filePath,
+                             Map<String, Column> columnMap,
+                             Map<String, StatsRecorder> columnStatsMap,
+                             AtomicInteger totalRowGroupCount,
+                             AtomicLong totalRowCount) throws IOException
+    {
+        Storage storage = StorageFactory.Instance().getStorage(filePath);
+        try (PixelsReader pixelsReader = PixelsReaderImpl.newBuilder()
+                .setPath(filePath).setStorage(storage).setEnableCache(false)
+                .setCacheOrder(ImmutableList.of()).setPixelsCacheReader(null)
+                .setPixelsFooterCache(new PixelsFooterCache()).build())
+        {
+            PixelsProto.Footer fileFooter = pixelsReader.getFooter();
+            int numRowGroup = pixelsReader.getRowGroupNum();
+            totalRowGroupCount.addAndGet(numRowGroup);
+            totalRowCount.addAndGet(pixelsReader.getNumberOfRows());
+            List<PixelsProto.Type> types = fileFooter.getTypesList();
+            for (int i = 0; i < numRowGroup; ++i)
+            {
+                PixelsProto.RowGroupFooter rowGroupFooter = pixelsReader.getRowGroupFooter(i);
+                List<PixelsProto.ColumnChunkIndex> chunkIndices =
+                        rowGroupFooter.getRowGroupIndexEntry().getColumnChunkIndexEntriesList();
+                for (int j = 0; j < types.size(); ++j)
+                {
+                    Column column = columnMap.get(types.get(j).getName());
+                    synchronized (column)
+                    {
+                        long chunkLength = chunkIndices.get(j).getChunkLength();
+                        column.setSize(chunkLength + column.getSize());
+                    }
+                }
+            }
+            List<TypeDescription> fields = pixelsReader.getFileSchema().getChildren();
+            checkArgument(fields.size() == types.size(),
+                    "types.size and fields.size are not consistent");
+            for (int i = 0; i < fields.size(); ++i)
+            {
+                TypeDescription field = fields.get(i);
+                PixelsProto.Type type = types.get(i);
+
+                PixelsProto.ColumnStatistic currentStat = fileFooter.getColumnStats(i);
+                columnStatsMap.compute(type.getName(), (k, existingRecorder) ->
+                {
+                    if (existingRecorder == null)
+                    {
+                        return StatsRecorder.create(field, currentStat);
+                    } else
+                    {
+                        existingRecorder.merge(StatsRecorder.create(field, currentStat));
+                        return existingRecorder;
+                    }
+                });
+            }
+        }
     }
 }
