@@ -9,6 +9,13 @@ endif()
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# --- Retina Capacity Configuration ---
+# Default to 256. Use CACHE to allow command line overrides.
+set(RETINA_CAPACITY 10240 CACHE STRING "Capacity for Retina objects (must be multiple of 64)")
+# Apply the macro globally
+add_definitions(-DRETINA_CAPACITY=${RETINA_CAPACITY})
+message(STATUS "Retina Capacity set to: ${RETINA_CAPACITY}")
+
 # Find Java and JNI
 find_package(Java REQUIRED)
 find_package(JNI REQUIRED)

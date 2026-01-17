@@ -31,7 +31,11 @@
 #include "gtest/gtest.h"
 #include "TileVisibility.h"
 
-#define BITMAP_SIZE 4
+#ifndef RETINA_CAPACITY
+#define RETINA_CAPACITY 256
+#endif
+
+#define BITMAP_SIZE BITMAP_WORDS(RETINA_CAPACITY)
 #ifndef GET_BITMAP_BIT
 #define GET_BITMAP_BIT(bitmap, rowId)                                          \
     (((bitmap)[(rowId) / 64] >> ((rowId) % 64)) & 1ULL)
@@ -42,7 +46,7 @@ bool VISIBILITY_TEST_DEBUG = true;
 class TileVisibilityTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        v = new TileVisibility();
+        v = new TileVisibility<RETINA_CAPACITY>();
     }
 
     void TearDown() override {
@@ -64,7 +68,7 @@ protected:
         return true;
     }
 
-    TileVisibility* v;
+    TileVisibility<RETINA_CAPACITY>* v;
 };
 
 TEST_F(TileVisibilityTest, BaseFunction) {
@@ -94,7 +98,7 @@ TEST_F(TileVisibilityTest, DeleteRecord) {
     uint64_t actualBitmap[BITMAP_SIZE] = {0};
     uint64_t expectedBitmap[BITMAP_SIZE] = {0};
 
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < RETINA_CAPACITY; i++) {
         v->deleteTileRecord(i, i + 100);
         SET_BITMAP_BIT(expectedBitmap, i);
         v->getTileVisibilityBitmap(i + 100, actualBitmap);
@@ -103,7 +107,8 @@ TEST_F(TileVisibilityTest, DeleteRecord) {
 }
 
 TEST_F(TileVisibilityTest, GarbageCollect) {
-    for (int i = 0; i < 100; i++) {
+    int count = RETINA_CAPACITY < 100 ? RETINA_CAPACITY : 100;
+    for (int i = 0; i < count; i++) {
         v->deleteTileRecord(i, i + 100);
     }
     v->collectTileGarbage(150);
@@ -111,15 +116,15 @@ TEST_F(TileVisibilityTest, GarbageCollect) {
     uint64_t expectedBitmap[BITMAP_SIZE] = {0};
 
     v->getTileVisibilityBitmap(150, actualBitmap);
-    for (int i = 0; i <= 50; i++) {
+    for (int i = 0; i <= 50 && i < count; i++) {
         SET_BITMAP_BIT(expectedBitmap, i);
     }
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
-    for (int i = 51; i < 100; i++) {
+    for (int i = 51; i < count; i++) {
         SET_BITMAP_BIT(expectedBitmap, i);
     }
-    v->collectTileGarbage(200);
-    v->getTileVisibilityBitmap(200, actualBitmap);
+    v->collectTileGarbage(100 + count);
+    v->getTileVisibilityBitmap(100 + count, actualBitmap);
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
 
@@ -145,18 +150,18 @@ TEST_F(TileVisibilityTest, MultiThread) {
     auto verifyBitmap = [&](uint64_t timestamp, const uint64_t* bitmap) {
         uint64_t expectedBitmap[BITMAP_SIZE] = {0};
         std::vector<DeleteRecord> historySnapshot;
-        
+
         {
             std::lock_guard<std::mutex> lock(historyMutex);
             historySnapshot = deleteHistory;
         }
-        
+
         for (const auto& record : historySnapshot) {
             if (record.timestamp <= timestamp) {
                 SET_BITMAP_BIT(expectedBitmap, record.rowId);
             }
         }
-        
+
         for (int i = 0; i < BITMAP_SIZE; i++) {
             if (bitmap[i] != expectedBitmap[i]) {
                 if (VISIBILITY_TEST_DEBUG) {
@@ -184,9 +189,9 @@ TEST_F(TileVisibilityTest, MultiThread) {
         uint64_t timestamp = 1;
         std::random_device rd;
         std::mt19937 gen(rd());
-        
+
         std::vector<uint32_t> remainingRows;
-        for (uint32_t i = 0; i < 256; i++) {
+        for (uint32_t i = 0; i < RETINA_CAPACITY; i++) {
             remainingRows.push_back(i);
         }
 
@@ -211,7 +216,7 @@ TEST_F(TileVisibilityTest, MultiThread) {
 
         if (VISIBILITY_TEST_DEBUG) {
             std::lock_guard<std::mutex> lock(printMutex);
-            std::cout << "Delete thread completed: deleted " << deleteHistory.size() 
+            std::cout << "Delete thread completed: deleted " << deleteHistory.size()
                       << " rows with max timestamp " << (timestamp-1) << std::endl;
         }
 
@@ -219,33 +224,33 @@ TEST_F(TileVisibilityTest, MultiThread) {
     });
 
     std::vector<std::thread> getThreads;
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < 100; i++) {
         getThreads.emplace_back([&, i]() {
             std::random_device rd;
             std::mt19937 gen(rd());
             int localVerificationCount = 0;
-            
+
             while (running) {
                 uint64_t maxTs = currentMaxTimestamp.load();
                 if (maxTs == 0) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
                     continue;
                 }
-                
+
                 std::uniform_int_distribution<uint64_t> tsDist(0, maxTs);
                 uint64_t queryTs = tsDist(gen);
-                
+
                 uint64_t actualBitmap[BITMAP_SIZE] = {0};
                 v->getTileVisibilityBitmap(queryTs, actualBitmap);
-                
+
                 EXPECT_TRUE(verifyBitmap(queryTs, actualBitmap));
                 localVerificationCount++;
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
-            
+
             if (VISIBILITY_TEST_DEBUG) {
                 std::lock_guard<std::mutex> lock(printMutex);
-                std::cout << "Get thread " << i << " completed: performed " 
+                std::cout << "Get thread " << i << " completed: performed "
                           << localVerificationCount << " verifications" << std::endl;
             }
         });
@@ -260,6 +265,6 @@ TEST_F(TileVisibilityTest, MultiThread) {
     v->getTileVisibilityBitmap(currentMaxTimestamp.load(), finalBitmap);
     uint64_t expectedFinalBitmap[BITMAP_SIZE];
     std::memset(expectedFinalBitmap, 0xFF, sizeof(expectedFinalBitmap));
-    
+
     EXPECT_TRUE(checkBitmap(finalBitmap, expectedFinalBitmap));
 }

@@ -22,49 +22,52 @@
 #include <cstring>
 #include <thread>
 
-RGVisibility::RGVisibility(uint64_t rgRecordNum)
+template<size_t CAPACITY>
+RGVisibility<CAPACITY>::RGVisibility(uint64_t rgRecordNum)
     : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
-    size_t allocSize = tileCount * sizeof(TileVisibility); // Define size
+    size_t allocSize = tileCount * sizeof(TileVisibility<CAPACITY>);
     void* rawMemory = operator new[](allocSize);
-    tileVisibilities = static_cast<TileVisibility*>(rawMemory);
+    tileVisibilities = static_cast<TileVisibility<CAPACITY>*>(rawMemory);
     for (uint64_t i = 0; i < tileCount; ++i) {
-        new (&tileVisibilities[i]) TileVisibility();
+        new (&tileVisibilities[i]) TileVisibility<CAPACITY>();
     }
 }
 
-RGVisibility::RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap)
+template<size_t CAPACITY>
+RGVisibility<CAPACITY>::RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap)
     : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
-    size_t allocSize = tileCount * sizeof(TileVisibility); // Define size
+    size_t allocSize = tileCount * sizeof(TileVisibility<CAPACITY>);
     void* rawMemory = operator new[](allocSize);
 
-    // Ensure bitmap size matches
     if (initialBitmap.size() < tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY) {
         operator delete[](rawMemory);
         throw std::runtime_error("Initial bitmap size is too small for the given record number.");
     }
 
-    tileVisibilities = static_cast<TileVisibility*>(rawMemory);
+    tileVisibilities = static_cast<TileVisibility<CAPACITY>*>(rawMemory);
     for (uint64_t i = 0; i < tileCount; ++i) {
         const uint64_t* tileBitmap = &initialBitmap[i * BITMAP_SIZE_PER_TILE_VISIBILITY];
-        new (&tileVisibilities[i]) TileVisibility(timestamp, tileBitmap);
+        new (&tileVisibilities[i]) TileVisibility<CAPACITY>(timestamp, tileBitmap);
     }
 }
 
-RGVisibility::~RGVisibility() {
+template<size_t CAPACITY>
+RGVisibility<CAPACITY>::~RGVisibility() {
     for (uint64_t i = 0; i < tileCount; ++i) {
         tileVisibilities[i].~TileVisibility();
     }
     operator delete[](tileVisibilities);
 }
 
-void RGVisibility::collectRGGarbage(uint64_t timestamp) {
-    // TileVisibility::collectTileGarbage uses COW + Epoch, so it's safe to call concurrently
+template<size_t CAPACITY>
+void RGVisibility<CAPACITY>::collectRGGarbage(uint64_t timestamp) {
     for (uint64_t i = 0; i < tileCount; i++) {
         tileVisibilities[i].collectTileGarbage(timestamp);
     }
 }
 
-TileVisibility* RGVisibility::getTileVisibility(uint32_t rowId) const {
+template<size_t CAPACITY>
+TileVisibility<CAPACITY>* RGVisibility<CAPACITY>::getTileVisibility(uint16_t rowId) const {
     uint32_t tileIndex = rowId / VISIBILITY_RECORD_CAPACITY;
     if (tileIndex >= tileCount) {
         throw std::runtime_error("Row id is out of range.");
@@ -72,19 +75,19 @@ TileVisibility* RGVisibility::getTileVisibility(uint32_t rowId) const {
     return &tileVisibilities[tileIndex];
 }
 
-void RGVisibility::deleteRGRecord(uint32_t rowId, uint64_t timestamp) {
-    // TileVisibility::deleteTileRecord is lock-free and concurrent-safe
-    TileVisibility* tileVisibility = getTileVisibility(rowId);
+template<size_t CAPACITY>
+void RGVisibility<CAPACITY>::deleteRGRecord(uint16_t rowId, uint64_t timestamp) {
+    TileVisibility<CAPACITY>* tileVisibility = getTileVisibility(rowId);
     tileVisibility->deleteTileRecord(rowId % VISIBILITY_RECORD_CAPACITY, timestamp);
 }
 
-uint64_t* RGVisibility::getRGVisibilityBitmap(uint64_t timestamp) {
+template<size_t CAPACITY>
+uint64_t* RGVisibility<CAPACITY>::getRGVisibilityBitmap(uint64_t timestamp) {
     size_t len = tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
     size_t byteSize = len * sizeof(uint64_t);
-    // TileVisibility::getTileVisibilityBitmap uses Epoch protection internally
     auto* bitmap = new uint64_t[len];
     pixels::g_retina_tracked_memory.fetch_add(byteSize, std::memory_order_relaxed);
-    memset(bitmap, 0, tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY * sizeof(uint64_t));
+    memset(bitmap, 0, byteSize);
 
     for (uint64_t i = 0; i < tileCount; i++) {
         tileVisibilities[i].getTileVisibilityBitmap(timestamp, bitmap + i * BITMAP_SIZE_PER_TILE_VISIBILITY);
@@ -92,6 +95,10 @@ uint64_t* RGVisibility::getRGVisibilityBitmap(uint64_t timestamp) {
     return bitmap;
 }
 
-uint64_t RGVisibility::getBitmapSize() const {
+template<size_t CAPACITY>
+uint64_t RGVisibility<CAPACITY>::getBitmapSize() const {
     return tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
 }
+
+// Explicit Instantiations for JNI use
+template class RGVisibility<RETINA_CAPACITY>;

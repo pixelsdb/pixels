@@ -29,6 +29,9 @@
 #ifdef ENABLE_JEMALLOC
 #include <jemalloc/jemalloc.h>
 #endif
+#ifndef RETINA_CAPACITY
+#define RETINA_CAPACITY 256
+#endif
 
 namespace pixels {
 

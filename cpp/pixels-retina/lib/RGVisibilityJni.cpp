@@ -31,7 +31,7 @@
 JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNativeObject
   (JNIEnv* env, jobject, jlong rgRecordNum) {
     try {
-        auto* rgVisibility = new RGVisibility(rgRecordNum);
+        auto* rgVisibility = new RGVisibilityInstance(rgRecordNum);
         return reinterpret_cast<jlong>(rgVisibility);
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
@@ -58,7 +58,7 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNative
 
         env->ReleaseLongArrayElements(bitmap, body, JNI_ABORT);
 
-        RGVisibility *rgVisibility = new RGVisibility(rgRecordNum, timestamp, bitmapData);
+        RGVisibilityInstance *rgVisibility = new RGVisibilityInstance(rgRecordNum, timestamp, bitmapData);
         return reinterpret_cast<jlong>(rgVisibility);
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
@@ -74,7 +74,7 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNative
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_destroyNativeObject
   (JNIEnv* env, jobject, jlong handle) {
     try {
-        auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
+        auto* rgVisibility = reinterpret_cast<RGVisibilityInstance*>(handle);
         delete rgVisibility;
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
@@ -89,7 +89,7 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_destroyNative
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_deleteRecord
   (JNIEnv* env, jobject, jint rowId, jlong timestamp, jlong handle) {
     try {
-        auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
+        auto* rgVisibility = reinterpret_cast<RGVisibilityInstance*>(handle);
         rgVisibility->deleteRGRecord(rowId, timestamp);
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
@@ -106,7 +106,7 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
     uint64_t* bitmap = nullptr;
     uint64_t bitmapSize = 0;
     try {
-        auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
+        auto* rgVisibility = reinterpret_cast<RGVisibilityInstance*>(handle);
         bitmap = rgVisibility->getRGVisibilityBitmap(timestamp);
         bitmapSize = rgVisibility->getBitmapSize();
         jlongArray result = env->NewLongArray(bitmapSize);
@@ -121,7 +121,6 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
             pixels::g_retina_tracked_memory.fetch_sub(byteSize, std::memory_order_relaxed);
             delete[] bitmap;
         }
-        delete[] bitmap;
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
         return nullptr;
     }
@@ -135,7 +134,7 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollect
   (JNIEnv* env, jobject, jlong timestamp, jlong handle) {
     try {
-        auto* rgVisibility = reinterpret_cast<RGVisibility*>(handle);
+        auto* rgVisibility = reinterpret_cast<RGVisibilityInstance*>(handle);
         rgVisibility->collectRGGarbage(timestamp);
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
