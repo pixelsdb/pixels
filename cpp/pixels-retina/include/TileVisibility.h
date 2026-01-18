@@ -63,7 +63,7 @@ struct VersionedData : public pixels::RetinaBase<VersionedData<CAPACITY>> {
     static constexpr size_t NUM_WORDS = BITMAP_WORDS(CAPACITY);
     uint64_t baseBitmap[NUM_WORDS];
     uint64_t baseTimestamp;
-    DeleteIndexBlock* head;
+    DeleteIndexBlock* head; // Delete chain head, part of the version
 
     VersionedData() : baseTimestamp(0), head(nullptr) {
         std::memset(baseBitmap, 0, sizeof(baseBitmap));
@@ -91,7 +91,7 @@ struct RetiredVersion : public pixels::RetinaBase<RetiredVersion<CAPACITY>> {
 template<size_t CAPACITY>
 class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     static constexpr size_t NUM_WORDS = BITMAP_WORDS(CAPACITY);
-public:
+ public:
     TileVisibility();
     TileVisibility(uint64_t ts, const uint64_t* bitmap);
     ~TileVisibility() override;

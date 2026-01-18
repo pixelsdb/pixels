@@ -46,7 +46,9 @@ RGVisibility<CAPACITY>::RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, c
 
     tileVisibilities = static_cast<TileVisibility<CAPACITY>*>(rawMemory);
     for (uint64_t i = 0; i < tileCount; ++i) {
+        // Each tile takes 4 uint64_t
         const uint64_t* tileBitmap = &initialBitmap[i * BITMAP_SIZE_PER_TILE_VISIBILITY];
+        // We use timestamp 0 for restored checkpoints to serve as the base state
         new (&tileVisibilities[i]) TileVisibility<CAPACITY>(timestamp, tileBitmap);
     }
 }
@@ -61,13 +63,14 @@ RGVisibility<CAPACITY>::~RGVisibility() {
 
 template<size_t CAPACITY>
 void RGVisibility<CAPACITY>::collectRGGarbage(uint64_t timestamp) {
+// TileVisibility::collectTileGarbage uses COW + Epoch, so it's safe to call concurrently
     for (uint64_t i = 0; i < tileCount; i++) {
         tileVisibilities[i].collectTileGarbage(timestamp);
     }
 }
 
 template<size_t CAPACITY>
-TileVisibility<CAPACITY>* RGVisibility<CAPACITY>::getTileVisibility(uint16_t rowId) const {
+TileVisibility<CAPACITY>* RGVisibility<CAPACITY>::getTileVisibility(uint32_t rowId) const {
     uint32_t tileIndex = rowId / VISIBILITY_RECORD_CAPACITY;
     if (tileIndex >= tileCount) {
         throw std::runtime_error("Row id is out of range.");
@@ -76,13 +79,14 @@ TileVisibility<CAPACITY>* RGVisibility<CAPACITY>::getTileVisibility(uint16_t row
 }
 
 template<size_t CAPACITY>
-void RGVisibility<CAPACITY>::deleteRGRecord(uint16_t rowId, uint64_t timestamp) {
+void RGVisibility<CAPACITY>::deleteRGRecord(uint32_t rowId, uint64_t timestamp); {
     TileVisibility<CAPACITY>* tileVisibility = getTileVisibility(rowId);
     tileVisibility->deleteTileRecord(rowId % VISIBILITY_RECORD_CAPACITY, timestamp);
 }
 
 template<size_t CAPACITY>
 uint64_t* RGVisibility<CAPACITY>::getRGVisibilityBitmap(uint64_t timestamp) {
+    // TileVisibility::getTileVisibilityBitmap uses Epoch protection internally
     size_t len = tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
     size_t byteSize = len * sizeof(uint64_t);
     auto* bitmap = new uint64_t[len];

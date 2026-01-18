@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # --- Retina Capacity Configuration ---
 # Default to 256. Use CACHE to allow command line overrides.
-set(RETINA_CAPACITY 10240 CACHE STRING "Capacity for Retina objects (must be multiple of 64)")
+set(RETINA_CAPACITY 256 CACHE STRING "Capacity for Retina objects (must be multiple of 64)")
 # Apply the macro globally
 add_definitions(-DRETINA_CAPACITY=${RETINA_CAPACITY})
 message(STATUS "Retina Capacity set to: ${RETINA_CAPACITY}")
@@ -20,7 +20,7 @@ message(STATUS "Retina Capacity set to: ${RETINA_CAPACITY}")
 find_package(Java REQUIRED)
 find_package(JNI REQUIRED)
 
-# --- Jemalloc Configuration (Shared with Prefix) ---
+# --- Jemalloc Configuration ---
 option(ENABLE_JEMALLOC "Enable jemalloc with pixels_ prefix" ON)
 include(ExternalProject)
 
@@ -28,11 +28,7 @@ if(ENABLE_JEMALLOC)
     set(JEMALLOC_INSTALL_DIR "${CMAKE_BINARY_DIR}/jemalloc_install")
     set(JEMALLOC_LIB_PATH "${JEMALLOC_INSTALL_DIR}/lib/libjemalloc.so")
     set(JEMALLOC_INCLUDE_DIR "${JEMALLOC_INSTALL_DIR}/include")
-
-    # --- ADD THIS LINE TO FIX THE ERROR ---
     file(MAKE_DIRECTORY ${JEMALLOC_INCLUDE_DIR})
-    # --------------------------------------
-
     ExternalProject_Add(jemalloc_ext
             URL https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
             CONFIGURE_COMMAND <SOURCE_DIR>/configure
@@ -121,14 +117,24 @@ if(ENABLE_JEMALLOC)
     )
 endif()
 
-# --- Tests ---
+# Add the test executable
 add_executable(tile_visibility_tests test/TileVisibilityTest.cpp)
 add_executable(rg_visibility_tests test/RGVisibilityTest.cpp)
 add_executable(visibility_perf_tests test/VisibilityPerformanceTest.cpp)
 
-target_link_libraries(tile_visibility_tests pixels-retina GTest::gtest_main)
-target_link_libraries(rg_visibility_tests pixels-retina GTest::gtest_main)
-target_link_libraries(visibility_perf_tests pixels-retina GTest::gtest_main)
+# Link the test executable with the library
+target_link_libraries(tile_visibility_tests
+    pixels-retina
+    GTest::gtest_main
+)
+target_link_libraries(rg_visibility_tests
+    pixels-retina
+    GTest::gtest_main
+)
+target_link_libraries(visibility_perf_tests
+    pixels-retina
+    GTest::gtest_main
+)
 
 if(ENABLE_JEMALLOC)
     target_link_libraries(tile_visibility_tests jemalloc_lib)

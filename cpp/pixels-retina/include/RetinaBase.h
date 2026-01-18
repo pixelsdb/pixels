@@ -1,5 +1,5 @@
 /*
-* Copyright 2026 PixelsDB.
+ * Copyright 2026 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -21,10 +21,10 @@
 #ifndef PIXELS_RETINA_RETINABASE_H
 #define PIXELS_RETINA_RETINABASE_H
 
-#include <cstddef>
-#include <new>
-#include <cstdlib>
 #include <atomic>
+#include <cstddef>
+#include <cstdlib>
+#include <new>
 
 #ifdef ENABLE_JEMALLOC
 #include <jemalloc/jemalloc.h>
@@ -35,46 +35,40 @@
 
 namespace pixels {
 
- /**
-  * Global atomic counter for tracked Retina objects.
-  * Must be defined in a .cpp file: std::atomic<int64_t> pixels::g_retina_tracked_memory{0};
-  */
- extern std::atomic<int64_t> g_retina_tracked_memory;
- extern std::atomic<int64_t> g_retina_object_count;
- /**
-  * RetinaBase: A CRTP-based base class for automatic memory accounting.
-  * Usage: class MyObject : public RetinaBase<MyObject> { ... };
-  */
- template <typename T>
- class RetinaBase {
- public:
-  // Constructor: increment the global counter by the size of the derived class
-  RetinaBase() {
-   g_retina_tracked_memory.fetch_add(sizeof(T), std::memory_order_relaxed);
-   g_retina_object_count.fetch_add(1, std::memory_order_relaxed);
-  }
+/**
+ * Global atomic counter for tracked Retina objects.
+ */
+extern std::atomic<int64_t> g_retina_tracked_memory;
+extern std::atomic<int64_t> g_retina_object_count;
 
-  // Copy constructor: handle object duplication
-  RetinaBase(const RetinaBase&) {
-   g_retina_tracked_memory.fetch_add(sizeof(T), std::memory_order_relaxed);
-   g_retina_object_count.fetch_add(1, std::memory_order_relaxed);
-  }
+/**
+ * RetinaBase: A CRTP-based base class for automatic memory accounting.
+ */
+template <typename T> class RetinaBase {
+public:
+    RetinaBase() {
+        g_retina_tracked_memory.fetch_add(sizeof(T), std::memory_order_relaxed);
+        g_retina_object_count.fetch_add(1, std::memory_order_relaxed);
+    }
 
-  // Move constructor: memory usage stays the same for the new instance
-  RetinaBase(RetinaBase&&) noexcept {
-   g_retina_tracked_memory.fetch_add(sizeof(T), std::memory_order_relaxed);
-   g_retina_object_count.fetch_add(1, std::memory_order_relaxed);
-  }
+    RetinaBase(const RetinaBase &) {
+        g_retina_tracked_memory.fetch_add(sizeof(T), std::memory_order_relaxed);
+        g_retina_object_count.fetch_add(1, std::memory_order_relaxed);
+    }
 
-  RetinaBase& operator=(const RetinaBase&) = default;
-  RetinaBase& operator=(RetinaBase&&) noexcept = default;
+    RetinaBase(RetinaBase &&) noexcept {
+        g_retina_tracked_memory.fetch_add(sizeof(T), std::memory_order_relaxed);
+        g_retina_object_count.fetch_add(1, std::memory_order_relaxed);
+    }
 
-  // Virtual destructor: decrement the counter when the object is destroyed
-  virtual ~RetinaBase() {
-   g_retina_tracked_memory.fetch_sub(sizeof(T), std::memory_order_relaxed);
-   g_retina_object_count.fetch_sub(1, std::memory_order_relaxed);
-  }
- };
+    RetinaBase &operator=(const RetinaBase &) = default;
+    RetinaBase &operator=(RetinaBase &&) noexcept = default;
+
+    virtual ~RetinaBase() {
+        g_retina_tracked_memory.fetch_sub(sizeof(T), std::memory_order_relaxed);
+        g_retina_object_count.fetch_sub(1, std::memory_order_relaxed);
+    }
+};
 
 } // namespace pixels
 
