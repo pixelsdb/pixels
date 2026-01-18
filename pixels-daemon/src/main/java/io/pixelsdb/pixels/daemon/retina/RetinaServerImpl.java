@@ -40,7 +40,6 @@ import io.pixelsdb.pixels.retina.RetinaResourceManager;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.management.ManagementFactory;
 import java.util.*;
@@ -824,7 +823,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }, 0, logInterval, TimeUnit.SECONDS);
     }
 
-    @NotNull
     private static String getRetinaMetrics(OperatingSystemMXBean osBean)
     {
         /* Get basic runtime and resource info */
