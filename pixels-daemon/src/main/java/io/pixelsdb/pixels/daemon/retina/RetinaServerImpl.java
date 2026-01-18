@@ -854,11 +854,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         long heapUsed = heapCommitted - runtime.freeMemory();
         long heapMax = runtime.maxMemory();
 
-        /* Fix CPU Metrics:
-           osBean.getProcessCpuLoad() is non-blocking and calculates the delta since the last call.
-           Calling it twice in the same method (especially in the format string) causes the
-           second call to return near-zero or -1 because the time delta is too small.
-        */
         double rawProcessLoad = osBean.getProcessCpuLoad();
         double rawSystemLoad = osBean.getSystemCpuLoad();
 

@@ -81,7 +81,8 @@ public class RGVisibility implements AutoCloseable
     }
 
     @Override
-    public void close() {
+    public void close()
+    {
         long handle = nativeHandle.getAndSet(0);
         if (handle != 0)
         {
