@@ -167,8 +167,8 @@ public class RocksDBFactory
 
         long blockSize = Long.parseLong(config.getProperty("index.rocksdb.block.size"));
         BlockBasedTableConfig tableConfig = new BlockBasedTableConfig()
-                .setFilterPolicy(new BloomFilter(10, false))
-                .setWholeKeyFiltering(false)
+                .setFilterPolicy(new BloomFilter(20, false))
+                .setWholeKeyFiltering(true)
                 .setBlockSize(blockSize)
                 .setCacheIndexAndFilterBlocks(true)
                 .setPinL0FilterAndIndexBlocksInCache(true)
@@ -188,7 +188,7 @@ public class RocksDBFactory
         int fixedLengthPrefix = Integer.parseInt(config.getProperty("index.rocksdb.prefix.length"));
         if(keyLen != null)
         {
-            fixedLengthPrefix = keyLen + Long.BYTES; // key buffer + index id
+            fixedLengthPrefix = Long.BYTES + keyLen; // index id + key buffer
         }
         CompactionStyle compactionStyle = CompactionStyle.valueOf(config.getProperty("index.rocksdb.compaction.style"));
 
@@ -200,7 +200,8 @@ public class RocksDBFactory
                 .setWriteBufferSize(writeBufferSize)
                 .setMaxWriteBufferNumber(maxWriteBufferNumber)
                 .setMinWriteBufferNumberToMerge(minWriteBufferNumberToMerge)
-                .setMemtablePrefixBloomSizeRatio(0.1)
+                .setMemtablePrefixBloomSizeRatio(0.2)
+                .setOptimizeFiltersForHits(false)
                 .setTableFormatConfig(tableConfig)
                 .setLevel0FileNumCompactionTrigger(level0FileNumCompactionTrigger)
                 .setMaxBytesForLevelBase(maxBytesForLevelBase)

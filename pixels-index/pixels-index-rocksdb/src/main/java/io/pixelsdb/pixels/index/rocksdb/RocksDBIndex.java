@@ -98,7 +98,9 @@ public class RocksDBIndex extends CachingSinglePointIndex
             throw new SinglePointIndexException("getUniqueRowId should only be called on unique index");
         }
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
-        readOptions.setPrefixSameAsStart(true);
+        readOptions.setPrefixSameAsStart(true)
+                    .setTotalOrderSeek(false)
+                    .setVerifyChecksums(false);
         ByteBuffer keyBuffer = toKeyBuffer(key);
         long rowId = -1L;
         try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
@@ -131,7 +133,8 @@ public class RocksDBIndex extends CachingSinglePointIndex
             return ImmutableList.of(getUniqueRowId(key));
         }
         Set<Long> rowIds = new HashSet<>();
-        ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
+//        ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
+        ReadOptions readOptions = new ReadOptions();
         readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
         // use RocksDB iterator for prefix search

@@ -515,14 +515,14 @@ public abstract class ColumnVector implements AutoCloseable
      */
     protected boolean checkBytesNull(byte[] value)
     {
-        if (value == null)
+        if (value == null || value.length == 0)
         {
             if(writeIndex >= getLength())
             {
                 ensureSize(writeIndex * 2, true);
-                isNull[writeIndex++] = true;
-                return true;
             }
+            isNull[writeIndex++] = true;
+            return true;
         }
         return false;
     }
