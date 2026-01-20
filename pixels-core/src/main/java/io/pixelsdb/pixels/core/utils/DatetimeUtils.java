@@ -119,6 +119,11 @@ public class DatetimeUtils
      */
     public static int stringDateToDay(String date)
     {
+        if (date == null) return 0;
+        if (date.contains(" ") || date.contains("T")) {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("[yyyy-MM-dd HH:mm:ss][yyyy-MM-dd'T'HH:mm:ss]");
+            return (int) LocalDateTime.parse(date, formatter).toLocalDate().toEpochDay();
+        }
         return (int) LocalDate.parse(date).toEpochDay();
     }
 
