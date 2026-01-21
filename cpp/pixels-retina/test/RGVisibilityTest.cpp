@@ -39,14 +39,14 @@ bool RETINA_TEST_DEBUG = true;
 class RGVisibilityTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        rgVisibility = new RGVisibility(ROW_COUNT);
+        rgVisibility = new RGVisibilityInstance(ROW_COUNT);
     }
     
     void TearDown() override {
         delete rgVisibility;
     }
 
-    RGVisibility* rgVisibility;
+    RGVisibilityInstance* rgVisibility;
 };
 
 TEST_F(RGVisibilityTest, BasicDeleteAndVisibility) {

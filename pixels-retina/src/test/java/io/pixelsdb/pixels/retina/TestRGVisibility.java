@@ -90,6 +90,75 @@ public class TestRGVisibility
     }
 
     @Test
+    public void testMemoryUsage()
+    {
+        // 1. Capture initial state
+        long initialNative = RGVisibility.getMemoryUsage();
+        long initialTracked = RGVisibility.getTrackedMemoryUsage();
+        long initialObjects = RGVisibility.getRetinaTrackedObjectCount();
+
+        int testCount = 10000000; // 10 Million deletions
+
+        // 2. Perform intensive delete operations
+        for (int i = 0; i < testCount; i++)
+        {
+            rgVisibility.deleteRecord(i % ROW_COUNT, 1000 + i);
+        }
+
+        long afterDeletesNative = RGVisibility.getMemoryUsage();
+        long afterDeletesTracked = RGVisibility.getTrackedMemoryUsage();
+        long afterDeletesObjects = RGVisibility.getRetinaTrackedObjectCount();
+
+        // Calculate business logic growth
+        long netObjects = afterDeletesObjects - initialObjects;
+        long netTrackedBytes = afterDeletesTracked - initialTracked;
+
+        // Calculate pure memory (Excluding 8-byte vptr per object)
+        long vptrTotalOverhead = netObjects * 8;
+        long pureBusinessMemory = netTrackedBytes - vptrTotalOverhead;
+
+        if (DEBUG) {
+            System.out.println("--- Post-Deletion Audit ---");
+            System.out.println("New Objects Created: " + netObjects);
+            System.out.println("Tracked Memory (incl. vptr): " + netTrackedBytes + " bytes");
+            System.out.println("Pure Business Memory (excl. vptr): " + pureBusinessMemory + " bytes");
+
+            if (netObjects > 0) {
+                System.out.println(String.format("Average Pure Size per Object: %.2f bytes",
+                        (double) pureBusinessMemory / netObjects));
+            }
+        }
+
+        // Assertion: Ensure objects are actually tracked
+        assertTrue("Object count should increase", netObjects > 0);
+
+        // 3. Perform Garbage Collection
+        // Use a timestamp that covers all previous operations
+        rgVisibility.garbageCollect(100000000 + testCount + 100);
+
+        long finalNative = RGVisibility.getMemoryUsage();
+        long finalTracked = RGVisibility.getTrackedMemoryUsage();
+        long finalObjects = RGVisibility.getRetinaTrackedObjectCount();
+
+        if (DEBUG) {
+            System.out.println("--- Post-GC Audit ---");
+            System.out.println("Residual Objects: " + finalObjects);
+            System.out.println("Residual Tracked Memory: " + finalTracked + " bytes");
+        }
+
+        // 4. Critical Assertions for Paper Accuracy
+        // The object count must return to baseline if there is no leak
+        assertEquals("Object leak detected! Object count should return to baseline.",
+                initialObjects, finalObjects, 10); // Allowing small constant overhead
+
+        // Tracked memory should also return to baseline
+        assertTrue("Tracked memory should be reclaimed", finalTracked < afterDeletesTracked);
+
+        // Native memory (jemalloc) should follow the trend
+        assertTrue("Physical memory (jemalloc) should decrease after GC", finalNative < afterDeletesNative);
+    }
+
+    @Test
     public void testMultiThread() throws InterruptedException
     {
         class DeleteRecord

@@ -394,7 +394,7 @@ public class RocksDBFactory
 
     private static void startRocksDBLogThread(RocksDB db)
     {
-        int logInterval = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.log.interval"));
+        int logInterval = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.metrics.log.interval"));
         List<RocksDB> dbList = Collections.singletonList(db);
 
         scheduler.scheduleAtFixedRate(() ->
@@ -406,8 +406,7 @@ public class RocksDBFactory
                 long tableReaders = memoryUsage.getOrDefault(MemoryUsageType.kTableReadersTotal, 0L);
                 long memTable = memoryUsage.getOrDefault(MemoryUsageType.kMemTableTotal, 0L);
                 long blockCacheOnly = db.getLongProperty("rocksdb.block-cache-usage");
-                long indexFilterOnly = Math.max(0, tableReaders - blockCacheOnly);
-                long totalNativeBytes = tableReaders + memTable;
+                long totalNativeBytes = tableReaders + memTable + blockCacheOnly;
 
                 // 2. Get JVM Heap Metrics
                 Runtime runtime = Runtime.getRuntime();
@@ -415,20 +414,23 @@ public class RocksDBFactory
                 long heapCommitted = runtime.totalMemory();
                 long heapUsed = heapCommitted - runtime.freeMemory();
 
-                // 3. Format string with both RocksDB and JVM data
-                // We use GiB for all units to keep the Shell script calculations simple
+                // 3. Get Current Timestamp (ms)
+                long timestamp = System.currentTimeMillis();
+
+                // 4. Formatting
                 double GiB = 1024.0 * 1024.0 * 1024.0;
 
                 String formattedMetrics = String.format(
-                        "TotalNative≈%.4f GiB (MemTable=%.4f GiB, BlockCache=%.4f GiB, IndexFilter=%.4f GiB) " +
-                                "JVMHeap (Used=%.4f GiB, Committed=%.4f GiB, Max=%.4f GiB)",
-                        totalNativeBytes / GiB,
-                        memTable / GiB,
-                        blockCacheOnly / GiB,
-                        indexFilterOnly / GiB,
-                        heapUsed / GiB,
-                        heapCommitted / GiB,
-                        heapMax / GiB
+                        "Timestamp=%d RocksDB_Native[Total=%.4f GiB (%d Bytes), MemTable=%.4f GiB (%d Bytes), " +
+                                "BlockCache=%.4f GiB (%d Bytes)]" +
+                                "JVM_Heap[Used=%.4f GiB (%d Bytes), Committed=%.4f GiB (%d Bytes), Max=%.4f GiB (%d Bytes)]",
+                        timestamp,
+                        totalNativeBytes / GiB, totalNativeBytes,
+                        memTable / GiB, memTable,
+                        blockCacheOnly / GiB, blockCacheOnly,
+                        heapUsed / GiB, heapUsed,
+                        heapCommitted / GiB, heapCommitted,
+                        heapMax / GiB, heapMax
                 );
 
                 logger.info("[RocksDB Metrics] {}", formattedMetrics);

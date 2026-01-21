@@ -19,17 +19,16 @@
  */
 #ifndef RG_VISIBILITY_H
 #define RG_VISIBILITY_H
-
+#include "RetinaBase.h"
 #include "TileVisibility.h"
-#include <memory>
-#include <atomic>
 #include <vector>
 
-class RGVisibility {
+template<size_t CAPACITY>
+class RGVisibility : public pixels::RetinaBase<RGVisibility<CAPACITY>> {
 public:
     explicit RGVisibility(uint64_t rgRecordNum);
     explicit RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap);
-    ~RGVisibility();
+    ~RGVisibility() override;
 
     void deleteRGRecord(uint32_t rowId, uint64_t timestamp);
     uint64_t* getRGVisibilityBitmap(uint64_t timestamp);
@@ -39,13 +38,16 @@ public:
     uint64_t getBitmapSize() const;
 
 private:
-    static constexpr uint32_t VISIBILITY_RECORD_CAPACITY = 256;
-    static constexpr uint32_t BITMAP_SIZE_PER_TILE_VISIBILITY = 4;
+    static constexpr uint32_t VISIBILITY_RECORD_CAPACITY = CAPACITY;
+    static constexpr uint32_t BITMAP_SIZE_PER_TILE_VISIBILITY = BITMAP_WORDS(CAPACITY);
 
-    TileVisibility* tileVisibilities;
+    TileVisibility<CAPACITY>* tileVisibilities;
     const uint64_t tileCount;
 
-    TileVisibility* getTileVisibility(uint32_t rowId) const;
+    TileVisibility<CAPACITY>* getTileVisibility(uint32_t rowId) const;
 };
 
+static_assert(RETINA_CAPACITY > 0 && RETINA_CAPACITY % 64 == 0,
+              "RETINA_CAPACITY must be a multiple of 64.");
+using RGVisibilityInstance = RGVisibility<RETINA_CAPACITY>;
 #endif //RG_VISIBILITY_H

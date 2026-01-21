@@ -15,6 +15,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.source>1.8</maven.compiler.source>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <pixels.retina.capacity>10240</pixels.retina.capacity>
     </properties>
 
     <dependencies>
@@ -158,7 +159,9 @@
                         <configuration>
                             <target>
                                 <exec executable="cmake" failonerror="true" outputproperty="cmake.output" errorproperty="cmake.error">
-                                    <arg line="-B ${project.basedir}/../cpp/pixels-retina/build -S ${project.basedir}/../cpp/pixels-retina"/>
+                                    <arg line="-B ${project.basedir}/../cpp/pixels-retina/build"/>
+                                    <arg line="-S ${project.basedir}/../cpp/pixels-retina"/>
+                                    <arg line="-DRETINA_CAPACITY=${pixels.retina.capacity}"/>
                                 </exec>
                                 <exec executable="make" dir="${project.basedir}/../cpp/pixels-retina/build" failonerror="true" outputproperty="make.output" errorproperty="make.error">
                                     <arg value="install"/>

@@ -23,6 +23,7 @@
 #include <atomic>
 #include <thread>
 #include <mutex>
+#include "RetinaBase.h"
 
 /**
  * EpochManager - A global epoch-based memory reclamation system
@@ -32,7 +33,7 @@
  * in an epoch, and objects can only be reclaimed when all threads have
  * advanced past the epoch in which the object was retired.
  */
-class EpochManager {
+class EpochManager : public pixels::RetinaBase<EpochManager> {
 public:
     static EpochManager& getInstance() {
         static EpochManager instance;
@@ -71,12 +72,12 @@ public:
 
 private:
     EpochManager() : globalEpoch(1) {}
-    ~EpochManager();
+    ~EpochManager() override;
 
     EpochManager(const EpochManager&) = delete;
     EpochManager& operator=(const EpochManager&) = delete;
 
-    struct ThreadInfo {
+    struct ThreadInfo : public pixels::RetinaBase<ThreadInfo> {
         std::atomic<uint64_t> localEpoch{0};  // 0 means not in critical section
         std::atomic<bool> active{true};
         std::thread::id threadId;
@@ -94,13 +95,13 @@ private:
 /**
  * RAII helper for epoch protection
  */
-class EpochGuard {
+class EpochGuard : public pixels::RetinaBase<EpochGuard> {
 public:
     EpochGuard() {
         EpochManager::getInstance().enterEpoch();
     }
 
-    ~EpochGuard() {
+    ~EpochGuard() override {
         EpochManager::getInstance().exitEpoch();
     }
 
