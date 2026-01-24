@@ -133,8 +133,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
             return ImmutableList.of(getUniqueRowId(key));
         }
         Set<Long> rowIds = new HashSet<>();
-//        ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
-        ReadOptions readOptions = new ReadOptions();
+        ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
         readOptions.setPrefixSameAsStart(true);
         ByteBuffer keyBuffer = toKeyBuffer(key);
         // use RocksDB iterator for prefix search

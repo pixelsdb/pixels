@@ -167,8 +167,8 @@ public class RocksDBFactory
 
         long blockSize = Long.parseLong(config.getProperty("index.rocksdb.block.size"));
         BlockBasedTableConfig tableConfig = new BlockBasedTableConfig()
-                .setFilterPolicy(new BloomFilter(20, false))
-                .setWholeKeyFiltering(true)
+                .setFilterPolicy(new BloomFilter(10, false))
+                .setWholeKeyFiltering(false)
                 .setBlockSize(blockSize)
                 .setCacheIndexAndFilterBlocks(true)
                 .setPinL0FilterAndIndexBlocksInCache(true)
@@ -200,8 +200,7 @@ public class RocksDBFactory
                 .setWriteBufferSize(writeBufferSize)
                 .setMaxWriteBufferNumber(maxWriteBufferNumber)
                 .setMinWriteBufferNumberToMerge(minWriteBufferNumberToMerge)
-                .setMemtablePrefixBloomSizeRatio(0.2)
-                .setOptimizeFiltersForHits(false)
+                .setMemtablePrefixBloomSizeRatio(0.1)
                 .setTableFormatConfig(tableConfig)
                 .setLevel0FileNumCompactionTrigger(level0FileNumCompactionTrigger)
                 .setMaxBytesForLevelBase(maxBytesForLevelBase)
