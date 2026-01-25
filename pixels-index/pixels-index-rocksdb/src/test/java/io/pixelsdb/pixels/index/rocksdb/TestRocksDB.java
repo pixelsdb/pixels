@@ -428,7 +428,7 @@ public class TestRocksDB
                 // Configure CompactRangeOptions to force a rewrite of the bottommost level
                 // This is mandatory to apply the new 20-bit Bloom Filter configuration
                 CompactRangeOptions options = new CompactRangeOptions()
-                        .setBottommostLevelCompaction(CompactRangeOptions.BottommostLevelCompaction.kForce)
+//                        .setBottommostLevelCompaction(CompactRangeOptions.BottommostLevelCompaction.kForce)
                         .setMaxSubcompactions(4) // Parallel threads within a single CF compaction job
                         .setAllowWriteStall(true);
 

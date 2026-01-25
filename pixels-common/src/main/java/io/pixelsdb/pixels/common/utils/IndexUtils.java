@@ -20,6 +20,8 @@
 
  package io.pixelsdb.pixels.common.utils;
 
+ import com.google.common.hash.Hashing;
+ import com.google.protobuf.ByteString;
  import io.pixelsdb.pixels.common.exception.MetadataException;
  import io.pixelsdb.pixels.common.metadata.MetadataService;
  import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -34,6 +36,29 @@
  public class IndexUtils
 {
     private static final MetadataService metadataService = MetadataService.Instance();
+    private static volatile IndexUtils instance;
+    private final int bucketNum;
+
+    private IndexUtils()
+    {
+        ConfigFactory config = ConfigFactory.Instance();
+        this.bucketNum = Integer.parseInt(config.getProperty("index.bucket.num"));
+    }
+
+    public static IndexUtils getInstance()
+    {
+        if (instance == null)
+        {
+            synchronized (IndexUtils.class)
+            {
+                if (instance == null)
+                {
+                    instance = new IndexUtils();
+                }
+            }
+        }
+        return instance;
+    }
 
     public static List<Column> extractInfoFromIndex(long tableId, long indexId) throws MetadataException
     {
@@ -64,5 +89,23 @@
             orderedKeyCols.add(columns.get(i));
         }
         return orderedKeyCols;
+    }
+
+    public static int getBucketIdFromByteBuffer(ByteString byteString)
+    {
+        IndexUtils indexUtils = IndexUtils.getInstance();
+
+        int hash = Hashing.sha256()
+                .hashBytes(byteString.toByteArray())
+                .asInt();
+
+        int absHash = Math.abs(hash);
+
+        return absHash % indexUtils.getBucketNum();
+    }
+
+    public int getBucketNum()
+    {
+        return bucketNum;
     }
 }

@@ -24,6 +24,7 @@ import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.CachingSinglePointIndex;
 import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.commons.io.FileUtils;
 import org.rocksdb.*;
@@ -58,6 +59,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     private final boolean unique;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean removed = new AtomicBoolean(false);
+    private static final boolean multiCF = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rocksdb.multicf"));
 
     public RocksDBIndex(long tableId, long indexId, boolean unique, IndexOption indexOption) throws RocksDBException
     {
@@ -576,7 +578,11 @@ public class RocksDBIndex extends CachingSinglePointIndex
             throws SinglePointIndexException
     {
         int keySize = key.size();
-        int totalLength = Long.BYTES + keySize + Long.BYTES * postValues.length;
+        int totalLength = keySize + Long.BYTES * postValues.length;
+        if (!multiCF)
+        {
+            totalLength += Long.BYTES; // Index Id Length
+        }
         ByteBuffer compositeKey;
         if (bufferNum == 1)
         {
@@ -594,8 +600,11 @@ public class RocksDBIndex extends CachingSinglePointIndex
         {
             throw new SinglePointIndexException("Invalid buffer number");
         }
-        // Write indexId (8 bytes, big endian)
-        compositeKey.putLong(indexId);
+        if (!multiCF)
+        {
+            // Write indexId (8 bytes, big endian)
+            compositeKey.putLong(indexId);
+        }
         // Write key bytes (variable length)
         key.copyTo(compositeKey);
         // Write post values (8 bytes each, big endian)
