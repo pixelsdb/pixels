@@ -35,7 +35,8 @@
 class DirectUringRandomAccessFile : public DirectRandomAccessFile
 {
 public:
-    explicit DirectUringRandomAccessFile(const std::string &file);
+    explicit
+    DirectUringRandomAccessFile(const std::string &file);
 
     static void RegisterBuffer(std::vector <std::shared_ptr<ByteBuffer>> buffers);
 

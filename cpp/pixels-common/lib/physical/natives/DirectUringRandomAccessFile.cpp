@@ -65,7 +65,6 @@ void DirectUringRandomAccessFile::RegisterBufferFromPool(std::vector <uint32_t> 
     }
 }
 
-
 void DirectUringRandomAccessFile::RegisterBuffer(std::vector <std::shared_ptr<ByteBuffer>> buffers)
 {
     if (!isRegistered)

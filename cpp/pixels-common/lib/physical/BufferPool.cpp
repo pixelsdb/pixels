@@ -42,6 +42,7 @@ void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t
     assert(colIds.size() == bytes.size());
     int fsBlockSize = std::stoi(ConfigFactory::Instance().getProperty("localfs.block.size"));
     std::string columnSizePath = ConfigFactory::Instance().getProperty("pixel.column.size.path");
+    int bufferPoolSize=std::stoi(ConfigFactory::Instance().getProperty("pixel.bufferpool.bufferpoolSize"));
     std::shared_ptr <ColumnSizeCSVReader> csvReader;
     if (!columnSizePath.empty())
     {
@@ -67,9 +68,8 @@ void BufferPool::Initialize(std::vector <uint32_t> colIds, std::vector <uint64_t
                 }
                 else
                 {
-                    buffer = BufferPool::directIoLib->allocateDirectBuffer(csvReader->get(columnName));
+                    buffer = BufferPool::directIoLib->allocateDirectBuffer(csvReader->get(columnName)+bufferPoolSize);
                 }
-
                 BufferPool::nrBytes[colId] = buffer->size();
                 BufferPool::buffers[idx][colId] = buffer;
             }

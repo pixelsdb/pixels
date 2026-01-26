@@ -24,8 +24,10 @@
  */
 #include "physical/storage/LocalFS.h"
 #include "physical/natives/DirectRandomAccessFile.h"
-#include "physical/natives/DirectUringRandomAccessFile.h"
+#include "physical/natives/DirectUringRandomAccessFile.h"  // Static buffer pool version
+#include "physical/natives/DirectUringRandomAccessFileDynamic.h"  // Dynamic buffer pool version
 #include "physical/FilePath.h"
+#include "utils/ConfigFactory.h"
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -58,14 +60,24 @@ std::string LocalFS::ensureSchemePrefix(const std::string &path) const
 
 std::shared_ptr <PixelsRandomAccessFile> LocalFS::openRaf(const std::string &path)
 {
-    if (true)
+    // Check if dynamic buffer pool is enabled
+    bool useDynamicBuffer = false;
+    try {
+        useDynamicBuffer = ConfigFactory::Instance().boolCheckProperty("pixels.enable.dynamic.buffer");
+    } catch (...) {
+        // Default to false if property not found
+        useDynamicBuffer = false;
+    }
+    
+    if (useDynamicBuffer)
     {
-        // TODO: change this class to mmap class in the future.
-        return std::make_shared<DirectUringRandomAccessFile>(path);
+        // Use dynamic buffer pool version with io_uring sparse registration
+        return std::make_shared<DirectUringRandomAccessFileDynamic>(path);
     }
     else
     {
-        return std::make_shared<DirectRandomAccessFile>(path);
+        // Use static buffer pool version with io_uring
+        return std::make_shared<DirectUringRandomAccessFile>(path);
     }
 }
 

@@ -51,6 +51,10 @@ set(pixels_common_cxx
 		include/physical/StorageArrayScheduler.h
 		lib/physical/StorageArrayScheduler.cpp
 		include/physical/natives/ByteOrder.h
+		lib/physical/DynamicBufferPool.cpp
+		include/physical/DynamicBufferPool.h
+		lib/physical/natives/DirectUringRandomAccessFileDynamic.cpp
+		include/physical/natives/DirectUringRandomAccessFileDynamic.h
 )
 
 set(FBS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../proto/pixels.fbs")

@@ -25,6 +25,10 @@
 #include "reader/PixelsRecordReaderImpl.h"
 #include "physical/io/PhysicalLocalReader.h"
 #include "profiler/CountProfiler.h"
+#include "physical/BufferPool.h"
+#include "physical/natives/DirectUringRandomAccessFile.h"
+#include "physical/DynamicBufferPool.h"
+#include "physical/natives/DirectUringRandomAccessFileDynamic.h"
 
 PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> reader,
                                                const pixels::fb::PostScript* pixelsPostScript,
@@ -461,22 +465,75 @@ bool PixelsRecordReaderImpl::read()
         for (int i = 0; i < diskChunks.size(); i++)
         {
             ChunkId chunk = diskChunks.at(i);
-            requestBatch.add(queryId, chunk.offset, (int) chunk.length, ::BufferPool::GetBufferId(i));
             colIds.emplace_back(chunk.columnId);
             bytes.emplace_back(chunk.length);
-
-            // std::cout << "[DEBUG] Reading RowGroup. Offset: " << chunk.offset
-            //           << ", Length: " << chunk.length << std::endl;
         }
-        ::DirectUringRandomAccessFile::Initialize();
-        ::BufferPool::Initialize(colIds, bytes, fileSchema->getFieldNames());
-
-        ::DirectUringRandomAccessFile::RegisterBufferFromPool(colIds);
+        
+        // Check if dynamic buffer pool is enabled
+        bool useDynamicBuffer = false;
+        try {
+            useDynamicBuffer = ConfigFactory::Instance().boolCheckProperty("pixels.enable.dynamic.buffer");
+        } catch (...) {
+            useDynamicBuffer = false;
+        }
+        
         std::vector <std::shared_ptr<ByteBuffer>> originalByteBuffers;
-        for (int i = 0; i < colIds.size(); i++)
-        {
-            auto colId = colIds.at(i);
-            originalByteBuffers.emplace_back(::BufferPool::GetBuffer(colId));
+        
+        if (useDynamicBuffer) {
+            // ========== Dynamic BufferPool Implementation ==========
+            // Initialize DirectUringRandomAccessFileDynamic with io_uring and buffer pool
+            DirectUringRandomAccessFileDynamic::Initialize(4096, 1024);
+            
+            // Get DirectIoLib for alignment calculation
+            auto directIoLib = DynamicBufferPool::GetDirectIoLib();
+            
+            // Allocate buffers for each column dynamically
+            for (int i = 0; i < colIds.size(); i++)
+            {
+                auto colId = colIds.at(i);
+                auto offset = diskChunks.at(i).offset;
+                auto length = diskChunks.at(i).length;
+                
+                // Calculate aligned buffer size for Direct I/O
+                uint64_t bufferSize;
+                if (ConfigFactory::Instance().boolCheckProperty("localfs.enable.direct.io") && directIoLib != nullptr) {
+                    // For Direct I/O, we need to align to block boundaries
+                    uint64_t fileOffsetAligned = directIoLib->blockStart(offset);
+                    bufferSize = directIoLib->blockEnd(offset + length) - fileOffsetAligned;
+                } else {
+                    bufferSize = length;
+                }
+                
+                // Allocate buffer for this column if not already allocated
+                auto buffer = DynamicBufferPool::GetBuffer(colId);
+                if (buffer == nullptr) {
+                    buffer = DynamicBufferPool::AllocateBuffer(colId, bufferSize);
+                } else if (buffer->size() < bufferSize) {
+                    // Grow buffer if needed
+                    buffer = DynamicBufferPool::GrowBuffer(colId, bufferSize);
+                }
+                
+                originalByteBuffers.emplace_back(buffer);
+                
+                // Get buffer slot index for io_uring fixed buffer read
+                int slotIndex = DynamicBufferPool::GetBufferSlotIndex(colId);
+                requestBatch.add(queryId, offset, (int) length, slotIndex);
+            }
+            // ==========================================================
+        } else {
+            // ========== Static BufferPool Implementation ==========
+            ::DirectUringRandomAccessFile::Initialize();
+            ::BufferPool::Initialize(colIds, bytes, fileSchema->getFieldNames());
+            ::DirectUringRandomAccessFile::RegisterBufferFromPool(colIds);
+            
+            for (int i = 0; i < colIds.size(); i++)
+            {
+                auto colId = colIds.at(i);
+                originalByteBuffers.emplace_back(::BufferPool::GetBuffer(colId));
+                requestBatch.add(queryId, diskChunks.at(i).offset, (int) diskChunks.at(i).length, 
+                                 ::BufferPool::GetBufferId(i));
+            }
+            // ==========================================================
         }
 
         auto byteBuffers = scheduler->executeBatch(

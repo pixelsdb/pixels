@@ -42,7 +42,7 @@ def parse_args():
     parser.add_argument(
         "--sql-dir",
         type=str,
-        default="/home/whz/test/pixels/cpp/pixels-duckdb/duckdb/benchmark/clickbench/queries-test",
+        default="/home/whz/test/pixels/cpp/pixels-duckdb/duckdb/benchmark/clickbench/queries",
         help="Directory containing SQL files (only processes .sql files starting with 'q')"
     )
     parser.add_argument(

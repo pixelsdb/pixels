@@ -24,6 +24,8 @@
  */
 #include "physical/storage/LocalFS.h"
 #include "physical/io/PhysicalLocalReader.h"
+#include "physical/natives/DirectUringRandomAccessFile.h"
+#include "physical/natives/DirectUringRandomAccessFileDynamic.h"
 
 #include <utility>
 #include "profiler/TimeProfiler.h"
@@ -110,8 +112,23 @@ std::shared_ptr <ByteBuffer> PhysicalLocalReader::readAsync(int length, std::sha
     numRequests++;
     if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
     {
-        auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
-        return directRaf->readAsync(length, std::move(buffer), index);
+        // Check if dynamic buffer pool is enabled
+        bool useDynamicBuffer = false;
+        try {
+            useDynamicBuffer = ConfigFactory::Instance().boolCheckProperty("pixels.enable.dynamic.buffer");
+        } catch (...) {
+            useDynamicBuffer = false;
+        }
+        
+        if (useDynamicBuffer) {
+            // Use dynamic buffer pool version
+            auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFileDynamic>(raf);
+            return directRaf->readAsync(length, std::move(buffer), index);
+        } else {
+            // Use static buffer pool version
+            auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
+            return directRaf->readAsync(length, std::move(buffer), index);
+        }
     }
     else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
     {
@@ -129,8 +146,21 @@ void PhysicalLocalReader::readAsyncSubmit(uint32_t size)
     numRequests++;
     if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
     {
-        auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
-        directRaf->readAsyncSubmit(size);
+        // Check if dynamic buffer pool is enabled
+        bool useDynamicBuffer = false;
+        try {
+            useDynamicBuffer = ConfigFactory::Instance().boolCheckProperty("pixels.enable.dynamic.buffer");
+        } catch (...) {
+            useDynamicBuffer = false;
+        }
+        
+        if (useDynamicBuffer) {
+            auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFileDynamic>(raf);
+            directRaf->readAsyncSubmit(size);
+        } else {
+            auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
+            directRaf->readAsyncSubmit(size);
+        }
     }
     else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
     {
@@ -147,8 +177,21 @@ void PhysicalLocalReader::readAsyncComplete(uint32_t size)
     numRequests++;
     if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
     {
-        auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
-        directRaf->readAsyncComplete(size);
+        // Check if dynamic buffer pool is enabled
+        bool useDynamicBuffer = false;
+        try {
+            useDynamicBuffer = ConfigFactory::Instance().boolCheckProperty("pixels.enable.dynamic.buffer");
+        } catch (...) {
+            useDynamicBuffer = false;
+        }
+        
+        if (useDynamicBuffer) {
+            auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFileDynamic>(raf);
+            directRaf->readAsyncComplete(size);
+        } else {
+            auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
+            directRaf->readAsyncComplete(size);
+        }
     }
     else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
     {
@@ -165,11 +208,27 @@ void PhysicalLocalReader::readAsyncSubmitAndComplete(uint32_t size)
     numRequests++;
     if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
     {
-        auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
-        directRaf->readAsyncSubmit(size);
-        ::TimeProfiler::Instance().Start("async wait");
-        directRaf->readAsyncComplete(size);
-        ::TimeProfiler::Instance().End("async wait");
+        // Check if dynamic buffer pool is enabled
+        bool useDynamicBuffer = false;
+        try {
+            useDynamicBuffer = ConfigFactory::Instance().boolCheckProperty("pixels.enable.dynamic.buffer");
+        } catch (...) {
+            useDynamicBuffer = false;
+        }
+        
+        if (useDynamicBuffer) {
+            auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFileDynamic>(raf);
+            directRaf->readAsyncSubmit(size);
+            ::TimeProfiler::Instance().Start("async wait");
+            directRaf->readAsyncComplete(size);
+            ::TimeProfiler::Instance().End("async wait");
+        } else {
+            auto directRaf = std::static_pointer_cast<DirectUringRandomAccessFile>(raf);
+            directRaf->readAsyncSubmit(size);
+            ::TimeProfiler::Instance().Start("async wait");
+            directRaf->readAsyncComplete(size);
+            ::TimeProfiler::Instance().End("async wait");
+        }
     }
     else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
     {

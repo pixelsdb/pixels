@@ -38,3 +38,12 @@ options:
 
 ## perf实验
 
+
+## pixels-cli 
+
+测试`pixels-cli`的正确性和功能性，生成文件之后，需要调用duckdb读取，得到正确结果
+
+## bufferpool Size
+
+验证bufferpool size对查询性能的影响，主要目的是，证明提前分配内存空间这个过程很耗时，需要尽可能减少内存分配，使用提前注册好的buffer
+方法，使用q06 改变buffer大小，查看总内存消耗量，性能变化和page-fault触发的次数，以及cpu时间

@@ -476,6 +476,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsR
       if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "iouring")
         {
         ::DirectUringRandomAccessFile::Reset();
+        ::TimeProfiler::Instance().Print();
         } else if (ConfigFactory::Instance().getProperty("localfs.async.lib") == "aio")
         {
         throw InvalidArgumentException(
