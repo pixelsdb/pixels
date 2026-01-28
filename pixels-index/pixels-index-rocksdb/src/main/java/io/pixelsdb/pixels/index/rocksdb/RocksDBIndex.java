@@ -98,7 +98,9 @@ public class RocksDBIndex extends CachingSinglePointIndex
             throw new SinglePointIndexException("getUniqueRowId should only be called on unique index");
         }
         ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
-        readOptions.setPrefixSameAsStart(true);
+        readOptions.setPrefixSameAsStart(true)
+                    .setTotalOrderSeek(false)
+                    .setVerifyChecksums(false);
         ByteBuffer keyBuffer = toKeyBuffer(key);
         long rowId = -1L;
         try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))

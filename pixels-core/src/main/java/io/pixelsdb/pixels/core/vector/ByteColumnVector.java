@@ -75,7 +75,7 @@ public class ByteColumnVector extends ColumnVector
     @Override
     public void add(byte[] value)
     {
-        if(checkBytesNull(value))
+        if (checkBytesNull(value))
         {
             return;
         }

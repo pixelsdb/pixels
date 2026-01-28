@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.RowIdException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.*;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.ArrayList;
@@ -32,13 +33,16 @@ import java.util.List;
 public class LocalIndexService implements IndexService
 {
     private static final LocalIndexService defaultInstance = new LocalIndexService();
-
+    private static boolean upsertMode;
     public static LocalIndexService Instance()
     {
         return defaultInstance;
     }
 
-    private LocalIndexService() {}
+    private LocalIndexService()
+    {
+        upsertMode = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("retina.upsert-mode.enabled"));
+    }
 
     @Override
     public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws IndexException
@@ -251,6 +255,10 @@ public class LocalIndexService implements IndexService
             long prevRowId = singlePointIndex.deleteUniqueEntry(key);
             if (prevRowId < 0)
             {
+                if (upsertMode)
+                {
+                    return null;
+                }
                 throw new IndexException("Primary index entry not found for tableId=" + tableId + ", indexId=" + indexId);
             }
             IndexProto.RowLocation location = mainIndex.getLocation(prevRowId);
@@ -278,6 +286,10 @@ public class LocalIndexService implements IndexService
             List<Long> prevRowIds = singlePointIndex.deleteEntries(keys);
             if (prevRowIds == null || prevRowIds.isEmpty())
             {
+                if (upsertMode)
+                {
+                    return new ArrayList<>();
+                }
                 throw new IndexException("Primary index entries not found for tableId="
                         + tableId + ", indexId=" + indexId);
             }
@@ -348,7 +360,7 @@ public class LocalIndexService implements IndexService
             SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
             // update the entry in the single point index and get the previous row ID
             long prevRowId = singlePointIndex.updatePrimaryEntry(key, indexEntry.getRowId());
-            IndexProto.RowLocation prevLocation;
+            IndexProto.RowLocation prevLocation = null;
             if (prevRowId >= 0)
             {
                 // retrieve the previous RowLocation from the main index
@@ -360,7 +372,10 @@ public class LocalIndexService implements IndexService
             }
             else
             {
-                throw new IndexException("Failed to get previous row id for tableId=" + tableId + ", indexId=" + indexId);
+                if (!upsertMode)
+                {
+                    throw new IndexException("Failed to get previous row id for tableId=" + tableId + ", indexId=" + indexId);
+                }
             }
             boolean mainSuccess = mainIndex.putEntry(indexEntry.getRowId(), indexEntry.getRowLocation());
             if (!mainSuccess)
@@ -393,13 +408,21 @@ public class LocalIndexService implements IndexService
             List<Long> prevRowIds = singlePointIndex.updatePrimaryEntries(indexEntries);
             if (prevRowIds == null || prevRowIds.isEmpty())
             {
-                throw new IndexException("Failed to get previous row ids for tableId=" + tableId + ", indexId=" + indexId);
+                if (!upsertMode)
+                {
+                    throw new IndexException("Failed to get previous row ids for tableId=" + tableId + ", indexId=" + indexId);
+                }
+                prevRowIds = new ArrayList<>();
             }
             List<IndexProto.RowLocation> prevRowLocations = mainIndex.getLocations(prevRowIds);
             if (prevRowLocations == null || prevRowLocations.isEmpty())
             {
-                throw new IndexException("Failed to get previous row locations for tableId=" +
-                        tableId + ", indexId=" + indexId);
+                if (!(upsertMode && prevRowIds.isEmpty()))
+                {
+                    throw new IndexException("Failed to get previous row locations for tableId=" +
+                            tableId + ", indexId=" + indexId);
+                }
+
             }
             for (Boolean mainSuccess : mainIndex.putEntries(indexEntries))
             {

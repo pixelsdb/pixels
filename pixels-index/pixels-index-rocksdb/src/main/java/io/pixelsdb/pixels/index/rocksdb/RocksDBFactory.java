@@ -188,7 +188,7 @@ public class RocksDBFactory
         int fixedLengthPrefix = Integer.parseInt(config.getProperty("index.rocksdb.prefix.length"));
         if(keyLen != null)
         {
-            fixedLengthPrefix = keyLen + Long.BYTES; // key buffer + index id
+            fixedLengthPrefix = Long.BYTES + keyLen; // index id + key buffer
         }
         CompactionStyle compactionStyle = CompactionStyle.valueOf(config.getProperty("index.rocksdb.compaction.style"));
 
