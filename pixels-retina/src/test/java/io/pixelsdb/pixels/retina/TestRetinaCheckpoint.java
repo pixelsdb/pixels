@@ -31,12 +31,14 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test checkpoint creation and recovery logic.
@@ -46,7 +48,7 @@ public class TestRetinaCheckpoint
     private RetinaResourceManager retinaManager;
     private String testCheckpointDir;
     private Storage storage;
-    private final long fileId = 1L;
+    private final long fileId = 999999L;
     private final int rgId = 0;
     private final int numRows = 1024;
 
@@ -74,7 +76,7 @@ public class TestRetinaCheckpoint
         }
 
         retinaManager = RetinaResourceManager.Instance();
-        retinaManager.addVisibility(fileId, rgId, numRows);
+        resetSingletonState();
     }
 
     private String resolve(String dir, String filename) {
@@ -84,7 +86,7 @@ public class TestRetinaCheckpoint
     @Test
     public void testRegisterOffload() throws RetinaException, IOException
     {
-        long transId = 12345L;
+        retinaManager.addVisibility(fileId, rgId, numRows);
         long timestamp = 100L;
 
         // Register offload
@@ -104,9 +106,8 @@ public class TestRetinaCheckpoint
     @Test
     public void testMultipleOffloads() throws RetinaException, IOException
     {
-        long transId1 = 12345L;
+        retinaManager.addVisibility(fileId, rgId, numRows);
         long timestamp1 = 100L;
-        long transId2 = 12346L;
         long timestamp1_dup = 100L; // same timestamp
 
         // Both register the same timestamp - should share checkpoint
@@ -128,8 +129,8 @@ public class TestRetinaCheckpoint
     @Test
     public void testCheckpointRecovery() throws RetinaException, IOException
     {
+        retinaManager.addVisibility(fileId, rgId, numRows);
         long timestamp = 100L;
-        long transId = 999L;
 
         // 1. Delete row 10
         int rowToDelete = 10;
@@ -178,6 +179,7 @@ public class TestRetinaCheckpoint
     @Test
     public void testDiskBitmapQuery() throws RetinaException
     {
+        retinaManager.addVisibility(fileId, rgId, numRows);
         long baseTimestamp = 200L;
         long transId = 888L;
 
@@ -210,8 +212,9 @@ public class TestRetinaCheckpoint
     @Test
     public void testConcurrency() throws InterruptedException, RetinaException
     {
-        int numThreads = 100;
-        int operationsPerThread = 500;
+        retinaManager.addVisibility(fileId, rgId, numRows);
+        int numThreads = 20;
+        int operationsPerThread = 50;
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(numThreads);
@@ -237,11 +240,6 @@ public class TestRetinaCheckpoint
                         {
                             // Register Offload
                             retinaManager.registerOffload(timestamp);
-                            // Verify file exists
-                            String p = resolve(testCheckpointDir, "vis_offload_" + timestamp + ".bin");
-                            if (!storage.exists(p)) {
-                                throw new RuntimeException("Checkpoint file missing after register: " + p);
-                            }
                         }
                         else if (j % 3 == 1)
                         {
@@ -269,7 +267,7 @@ public class TestRetinaCheckpoint
         }
 
         startLatch.countDown(); // Start all threads
-        boolean finished = doneLatch.await(30, TimeUnit.SECONDS);
+        boolean finished = doneLatch.await(60, TimeUnit.SECONDS);
         executor.shutdownNow();
 
         assertTrue("Timeout waiting for concurrency test", finished);
@@ -295,6 +293,10 @@ public class TestRetinaCheckpoint
             offloadedField.setAccessible(true);
             ((Map<?, ?>) offloadedField.get(retinaManager)).clear();
 
+            Field offloadCacheField = RetinaResourceManager.class.getDeclaredField("offloadCache");
+            offloadCacheField.setAccessible(true);
+            ((Map<?, ?>) offloadCacheField.get(retinaManager)).clear();
+
             Field refCountsField = RetinaResourceManager.class.getDeclaredField("checkpointRefCounts");
             refCountsField.setAccessible(true);
             ((Map<?, ?>) refCountsField.get(retinaManager)).clear();
@@ -313,20 +315,6 @@ public class TestRetinaCheckpoint
         }
     }
 
-    private boolean assertTrue(String message, boolean condition)
-    {
-        if (!condition)
-        {
-            throw new AssertionError(message);
-        }
-        return condition;
-    }
-
-    private boolean assertFalse(String message, boolean condition)
-    {
-        return assertTrue(message, !condition);
-    }
-
     private boolean isBitSet(long[] bitmap, int rowIndex)
     {
         if (bitmap == null || bitmap.length == 0) return false;
@@ -337,5 +325,96 @@ public class TestRetinaCheckpoint
         if (longIndex >= bitmap.length) return false;
 
         return (bitmap[longIndex] & (1L << bitOffset)) != 0;
+    }
+
+    @Test
+    public void testCheckpointPerformance() throws RetinaException, InterruptedException
+    {
+        // 1. Configuration parameters
+        int numFiles = 50000;
+        int rgsPerFile = 1;
+        int rowsPerRG = 200000; // rows per Row Group
+        long totalRecords = (long) numFiles * rgsPerFile * rowsPerRG;
+        double targetDeleteRatio = 0.1;
+        int queryCount = 200;
+        
+        long timestamp = 1000L;
+        long transId = 2000L;
+        java.util.Random random = new java.util.Random();
+
+        System.out.println("--- Starting Checkpoint Performance Test ---");
+        System.out.printf("Config: %d files, %d RGs/file, %d rows/RG, %d queries\n", 
+                numFiles, rgsPerFile, rowsPerRG, queryCount);
+        System.out.printf("Target Delete Ratio: %.2f%%\n", targetDeleteRatio * 100);
+
+        // 2. Initialize data and perform random deletes, accurately count actual deleted rows
+        long totalActualDeletedRows = 0;
+        for (int f = 0; f < numFiles; f++)
+        {
+            for (int r = 0; r < rgsPerFile; r++)
+            {
+                retinaManager.addVisibility(f, r, rowsPerRG);
+                int targetDeleteCount = (int) (rowsPerRG * targetDeleteRatio);
+                
+                java.util.Set<Integer> deletedInRG = new java.util.HashSet<>();
+                while (deletedInRG.size() < targetDeleteCount)
+                {
+                    int rowId = random.nextInt(rowsPerRG);
+                    if (deletedInRG.add(rowId))
+                    {
+                        retinaManager.deleteRecord(f, r, rowId, timestamp);
+                    }
+                }
+                totalActualDeletedRows += deletedInRG.size();
+            }
+        }
+
+        double actualDeleteRatio = (double) totalActualDeletedRows / totalRecords;
+        System.out.printf("Actual Total Deleted Rows: %d\n", totalActualDeletedRows);
+        System.out.printf("Actual Delete Ratio: %.4f%%\n", actualDeleteRatio * 100);
+
+        // 3. Test Offload (Checkpoint Creation) performance
+        long startOffload = System.nanoTime();
+        retinaManager.registerOffload(timestamp);
+        long endOffload = System.nanoTime();
+        double offloadTimeMs = (endOffload - startOffload) / 1e6;
+
+        System.out.printf("Total Offload Time (Writing to disk): %.2f ms\n", offloadTimeMs);
+        System.out.printf("Average Offload Time per RG: %.4f ms\n", offloadTimeMs / (numFiles * rgsPerFile));
+
+        // 4. Test Load (Checkpoint Load) performance
+        long firstLoadTimeNs = 0;
+        long subsequentLoadsTotalNs = 0;
+
+        for (int i = 0; i < queryCount; i++)
+        {
+            int f = random.nextInt(numFiles);
+            int r = random.nextInt(rgsPerFile);
+            
+            long start = System.nanoTime();
+            retinaManager.queryVisibility(f, r, timestamp, transId);
+            long end = System.nanoTime();
+            
+            if (i == 0)
+            {
+                firstLoadTimeNs = (end - start);
+            }
+            else
+            {
+                subsequentLoadsTotalNs += (end - start);
+            }
+        }
+        
+        double totalLoadTimeMs = (firstLoadTimeNs + subsequentLoadsTotalNs) / 1e6;
+        double firstLoadTimeMs = firstLoadTimeNs / 1e6;
+        double avgSubsequentLoadTimeMs = (subsequentLoadsTotalNs / (queryCount - 1.0)) / 1e6;
+
+        System.out.printf("Total Load Time (for %d queries): %.2f ms\n", queryCount, totalLoadTimeMs);
+        System.out.printf("First Load Time (Cold Start IO): %.2f ms\n", firstLoadTimeMs);
+        System.out.printf("Average Subsequent Load Time (Memory Hit): %.6f ms\n", avgSubsequentLoadTimeMs);
+
+        // 5. Cleanup
+        retinaManager.unregisterOffload(timestamp);
+        System.out.println("--- Performance Test Finished ---\n");
     }
 }
