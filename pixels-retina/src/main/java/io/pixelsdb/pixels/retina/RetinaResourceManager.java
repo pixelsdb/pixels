@@ -116,8 +116,7 @@ public class RetinaResourceManager
         this.offloadedCheckpoints = new ConcurrentHashMap<>();
 
         ConfigFactory config = ConfigFactory.Instance();
-        String leaseDurationStr = config.getProperty("retina.offload.cache.lease.duration");
-        long leaseDuration = (leaseDurationStr != null) ? Long.parseLong(leaseDurationStr) : 600;
+        long leaseDuration = Long.parseLong(config.getProperty("retina.offload.cache.lease.duration"));
 
         this.offloadCache = Caffeine.newBuilder()
                 .expireAfterAccess(leaseDuration, TimeUnit.SECONDS)
@@ -130,8 +129,7 @@ public class RetinaResourceManager
         this.checkpointDir = config.getProperty("pixels.retina.checkpoint.dir");
         this.recoveryCache = new ConcurrentHashMap<>();
 
-        String cpThreadsStr = config.getProperty("retina.checkpoint.threads");
-        int cpThreads = (cpThreadsStr != null) ? Integer.parseInt(cpThreadsStr) : 4;
+        int cpThreads = Integer.parseInt(config.getProperty("retina.checkpoint.threads"));
         this.checkpointExecutor = Executors.newFixedThreadPool(cpThreads, r -> {
             Thread t = new Thread(r, "retina-checkpoint-thread");
             t.setDaemon(true);
