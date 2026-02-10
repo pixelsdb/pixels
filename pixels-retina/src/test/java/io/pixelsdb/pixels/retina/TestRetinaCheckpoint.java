@@ -378,7 +378,7 @@ public class TestRetinaCheckpoint
         int rgsPerFile = 1;
         int rowsPerRG = 200000; // rows per Row Group
         long totalRecords = (long) numFiles * rgsPerFile * rowsPerRG;
-        double targetDeleteRatio = 0.1;
+        double targetDeleteRatio = 0.1; // @TARGET_DELETE_RATIO@
         int queryCount = 200;
 
         long timestamp = 1000L;
