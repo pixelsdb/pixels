@@ -561,13 +561,21 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .newBuilder()
                     .setHeader(headerBuilder.build());
 
-            for (int rgId : rgIds)
+            String checkpointPath = this.retinaResourceManager.getCheckpointPath(timestamp);
+            if (checkpointPath != null)
             {
-                long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp, transId);
-                RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
-                        .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
-                        .build();
-                responseBuilder.addBitmaps(bitmap);
+                responseBuilder.setCheckpointPath(checkpointPath);
+            }
+            else
+            {
+                for (int rgId : rgIds)
+                {
+                    long[] visibilityBitmap = this.retinaResourceManager.queryVisibility(fileId, rgId, timestamp, transId);
+                    RetinaProto.VisibilityBitmap bitmap = RetinaProto.VisibilityBitmap.newBuilder()
+                            .addAllBitmap(Arrays.stream(visibilityBitmap).boxed().collect(Collectors.toList()))
+                            .build();
+                    responseBuilder.addBitmaps(bitmap);
+                }
             }
             responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();

@@ -33,8 +33,6 @@ import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -67,7 +65,6 @@ public class RetinaResourceManager
     // Checkpoint related fields
     private final ExecutorService checkpointExecutor;
     private final Map<Long, String> offloadedCheckpoints;
-    private final Cache<Long, Map<String, long[]>> offloadCache;
     private final String checkpointDir;
     private long latestGcTimestamp = -1;
     private final int totalVirtualNodeNum;
@@ -115,14 +112,6 @@ public class RetinaResourceManager
         this.offloadedCheckpoints = new ConcurrentHashMap<>();
 
         ConfigFactory config = ConfigFactory.Instance();
-        long leaseDuration = Long.parseLong(config.getProperty("retina.offload.cache.lease.duration"));
-
-        this.offloadCache = Caffeine.newBuilder()
-                .expireAfterAccess(leaseDuration, TimeUnit.SECONDS)
-                .removalListener((key, value, cause) -> {
-                    logger.info("Retina offload cache for timestamp {} evicted due to {}", key, cause);
-                })
-                .build();
 
         this.checkpointRefCounts = new ConcurrentHashMap<>();
         this.checkpointDir = config.getProperty("pixels.retina.checkpoint.dir");
@@ -343,16 +332,7 @@ public class RetinaResourceManager
 
     public long[] queryVisibility(long fileId, int rgId, long timestamp, long transId) throws RetinaException
     {
-        // [Routing Logic] Only read from disk/cache if the transaction is explicitly registered as Offload
-        if (transId != -1)
-        {
-            if (offloadedCheckpoints.containsKey(timestamp))
-            {
-                return queryFromOffloadCache(timestamp, fileId, rgId);
-            }
-            throw new RetinaException("Offloaded checkpoint missing for TransID " + transId);
-        }
-        // otherwise read from memory
+        // read from memory
         RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
         long[] visibilityBitmap = rgVisibility.getVisibilityBitmap(timestamp);
         if (visibilityBitmap == null)
@@ -362,20 +342,6 @@ public class RetinaResourceManager
         return visibilityBitmap;
     }
 
-    private long[] queryFromOffloadCache(long timestamp, long fileId, int rgId) throws RetinaException
-    {
-        Map<String, long[]> cache = offloadCache.getIfPresent(timestamp);
-        if (cache != null)
-        {
-            long[] bitmap = cache.get(fileId + "_" + rgId);
-            if (bitmap != null)
-            {
-                return bitmap;
-            }
-        }
-        // Cache miss, load from storage
-        return loadBitmapFromStorage(timestamp, fileId, rgId);
-    }
 
     public long[] queryVisibility(long fileId, int rgId, long timestamp) throws RetinaException
     {
@@ -476,7 +442,6 @@ public class RetinaResourceManager
                 if (remaining <= 0)
                 {
                     offloadedCheckpoints.remove(timestamp);
-                    offloadCache.invalidate(timestamp);
                     if (refCount.get() > 0)
                     {
                         logger.info("Checkpoint resurrection detected, skipping deletion. TS: {}", timestamp);
@@ -577,85 +542,6 @@ public class RetinaResourceManager
         });
     }
 
-    private long[] loadBitmapFromStorage(long timestamp, long targetFileId, int targetRgId) throws RetinaException
-    {
-        String path = offloadedCheckpoints.get(timestamp);
-        if (path == null)
-        {
-            throw new RetinaException("Checkpoint missing: " + timestamp);
-        }
-
-        // Use a lock to ensure only one thread parses the file for this timestamp
-        // For 50,000 RGs, the initial capacity of ConcurrentHashMap should be sufficient
-        Map<String, long[]> cache;
-        synchronized (offloadCache)
-        {
-            cache = offloadCache.getIfPresent(timestamp);
-            if (cache == null)
-            {
-                cache = new ConcurrentHashMap<>(50000);
-                offloadCache.put(timestamp, cache);
-            }
-        }
-
-        synchronized (cache)
-        {
-            // Double check if target already in cache after acquiring lock
-            long[] cached = cache.get(targetFileId + "_" + targetRgId);
-            if (cached != null)
-            {
-                return cached;
-            }
-
-            // Still not in cache, perform full load
-            try
-            {
-                Storage storage = StorageFactory.Instance().getStorage(path);
-                long fileLength = storage.getStatus(path).getLength();
-
-                // Use PhysicalReader to read the entire file into memory at once
-                // This is much faster than streaming from S3 for many small reads
-                byte[] content;
-                try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path))
-                {
-                    ByteBuffer buffer = reader.readFully((int) fileLength);
-                    if (buffer.hasArray())
-                    {
-                        content = buffer.array();
-                    }
-                    else
-                    {
-                        content = new byte[(int) fileLength];
-                        buffer.get(content);
-                    }
-                }
-
-                try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(content)))
-                {
-                    int rgCount = in.readInt();
-
-                    for (int i = 0; i < rgCount; i++)
-                    {
-                        long fileId = in.readLong();
-                        int rgId = in.readInt();
-                        int len = in.readInt();
-                        long[] bitmap = new long[len];
-                        for (int j = 0; j < len; j++)
-                        {
-                            bitmap[j] = in.readLong();
-                        }
-                        
-                        cache.put(fileId + "_" + rgId, bitmap);
-                    }
-                }
-            } catch (IOException e)
-            {
-                throw new RetinaException("Failed to read checkpoint file", e);
-            }
-        }
-
-        return cache.getOrDefault(targetFileId + "_" + targetRgId, new long[0]);
-    }
 
     private void removeCheckpointFile(long timestamp, CheckpointType type)
     {
@@ -676,6 +562,11 @@ public class RetinaResourceManager
     {
         RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
         rgVisibility.getVisibilityBitmap(timestamp);
+    }
+
+    public String getCheckpointPath(long timestamp)
+    {
+        return offloadedCheckpoints.get(timestamp);
     }
 
     public void deleteRecord(long fileId, int rgId, int rgRowOffset, long timestamp) throws RetinaException
