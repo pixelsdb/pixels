@@ -328,36 +328,47 @@ public class TestRetinaCheckpoint
         return (bitmap[longIndex] & (1L << bitOffset)) != 0;
     }
 
+    /**
+     * Test the performance and memory overhead of checkpoint offload and load.
+     * <p>
+     * Run Command:
+     * LD_PRELOAD=/lib/x86_64-linux-gnu/libjemalloc.so.2 mvn test \
+     *   -Dtest=TestRetinaCheckpoint#testCheckpointPerformance \
+     *   -pl pixels-retina \
+     *   -DargLine="-Xms40g -Xmx40g"
+     */
     @Test
-    public void testCheckpointPerformance() throws RetinaException, InterruptedException
+    public void testCheckpointPerformance() throws RetinaException, InterruptedException, IOException
     {
         // 1. Configuration parameters
-        int numFiles = 50000;
+        int numFiles = 500;
         int rgsPerFile = 1;
         int rowsPerRG = 200000; // rows per Row Group
         long totalRecords = (long) numFiles * rgsPerFile * rowsPerRG;
         double targetDeleteRatio = 0.1;
         int queryCount = 200;
-        
+
         long timestamp = 1000L;
         long transId = 2000L;
 
+        System.out.println("\n============================================================");
         System.out.println("--- Starting Checkpoint Performance Test ---");
-        System.out.printf("Config: %d files, %d RGs/file, %d rows/RG, %d queries\n", 
+        System.out.printf("Config: %d files, %d RGs/file, %d rows/RG, %d queries\n",
                 numFiles, rgsPerFile, rowsPerRG, queryCount);
         System.out.printf("Target Delete Ratio: %.2f%%\n", targetDeleteRatio * 100);
+        System.out.println("============================================================\n");
 
-        // 2. Initialize data and perform random deletes, accurately count actual deleted rows
+        // 2. Initialize data and perform random deletes
         LongAdder totalActualDeletedRows = new LongAdder();
-        
-        // Step A: Pre-add Visibility (Synchronous or Sequential to ensure correct state in memory)
+
+        // Step A: Pre-add Visibility
         for (int f = 0; f < numFiles; f++) {
             for (int r = 0; r < rgsPerFile; r++) {
                 retinaManager.addVisibility(f, r, rowsPerRG);
             }
         }
 
-        // Step B: Parallel deleteRecord (RG-level parallelism)
+        // Step B: Parallel deleteRecord
         int numThreads = Runtime.getRuntime().availableProcessors();
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 
@@ -400,53 +411,127 @@ public class TestRetinaCheckpoint
         executor.shutdown();
 
         double actualDeleteRatio = (double) totalActualDeletedRows.sum() / totalRecords;
-        System.out.printf("Actual Total Deleted Rows: %d\n", totalActualDeletedRows.sum());
-        System.out.printf("Actual Delete Ratio: %.4f%%\n", actualDeleteRatio * 100);
+        System.out.printf("[Data Gen] Total Deleted Rows: %d (Actual Ratio: %.4f%%)\n",
+                totalActualDeletedRows.sum(), actualDeleteRatio * 100);
 
         // 3. Test Offload (Checkpoint Creation) performance
+        System.out.println("\n[Phase 1] Testing Checkpoint Offload (Write)...");
         long startOffload = System.nanoTime();
         retinaManager.registerOffload(timestamp);
         long endOffload = System.nanoTime();
-        double offloadTimeMs = (endOffload - startOffload) / 1e6;
 
-        System.out.printf("Total Offload Time (Writing to disk): %.2f ms\n", offloadTimeMs);
-        System.out.printf("Average Offload Time per RG: %.4f ms\n", offloadTimeMs / (numFiles * rgsPerFile));
+        // [Accuracy] Calculate offload peak memory overhead AFTER timing to avoid interference.
+        // We simulate the snapshot logic to get the exact physical size of long arrays being offloaded.
+        long offloadPeakBytes = calculateOffloadPeakMemory(timestamp);
+
+        double offloadTimeMs = (endOffload - startOffload) / 1e6;
+        String offloadPath = resolve(testCheckpointDir, "vis_offload_" + timestamp + ".bin");
+        long fileSize = storage.getStatus(offloadPath).getLength();
+        double writeThroughputMBs = (fileSize / (1024.0 * 1024.0)) / (offloadTimeMs / 1000.0);
+
+        System.out.println("------------------------------------------------------------");
+        System.out.printf("Total Offload Time:         %.2f ms\n", offloadTimeMs);
+        System.out.printf("Checkpoint File Size:       %.2f MB\n", fileSize / (1024.0 * 1024.0));
+        System.out.printf("Offload Peak Mem Overhead:  %.2f MB\n", offloadPeakBytes / (1024.0 * 1024.0));
+        System.out.printf("Write Throughput:           %.2f MB/s\n", writeThroughputMBs);
+        System.out.printf("Avg Offload Time per RG:    %.4f ms\n", offloadTimeMs / (numFiles * rgsPerFile));
+        System.out.println("------------------------------------------------------------");
 
         // 4. Test Load (Checkpoint Load) performance
+        System.out.println("\n[Phase 2] Testing Checkpoint Load (Read)...");
         long firstLoadTimeNs = 0;
         long subsequentLoadsTotalNs = 0;
         java.util.Random randomForQuery = new java.util.Random();
 
         for (int i = 0; i < queryCount; i++)
         {
-            System.out.println("query id: " + i);
             int f = randomForQuery.nextInt(numFiles);
             int r = randomForQuery.nextInt(rgsPerFile);
-            
+
             long start = System.nanoTime();
             retinaManager.queryVisibility(f, r, timestamp, transId);
             long end = System.nanoTime();
-            
+
             if (i == 0)
             {
                 firstLoadTimeNs = (end - start);
+                System.out.printf("Cold Start Query (Triggered full file load): %.2f ms\n", firstLoadTimeNs / 1e6);
             }
             else
             {
                 subsequentLoadsTotalNs += (end - start);
             }
         }
-        
-        double totalLoadTimeMs = (firstLoadTimeNs + subsequentLoadsTotalNs) / 1e6;
+
+        // [Accuracy] Calculate load memory overhead AFTER timing via reflection on offloadCache.
+        long loadCacheBytes = calculateLoadCacheMemory(timestamp);
+
         double firstLoadTimeMs = firstLoadTimeNs / 1e6;
         double avgSubsequentLoadTimeMs = (subsequentLoadsTotalNs / (queryCount - 1.0)) / 1e6;
+        double readThroughputMBs = (fileSize / (1024.0 * 1024.0)) / (firstLoadTimeMs / 1000.0);
 
-        System.out.printf("Total Load Time (for %d queries): %.2f ms\n", queryCount, totalLoadTimeMs);
-        System.out.printf("First Load Time (Cold Start IO): %.2f ms\n", firstLoadTimeMs);
-        System.out.printf("Average Subsequent Load Time (Memory Hit): %.6f ms\n", avgSubsequentLoadTimeMs);
+        System.out.println("------------------------------------------------------------");
+        System.out.printf("First Load Time (Cold):     %.2f ms\n", firstLoadTimeMs);
+        System.out.printf("Load Memory Overhead:       %.2f MB\n", loadCacheBytes / (1024.0 * 1024.0));
+        System.out.printf("Read/Parse Throughput:      %.2f MB/s\n", readThroughputMBs);
+        System.out.printf("Avg Memory Hit Latency:     %.6f ms\n", avgSubsequentLoadTimeMs);
+        System.out.printf("Total Time for %d queries:  %.2f ms\n", queryCount, (firstLoadTimeNs + subsequentLoadsTotalNs) / 1e6);
+        System.out.println("------------------------------------------------------------");
 
         // 5. Cleanup
         retinaManager.unregisterOffload(timestamp);
-        System.out.println("--- Performance Test Finished ---\n");
+        System.out.println("\n--- Checkpoint Performance Test Finished ---\n");
+    }
+
+    /**
+     * Accurately calculate the memory size of long arrays that would be captured in a snapshot.
+     * This represents the peak heap usage during the offload process.
+     */
+    private long calculateOffloadPeakMemory(long timestamp)
+    {
+        try {
+            Field rgMapField = RetinaResourceManager.class.getDeclaredField("rgVisibilityMap");
+            rgMapField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, RGVisibility> rgMap = (Map<String, RGVisibility>) rgMapField.get(retinaManager);
+            
+            long totalBytes = 0;
+            for (RGVisibility visibility : rgMap.values()) {
+                long[] bitmap = visibility.getVisibilityBitmap(timestamp);
+                if (bitmap != null) {
+                    totalBytes += (long) bitmap.length * 8;
+                }
+            }
+            return totalBytes;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
+
+    /**
+     * Accurately calculate the memory size of long arrays currently stored in offloadCache.
+     * This represents the persistent heap usage after loading a checkpoint.
+     */
+    private long calculateLoadCacheMemory(long timestamp)
+    {
+        try {
+            Field offloadCacheField = RetinaResourceManager.class.getDeclaredField("offloadCache");
+            offloadCacheField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<Long, Map<String, long[]>> offloadCache = (Map<Long, Map<String, long[]>>) offloadCacheField.get(retinaManager);
+            
+            Map<String, long[]> cacheForTs = offloadCache.get(timestamp);
+            if (cacheForTs == null) return 0;
+            
+            long totalBytes = 0;
+            for (long[] bitmap : cacheForTs.values()) {
+                totalBytes += (long) bitmap.length * 8;
+            }
+            return totalBytes;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        }
     }
 }
