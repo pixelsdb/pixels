@@ -36,6 +36,8 @@ import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -68,7 +70,7 @@ public class RetinaResourceManager
     // Checkpoint related fields
     private final ExecutorService checkpointExecutor;
     private final Map<Long, String> offloadedCheckpoints;
-    private final Map<Long, Map<String, long[]>> offloadCache;
+    private final Cache<Long, Map<String, long[]>> offloadCache;
     private final String checkpointDir;
     private long latestGcTimestamp = -1;
     private final int totalVirtualNodeNum;
@@ -88,6 +90,20 @@ public class RetinaResourceManager
     }
     private final Map<String, RecoveredState> recoveryCache;
 
+    private static class CheckpointEntry
+    {
+        final long fileId;
+        final int rgId;
+        final long[] bitmap;
+
+        CheckpointEntry(long fileId, int rgId, long[] bitmap)
+        {
+            this.fileId = fileId;
+            this.rgId = rgId;
+            this.bitmap = bitmap;
+        }
+    }
+
     private enum CheckpointType
     {
         GC,
@@ -100,9 +116,20 @@ public class RetinaResourceManager
         this.rgVisibilityMap = new ConcurrentHashMap<>();
         this.pixelsWriteBufferMap = new ConcurrentHashMap<>();
         this.offloadedCheckpoints = new ConcurrentHashMap<>();
-        this.offloadCache = new ConcurrentHashMap<>();
+
+        ConfigFactory config = ConfigFactory.Instance();
+        String leaseDurationStr = config.getProperty("retina.offload.cache.lease.duration");
+        long leaseDuration = (leaseDurationStr != null) ? Long.parseLong(leaseDurationStr) : 600;
+
+        this.offloadCache = Caffeine.newBuilder()
+                .expireAfterAccess(leaseDuration, TimeUnit.SECONDS)
+                .removalListener((key, value, cause) -> {
+                    logger.info("Retina offload cache for timestamp {} evicted due to {}", key, cause);
+                })
+                .build();
+
         this.checkpointRefCounts = new ConcurrentHashMap<>();
-        this.checkpointDir = ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir");
+        this.checkpointDir = config.getProperty("pixels.retina.checkpoint.dir");
         this.recoveryCache = new ConcurrentHashMap<>();
 
         this.checkpointExecutor = Executors.newFixedThreadPool(4, r -> {
@@ -118,7 +145,6 @@ public class RetinaResourceManager
                 });
         try
         {
-            ConfigFactory config = ConfigFactory.Instance();
             long interval = Long.parseLong(config.getProperty("retina.gc.interval"));
             if (interval > 0)
             {
@@ -397,7 +423,7 @@ public class RetinaResourceManager
 
     private long[] queryFromOffloadCache(long timestamp, long fileId, int rgId) throws RetinaException
     {
-        Map<String, long[]> cache = offloadCache.get(timestamp);
+        Map<String, long[]> cache = offloadCache.getIfPresent(timestamp);
         if (cache != null)
         {
             long[] bitmap = cache.get(fileId + "_" + rgId);
@@ -509,7 +535,7 @@ public class RetinaResourceManager
                 if (remaining <= 0)
                 {
                     offloadedCheckpoints.remove(timestamp);
-                    offloadCache.remove(timestamp);
+                    offloadCache.invalidate(timestamp);
                     if (refCount.get() > 0)
                     {
                         logger.info("Checkpoint resurrection detected, skipping deletion. TS: {}", timestamp);
@@ -529,17 +555,35 @@ public class RetinaResourceManager
         String fileName = prefix + timestamp + ".bin";
         String filePath = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
 
-        // 1. Snapshot: capture bitmaps in memory synchronously to ensure consistency
-        long startSnapshot = System.currentTimeMillis();
-        Map<String, long[]> snapshot = new HashMap<>(this.rgVisibilityMap.size());
-        for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
-        {
-            snapshot.put(entry.getKey(), entry.getValue().getVisibilityBitmap(timestamp));
-        }
-        long endSnapshot = System.currentTimeMillis();
-        logger.info("Snapshot for {} checkpoint took {} ms, size: {}", type, (endSnapshot - startSnapshot), snapshot.size());
+        // 1. Capture current entries to ensure we process a consistent set of RGs
+        List<Map.Entry<String, RGVisibility>> entries = new ArrayList<>(this.rgVisibilityMap.entrySet());
+        int totalRgs = entries.size();
+        logger.info("Starting {} checkpoint for {} RGs at timestamp {}", type, totalRgs, timestamp);
 
-        // 2. Async Write: perform IO in background thread
+        // 2. Use a BlockingQueue for producer-consumer pattern
+        // Limit capacity to avoid excessive memory usage if writing is slow
+        BlockingQueue<CheckpointEntry> queue = new LinkedBlockingQueue<>(1024);
+
+        // 3. Start producer tasks to fetch bitmaps in parallel
+        for (Map.Entry<String, RGVisibility> entry : entries)
+        {
+            checkpointExecutor.submit(() -> {
+                try
+                {
+                    String key = entry.getKey();
+                    String[] parts = key.split("_");
+                    long fileId = Long.parseLong(parts[0]);
+                    int rgId = Integer.parseInt(parts[1]);
+                    long[] bitmap = entry.getValue().getVisibilityBitmap(timestamp);
+                    queue.put(new CheckpointEntry(fileId, rgId, bitmap));
+                } catch (Exception e)
+                {
+                    logger.error("Failed to fetch visibility bitmap for checkpoint", e);
+                }
+            });
+        }
+
+        // 4. Async Write: perform IO in background thread (Consumer)
         return CompletableFuture.runAsync(() -> {
             long startWrite = System.currentTimeMillis();
             try
@@ -547,18 +591,14 @@ public class RetinaResourceManager
                 Storage storage = StorageFactory.Instance().getStorage(filePath);
                 try (DataOutputStream out = storage.create(filePath, true, 8 * 1024 * 1024))
                 {
-                    out.writeInt(snapshot.size());
-                    for (Map.Entry<String, long[]> entry : snapshot.entrySet())
+                    out.writeInt(totalRgs);
+                    for (int i = 0; i < totalRgs; i++)
                     {
-                        String[] parts = entry.getKey().split("_");
-                        long fileId = Long.parseLong(parts[0]);
-                        int rgId = Integer.parseInt(parts[1]);
-                        long[] bitmap = entry.getValue();
-
-                        out.writeLong(fileId);
-                        out.writeInt(rgId);
-                        out.writeInt(bitmap.length);
-                        for (long l : bitmap)
+                        CheckpointEntry entry = queue.take();
+                        out.writeLong(entry.fileId);
+                        out.writeInt(entry.rgId);
+                        out.writeInt(entry.bitmap.length);
+                        for (long l : entry.bitmap)
                         {
                             out.writeLong(l);
                         }
@@ -580,7 +620,7 @@ public class RetinaResourceManager
                         removeCheckpointFile(oldGcTs, CheckpointType.GC);
                     }
                 }
-            } catch (IOException e)
+            } catch (Exception e)
             {
                 logger.error("Failed to commit {} checkpoint file for timestamp: {}", type, timestamp, e);
                 // Try to cleanup the potentially corrupted or partial file
@@ -605,17 +645,19 @@ public class RetinaResourceManager
 
         // Use a lock to ensure only one thread parses the file for this timestamp
         // For 50,000 RGs, the initial capacity of ConcurrentHashMap should be sufficient
-        Map<String, long[]> cache = offloadCache.computeIfAbsent(timestamp, k -> new ConcurrentHashMap<>(50000));
+        Map<String, long[]> cache;
+        synchronized (offloadCache)
+        {
+            cache = offloadCache.getIfPresent(timestamp);
+            if (cache == null)
+            {
+                cache = new ConcurrentHashMap<>(50000);
+                offloadCache.put(timestamp, cache);
+            }
+        }
 
-        long lockWaitStart = System.currentTimeMillis();
         synchronized (cache)
         {
-            long lockAcquiredTime = System.currentTimeMillis();
-            if (lockAcquiredTime - lockWaitStart > 0)
-            {
-                System.out.println("Wait for checkpoint lock took " + (lockAcquiredTime - lockWaitStart) + " ms");
-            }
-
             // Double check if target already in cache after acquiring lock
             long[] cached = cache.get(targetFileId + "_" + targetRgId);
             if (cached != null)
@@ -624,14 +666,10 @@ public class RetinaResourceManager
             }
 
             // Still not in cache, perform full load
-            long startTime = System.currentTimeMillis();
             try
             {
-                long s1 = System.currentTimeMillis();
                 Storage storage = StorageFactory.Instance().getStorage(path);
                 long fileLength = storage.getStatus(path).getLength();
-                long s2 = System.currentTimeMillis();
-                System.out.println("Storage get and length check took " + (s2 - s1) + " ms, file size: " + (fileLength / 1024) + " KB");
 
                 // Use PhysicalReader to read the entire file into memory at once
                 // This is much faster than streaming from S3 for many small reads
@@ -649,20 +687,13 @@ public class RetinaResourceManager
                         buffer.get(content);
                     }
                 }
-                long s3 = System.currentTimeMillis();
-                System.out.println("PhysicalReader readFully took " + (s3 - s2) + " ms");
 
                 try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(content)))
                 {
                     int rgCount = in.readInt();
-                    System.out.println("Loading checkpoint from memory buffer, RG count: " + rgCount);
-                    
-                    long totalReadNanos = 0;
-                    long totalPutNanos = 0;
 
                     for (int i = 0; i < rgCount; i++)
                     {
-                        long t1 = System.nanoTime();
                         long fileId = in.readLong();
                         int rgId = in.readInt();
                         int len = in.readInt();
@@ -671,25 +702,10 @@ public class RetinaResourceManager
                         {
                             bitmap[j] = in.readLong();
                         }
-                        long t2 = System.nanoTime();
                         
                         cache.put(fileId + "_" + rgId, bitmap);
-                        long t3 = System.nanoTime();
-
-                        totalReadNanos += (t2 - t1);
-                        totalPutNanos += (t3 - t2);
-
-                        if ((i + 1) % 10000 == 0)
-                        {
-                            System.out.println("Processed " + (i + 1) + "/" + rgCount + " RGs... (cumulative memory parse: " + (totalReadNanos / 1_000_000) + " ms, put: " + (totalPutNanos / 1_000_000) + " ms)");
-                            System.out.flush();
-                        }
                     }
-                    long s4 = System.currentTimeMillis();
-                    System.out.println("Core loop finished. Total memory parse: " + (totalReadNanos / 1_000_000) + " ms, Total cache put: " + (totalPutNanos / 1_000_000) + " ms. Loop wall time: " + (s4 - s3) + " ms");
                 }
-                long endTime = System.currentTimeMillis();
-                System.out.println("Loaded " + cache.size() + " RGs from checkpoint " + path + " in total " + (endTime - startTime) + " ms (wall time)");
             } catch (IOException e)
             {
                 throw new RetinaException("Failed to read checkpoint file", e);
