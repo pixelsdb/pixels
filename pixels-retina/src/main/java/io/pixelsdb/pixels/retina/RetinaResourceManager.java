@@ -522,6 +522,7 @@ public class RetinaResourceManager
         }
 
         // 4. Async Write: perform IO in background thread (Consumer)
+        // Use commonPool to avoid deadlocks with checkpointExecutor
         return CompletableFuture.runAsync(() -> {
             long startWrite = System.currentTimeMillis();
             try
@@ -570,7 +571,7 @@ public class RetinaResourceManager
                 }
                 throw new CompletionException(e);
             }
-        }, checkpointExecutor);
+        });
     }
 
     private long[] loadBitmapFromStorage(long timestamp, long targetFileId, int targetRgId) throws RetinaException
