@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.LongAdder;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -340,7 +341,6 @@ public class TestRetinaCheckpoint
         
         long timestamp = 1000L;
         long transId = 2000L;
-        java.util.Random random = new java.util.Random();
 
         System.out.println("--- Starting Checkpoint Performance Test ---");
         System.out.printf("Config: %d files, %d RGs/file, %d rows/RG, %d queries\n", 
@@ -348,29 +348,59 @@ public class TestRetinaCheckpoint
         System.out.printf("Target Delete Ratio: %.2f%%\n", targetDeleteRatio * 100);
 
         // 2. Initialize data and perform random deletes, accurately count actual deleted rows
-        long totalActualDeletedRows = 0;
+        LongAdder totalActualDeletedRows = new LongAdder();
+        
+        // Step A: Pre-add Visibility (Synchronous or Sequential to ensure correct state in memory)
+        for (int f = 0; f < numFiles; f++) {
+            for (int r = 0; r < rgsPerFile; r++) {
+                retinaManager.addVisibility(f, r, rowsPerRG);
+            }
+        }
+
+        // Step B: Parallel deleteRecord (RG-level parallelism)
+        int numThreads = Runtime.getRuntime().availableProcessors();
+        ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+
+        CountDownLatch latch = new CountDownLatch(numFiles * rgsPerFile);
         for (int f = 0; f < numFiles; f++)
         {
             for (int r = 0; r < rgsPerFile; r++)
             {
-                retinaManager.addVisibility(f, r, rowsPerRG);
-                int targetDeleteCount = (int) (rowsPerRG * targetDeleteRatio);
-                
-                java.util.Set<Integer> deletedInRG = new java.util.HashSet<>();
-                while (deletedInRG.size() < targetDeleteCount)
-                {
-                    int rowId = random.nextInt(rowsPerRG);
-                    if (deletedInRG.add(rowId))
+                final int fileId = f;
+                final int rgId = r;
+                executor.submit(() -> {
+                    try
                     {
-                        retinaManager.deleteRecord(f, r, rowId, timestamp);
+                        java.util.Random randomInThread = new java.util.Random();
+                        int targetDeleteCount = (int) (rowsPerRG * targetDeleteRatio);
+
+                        int actualDeletedCount = 0;
+                        java.util.Set<Integer> deletedInRG = new java.util.HashSet<>();
+                        while (deletedInRG.size() < targetDeleteCount)
+                        {
+                            int rowId = randomInThread.nextInt(rowsPerRG);
+                            if (deletedInRG.add(rowId))
+                            {
+                                retinaManager.deleteRecord(fileId, rgId, rowId, timestamp);
+                                actualDeletedCount++;
+                            }
+                        }
+                        totalActualDeletedRows.add(actualDeletedCount);
+                    } catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    } finally
+                    {
+                        latch.countDown();
                     }
-                }
-                totalActualDeletedRows += deletedInRG.size();
+                });
             }
         }
+        latch.await(30, TimeUnit.MINUTES);
+        executor.shutdown();
 
-        double actualDeleteRatio = (double) totalActualDeletedRows / totalRecords;
-        System.out.printf("Actual Total Deleted Rows: %d\n", totalActualDeletedRows);
+        double actualDeleteRatio = (double) totalActualDeletedRows.sum() / totalRecords;
+        System.out.printf("Actual Total Deleted Rows: %d\n", totalActualDeletedRows.sum());
         System.out.printf("Actual Delete Ratio: %.4f%%\n", actualDeleteRatio * 100);
 
         // 3. Test Offload (Checkpoint Creation) performance
@@ -385,11 +415,13 @@ public class TestRetinaCheckpoint
         // 4. Test Load (Checkpoint Load) performance
         long firstLoadTimeNs = 0;
         long subsequentLoadsTotalNs = 0;
+        java.util.Random randomForQuery = new java.util.Random();
 
         for (int i = 0; i < queryCount; i++)
         {
-            int f = random.nextInt(numFiles);
-            int r = random.nextInt(rgsPerFile);
+            System.out.println("query id: " + i);
+            int f = randomForQuery.nextInt(numFiles);
+            int r = randomForQuery.nextInt(rgsPerFile);
             
             long start = System.nanoTime();
             retinaManager.queryVisibility(f, r, timestamp, transId);

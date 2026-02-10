@@ -431,6 +431,7 @@ public class RetinaResourceManager
         {
             AtomicInteger refCount = checkpointRefCounts.computeIfAbsent(timestamp, k -> new AtomicInteger(0));
 
+            CompletableFuture<Void> currentFuture = null;
             synchronized (refCount)
             {
                 if (checkpointRefCounts.get(timestamp) != refCount)
@@ -445,12 +446,7 @@ public class RetinaResourceManager
                     {
                         if (!offloadedCheckpoints.containsKey(timestamp))
                         {
-                            CompletableFuture<Void> future = createCheckpoint(timestamp, CheckpointType.OFFLOAD);
-                            // For performance testing or specific needs, we might want to wait.
-                            // But for general offload, we let it run asynchronously.
-                            // To maintain current test's expectations, we add a way to wait if needed,
-                            // or just wait here if it's the first time.
-                            future.join();
+                            currentFuture = createCheckpoint(timestamp, CheckpointType.OFFLOAD);
                         }
                     } catch (Exception e)
                     {
@@ -460,6 +456,43 @@ public class RetinaResourceManager
                     }
                 }
             }
+
+            if (currentFuture != null)
+            {
+                try
+                {
+                    currentFuture.join();
+                } catch (Exception e)
+                {
+                    // Checkpoint creation failed
+                    synchronized (refCount)
+                    {
+                        refCount.decrementAndGet();
+                    }
+                    throw new RetinaException("Failed to create checkpoint", e);
+                }
+            }
+            else
+            {
+                // Wait for the thread that's currently creating the checkpoint
+                while (!offloadedCheckpoints.containsKey(timestamp) && checkpointRefCounts.containsKey(timestamp))
+                {
+                    try
+                    {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e)
+                    {
+                        Thread.currentThread().interrupt();
+                        throw new RetinaException("Interrupted while waiting for offload", e);
+                    }
+                }
+                if (!offloadedCheckpoints.containsKey(timestamp))
+                {
+                    // Maybe the other thread failed or it was unregistered immediately
+                    continue;
+                }
+            }
+
             logger.info("Registered offload for Timestamp: {}", timestamp);
             return;
         }
@@ -497,14 +530,18 @@ public class RetinaResourceManager
         String filePath = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
 
         // 1. Snapshot: capture bitmaps in memory synchronously to ensure consistency
-        Map<String, long[]> snapshot = new HashMap<>();
+        long startSnapshot = System.currentTimeMillis();
+        Map<String, long[]> snapshot = new HashMap<>(this.rgVisibilityMap.size());
         for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
         {
             snapshot.put(entry.getKey(), entry.getValue().getVisibilityBitmap(timestamp));
         }
+        long endSnapshot = System.currentTimeMillis();
+        logger.info("Snapshot for {} checkpoint took {} ms, size: {}", type, (endSnapshot - startSnapshot), snapshot.size());
 
         // 2. Async Write: perform IO in background thread
         return CompletableFuture.runAsync(() -> {
+            long startWrite = System.currentTimeMillis();
             try
             {
                 Storage storage = StorageFactory.Instance().getStorage(filePath);
@@ -528,6 +565,8 @@ public class RetinaResourceManager
                     }
                     out.flush();
                 }
+                long endWrite = System.currentTimeMillis();
+                logger.info("Writing {} checkpoint file to {} took {} ms", type, filePath, (endWrite - startWrite));
 
                 if (type == CheckpointType.OFFLOAD)
                 {
@@ -565,10 +604,18 @@ public class RetinaResourceManager
         }
 
         // Use a lock to ensure only one thread parses the file for this timestamp
-        Map<String, long[]> cache = offloadCache.computeIfAbsent(timestamp, k -> new ConcurrentHashMap<>());
-        
+        // For 50,000 RGs, the initial capacity of ConcurrentHashMap should be sufficient
+        Map<String, long[]> cache = offloadCache.computeIfAbsent(timestamp, k -> new ConcurrentHashMap<>(50000));
+
+        long lockWaitStart = System.currentTimeMillis();
         synchronized (cache)
         {
+            long lockAcquiredTime = System.currentTimeMillis();
+            if (lockAcquiredTime - lockWaitStart > 0)
+            {
+                System.out.println("Wait for checkpoint lock took " + (lockAcquiredTime - lockWaitStart) + " ms");
+            }
+
             // Double check if target already in cache after acquiring lock
             long[] cached = cache.get(targetFileId + "_" + targetRgId);
             if (cached != null)
@@ -577,19 +624,45 @@ public class RetinaResourceManager
             }
 
             // Still not in cache, perform full load
+            long startTime = System.currentTimeMillis();
             try
             {
+                long s1 = System.currentTimeMillis();
                 Storage storage = StorageFactory.Instance().getStorage(path);
-                if (!storage.exists(path))
-                {
-                    throw new RetinaException("Checkpoint file missing: " + path);
-                }
+                long fileLength = storage.getStatus(path).getLength();
+                long s2 = System.currentTimeMillis();
+                System.out.println("Storage get and length check took " + (s2 - s1) + " ms, file size: " + (fileLength / 1024) + " KB");
 
-                try (DataInputStream in = storage.open(path))
+                // Use PhysicalReader to read the entire file into memory at once
+                // This is much faster than streaming from S3 for many small reads
+                byte[] content;
+                try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path))
+                {
+                    ByteBuffer buffer = reader.readFully((int) fileLength);
+                    if (buffer.hasArray())
+                    {
+                        content = buffer.array();
+                    }
+                    else
+                    {
+                        content = new byte[(int) fileLength];
+                        buffer.get(content);
+                    }
+                }
+                long s3 = System.currentTimeMillis();
+                System.out.println("PhysicalReader readFully took " + (s3 - s2) + " ms");
+
+                try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(content)))
                 {
                     int rgCount = in.readInt();
+                    System.out.println("Loading checkpoint from memory buffer, RG count: " + rgCount);
+                    
+                    long totalReadNanos = 0;
+                    long totalPutNanos = 0;
+
                     for (int i = 0; i < rgCount; i++)
                     {
+                        long t1 = System.nanoTime();
                         long fileId = in.readLong();
                         int rgId = in.readInt();
                         int len = in.readInt();
@@ -598,9 +671,25 @@ public class RetinaResourceManager
                         {
                             bitmap[j] = in.readLong();
                         }
+                        long t2 = System.nanoTime();
+                        
                         cache.put(fileId + "_" + rgId, bitmap);
+                        long t3 = System.nanoTime();
+
+                        totalReadNanos += (t2 - t1);
+                        totalPutNanos += (t3 - t2);
+
+                        if ((i + 1) % 10000 == 0)
+                        {
+                            System.out.println("Processed " + (i + 1) + "/" + rgCount + " RGs... (cumulative memory parse: " + (totalReadNanos / 1_000_000) + " ms, put: " + (totalPutNanos / 1_000_000) + " ms)");
+                            System.out.flush();
+                        }
                     }
+                    long s4 = System.currentTimeMillis();
+                    System.out.println("Core loop finished. Total memory parse: " + (totalReadNanos / 1_000_000) + " ms, Total cache put: " + (totalPutNanos / 1_000_000) + " ms. Loop wall time: " + (s4 - s3) + " ms");
                 }
+                long endTime = System.currentTimeMillis();
+                System.out.println("Loaded " + cache.size() + " RGs from checkpoint " + path + " in total " + (endTime - startTime) + " ms (wall time)");
             } catch (IOException e)
             {
                 throw new RetinaException("Failed to read checkpoint file", e);
