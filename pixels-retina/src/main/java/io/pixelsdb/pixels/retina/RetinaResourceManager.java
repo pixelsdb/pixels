@@ -30,8 +30,6 @@ import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.transaction.TransContext;
-import io.pixelsdb.pixels.common.transaction.TransContextCache;
 import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -132,17 +130,19 @@ public class RetinaResourceManager
         this.checkpointDir = config.getProperty("pixels.retina.checkpoint.dir");
         this.recoveryCache = new ConcurrentHashMap<>();
 
-        this.checkpointExecutor = Executors.newFixedThreadPool(4, r -> {
+        String cpThreadsStr = config.getProperty("retina.checkpoint.threads");
+        int cpThreads = (cpThreadsStr != null) ? Integer.parseInt(cpThreadsStr) : 4;
+        this.checkpointExecutor = Executors.newFixedThreadPool(cpThreads, r -> {
             Thread t = new Thread(r, "retina-checkpoint-thread");
             t.setDaemon(true);
             return t;
         });
 
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
-                    Thread t = new Thread(r, "retina-gc-thread");
-                    t.setDaemon(true);
-                    return t;
-                });
+            Thread t = new Thread(r, "retina-gc-thread");
+            t.setDaemon(true);
+            return t;
+        });
         try
         {
             long interval = Long.parseLong(config.getProperty("retina.gc.interval"));
@@ -155,19 +155,9 @@ public class RetinaResourceManager
                         TimeUnit.SECONDS
                 );
             }
-
-            // Start offload monitor
-            String offloadIntervalStr = config.getProperty("retina.offload.monitor.interval");
-            long offloadInterval = (offloadIntervalStr != null) ? Long.parseLong(offloadIntervalStr) : 5;
-            executor.scheduleAtFixedRate(
-                    this::monitorAndOffloadTransactions,
-                    offloadInterval,
-                    offloadInterval,
-                    TimeUnit.SECONDS
-            );
         } catch (Exception e)
         {
-            logger.error("Failed to start retina background gc or monitor", e);
+            logger.error("Failed to start retina background gc", e);
         }
         this.gcExecutor = executor;
         totalVirtualNodeNum = Integer.parseInt(ConfigFactory.Instance().getProperty("node.virtual.num"));
@@ -193,55 +183,6 @@ public class RetinaResourceManager
     public static RetinaResourceManager Instance()
     {
         return InstanceHolder.instance;
-    }
-
-    private void monitorAndOffloadTransactions()
-    {
-        try
-        {
-            String thresholdStr = ConfigFactory.Instance().getProperty("retina.offload.threshold");
-            long thresholdMs = (thresholdStr != null) ? Long.parseLong(thresholdStr) : 60000;
-            long currentTime = System.currentTimeMillis();
-            
-            Map<Long, TransContext> activeTransactions = getActiveTransactions();
-            for (TransContext context : activeTransactions.values())
-            {
-                if (context.isReadOnly() && !context.isOffloaded())
-                {
-                    if (currentTime - context.getStartTime() > thresholdMs)
-                    {
-                        try
-                        {
-                            logger.info("Transaction {} exceeds threshold, offloading...", context.getTransId());
-                            registerOffload(context.getTimestamp());
-                            TransService.Instance().markTransOffloaded(context.getTransId());
-                            context.setOffloaded(true);
-                        } catch (Exception e)
-                        {
-                            logger.error("Failed to offload transaction {}", context.getTransId(), e);
-                        }
-                    }
-                }
-            }
-        } catch (Exception e)
-        {
-            logger.error("Error in offload monitor", e);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<Long, TransContext> getActiveTransactions()
-    {
-        try
-        {
-            java.lang.reflect.Field field = TransContextCache.class.getDeclaredField("transIdToContext");
-            field.setAccessible(true);
-            return (Map<Long, TransContext>) field.get(TransContextCache.Instance());
-        } catch (Exception e)
-        {
-            logger.error("Failed to get active transactions via reflection", e);
-            return Collections.emptyMap();
-        }
     }
 
     public void recoverCheckpoints()
@@ -432,8 +373,8 @@ public class RetinaResourceManager
                 return bitmap;
             }
         }
-        // Cache miss, load from disk
-        return loadBitmapFromDisk(timestamp, fileId, rgId);
+        // Cache miss, load from storage
+        return loadBitmapFromStorage(timestamp, fileId, rgId);
     }
 
     public long[] queryVisibility(long fileId, int rgId, long timestamp) throws RetinaException
@@ -635,7 +576,7 @@ public class RetinaResourceManager
         }, checkpointExecutor);
     }
 
-    private long[] loadBitmapFromDisk(long timestamp, long targetFileId, int targetRgId) throws RetinaException
+    private long[] loadBitmapFromStorage(long timestamp, long targetFileId, int targetRgId) throws RetinaException
     {
         String path = offloadedCheckpoints.get(timestamp);
         if (path == null)
