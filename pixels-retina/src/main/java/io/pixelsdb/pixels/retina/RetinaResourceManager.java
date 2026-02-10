@@ -198,11 +198,14 @@ public class RetinaResourceManager
             allFiles = allFiles.stream().filter(p -> p.endsWith(".bin")).collect(Collectors.toList());
 
             List<Long> gcTimestamps = new ArrayList<>();
+            String offloadPrefix = "vis_offload_" + retinaHostName + "_";
+            String gcPrefix = "vis_gc_" + retinaHostName + "_";
+
             for (String path : allFiles)
             {
                 // use Paths.get().getFileName() to extract filename from path string
                 String filename = Paths.get(path).getFileName().toString();
-                if (filename.startsWith("vis_offload_"))
+                if (filename.startsWith(offloadPrefix))
                 {
                     // delete offload checkpoint files when restarting
                     try
@@ -212,11 +215,11 @@ public class RetinaResourceManager
                     {
                         logger.error("Failed to delete checkpoint file {}", path, e);
                     }
-                } else if (filename.startsWith("vis_gc_"))
+                } else if (filename.startsWith(gcPrefix))
                 {
                     try
                     {
-                        gcTimestamps.add(Long.parseLong(filename.replace("vis_gc_", "").replace(".bin", "")));
+                        gcTimestamps.add(Long.parseLong(filename.replace(gcPrefix, "").replace(".bin", "")));
                     } catch (Exception e)
                     {
                         logger.error("Failed to parse checkpoint timestamp from file {}", path, e);
@@ -250,7 +253,7 @@ public class RetinaResourceManager
 
     private void loadCheckpointToCache(long timestamp)
     {
-        String fileName = "vis_gc_" + timestamp + ".bin";
+        String fileName = "vis_gc_" + retinaHostName + "_" + timestamp + ".bin";
         // construct path. Storage expects '/' separator usually, but let's be safe
         String path = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
 
@@ -490,7 +493,7 @@ public class RetinaResourceManager
     private CompletableFuture<Void> createCheckpoint(long timestamp, CheckpointType type) throws RetinaException
     {
         String prefix = (type == CheckpointType.GC) ? "vis_gc_" : "vis_offload_";
-        String fileName = prefix + timestamp + ".bin";
+        String fileName = prefix + retinaHostName + "_" + timestamp + ".bin";
         String filePath = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
 
         // 1. Capture current entries to ensure we process a consistent set of RGs
@@ -657,7 +660,7 @@ public class RetinaResourceManager
     private void removeCheckpointFile(long timestamp, CheckpointType type)
     {
         String prefix = (type == CheckpointType.GC) ? "vis_gc_" : "vis_offload_";
-        String fileName = prefix + timestamp + ".bin";
+        String fileName = prefix + retinaHostName + "_" + timestamp + ".bin";
         String path = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
 
         try
