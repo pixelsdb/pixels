@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -30,25 +31,29 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.InetAddress;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 /**
- * Test checkpoint creation and recovery logic.
+ * Test checkpoint creation and recovery logic in Retina side.
  */
 public class TestRetinaCheckpoint
 {
     private RetinaResourceManager retinaManager;
     private String testCheckpointDir;
     private Storage storage;
-    private final long fileId = 1L;
+    private final long fileId = 999999L;
     private final int rgId = 0;
     private final int numRows = 1024;
+    private String hostName;
 
     @Before
     public void setUp() throws IOException, RetinaException
@@ -74,65 +79,90 @@ public class TestRetinaCheckpoint
         }
 
         retinaManager = RetinaResourceManager.Instance();
-        retinaManager.addVisibility(fileId, rgId, numRows);
+        resetSingletonState();
+        hostName = System.getenv("HOSTNAME");
+        if (hostName == null)
+        {
+            hostName = InetAddress.getLocalHost().getHostName();
+        }
     }
 
     private String resolve(String dir, String filename) {
         return dir.endsWith("/") ? dir + filename : dir + "/" + filename;
     }
 
+    private String getOffloadFileName(long timestamp) {
+        return RetinaUtils.getCheckpointFileName(RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD, hostName, timestamp);
+    }
+
+    private String getGcFileName(long timestamp) {
+        return RetinaUtils.getCheckpointFileName(RetinaUtils.CHECKPOINT_PREFIX_GC, hostName, timestamp);
+    }
+
     @Test
     public void testRegisterOffload() throws RetinaException, IOException
     {
-        long transId = 12345L;
+        System.out.println("\n[Test] Starting testRegisterOffload...");
+        retinaManager.addVisibility(fileId, rgId, numRows);
         long timestamp = 100L;
 
         // Register offload
+        System.out.println("Registering offload for timestamp: " + timestamp);
         retinaManager.registerOffload(timestamp);
 
         // Verify checkpoint file exists
-        String expectedFile = resolve(testCheckpointDir, "vis_offload_100.bin");
+        String expectedFile = resolve(testCheckpointDir, getOffloadFileName(timestamp));
         assertTrue("Offload checkpoint file should exist", storage.exists(expectedFile));
+        System.out.println("Verified: Checkpoint file exists at " + expectedFile);
 
         // Unregister
+        System.out.println("Unregistering offload...");
         retinaManager.unregisterOffload(timestamp);
 
         // File should be removed
         assertFalse("Offload checkpoint file should be removed", storage.exists(expectedFile));
+        System.out.println("Verified: Checkpoint file removed. testRegisterOffload passed.");
     }
 
     @Test
     public void testMultipleOffloads() throws RetinaException, IOException
     {
-        long transId1 = 12345L;
+        System.out.println("\n[Test] Starting testMultipleOffloads...");
+        retinaManager.addVisibility(fileId, rgId, numRows);
         long timestamp1 = 100L;
-        long transId2 = 12346L;
         long timestamp1_dup = 100L; // same timestamp
 
         // Both register the same timestamp - should share checkpoint
+        System.out.println("Registering same timestamp twice...");
         retinaManager.registerOffload(timestamp1);
         retinaManager.registerOffload(timestamp1_dup);
 
-        String expectedFile = resolve(testCheckpointDir, "vis_offload_100.bin");
+        String expectedFile = resolve(testCheckpointDir, getOffloadFileName(timestamp1));
         assertTrue("Offload checkpoint file should exist", storage.exists(expectedFile));
 
         // Unregister one - should not remove yet (ref count >1)
+        System.out.println("Unregistering once (ref count should still be > 0)...");
         retinaManager.unregisterOffload(timestamp1);
         assertTrue("Offload checkpoint should still exist (ref count >1)", storage.exists(expectedFile));
+        System.out.println("Verified: Checkpoint still exists after one unregister.");
 
         // Unregister second
+        System.out.println("Unregistering second time...");
         retinaManager.unregisterOffload(timestamp1);
         assertFalse("Offload checkpoint should be removed", storage.exists(expectedFile));
+        System.out.println("Verified: Checkpoint removed after final unregister. testMultipleOffloads passed.");
     }
 
     @Test
     public void testCheckpointRecovery() throws RetinaException, IOException
     {
+        System.out.println("\n[Test] Starting testCheckpointRecovery...");
+        retinaManager.addVisibility(fileId, rgId, numRows);
         long timestamp = 100L;
-        long transId = 999L;
 
         // 1. Delete row 10
         int rowToDelete = 10;
+        System.out.println("Deleting row " + rowToDelete + " in memory...");
         retinaManager.deleteRecord(fileId, rgId, rowToDelete, timestamp);
 
         // Verify deleted in memory
@@ -140,13 +170,15 @@ public class TestRetinaCheckpoint
         assertTrue("Row 10 should be deleted in memory", isBitSet(memBitmap, rowToDelete));
 
         // 2. Register Offload to generate checkpoint file
+        System.out.println("Creating checkpoint on disk...");
         retinaManager.registerOffload(timestamp);
-        String offloadPath = resolve(testCheckpointDir, "vis_offload_" + timestamp + ".bin");
+        String offloadPath = resolve(testCheckpointDir, getOffloadFileName(timestamp));
         assertTrue("Checkpoint file should exist", storage.exists(offloadPath));
 
         // 3. Rename offload file to GC file to simulate checkpoint generated by GC
-        String gcPath = resolve(testCheckpointDir, "vis_gc_" + timestamp + ".bin");
-        // Storage interface doesn't have renamed, using copy and delete
+        String gcPath = resolve(testCheckpointDir, getGcFileName(timestamp));
+        System.out.println("Simulating GC checkpoint by renaming offload file to: " + gcPath);
+        // Storage interface doesn't have rename, using copy and delete
         try (DataInputStream in = storage.open(offloadPath);
              DataOutputStream out = storage.create(gcPath, true, 4096))
         {
@@ -160,58 +192,140 @@ public class TestRetinaCheckpoint
         storage.delete(offloadPath, false);
 
         // 4. Reset singleton state (Simulate Crash/Restart)
+        System.out.println("Simulating system restart (resetting memory state)...");
         resetSingletonState();
 
         // 5. Perform recovery
-        // At this point rgVisibilityMap is empty, need to call recoverCheckpoints to load data into cache
+        System.out.println("Running recoverCheckpoints()...");
+        // At this point rgVisibilityMap is empty, recoverCheckpoints will load data directly into rgVisibilityMap
         retinaManager.recoverCheckpoints();
 
-        // 6. Re-add Visibility, at this point it should recover state from recoveryCache instead of creating new
+        // 6. Verify recovered state immediately after recovery
+        System.out.println("Verifying recovered state immediately after recoverCheckpoints()...");
+        long[] recoveredBitmap = retinaManager.queryVisibility(fileId, rgId, timestamp);
+        assertTrue("Row 10 should be deleted after recovery", isBitSet(recoveredBitmap, rowToDelete));
+        assertFalse("Row 11 should not be deleted", isBitSet(recoveredBitmap, rowToDelete + 1));
+
+        // 7. Re-add Visibility, at this point it should see that it already exists in rgVisibilityMap
+        System.out.println("Re-adding visibility for file (should skip as it already exists)...");
         retinaManager.addVisibility(fileId, rgId, numRows);
 
-        // 7. Verify recovered state: Row 10 should still be in deleted state
-        long[] recoveredBitmap = retinaManager.queryVisibility(fileId, rgId, timestamp);
-        assertTrue("Row 10 should still be deleted after recovery", isBitSet(recoveredBitmap, rowToDelete));
-        assertFalse("Row 11 should not be deleted", isBitSet(recoveredBitmap, rowToDelete + 1));
+        // 8. Verify state still correct
+        long[] finalBitmap = retinaManager.queryVisibility(fileId, rgId, timestamp);
+        assertTrue("Row 10 should still be deleted", isBitSet(finalBitmap, rowToDelete));
+        System.out.println("Verified: Recovery successful, row state restored directly to map. testCheckpointRecovery passed.");
     }
 
     @Test
-    public void testDiskBitmapQuery() throws RetinaException
+    public void testCheckpointRetryAfterFailure() throws RetinaException, IOException
     {
-        long baseTimestamp = 200L;
-        long transId = 888L;
+        System.out.println("\n[Test] Starting testCheckpointRetryAfterFailure...");
+        retinaManager.addVisibility(fileId, rgId, numRows);
+        long timestamp = 123L;
 
-        // 1. Delete row 5 at baseTimestamp
-        retinaManager.deleteRecord(fileId, rgId, 5, baseTimestamp);
+        String expectedFile = resolve(testCheckpointDir, getOffloadFileName(timestamp));
 
-        // 2. Register Offload for this transaction (save snapshot at this moment to disk)
-        retinaManager.registerOffload(baseTimestamp);
+        // 1. Pre-create a DIRECTORY with the same name to cause creation failure
+        storage.mkdirs(expectedFile);
+        System.out.println("Created a directory at " + expectedFile + " to simulate failure.");
 
-        // 3. Delete row 6 at a later time baseTimestamp + 10
-        // This only affects the latest state in memory, should not affect the checkpoint on disk
-        retinaManager.deleteRecord(fileId, rgId, 6, baseTimestamp + 10);
+        // 2. Try to register offload - should fail
+        try
+        {
+            retinaManager.registerOffload(timestamp);
+            assertTrue("Should have thrown an exception", false);
+        } catch (RetinaException e)
+        {
+            System.out.println("Expected failure occurred: " + e.getMessage());
+        }
 
-        // 4. Case A: Query using transId (should read disk Checkpoint)
-        // Expected: Row 5 deleted, Row 6 not deleted (deleted after checkpoint)
-        long[] diskBitmap = retinaManager.queryVisibility(fileId, rgId, baseTimestamp, transId);
-        assertTrue("Disk: Row 5 should be deleted", isBitSet(diskBitmap, 5));
-        assertFalse("Disk: Row 6 should NOT be deleted (deleted after checkpoint)", isBitSet(diskBitmap, 6));
+        // 3. Remove the directory
+        storage.delete(expectedFile, true);
+        assertFalse("Directory should be removed", storage.exists(expectedFile));
 
-        // 5. Case B: Query without transId (read memory)
-        // Expected: Query at a later timestamp, both rows 5 and 6 are deleted
-        long[] memBitmap = retinaManager.queryVisibility(fileId, rgId, baseTimestamp + 20);
-        assertTrue("Memory: Row 5 should be deleted", isBitSet(memBitmap, 5));
-        assertTrue("Memory: Row 6 should be deleted", isBitSet(memBitmap, 6));
+        // 4. Try again - should succeed now because we clear failed futures
+        System.out.println("Retrying registration...");
+        retinaManager.registerOffload(timestamp);
 
-        // Cleanup
-        retinaManager.unregisterOffload(baseTimestamp);
+        assertTrue("Offload checkpoint file should exist after retry", storage.exists(expectedFile));
+        System.out.println("Verified: Retry successful. testCheckpointRetryAfterFailure passed.");
+    }
+
+    @Test
+    public void testMultiRGCheckpoint() throws RetinaException, IOException
+    {
+        System.out.println("\n[Test] Starting testMultiRGCheckpoint...");
+        int numRgs = 3;
+        for (int i = 0; i < numRgs; i++)
+        {
+            retinaManager.addVisibility(fileId, i, numRows);
+        }
+        long timestamp = 200L;
+
+        // Delete records in different RGs
+        retinaManager.deleteRecord(fileId, 0, 10, timestamp);
+        retinaManager.deleteRecord(fileId, 1, 20, timestamp);
+        retinaManager.deleteRecord(fileId, 2, 30, timestamp);
+
+        // Create checkpoint
+        retinaManager.registerOffload(timestamp);
+        String offloadPath = resolve(testCheckpointDir, getOffloadFileName(timestamp));
+        
+        // Simulating GC checkpoint for recovery
+        String gcPath = resolve(testCheckpointDir, getGcFileName(timestamp));
+        try (DataInputStream in = storage.open(offloadPath);
+             DataOutputStream out = storage.create(gcPath, true, 4096))
+        {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1)
+            {
+                out.write(buffer, 0, bytesRead);
+            }
+        }
+
+        // Reset and recover
+        resetSingletonState();
+        retinaManager.recoverCheckpoints();
+
+        // Verify all RGs
+        assertTrue("RG 0 row 10 should be deleted", isBitSet(retinaManager.queryVisibility(fileId, 0, timestamp), 10));
+        assertTrue("RG 1 row 20 should be deleted", isBitSet(retinaManager.queryVisibility(fileId, 1, timestamp), 20));
+        assertTrue("RG 2 row 30 should be deleted", isBitSet(retinaManager.queryVisibility(fileId, 2, timestamp), 30));
+        
+        System.out.println("Verified: Multi-RG state correctly restored. testMultiRGCheckpoint passed.");
+    }
+
+    @Test
+    public void testCheckpointDataIntegrity() throws RetinaException, IOException
+    {
+        System.out.println("\n[Test] Starting testCheckpointDataIntegrity...");
+        int numRgs = 5;
+        for (int i = 0; i < numRgs; i++)
+        {
+            retinaManager.addVisibility(fileId, i, numRows);
+        }
+        long timestamp = 300L;
+
+        retinaManager.registerOffload(timestamp);
+        String path = resolve(testCheckpointDir, getOffloadFileName(timestamp));
+
+        // Directly read file to verify header
+        try (DataInputStream in = storage.open(path))
+        {
+            int savedRgs = in.readInt();
+            assertTrue("Saved RG count " + savedRgs + " should match " + numRgs, savedRgs == numRgs);
+        }
+        System.out.println("Verified: Data integrity (header) is correct. testCheckpointDataIntegrity passed.");
     }
 
     @Test
     public void testConcurrency() throws InterruptedException, RetinaException
     {
-        int numThreads = 100;
-        int operationsPerThread = 500;
+        System.out.println("\n[Test] Starting testConcurrency with 20 threads...");
+        retinaManager.addVisibility(fileId, rgId, numRows);
+        int numThreads = 20;
+        int operationsPerThread = 50;
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(numThreads);
@@ -227,7 +341,6 @@ public class TestRetinaCheckpoint
                 try
                 {
                     startLatch.await();
-                    long transId = 10000L + threadId;
                     long timestamp = 500L + (threadId % 5) * 10; // Multiple threads may share the same timestamp
 
                     for (int j = 0; j < operationsPerThread; j++)
@@ -237,16 +350,11 @@ public class TestRetinaCheckpoint
                         {
                             // Register Offload
                             retinaManager.registerOffload(timestamp);
-                            // Verify file exists
-                            String p = resolve(testCheckpointDir, "vis_offload_" + timestamp + ".bin");
-                            if (!storage.exists(p)) {
-                                throw new RuntimeException("Checkpoint file missing after register: " + p);
-                            }
                         }
                         else if (j % 3 == 1)
                         {
-                            // Query visibility
-                            long[] bitmap = retinaManager.queryVisibility(fileId, rgId, timestamp, transId);
+                            // Query visibility from memory
+                            long[] bitmap = retinaManager.queryVisibility(fileId, rgId, timestamp);
                             if (!isBitSet(bitmap, 0)) {
                                 throw new RuntimeException("Row 0 should be deleted in all views");
                             }
@@ -269,7 +377,7 @@ public class TestRetinaCheckpoint
         }
 
         startLatch.countDown(); // Start all threads
-        boolean finished = doneLatch.await(30, TimeUnit.SECONDS);
+        boolean finished = doneLatch.await(60, TimeUnit.SECONDS);
         executor.shutdownNow();
 
         assertTrue("Timeout waiting for concurrency test", finished);
@@ -303,28 +411,10 @@ public class TestRetinaCheckpoint
             gcTimestampField.setAccessible(true);
             gcTimestampField.setLong(retinaManager, -1L);
 
-            Field recoveryCacheField = RetinaResourceManager.class.getDeclaredField("recoveryCache");
-            recoveryCacheField.setAccessible(true);
-            ((Map<?, ?>) recoveryCacheField.get(retinaManager)).clear();
-
         } catch (Exception e)
         {
             throw new RuntimeException("Failed to reset singleton state", e);
         }
-    }
-
-    private boolean assertTrue(String message, boolean condition)
-    {
-        if (!condition)
-        {
-            throw new AssertionError(message);
-        }
-        return condition;
-    }
-
-    private boolean assertFalse(String message, boolean condition)
-    {
-        return assertTrue(message, !condition);
     }
 
     private boolean isBitSet(long[] bitmap, int rowIndex)

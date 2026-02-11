@@ -148,6 +148,7 @@
         <dep.junit.platform.version>1.8.2</dep.junit.platform.version>
         <dep.mockito.version>4.5.1</dep.mockito.version>
         <dep.junit.jupiter.version>5.8.2</dep.junit.jupiter.version>
+        <dep.junit.vintage.version>5.8.2</dep.junit.vintage.version>
     </properties>
 
     <repositories>
@@ -925,6 +926,12 @@
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-engine</artifactId>
                 <version>${dep.junit.jupiter.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.vintage</groupId>
+                <artifactId>junit-vintage-engine</artifactId>
+                <version>${dep.junit.vintage.version}</version>
                 <scope>test</scope>
             </dependency>
 
