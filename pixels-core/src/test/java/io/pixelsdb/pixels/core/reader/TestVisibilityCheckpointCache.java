@@ -91,7 +91,7 @@ public class TestVisibilityCheckpointCache
     public void testCacheLoading() throws IOException
     {
         long timestamp = 1000L;
-        String checkpointPath = resolve(testCheckpointDir, "test_vis_1000.bin");
+        String checkpointPath = resolve(testCheckpointDir, "vis_gc_tencent_100.bin");
         long[] dummyBitmap = new long[]{0x1L, 0x2L};
         createDummyCheckpoint(checkpointPath, 1, 1, dummyBitmap);
 
