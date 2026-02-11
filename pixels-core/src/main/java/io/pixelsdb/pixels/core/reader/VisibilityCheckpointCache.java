@@ -50,9 +50,7 @@ public class VisibilityCheckpointCache
 
     private VisibilityCheckpointCache()
     {
-        ConfigFactory config = ConfigFactory.Instance();
-        String leaseProperty = config.getProperty("retina.offload.cache.lease.duration");
-        long leaseDuration = leaseProperty != null ? Long.parseLong(leaseProperty) : 3600;
+        long leaseDuration = Long.parseLong(ConfigFactory.Instance().getProperty("retina.offload.cache.lease.duration"));
         
         this.cache = Caffeine.newBuilder()
                 .expireAfterAccess(leaseDuration, TimeUnit.SECONDS)

@@ -154,7 +154,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
                 }
             }
-            this.retinaResourceManager.finishRecovery();
             logger.info("Retina service is ready");
         } catch (Exception e)
         {
