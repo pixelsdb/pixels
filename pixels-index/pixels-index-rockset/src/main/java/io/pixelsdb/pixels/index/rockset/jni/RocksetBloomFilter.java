@@ -2,8 +2,14 @@ package io.pixelsdb.pixels.index.rockset.jni;
 
 import java.util.Objects;
 
+/**
+ * This file is modified from RocksDB's own JNI bindings.
+ * @author Rolland1944
+ * @create 2025-12-22
+ */
+
 public class RocksetBloomFilter extends Filter
-{
+{ 
     private static final double DEFAULT_BITS_PER_KEY = (double)10.0F;
     private final double bitsPerKey;
 
