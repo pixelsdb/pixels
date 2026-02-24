@@ -525,8 +525,12 @@ public class RetinaResourceManager
 
     public void reclaimVisibility(long fileId, int rgId, long timestamp) throws RetinaException
     {
-        RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
-        rgVisibility.getVisibilityBitmap(timestamp);
+        String retinaKey = fileId + "_" + rgId;
+        RGVisibility rgVisibility = this.rgVisibilityMap.remove(retinaKey);
+        if (rgVisibility != null)
+        {
+            rgVisibility.close();
+        }
     }
 
     public void deleteRecord(long fileId, int rgId, int rgRowOffset, long timestamp) throws RetinaException
