@@ -75,7 +75,7 @@ public class RocksetFactory
                 .setPersistentCacheSizeGB(persistentCacheSizeGB).setReadOnly(readOnly);
         return RocksetEnv.create(dbOptions.getBucketName(),dbOptions.getS3Prefix());
     }
-    static RocksetDB createRocksetDB(String rocksetPath) throws RocksetException
+    static RocksetDB createRocksetDB(String rocksetPath) throws Exception
     {
         // 1. Get existing column families (returns empty list for new database)
         List<byte[]> existingColumnFamilies;
@@ -230,7 +230,7 @@ public class RocksetFactory
         return new RocksetColumnFamilyDescriptor(name, cfOptions);
     }
 
-    public static synchronized RocksetColumnFamilyHandle getOrCreateColumnFamily(long tableId, long indexId, int vNodeId) throws RocksetException {
+    public static synchronized RocksetColumnFamilyHandle getOrCreateColumnFamily(long tableId, long indexId, int vNodeId) throws Exception {
         String cfName = getCFName(tableId, indexId, vNodeId);
 
         // Return cached handle if exists
@@ -268,7 +268,7 @@ public class RocksetFactory
         }
     }
 
-    private static long[] parseTableAndIndexId(byte[] cfNameBytes) throws RocksetException
+    private static long[] parseTableAndIndexId(byte[] cfNameBytes) throws Exception
     {
         if (cfNameBytes == null || Arrays.equals(cfNameBytes, RocksetDB.DEFAULT_COLUMN_FAMILY))
         {
@@ -299,13 +299,13 @@ public class RocksetFactory
                 }
                 else
                 {
-                    throw new RocksetException("Failed to parse CF name (invalid segments): " + name);
+                    throw new Exception("Failed to parse CF name (invalid segments): " + name);
                 }
             }
         }
-        catch (RocksetException e)
+        catch (Exception e)
         {
-            throw new RocksetException("Failed to parse CF name: " + name);
+            throw new Exception("Failed to parse CF name: " + name, e);
         }
 
         return null;
@@ -366,7 +366,7 @@ public class RocksetFactory
         return -1;
     }
 
-    public static synchronized RocksetDB getRocksetDB() throws RocksetException {
+    public static synchronized RocksetDB getRocksetDB() throws Exception {
         if (rocksetDB == null || rocksetDB.isClosed()) {
             rocksetDB = createRocksetDB(dbPath);
         }

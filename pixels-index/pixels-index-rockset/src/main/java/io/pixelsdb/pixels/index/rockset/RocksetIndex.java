@@ -83,7 +83,7 @@ public class RocksetIndex extends CachingSinglePointIndex
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean removed = new AtomicBoolean(false);
 
-    public RocksetIndex(long tableId, long indexId, boolean unique, IndexOption indexOption) throws RocksetException {
+    public RocksetIndex(long tableId, long indexId, boolean unique, IndexOption indexOption) throws Exception {
         this.tableId = tableId;
         this.indexId = indexId;
         this.rocksDBPath = RocksetFactory.getDbPath();

@@ -33,11 +33,11 @@ JNIEXPORT jobject JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_li
 
 /*
  * Class:     io_pixelsdb_pixels_index_rockset_jni_RocksetDB
- * Method:    createColumnFamily0
- * Signature: (J[B)J
+ * Method:    createColumnFamily
+ * Signature: (J[BIJ)J
  */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily0
-  (JNIEnv *, jobject, jlong, jbyteArray);
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily
+  (JNIEnv *, jclass, jlong, jbyteArray, jint, jlong);
 
 /*
  * Class:     io_pixelsdb_pixels_index_rockset_jni_RocksetDB
@@ -70,6 +70,14 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_write
  */
 JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_iterator
   (JNIEnv *, jclass, jlong, jlong, jlong);
+
+/*
+ * Class:     io_pixelsdb_pixels_index_rockset_jni_RocksetDB
+ * Method:    getLongProperty
+ * Signature: (JJLjava/lang/String;I)J
+ */
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_getLongProperty
+  (JNIEnv *, jclass, jlong, jlong, jstring, jint);
 
 #ifdef __cplusplus
 }
