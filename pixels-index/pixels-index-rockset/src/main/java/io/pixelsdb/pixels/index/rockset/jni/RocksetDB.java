@@ -149,26 +149,55 @@ public final class RocksetDB
         return this.nativeHandle == 0;
     }
 
-    public RocksetColumnFamilyHandle createColumnFamily(byte[] name) 
+    public RocksetColumnFamilyHandle createColumnFamily(
+      final RocksetColumnFamilyDescriptor columnFamilyDescriptor)
+      throws RocksetException 
     {
-        try 
-        {
-            long handle = createColumnFamily0(this.nativeHandle, name);
-            return new RocksetColumnFamilyHandle(handle);
-        } 
-        catch (Exception e) 
-        {
-            throw new RuntimeException(e);
-        }
+        final RocksetColumnFamilyHandle columnFamilyHandle = new RocksetColumnFamilyHandle(this,
+            createColumnFamily(nativeHandle, columnFamilyDescriptor.getName(),
+                columnFamilyDescriptor.getName().length,
+                columnFamilyDescriptor.getOptions().handle()));
+        ownedColumnFamilyHandles.add(columnFamilyHandle);
+        return columnFamilyHandle;
+    }
+
+    // public RocksetColumnFamilyHandle createColumnFamily(byte[] name) 
+    // {
+    //     try 
+    //     {
+    //         long handle = createColumnFamily0(this.nativeHandle, name);
+    //         return new RocksetColumnFamilyHandle(handle);
+    //     } 
+    //     catch (Exception e) 
+    //     {
+    //         throw new RuntimeException(e);
+    //     }
+    // }
+
+    public long getLongProperty(final String property) throws RocksetException 
+    {
+        return getLongProperty(null, property);
+    }
+
+    public long getLongProperty(
+      /* @Nullable */ final RocksetColumnFamilyHandle columnFamilyHandle,
+      final String property) throws RocksetException 
+    {
+        return getLongProperty(nativeHandle,
+            columnFamilyHandle == null ? 0 : columnFamilyHandle.nativeHandle,
+            property, property.length());
     }
 
     private static native void closeDatabase(long var0);
     private static native long[] open(long env_handle, long options_handle, String db_path, byte[][] descriptors, long[] cf_handles);
     public static native List<byte[]> listColumnFamilies0(String dbPath);
-    private native long createColumnFamily0(long dbHandle, byte[] columnFamilyName) throws Exception;
+    private static native long createColumnFamily(final long handle, final byte[] columnFamilyName,
+      final int columnFamilyNamelen, final long columnFamilyOptions) throws RocksetException;
     private static native void putDirect(long var0, long var2, ByteBuffer var4, int var5, int var6, ByteBuffer var7, int var8, int var9, long var10) throws RuntimeException;
     private static native void put(long var0, long var2, byte[] var4, int var5, int var6, byte[] var7, int var8, int var9, long var10) throws RuntimeException;
     private static native void write0(long var0, long var2, long var4) throws RuntimeException;
     private static native long iterator(long var0, long var2, long var4);
+    private static native long getLongProperty(final long nativeHandle, final long cfHandle,
+    final String property, final int propertyLength) throws RocksetException;
 }
 

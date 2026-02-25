@@ -161,4 +161,44 @@ class JniUtil {
             new ROCKSDB_NAMESPACE::Status(status));
     }
   };
+
+class MemoryUsageTypeJni {
+    public:
+    // C++ ROCKSDB_NAMESPACE::MemoryUtil::UsageType enum
+    static jbyte toJavaMemoryUsageType(
+        const ROCKSDB_NAMESPACE::MemoryUtil::UsageType& usage_type) {
+        switch (usage_type) {
+        case ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kMemTableTotal:
+            return 0x0;
+        case ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kMemTableUnFlushed:
+            return 0x1;
+        case ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kTableReadersTotal:
+            return 0x2;
+        case ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kCacheTotal:
+            return 0x3;
+        default:
+            // undefined: use kNumUsageTypes
+            return 0x4;
+        }
+    }
+
+    // Returns the equivalent C++ ROCKSDB_NAMESPACE::MemoryUtil::UsageType enum
+    // for the provided Java org.rocksdb.MemoryUsageType
+    static ROCKSDB_NAMESPACE::MemoryUtil::UsageType toCppMemoryUsageType(
+        jbyte usage_type) {
+        switch (usage_type) {
+        case 0x0:
+            return ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kMemTableTotal;
+        case 0x1:
+            return ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kMemTableUnFlushed;
+        case 0x2:
+            return ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kTableReadersTotal;
+        case 0x3:
+            return ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kCacheTotal;
+        default:
+            // undefined/default: use kNumUsageTypes
+            return ROCKSDB_NAMESPACE::MemoryUtil::UsageType::kNumUsageTypes;
+        }
+    }
+  };
 }

@@ -24,6 +24,7 @@ import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.CachingSinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
+import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.index.rockset.jni.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
@@ -82,14 +83,14 @@ public class RocksetIndex extends CachingSinglePointIndex
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean removed = new AtomicBoolean(false);
 
-    public RocksetIndex(long tableId, long indexId, boolean unique) throws Exception {
+    public RocksetIndex(long tableId, long indexId, boolean unique, IndexOption indexOption) throws RocksetException {
         this.tableId = tableId;
         this.indexId = indexId;
         this.rocksDBPath = RocksetFactory.getDbPath();
         this.rocksetDB = RocksetFactory.getRocksetDB();
         this.unique = unique;
         this.writeOptions = RocksetWriteOptions.create();
-        this.columnFamilyHandle = RocksetFactory.getOrCreateColumnFamily(tableId, indexId);
+        this.columnFamilyHandle = RocksetFactory.getOrCreateColumnFamily(tableId, indexId, indexOption.getVNodeId());
     }
 
     // ---------------- SinglePointIndex interface ----------------

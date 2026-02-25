@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.index.SinglePointIndexFactory;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,9 +52,11 @@ public class TestRocksetIndex
     @BeforeEach
     public void setUp() throws Exception
     {
-        RocksetIndex rocksetIndex = (RocksetIndex) SinglePointIndexFactory.Instance().
-                getSinglePointIndex(new SinglePointIndexFactory.TableIndex(
-                        1L, 1L, SinglePointIndex.Scheme.rockset, true), null);
+        IndexOption option = IndexOption.builder()
+            .vNodeId(0)
+            .build();
+        uniqueIndex = new RocksetIndex(TABLE_ID, INDEX_ID, true, option);
+        nonUniqueIndex = new RocksetIndex(TABLE_ID, INDEX_ID + 1, false, option);
     }
 
     @AfterEach
