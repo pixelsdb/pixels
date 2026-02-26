@@ -186,9 +186,13 @@ public class RocksDBFactory
         long targetFileSizeBase = Long.parseLong(config.getProperty("index.rocksdb.target.file.size.base"));
         int targetFileSizeMultiplier = Integer.parseInt(config.getProperty("index.rocksdb.target.file.size.multiplier"));
         int fixedLengthPrefix = Integer.parseInt(config.getProperty("index.rocksdb.prefix.length"));
-        if(keyLen != null)
+        if (keyLen != null)
         {
-            fixedLengthPrefix = Long.BYTES + keyLen; // index id + key buffer
+            fixedLengthPrefix = keyLen;
+            if (!multiCF)
+            {
+                fixedLengthPrefix +=  Long.BYTES; // index id + key buffer
+            }
         }
         CompactionStyle compactionStyle = CompactionStyle.valueOf(config.getProperty("index.rocksdb.compaction.style"));
 
