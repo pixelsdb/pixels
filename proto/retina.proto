@@ -135,7 +135,7 @@ message QueryVisibilityRequest {
 message QueryVisibilityResponse {
     ResponseHeader header = 1;
     repeated VisibilityBitmap bitmaps = 2;
-    string checkpointPath = 3;
+    optional string checkpointPath = 3;
 }
 
 message ReclaimVisibilityRequest {
