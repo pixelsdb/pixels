@@ -47,44 +47,81 @@ This container operates in ALL-IN-ONE mode, enabling full Pixels service functio
 ```shell
 # Recommended for users in mainland China due to network restrictions on DockerHub
 # Option 1: Build from Dockerfile (requires zulu23.32.11-ca-jdk23.0.2-linux_amd64.deb in build directory)
-docker build -t my-pixels:latest .
+docker build -f Dockerfile -t my-pixels ..
 
 # Option 2: Import from provided .tar (faster and more stable)
 docker load -i my-pixels.tar
-
-# Launch container instance with port 8080 exposed for Trino debugging
-docker run -p 8080:8080 -d --name pixels my-pixels tail -f /dev/null
-# Access container shell
-docker exec -it pixels /bin/bash
 ```
 
-After container initialization, execute service startup commands (default container user: root). If daemon processes fail to start, configure necessary permissions such as passwordless SSH authentication:
+### Launch Container
+
+#### Environment Variables
+
+Prepare the following environment variables for S3/MinIO connectivity:
+
+| Variable              | Description                           |
+|-----------------------|---------------------------------------|
+| AWS_ACCESS_KEY_ID     | S3/MinIO access key                   |
+| AWS_SECRET_ACCESS_KEY | S3/MinIO secret key                   |
+| AWS_REGION            | S3/MinIO region                       |
+| AWS_ENDPOINT_URL      | S3/MinIO endpoint URL                 |
+
+#### Container Startup
+
+Port `8080` is exposed for Trino web UI and debugging.
 
 ```shell
-# Start SSH service
-service ssh start
-# Initialize MySQL
-service mysql start
-# Launch ETCD
-nohup ~/opt/etcd/start-etcd.sh &
-# Navigate to Pixels directory
-cd ~/opt/pixels/
-# Start Pixels
-./sbin/start-pixels.sh                 
-# Prepare Trino initialization
-cd ~/opt/trino-server
-# Launch Trino
-./bin/launcher start
-# Connect via Trino CLI
-./bin/trino --server localhost:8080 --catalog pixels
+# Launch container with environment variables above
+docker run -p 8080:8080 -itd \
+  -e AWS_ACCESS_KEY_ID=x \
+  -e AWS_SECRET_ACCESS_KEY=x \
+  -e AWS_REGION=x \
+  -e AWS_ENDPOINT_URL=x \
+  --name pixels my-pixels
 ```
+
+### Verify Installation
+
+#### Check Service Logs
+
+View container logs to confirm all services started successfully:
+
+```shell
+docker logs pixels
+```
+
+Expected output:
+```shell
+ * Starting OpenBSD Secure Shell server sshd               [ OK ]
+ * Starting MySQL database server mysqld                   [ OK ]
+ * Start Etcd ...                                          [  OK  ]
+ * Start Pixels ...                                        [  OK  ]
+ * Start Trino ...                                         [  OK  ]
+
+=================================================
+      Pixels is installed successfully!
+=================================================
+```
+
+#### Access Container Shell
+
+```shell
+# Login to pixels container, you should in path ~/opt
+docker exec -it pixels bash
+
+# Connect via Trino CLI in pixels container
+~/opt/trino-server/bin/trino --server localhost:8080 --catalog pixels
+```
+
+#### Confirm Service Initialization
 
 Successful service initialization is confirmed when executing `SHOW SCHEMAS;` in trino-cli:
 
 ```shell
-    Schema       
--------------------- 
-information_schema 
+trino> SHOW SCHEMAS;
+    Schema
+--------------------
+ information_schema
 (1 row)
 ```
 

@@ -118,7 +118,14 @@ public class S3OutputStream extends OutputStream
     static
     {
         maxConcurrency = Integer.parseInt(ConfigFactory.Instance().getProperty("s3.client.service.threads"));
-        uploadService = Executors.newFixedThreadPool(maxConcurrency);
+
+        //Fix https://github.com/pixelsdb/pixels/issues/1291
+        uploadService = Executors.newFixedThreadPool(maxConcurrency, runnable -> {
+            Thread thread = new Thread(runnable);
+            thread.setDaemon(true);
+            thread.setName(String.format("s3-upload-daemon-thread-%d", thread.getId()));
+            return thread;
+        });
 
         enableRetry = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("read.request.enable.retry"));
         if (enableRetry)
