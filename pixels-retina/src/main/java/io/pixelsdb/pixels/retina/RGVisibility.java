@@ -63,14 +63,17 @@ public class RGVisibility implements AutoCloseable
      * Constructor creates C++ object and returns handle.
      */
     private final AtomicLong nativeHandle = new AtomicLong();
+    private final long recordNum;
 
     public RGVisibility(long rgRecordNum)
     {
+        this.recordNum = rgRecordNum;
         this.nativeHandle.set(createNativeObject(rgRecordNum));
     }
 
     public RGVisibility(long rgRecordNum, long timestamp, long[] initialBitmap)
     {
+        this.recordNum = rgRecordNum;
         if (initialBitmap == null)
         {
             this.nativeHandle.set(createNativeObject(rgRecordNum));
@@ -78,6 +81,11 @@ public class RGVisibility implements AutoCloseable
         {
             this.nativeHandle.set(createNativeObjectInitialized(rgRecordNum, timestamp, initialBitmap));
         }
+    }
+
+    public long getRecordNum()
+    {
+        return recordNum;
     }
 
     @Override

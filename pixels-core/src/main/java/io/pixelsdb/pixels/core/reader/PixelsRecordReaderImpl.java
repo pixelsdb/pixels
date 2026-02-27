@@ -509,7 +509,21 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             {
                 MetadataService metadataService = MetadataService.Instance();
                 long fileId = metadataService.getFileId(physicalReader.getPathUri());
-                rgVisibilityBitmaps = retinaService.queryVisibility(fileId, targetRGs, option.getTransTimestamp());
+                RetinaService.VisibilityResult result = retinaService.queryVisibility(fileId, targetRGs, option.getTransTimestamp(), option.getTransId());
+                if (result.isOffloaded())
+                {
+                    String checkpointPath = result.getCheckpointPath();
+                    rgVisibilityBitmaps = new long[targetRGNum][];
+                    for (int i = 0; i < targetRGNum; i++)
+                    {
+                        rgVisibilityBitmaps[i] = VisibilityCheckpointCache.getInstance()
+                                .getVisibilityBitmap(option.getTransTimestamp(), checkpointPath, fileId, targetRGs[i]);
+                    }
+                }
+                else
+                {
+                    rgVisibilityBitmaps = result.getBitmaps();
+                }
             } catch (IOException e)
             {
                 logger.error("Failed to get path uri");

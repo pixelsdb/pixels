@@ -315,16 +315,65 @@ public class RetinaService
         return true;
     }
 
-    public long[][] queryVisibility(long fileId, int[] rgIds, long timestamp) throws RetinaException
+    public static final class VisibilityResult
+    {
+        private final long[][] bitmaps;
+        private final String checkpointPath;
+
+        private VisibilityResult(long[][] bitmaps, String checkpointPath)
+        {
+            this.bitmaps = bitmaps;
+            this.checkpointPath = checkpointPath;
+        }
+
+        public static VisibilityResult fromBitmaps(long[][] bitmaps)
+        {
+            return new VisibilityResult(bitmaps, null);
+        }
+
+        public static VisibilityResult fromCheckpointPath(String path)
+        {
+            return new VisibilityResult(null, path);
+        }
+
+        public boolean isOffloaded()
+        {
+            return checkpointPath != null;
+        }
+
+        public long[][] getBitmaps()
+        {
+            if (isOffloaded())
+            {
+                throw new IllegalStateException("Data is offloaded to checkpoint, use getCheckpointPath() instead.");
+            }
+            return bitmaps;
+        }
+
+        public String getCheckpointPath()
+        {
+            return checkpointPath;
+        }
+    }
+
+    public VisibilityResult queryVisibility(long fileId, int[] rgIds, long timestamp) throws RetinaException
+    {
+        return queryVisibility(fileId, rgIds, timestamp, -1);
+    }
+
+    public VisibilityResult queryVisibility(long fileId, int[] rgIds, long timestamp, long transId) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
-        RetinaProto.QueryVisibilityRequest request = RetinaProto.QueryVisibilityRequest.newBuilder()
+        RetinaProto.QueryVisibilityRequest.Builder requestBuilder = RetinaProto.QueryVisibilityRequest.newBuilder()
                 .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
                 .setFileId(fileId)
                 .addAllRgIds(Arrays.stream(rgIds).boxed().collect(Collectors.toList()))
-                .setTimestamp(timestamp)
-                .build();
-        RetinaProto.QueryVisibilityResponse response = this.stub.queryVisibility(request);
+                .setTimestamp(timestamp);
+        if (transId != -1)
+        {
+            requestBuilder.setTransId(transId);
+        }
+        RetinaProto.QueryVisibilityResponse response = this.stub.queryVisibility(requestBuilder.build());
         if (response.getHeader().getErrorCode() != 0)
         {
             throw new RetinaException("Failed to query visibility: " + response.getHeader().getErrorCode()
@@ -334,13 +383,19 @@ public class RetinaService
         {
             throw new RetinaException("Response token does not match");
         }
+
+        if (response.getCheckpointPath() != null && !response.getCheckpointPath().isEmpty())
+        {
+            return VisibilityResult.fromCheckpointPath(response.getCheckpointPath());
+        }
+
         long[][] visibilityBitmaps = new long[rgIds.length][];
         for (int i = 0; i < response.getBitmapsCount(); i++)
         {
             RetinaProto.VisibilityBitmap bitmap = response.getBitmaps(i);
             visibilityBitmaps[i] = bitmap.getBitmapList().stream().mapToLong(Long::longValue).toArray();
         }
-        return visibilityBitmaps;
+        return VisibilityResult.fromBitmaps(visibilityBitmaps);
     }
 
     public boolean reclaimVisibility(long fileId, int[] rgIds, long timestamp) throws RetinaException

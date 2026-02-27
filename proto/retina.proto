@@ -55,8 +55,8 @@ message RequestHeader {
 
 message ResponseHeader {
     string token = 1;
-    int32 errorCode = 2;  // errorCode == 0 means success
-    string errorMsg = 3;  // empty if errorCode == 0
+    int32 errorCode = 2; // errorCode == 0 means success
+    string errorMsg = 3; // empty if errorCode == 0
 }
 
 // auxiliary structure
@@ -135,6 +135,7 @@ message QueryVisibilityRequest {
 message QueryVisibilityResponse {
     ResponseHeader header = 1;
     repeated VisibilityBitmap bitmaps = 2;
+    optional string checkpointPath = 3;
 }
 
 message ReclaimVisibilityRequest {

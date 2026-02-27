@@ -116,6 +116,12 @@
             <artifactId>log4j-over-slf4j</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

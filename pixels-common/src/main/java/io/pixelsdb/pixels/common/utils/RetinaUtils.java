@@ -29,6 +29,10 @@ import io.pixelsdb.pixels.daemon.NodeProto;
 
  public class RetinaUtils
 {
+    public static final String CHECKPOINT_PREFIX_GC = "vis_gc_";
+    public static final String CHECKPOINT_PREFIX_OFFLOAD = "vis_offload_";
+    public static final String CHECKPOINT_SUFFIX = ".bin";
+
     private static volatile RetinaUtils instance;
     private final int bucketNum;
     private final int defaultRetinaPort;
@@ -103,7 +107,7 @@ import io.pixelsdb.pixels.daemon.NodeProto;
         return RetinaService.CreateInstance(retinaHost, getInstance().defaultRetinaPort);
     }
 
-    public static RetinaService getRetinaServiceFromPath(String path)
+     public static RetinaService getRetinaServiceFromPath(String path)
     {
         String retinaHost = extractRetinaHostNameFromPath(path);
         if(retinaHost == null || retinaHost.equals(Constants.LOAD_DEFAULT_RETINA_PREFIX))
@@ -111,6 +115,16 @@ import io.pixelsdb.pixels.daemon.NodeProto;
             return RetinaService.Instance();
         }
         return RetinaService.CreateInstance(retinaHost, getInstance().defaultRetinaPort);
+    }
+
+    public static String getCheckpointFileName(String prefix, String hostname, long timestamp)
+    {
+        return prefix + hostname + "_" + timestamp + CHECKPOINT_SUFFIX;
+    }
+
+    public static String getCheckpointPrefix(String typePrefix, String hostname)
+    {
+        return typePrefix + hostname + "_";
     }
 
     private static String extractRetinaHostNameFromPath(String path)
