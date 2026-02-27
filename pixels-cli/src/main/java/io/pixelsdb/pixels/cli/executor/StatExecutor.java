@@ -166,9 +166,16 @@ public class StatExecutor implements CommandExecutor
         {
             for (Column column : columns)
             {
-                String sql = "SELECT COUNT(DISTINCT(" + column.getName() + ")) AS cardinality, " +
-                        "SUM(CASE WHEN " + column.getName() + " IS NULL THEN 1 ELSE 0 END) AS null_count " +
-                        "FROM " + schemaName + "." + tableName;
+                // ANSI SQL uses double quotes for identifiers.
+                String sql = String.format(
+                        "SELECT COUNT(DISTINCT(\"%s\")) AS cardinality, " +
+                                "SUM(CASE WHEN \"%s\" IS NULL THEN 1 ELSE 0 END) AS null_count " +
+                                "FROM \"%s\".\"%s\"",
+                        column.getName(),
+                        column.getName(),
+                        schemaName,
+                        tableName
+                );
                 Statement statement = connection.createStatement();
                 ResultSet resultSet = statement.executeQuery(sql);
                 if (resultSet.next())
