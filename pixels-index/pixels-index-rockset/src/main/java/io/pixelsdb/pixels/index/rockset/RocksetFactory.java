@@ -112,7 +112,7 @@ public class RocksetFactory
         List<RocksetColumnFamilyDescriptor> descriptors = new ArrayList<>();
         for(byte[] existingColumnFamily: existingColumnFamilies)
         {
-            long[] ids = parseTableAndIndexId(existingColumnFamily);
+            long[] ids = IndexUtils.parseTableAndIndexId(existingColumnFamily);
             Integer keyLen = null;
             if(ids != null)
             {
@@ -231,7 +231,7 @@ public class RocksetFactory
     }
 
     public static synchronized RocksetColumnFamilyHandle getOrCreateColumnFamily(long tableId, long indexId, int vNodeId) throws Exception {
-        String cfName = getCFName(tableId, indexId, vNodeId);
+        String cfName = IndexUtils.getCFName(tableId, indexId, vNodeId, multiCF);
 
         // Return cached handle if exists
         if (cfHandles.containsKey(cfName)) {
@@ -255,115 +255,6 @@ public class RocksetFactory
     protected static synchronized Map<String, RocksetColumnFamilyHandle> getAllCfHandles()
     {
         return cfHandles;
-    }
-
-    private static String getCFName(long tableId, long indexId, int vNodeId) {
-        if(multiCF)
-        {
-            return "t" + tableId + "_i" + indexId + "_v" + vNodeId;
-        }
-        else
-        {
-            return defaultColumnFamily;
-        }
-    }
-
-    private static long[] parseTableAndIndexId(byte[] cfNameBytes) throws Exception
-    {
-        if (cfNameBytes == null || Arrays.equals(cfNameBytes, RocksetDB.DEFAULT_COLUMN_FAMILY))
-        {
-            return null;
-        }
-
-        String name = new String(cfNameBytes, StandardCharsets.UTF_8);
-
-        try
-        {
-            // Expected format: "t{tableId}_i{indexId}_v{vNodeId}"
-            // Example: "t100_i200_v5" -> ["100", "200", "30"]
-            if (name.startsWith("t") && name.contains("_i") && name.contains("_v"))
-            {
-                // Remove the leading 't'
-                String content = name.substring(1);
-
-                // Split using regex for multiple delimiters: _i and _v
-                String[] parts = content.split("_i|_v");
-
-                if (parts.length == 3)
-                {
-                    long tableId = Long.parseLong(parts[0]);
-                    long indexId = Long.parseLong(parts[1]);
-                    long vNodeId = Long.parseLong(parts[2]);
-
-                    return new long[]{tableId, indexId, vNodeId};
-                }
-                else
-                {
-                    throw new Exception("Failed to parse CF name (invalid segments): " + name);
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            throw new Exception("Failed to parse CF name: " + name, e);
-        }
-
-        return null;
-    }
-
-    private static Integer getIndexKeyLen(long tableId, long indexId) throws MetadataException
-    {
-        // Try to retrieve from cache using only indexId
-        Integer cachedLen = indexKeyLenCache.get(indexId);
-        if (cachedLen != null)
-        {
-            return cachedLen.equals(VARIABLE_LEN_SENTINEL) ? null : cachedLen;
-        }
-
-        // Cache miss: Perform the metadata lookup
-        List<Column> keyColumns = IndexUtils.extractInfoFromIndex(tableId, indexId);
-        TypeDescription keySchema = TypeDescription.createSchemaFromColumns(keyColumns);
-
-        int keyLen = 0;
-        Integer result = null;
-
-        if (keySchema.getChildren() != null)
-        {
-            boolean isFixedLen = true;
-            for (TypeDescription typeDescription : keySchema.getChildren())
-            {
-                int colLen = keyLengthOf(typeDescription.getCategory().getExternalJavaType());
-                if (colLen == -1)
-                {
-                    isFixedLen = false;
-                    break;
-                }
-                keyLen += colLen;
-            }
-
-            if (isFixedLen)
-            {
-                result = keyLen;
-            }
-        }
-
-        // Update cache (store result or sentinel)
-        indexKeyLenCache.put(indexId, result == null ? VARIABLE_LEN_SENTINEL : result);
-
-        return result;
-    }
-
-    public static int keyLengthOf(Class<?> clazz) {
-        if (clazz == boolean.class) return 1;
-        if (clazz == byte.class)    return 1;
-        if (clazz == short.class)   return 2;
-        if (clazz == int.class)     return 4;
-        if (clazz == long.class)    return 8;
-        if (clazz == float.class)   return 4;
-        if (clazz == double.class)  return 8;
-
-        // Not Primitive
-        return -1;
     }
 
     public static synchronized RocksetDB getRocksetDB() throws Exception {
@@ -395,6 +286,48 @@ public class RocksetFactory
         return dbPath;
     }
 
+    private static Integer getIndexKeyLen(long tableId, long indexId) throws MetadataException
+    {
+        // Try to retrieve from cache using only indexId
+        Integer cachedLen = indexKeyLenCache.get(indexId);
+        if (cachedLen != null)
+        {
+            return cachedLen.equals(VARIABLE_LEN_SENTINEL) ? null : cachedLen;
+        }
+
+        // Cache miss: Perform the metadata lookup
+        List<Column> keyColumns = IndexUtils.extractInfoFromIndex(tableId, indexId);
+        TypeDescription keySchema = TypeDescription.createSchemaFromColumns(keyColumns);
+
+        int keyLen = 0;
+        Integer result = null;
+
+        if (keySchema.getChildren() != null)
+        {
+            boolean isFixedLen = true;
+            for (TypeDescription typeDescription : keySchema.getChildren())
+            {
+                int colLen = IndexUtils.keyLengthOf(typeDescription.getCategory().getExternalJavaType());
+                if (colLen == -1)
+                {
+                    isFixedLen = false;
+                    break;
+                }
+                keyLen += colLen;
+            }
+
+            if (isFixedLen)
+            {
+                result = keyLen;
+            }
+        }
+
+        // Update cache (store result or sentinel)
+        indexKeyLenCache.put(indexId, result == null ? VARIABLE_LEN_SENTINEL : result);
+
+        return result;
+    }
+
     private static void startRocksetLogThread(RocksetDB db)
     {
         int logInterval = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rockset.log.interval"));
@@ -423,8 +356,9 @@ public class RocksetFactory
                 double GiB = 1024.0 * 1024.0 * 1024.0;
 
                 String formattedMetrics = String.format(
-                        "TotalNative≈%.4f GiB (MemTable=%.4f GiB, BlockCache=%.4f GiB, IndexFilter=%.4f GiB) " +
-                                "JVMHeap (Used=%.4f GiB, Committed=%.4f GiB, Max=%.4f GiB)",
+                        "Timestamp=%d RocksDB_Cloud[Total=%.4f GiB (%d Bytes), MemTable=%.4f GiB (%d Bytes), " +
+                                "BlockCache=%.4f GiB (%d Bytes)]" +
+                                "JVM_Heap[Used=%.4f GiB (%d Bytes), Committed=%.4f GiB (%d Bytes), Max=%.4f GiB (%d Bytes)]",
                         totalNativeBytes / GiB,
                         memTable / GiB,
                         blockCacheOnly / GiB,

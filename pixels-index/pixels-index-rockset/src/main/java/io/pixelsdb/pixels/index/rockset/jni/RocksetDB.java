@@ -30,13 +30,8 @@ public final class RocksetDB
     private final long nativeHandle;
     protected RocksetDBOptions options;
     private RocksetColumnFamilyHandle defaultColumnFamilyHandle;
-    public static final byte[] DEFAULT_COLUMN_FAMILY;
     final List<RocksetColumnFamilyHandle> ownedColumnFamilyHandles = new ArrayList<>();
-
-    static 
-    {
-        DEFAULT_COLUMN_FAMILY = "default".getBytes(StandardCharsets.UTF_8);
-    }
+    public static final byte[] DEFAULT_COLUMN_FAMILY = "default".getBytes(StandardCharsets.UTF_8);
 
     public RocksetDB(long nativeHandle)
     {
