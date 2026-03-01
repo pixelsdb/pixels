@@ -34,6 +34,10 @@ Licensed under the Apache License, Version 2.0.
 Copyright (C) 2014 Stephen Macke (smacke@cs.stanford.edu)
 * DirectIoLib in pixels-common is partially derived from Jaydio.
 
+7. RocksDB-Cloud
+Licensed under the Apache License, Version 2.0.
+* RocksetJni in pixels-index-rockset is partially modified from RocksDB-Cloud Jni.
+
 
 According to the requirement of Apache License Version 2.0 (Apache 2.0), we include a copy of Apache 2.0 here:
 

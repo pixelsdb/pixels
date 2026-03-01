@@ -35,9 +35,21 @@
         </dependency>
 
         <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-core</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-testing</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <!-- this is only for third-party libs that use log4j-1 -->
+            <groupId>org.slf4j</groupId>
+            <artifactId>log4j-over-slf4j</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 

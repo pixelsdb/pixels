@@ -20,154 +20,80 @@
 package io.pixelsdb.pixels.index.rockset;
 
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.CachingSinglePointIndex;
 import io.pixelsdb.pixels.index.IndexProto;
+import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.index.rockset.jni.*;
+import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import javax.annotation.Nonnull;
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.File;
+import java.nio.file.Paths;
+
+import static io.pixelsdb.pixels.index.rockset.RocksetThreadResources.EMPTY_VALUE_BUFFER;
+
+/**
+ * @author Rolland1944
+ * @create 2025-12-29
+ */
 
 public class RocksetIndex extends CachingSinglePointIndex
 {
-    private final RocksetIndexStub stub = new RocksetIndexStub();
-
-    // --------- Small Java wrappers (null-safety & lifecycle) ----------
-    protected long CreateDBCloud(@Nonnull CloudDBOptions dbOptions)
+    // load pixels-index-rockset
+    static
     {
-        long cloudEnvPtr = stub.CreateCloudFileSystem0(dbOptions.getBucketName(), dbOptions.getS3Prefix());
-        if (cloudEnvPtr == 0)
+        String pixelsHome = System.getenv("PIXELS_HOME");
+        if (pixelsHome == null || pixelsHome.isEmpty())
         {
-            throw new RuntimeException("Failed to create CloudFileSystem");
+            throw new IllegalStateException("Environment variable PIXELS_HOME is not set");
         }
 
-        long dbHandle = stub.OpenDBCloud0(cloudEnvPtr, dbOptions.getLocalDbPath(), dbOptions.getPersistentCachePath(),
-                dbOptions.getPersistentCacheSizeGB(), dbOptions.isReadOnly());
-        if (dbHandle == 0)
+        String libPath = Paths.get(pixelsHome, "lib/libpixels-index-rockset.so").toString();
+        File libFile = new File(libPath);
+        if (!libFile.exists())
         {
-            stub.CloseDB0(0);
-            throw new RuntimeException("Failed to open DBCloud");
+            throw new IllegalStateException("libpixels-index-rockset.so not found at " + libPath);
         }
-
-        return dbHandle;
-    }
-
-    protected void DBput(long dbHandle, byte[] key, byte[] value)
-    {
-        stub.DBput0(dbHandle, key, value);
-    }
-
-    protected byte[] DBget(long dbHandle, byte[] key)
-    {
-        return stub.DBget0(dbHandle, key);
-    }
-
-    protected void DBdelete(long dbHandle, byte[] key)
-    {
-        stub.DBdelete0(dbHandle, key);
-    }
-
-    protected void CloseDB(long dbHandle)
-    {
-        if (dbHandle != 0)
+        if (!libFile.canRead())
         {
-            stub.CloseDB0(dbHandle);
+            throw new IllegalStateException("libpixels-index-rockset.so is not readable at " + libPath);
         }
+        System.load(libPath);
+        System.out.println("JNI loaded OK");
     }
-
-    // ---------------- Iterator wrapper methods ----------------
-    protected long DBNewIterator(long dbHandle)
-    {
-        return stub.DBNewIterator0(dbHandle);
-    }
-
-    protected void IteratorSeekForPrev(long itHandle, byte[] targetKey)
-    {
-        stub.IteratorSeekForPrev0(itHandle, targetKey);
-    }
-
-    protected boolean IteratorIsValid(long itHandle)
-    {
-        return stub.IteratorIsValid0(itHandle);
-    }
-
-    protected byte[] IteratorKey(long itHandle)
-    {
-        return stub.IteratorKey0(itHandle);
-    }
-
-    protected byte[] IteratorValue(long itHandle)
-    {
-        return stub.IteratorValue0(itHandle);
-    }
-
-    protected void IteratorPrev(long itHandle)
-    {
-        stub.IteratorPrev0(itHandle);
-    }
-
-    protected void IteratorClose(long itHandle)
-    {
-        stub.IteratorClose0(itHandle);
-    }
-
-    // ---------------- WriteBatch wrapper methods ----------------
-    protected long WriteBatchCreate()
-    {
-        return stub.WriteBatchCreate0();
-    }
-
-    protected void WriteBatchPut(long wbHandle, byte[] key, byte[] value)
-    {
-        stub.WriteBatchPut0(wbHandle, key, value);
-    }
-
-    protected void WriteBatchDelete(long wbHandle, byte[] key)
-    {
-        stub.WriteBatchDelete0(wbHandle, key);
-    }
-
-    protected boolean DBWrite(long dbHandle, long wbHandle)
-    {
-        return stub.DBWrite0(dbHandle, wbHandle);
-    }
-
-    protected void WriteBatchClear(long wbHandle)
-    {
-        stub.WriteBatchClear0(wbHandle);
-    }
-
-    protected void WriteBatchDestroy(long wbHandle)
-    {
-        stub.WriteBatchDestroy0(wbHandle);
-    }
-
     private static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
-
-    private long dbHandle;
+    private static final long TOMBSTONE_ROW_ID = Long.MAX_VALUE;
+    private final RocksetDB rocksetDB;
+    private final String rocksDBPath;
+    private final RocksetWriteOptions writeOptions;
+    private final RocksetColumnFamilyHandle columnFamilyHandle;
     private final long tableId;
     private final long indexId;
     private final boolean unique;
-    private volatile boolean closed = false;
-    private volatile boolean removed = false;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicBoolean removed = new AtomicBoolean(false);
 
-    public RocksetIndex(long tableId, long indexId, CloudDBOptions options, boolean unique)
-    {
+    public RocksetIndex(long tableId, long indexId, boolean unique, IndexOption indexOption) throws Exception {
         this.tableId = tableId;
         this.indexId = indexId;
+        this.rocksDBPath = RocksetFactory.getDbPath();
+        this.rocksetDB = RocksetFactory.getRocksetDB();
         this.unique = unique;
-        this.dbHandle = CreateDBCloud(options);
+        this.writeOptions = RocksetWriteOptions.create();
+        this.columnFamilyHandle = RocksetFactory.getOrCreateColumnFamily(tableId, indexId, indexOption.getVNodeId());
     }
 
     // ---------------- SinglePointIndex interface ----------------
-    protected long getDbHandle()
-    {
-        return dbHandle;
-    }
-
     @Override
     public long getTableId()
     {
@@ -187,71 +113,73 @@ public class RocksetIndex extends CachingSinglePointIndex
     }
 
     @Override
-    public long getUniqueRowIdInternal(IndexProto.IndexKey key)
-    {
-        byte[] prefix = toByteArray(key); // indexId + key (NO timestamp)
-        long ts = key.getTimestamp();
-        byte[] upperKey = concat(prefix, writeLongBE(ts + 1));
-        long it = 0;
-        try
+    public long getUniqueRowIdInternal(IndexProto.IndexKey key) throws SinglePointIndexException {
+        if (!unique)
         {
-            it = DBNewIterator(this.dbHandle);
-            IteratorSeekForPrev(it, upperKey);
-            if (!IteratorIsValid(it))
-                return -1L;
-            byte[] k = IteratorKey(it);
-            if (!startsWith(k, prefix))
-                return -1L;
-            byte[] v = IteratorValue(it);
-            if (v == null || v.length < Long.BYTES) return -1L;
-            return ByteBuffer.wrap(v).getLong();
+            throw new SinglePointIndexException("getUniqueRowId should only be called on unique index");
         }
-        catch (Throwable t)
+        RocksetReadOptions readOptions = RocksetThreadResources.getReadOptions();
+        readOptions.setPrefixSameAsStart(true);
+        ByteBuffer keyBuffer = toKeyBuffer(key);
+        long rowId = -1L;
+        try (RocksetIterator iterator = rocksetDB.newIterator(columnFamilyHandle,readOptions))
         {
-            LOGGER.error("getUniqueRowId failed", t);
-            return -1L;
-        }
-        finally
+            iterator.seek(keyBuffer);
+            if (iterator.isValid())
+            {
+                ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
+                if (startsWith(keyFound, keyBuffer))
+                {
+                    ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                    valueBuffer = ByteBuffer.wrap(iterator.value());
+                    rowId = valueBuffer.getLong();
+                    rowId = rowId == TOMBSTONE_ROW_ID ? -1L : rowId;
+                }
+            }
+        } catch (Exception e)
         {
-            if (it != 0)
-                IteratorClose(it);
+            throw new SinglePointIndexException("Error reading from Rockset CF for tableId="
+                    + tableId + ", indexId=" + indexId, e);
         }
+        return rowId;
     }
 
     @Override
-    public List<Long> getRowIds(IndexProto.IndexKey key)
-    {
-        ImmutableList.Builder<Long> out = ImmutableList.builder();
-        byte[] prefix = toByteArray(key);
-        long ts = key.getTimestamp();
-        byte[] upperKey = concat(prefix, writeLongBE(ts + 1));
-        long it = 0;
-        try
+    public List<Long> getRowIds(IndexProto.IndexKey key) throws SinglePointIndexException {
+        if (unique)
         {
-            it = DBNewIterator(this.dbHandle);
-            IteratorSeekForPrev(it, upperKey);
-            while (IteratorIsValid(it))
+            return ImmutableList.of(getUniqueRowId(key));
+        }
+        Set<Long> rowIds = new HashSet<>();
+        RocksetReadOptions readOptions = RocksetThreadResources.getReadOptions();
+        readOptions.setPrefixSameAsStart(true);
+        ByteBuffer keyBuffer = toKeyBuffer(key);
+        try (RocksetIterator iterator = rocksetDB.newIterator(columnFamilyHandle,readOptions))
+        {
+            iterator.seek(keyBuffer);
+            while (iterator.isValid())
             {
-                byte[] k = IteratorKey(it);
-                if (!startsWith(k, prefix))
+                ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
+                if (startsWith(keyFound, keyBuffer))
+                {
+                    long rowId = extractRowIdFromKey(keyFound);
+                    if (rowId == TOMBSTONE_ROW_ID)
+                    {
+                        break;
+                    }
+                    rowIds.add(rowId);
+                    iterator.next();
+                }
+                else
+                {
                     break;
-                long rowId = extractRowIdFromKey(k);
-                if (rowId < 0) break;
-                out.add(rowId);
-                IteratorPrev(it);
+                }
             }
+        } catch (Exception e) {
+            throw new SinglePointIndexException("Error reading from Rockset CF for tableId="
+                    + tableId + ", indexId=" + indexId, e);
         }
-        catch (Throwable t)
-        {
-            LOGGER.error("getRowIds failed", t);
-            return ImmutableList.of();
-        }
-        finally
-        {
-            if (it != 0)
-                IteratorClose(it);
-        }
-        return out.build();
+        return ImmutableList.copyOf(rowIds);
     }
 
     @Override
@@ -261,14 +189,15 @@ public class RocksetIndex extends CachingSinglePointIndex
         {
             if (unique)
             {
-                byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                byte[] val = writeLongBE(rowId);
-                DBput(this.dbHandle, fullKey, val);
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                valueBuffer.putLong(rowId).position(0);
+                rocksetDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             }
             else
             {
-                byte[] nonUniqueKey = toNonUniqueKey(key, rowId);
-                DBput(this.dbHandle, nonUniqueKey, new byte[0]);
+                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
+                rocksetDB.put(columnFamilyHandle, writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
             return true;
         }
@@ -282,85 +211,76 @@ public class RocksetIndex extends CachingSinglePointIndex
     public boolean putPrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries)
             throws SinglePointIndexException
     {
-        long wb = 0;
-        try
+        if (!unique)
         {
-            wb = WriteBatchCreate();
+            throw new SinglePointIndexException("putPrimaryEntries can only be called on unique indexes");
+        }
+        try(RocksetWriteBatch writeBatch = RocksetWriteBatch.create())
+        {
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
-                byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                byte[] val = writeLongBE(rowId);
-                WriteBatchPut(wb, fullKey, val);
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                valueBuffer.putLong(rowId).position(0);
+                writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
             }
-            DBWrite(this.dbHandle, wb);
+            rocksetDB.write(writeOptions,writeBatch);
             return true;
         }
         catch (Exception e)
         {
             throw new SinglePointIndexException("Failed to put rockset primary index entries", e);
         }
-        finally
-        {
-            if (wb != 0)
-            {
-                WriteBatchClear(wb);
-                WriteBatchDestroy(wb);
-            }
-        }
     }
 
     @Override
     public boolean putSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
-        long wb = 0;
-        try
+        try (RocksetWriteBatch writeBatch = RocksetWriteBatch.create())
         {
-            wb = WriteBatchCreate();
             for (IndexProto.SecondaryIndexEntry entry : entries)
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
                 long rowId = entry.getRowId();
                 if (unique)
                 {
-                    byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                    byte[] val = writeLongBE(rowId);
-                    WriteBatchPut(wb, fullKey, val);
+                    ByteBuffer keyBuffer = toKeyBuffer(key);
+                    ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                    valueBuffer.putLong(rowId).position(0);
+                    writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
                 }
                 else
                 {
-                    byte[] nonUniqueKey = toNonUniqueKey(key, rowId);
-                    WriteBatchPut(wb, nonUniqueKey, new byte[0]);
+                    ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
+                    writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
             }
-            DBWrite(this.dbHandle, wb);
+            rocksetDB.write(writeOptions,writeBatch);
             return true;
         }
         catch (Exception e)
         {
             throw new SinglePointIndexException("Failed to put rockset secondary index entries", e);
         }
-        finally
-        {
-            if (wb != 0)
-            {
-                WriteBatchClear(wb);
-                WriteBatchDestroy(wb);
-            }
-        }
     }
 
     @Override
     public long updatePrimaryEntryInternal(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("updatePrimaryEntry can only be called on unique indexes");
+        }
         try
         {
-            long prev = getUniqueRowId(key);
-            byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-            byte[] val = writeLongBE(rowId);
-            DBput(this.dbHandle, fullKey, val);
-            return prev;
+            long prevRowId = getUniqueRowId(key);
+            ByteBuffer keyBuffer = toKeyBuffer(key);
+            ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+            valueBuffer.putLong(rowId).position(0);
+            rocksetDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
+            return prevRowId;
         }
         catch (Exception e)
         {
@@ -376,16 +296,21 @@ public class RocksetIndex extends CachingSinglePointIndex
             ImmutableList.Builder<Long> prev = ImmutableList.builder();
             if (unique)
             {
-                prev.add(getUniqueRowId(key));
-                byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                DBput(this.dbHandle, fullKey, writeLongBE(rowId));
+                long prevRowId = getUniqueRowId(key);
+                if (prevRowId >= 0)
+                {
+                    prev.add(prevRowId);
+                }
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                valueBuffer.putLong(rowId).position(0);
+                rocksetDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
             }
             else
             {
-                List<Long> rowIds = getRowIds(key);
-                prev.addAll(rowIds);
-                byte[] nonUniqueKey = toNonUniqueKey(key, rowId);
-                DBput(this.dbHandle, nonUniqueKey, new byte[0]);
+                prev.addAll(this.getRowIds(key));
+                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
+                rocksetDB.put(columnFamilyHandle, writeOptions, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
             return prev.build();
         }
@@ -398,47 +323,41 @@ public class RocksetIndex extends CachingSinglePointIndex
     @Override
     public List<Long> updatePrimaryEntriesInternal(List<IndexProto.PrimaryIndexEntry> entries) throws SinglePointIndexException
     {
-        long wb = 0;
-        try
+        if (!unique)
         {
-            wb = WriteBatchCreate();
+            throw new SinglePointIndexException("updatePrimaryEntries can only be called on unique indexes");
+        }
+        try (RocksetWriteBatch writeBatch = RocksetWriteBatch.create())
+        {
             ImmutableList.Builder<Long> prevRowIds = ImmutableList.builder();
             for (IndexProto.PrimaryIndexEntry entry : entries)
             {
                 IndexProto.IndexKey key = entry.getIndexKey();
+                long rowId = entry.getRowId();
                 long prevRowId = getUniqueRowId(key);
-                if (prevRowId < 0)
+                if (prevRowId >= 0)
                 {
-                    return ImmutableList.of();
+                    prevRowIds.add(prevRowId);
                 }
-                prevRowIds.add(prevRowId);
-                byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                WriteBatchPut(wb, fullKey, writeLongBE(entry.getRowId()));
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                valueBuffer.putLong(rowId).position(0);
+                writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
             }
-            DBWrite(this.dbHandle, wb);
+            rocksetDB.write(writeOptions,writeBatch);
             return prevRowIds.build();
         }
         catch (Exception e)
         {
             throw new SinglePointIndexException("Failed to update primary index entries", e);
         }
-        finally
-        {
-            if (wb != 0)
-            {
-                WriteBatchClear(wb);
-                WriteBatchDestroy(wb);
-            }
-        }
     }
 
     @Override
     public List<Long> updateSecondaryEntriesInternal(List<IndexProto.SecondaryIndexEntry> entries) throws SinglePointIndexException
     {
-        long wb = 0;
-        try
+        try (RocksetWriteBatch writeBatch = RocksetWriteBatch.create())
         {
-            wb = WriteBatchCreate();
             ImmutableList.Builder<Long> prevRowIds = ImmutableList.builder();
             for (IndexProto.SecondaryIndexEntry entry : entries)
             {
@@ -447,54 +366,50 @@ public class RocksetIndex extends CachingSinglePointIndex
                 if (unique)
                 {
                     long prevRowId = getUniqueRowId(key);
-                    if (prevRowId < 0)
+                    if (prevRowId >= 0)
                     {
-                        return ImmutableList.of();
+                        prevRowIds.add(prevRowId);
                     }
-                    prevRowIds.add(prevRowId);
-                    byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                    WriteBatchPut(wb, fullKey, writeLongBE(rowId));
+                    ByteBuffer keyBuffer = toKeyBuffer(key);
+                    ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                    valueBuffer.putLong(rowId).position(0);
+                    writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
                 }
                 else
                 {
-                    List<Long> rowIds = getRowIds(key);
-                    if (rowIds.isEmpty())
-                    {
-                        return ImmutableList.of();
-                    }
-                    prevRowIds.addAll(rowIds);
-                    byte[] nonUniqueKey = toNonUniqueKey(key, rowId);
-                    WriteBatchPut(wb, nonUniqueKey, new byte[0]);
+                    prevRowIds.addAll(this.getRowIds(key));
+                    ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, rowId);
+                    writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                 }
             }
-            DBWrite(this.dbHandle, wb);
+            rocksetDB.write(writeOptions,writeBatch);
             return prevRowIds.build();
         }
         catch (Exception e)
         {
             throw new SinglePointIndexException("Failed to update secondary index entries", e);
         }
-        finally
-        {
-            if (wb != 0)
-            {
-                WriteBatchClear(wb);
-                WriteBatchDestroy(wb);
-            }
-        }
     }
 
     @Override
     public long deleteUniqueEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
+        if (!unique)
+        {
+            throw new SinglePointIndexException("deleteUniqueEntry can only be called on unique indexes");
+        }
         try
         {
-            long prev = getUniqueRowId(key);
-            byte[] tomb = writeLongBE(-1L);  // tombstone marker
-            byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-            DBput(this.dbHandle, fullKey, tomb);
-
-            return prev;
+            long rowId = getUniqueRowId(key);
+            if (rowId < 0)
+            {
+                return rowId;
+            }
+            ByteBuffer keyBuffer = toKeyBuffer(key);
+            ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+            valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
+            rocksetDB.put(columnFamilyHandle, writeOptions, keyBuffer, valueBuffer);
+            return rowId;
         }
         catch (Exception e)
         {
@@ -505,11 +420,9 @@ public class RocksetIndex extends CachingSinglePointIndex
     @Override
     public List<Long> deleteEntryInternal(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        long wb = 0;
-        try
+        try (RocksetWriteBatch writeBatch = RocksetWriteBatch.create())
         {
             ImmutableList.Builder<Long> prev = ImmutableList.builder();
-            wb = WriteBatchCreate();
             if (unique)
             {
                 long rowId = getUniqueRowId(key);
@@ -518,8 +431,10 @@ public class RocksetIndex extends CachingSinglePointIndex
                     return ImmutableList.of();
                 }
                 prev.add(rowId);
-                byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                WriteBatchPut(wb, fullKey, writeLongBE(-1L));
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
+                writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
             }
             else
             {
@@ -529,74 +444,55 @@ public class RocksetIndex extends CachingSinglePointIndex
                     return ImmutableList.of();
                 }
                 prev.addAll(rowIds);
-                // mark tombstone entry for this (key, -1L)
-                byte[] nonUniqueKeyTomb = toNonUniqueKey(key, -1L);
-                WriteBatchPut(wb, nonUniqueKeyTomb, new byte[0]);
+                ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, TOMBSTONE_ROW_ID);
+                writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
             }
-            DBWrite(this.dbHandle, wb);
+            rocksetDB.write(writeOptions,writeBatch);
             return prev.build();
         }
         catch (Exception e)
         {
             throw new SinglePointIndexException("Failed to delete entry", e);
         }
-        finally
-        {
-            if (wb != 0)
-            {
-                WriteBatchClear(wb);
-                WriteBatchDestroy(wb);
-            }
-        }
     }
 
     @Override
     public List<Long> deleteEntriesInternal(List<IndexProto.IndexKey> keys) throws SinglePointIndexException
     {
-        long wb = 0;
-        try
+        try (RocksetWriteBatch writeBatch = RocksetWriteBatch.create())
         {
-            wb = WriteBatchCreate();
             ImmutableList.Builder<Long> prev = ImmutableList.builder();
             for (IndexProto.IndexKey key : keys)
             {
                 if (unique)
                 {
                     long rowId = getUniqueRowId(key);
-                    if (rowId < 0)
+                    if(rowId >= 0)
                     {
-                        return ImmutableList.of();
+                        prev.add(rowId);
+                        ByteBuffer keyBuffer = toKeyBuffer(key);
+                        ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                        valueBuffer.putLong(TOMBSTONE_ROW_ID).position(0);
+                        writeBatch.put(columnFamilyHandle, keyBuffer, valueBuffer);
                     }
-                    prev.add(rowId);
-                    byte[] fullKey = concat(toByteArray(key), writeLongBE(key.getTimestamp()));
-                    WriteBatchPut(wb, fullKey, writeLongBE(-1L));
                 }
                 else
                 {
                     List<Long> rowIds = getRowIds(key);
-                    if (rowIds.isEmpty())
+                    if(!rowIds.isEmpty())
                     {
-                        return ImmutableList.of();
+                        prev.addAll(rowIds);
+                        ByteBuffer nonUniqueKeyBuffer = toNonUniqueKeyBuffer(key, TOMBSTONE_ROW_ID);
+                        writeBatch.put(columnFamilyHandle, nonUniqueKeyBuffer, EMPTY_VALUE_BUFFER);
                     }
-                    prev.addAll(rowIds);
-                    byte[] nonUniqueKeyTomb = toNonUniqueKey(key, -1L);
-                    WriteBatchPut(wb, nonUniqueKeyTomb, new byte[0]);
                 }
             }
-            DBWrite(this.dbHandle, wb);
+            rocksetDB.write(writeOptions,writeBatch);
             return prev.build();
         }
         catch (Exception e)
         {
             throw new SinglePointIndexException("Failed to delete entries", e);
-        }
-        finally
-        {
-            if (wb != 0)
-            {
-                WriteBatchClear(wb);
-                WriteBatchDestroy(wb);
-            }
         }
     }
 
@@ -604,33 +500,49 @@ public class RocksetIndex extends CachingSinglePointIndex
     public List<Long> purgeEntriesInternal(List<IndexProto.IndexKey> indexKeys) throws SinglePointIndexException
     {
         ImmutableList.Builder<Long> builder = ImmutableList.builder();
-        long wb = 0;
-        try
+        try (RocksetWriteBatch writeBatch = RocksetWriteBatch.create())
         {
-            wb = WriteBatchCreate();
             for (IndexProto.IndexKey key : indexKeys)
             {
-                byte[] prefix = toByteArray(key); // indexId + key (NO timestamp)
-                long ts = key.getTimestamp();
-                byte[] upperKey = concat(prefix, writeLongBE(ts + 1));
-                long it = 0;
-                try
+                RocksetReadOptions readOptions = RocksetThreadResources.getReadOptions();
+                readOptions.setPrefixSameAsStart(true);
+                ByteBuffer keyBuffer = toKeyBuffer(key);
+                try (RocksetIterator iterator = rocksetDB.newIterator(columnFamilyHandle,readOptions))
                 {
-                    it = DBNewIterator(this.dbHandle);
-                    IteratorSeekForPrev(it, upperKey);
-                    while (IteratorIsValid(it))
+
+                    iterator.seek(keyBuffer);
+                    boolean foundTombstone = false;
+                    while (iterator.isValid())
                     {
-                        byte[] k = IteratorKey(it);
-                        if (startsWith(k, prefix))
+                        ByteBuffer keyFound = ByteBuffer.wrap(iterator.key());
+                        if (startsWith(keyFound, keyBuffer))
                         {
+                            long rowId;
                             if(unique)
                             {
-                                long rowId = ByteBuffer.wrap(IteratorValue(it)).getLong();
-                                if(rowId > 0)
-                                    builder.add(rowId);
+                                ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+                                valueBuffer = ByteBuffer.wrap(iterator.value());
+                                rowId = valueBuffer.getLong();
                             }
-                            WriteBatchDelete(wb, k);
-                            IteratorPrev(it);
+                            else
+                            {
+                                rowId = extractRowIdFromKey(keyFound);
+                            }
+                            iterator.next();
+                            if (rowId == TOMBSTONE_ROW_ID)
+                            {
+                                foundTombstone = true;
+                            }
+                            else if(foundTombstone)
+                            {
+                                builder.add(rowId);
+                            }
+                            else
+                            {
+                                continue;
+                            }
+                            // keyFound is not direct, must use its backing array
+                            writeBatch.delete(columnFamilyHandle, keyFound.array());
                         }
                         else
                         {
@@ -643,96 +555,131 @@ public class RocksetIndex extends CachingSinglePointIndex
                     LOGGER.error("purgeEntries failed", t);
                     return ImmutableList.of();
                 }
-                finally
-                {
-                    if (it != 0)
-                        IteratorClose(it);
-                }
             }
-            DBWrite(this.dbHandle, wb);
+            rocksetDB.write(writeOptions,writeBatch);
             return builder.build();
         }
         catch (Exception e)
         {
             throw new SinglePointIndexException("Failed to purge entries by prefix", e);
         }
-        finally
-        {
-            if (wb != 0)
-            {
-                WriteBatchClear(wb);
-                WriteBatchDestroy(wb);
-            }
-        }
     }
 
     @Override
     public void close() throws IOException
     {
-        if (dbHandle != 0)
+        if (closed.compareAndSet(false, true))
         {
-            closed = true;
-            this.dbHandle = 0;
+            // Issue #1158: do not directly close the rocksDB instance as it is shared by other indexes
+            RocksetFactory.close();
+            writeOptions.close();
         }
     }
 
     @Override
     public boolean closeAndRemove() throws SinglePointIndexException
     {
-        try
+        if (closed.compareAndSet(false, true) && removed.compareAndSet(false, true))
         {
-            close();
-            removed = true; // no local RocksDB folder to delete for cloud; mark removed
+            try
+            {
+                // Issue #1158: do not directly close the rocksDB instance as it is shared by other indexes
+                RocksetFactory.close();
+                writeOptions.close();
+                FileUtils.deleteDirectory(new File(rocksDBPath));
+            }
+            catch (IOException e)
+            {
+                throw new SinglePointIndexException("Failed to close and cleanup the RocksDB index", e);
+            }
             return true;
         }
-        catch (IOException e)
-        {
-            throw new SinglePointIndexException("Failed to close rockset index", e);
-        }
+        return false;
     }
 
     // ----------------- Encoding helpers -----------------
-    private byte[] toByteArray(IndexProto.IndexKey key)
+    protected static ByteBuffer toBuffer(long indexId, ByteString key, int bufferNum, long... postValues)
+            throws SinglePointIndexException
     {
-        // prefix = indexId(8 bytes, BE) + raw key bytes
-        byte[] indexIdBytes = writeLongBE(this.indexId);
-        byte[] rawKey = key.getKey().toByteArray();
-        return concat(indexIdBytes, rawKey);
-    }
-
-    private byte[] toNonUniqueKey(IndexProto.IndexKey key, long rowId)
-    {
-        // prefix + timestamp + rowId
-        return concat(concat(toByteArray(key), writeLongBE(key.getTimestamp())), writeLongBE(rowId));
-    }
-
-    private static byte[] concat(byte[] a, byte[] b)
-    {
-        byte[] out = new byte[a.length + b.length];
-        System.arraycopy(a, 0, out, 0, a.length);
-        System.arraycopy(b, 0, out, a.length, b.length);
-        return out;
-    }
-
-    private static boolean startsWith(byte[] key, byte[] prefix)
-    {
-        if (key.length < prefix.length) return false;
-        for (int i = 0; i < prefix.length; i++)
+        int keySize = key.size();
+        int totalLength = Long.BYTES + keySize + Long.BYTES * postValues.length;
+        ByteBuffer compositeKey;
+        if (bufferNum == 1)
         {
-            if (key[i] != prefix[i]) return false;
+            compositeKey = RocksetThreadResources.getKeyBuffer(totalLength);
         }
-        return true;
+        else if (bufferNum == 2)
+        {
+            compositeKey = RocksetThreadResources.getKeyBuffer2(totalLength);
+        }
+        else if (bufferNum == 3)
+        {
+            compositeKey = RocksetThreadResources.getKeyBuffer3(totalLength);
+        }
+        else
+        {
+            throw new SinglePointIndexException("Invalid buffer number");
+        }
+        // Write indexId (8 bytes, big endian)
+        compositeKey.putLong(indexId);
+        // Write key bytes (variable length)
+        key.copyTo(compositeKey);
+        // Write post values (8 bytes each, big endian)
+        for (long postValue : postValues)
+        {
+            compositeKey.putLong(postValue);
+        }
+        compositeKey.position(0);
+        return compositeKey;
     }
 
-    private static long extractRowIdFromKey(byte[] fullKey)
+    protected static ByteBuffer toKeyBuffer(IndexProto.IndexKey key) throws SinglePointIndexException
     {
-        if (fullKey.length < Long.BYTES) return -1L;
-        int off = fullKey.length - Long.BYTES;
-        return ByteBuffer.wrap(fullKey, off, Long.BYTES).getLong();
+        return toBuffer(key.getIndexId(), key.getKey(), 1, Long.MAX_VALUE - key.getTimestamp());
+    }
+
+    protected static ByteBuffer toNonUniqueKeyBuffer(IndexProto.IndexKey key, long rowId) throws SinglePointIndexException
+    {
+        return toBuffer(key.getIndexId(), key.getKey(), 1,
+                Long.MAX_VALUE - key.getTimestamp(), Long.MAX_VALUE - rowId);
+    }
+
+    // check if byte array starts with specified prefix
+    protected static boolean startsWith(ByteBuffer keyFound, ByteBuffer keyCurrent)
+    {
+        // prefix is indexId + key, without timestamp
+        int prefixLength = keyCurrent.limit() - Long.BYTES;
+        if (keyFound.limit() < prefixLength)
+        {
+            return false;
+        }
+        keyFound.position(0);
+        keyCurrent.position(0);
+        ByteBuffer keyFound1 = keyFound.slice();
+        keyFound1.limit(prefixLength);
+        ByteBuffer keyCurrent1 = keyCurrent.slice();
+        keyCurrent1.limit(prefixLength);
+        return keyFound1.compareTo(keyCurrent1) == 0;
+    }
+
+    // extract rowId from non-unique key
+    protected static long extractRowIdFromKey(ByteBuffer keyBuffer)
+    {
+        // extract rowId portion (last 8 bytes of key)
+        return Long.MAX_VALUE - keyBuffer.getLong(keyBuffer.limit() - Long.BYTES);
     }
 
     private static byte[] writeLongBE(long v)
     {
         return ByteBuffer.allocate(Long.BYTES).putLong(v).array();
+    }
+
+    public static byte[] byteBufferToByteArray(ByteBuffer byteBuffer) {
+        if (byteBuffer == null) {
+            return null;
+        }
+        byte[] byteArray = new byte[byteBuffer.remaining()];
+        byteBuffer.get(byteArray);
+        return byteArray;
     }
 }
