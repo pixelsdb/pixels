@@ -30,6 +30,7 @@ import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.transaction.TransService;
+import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.core.PixelsProto;
@@ -72,22 +73,6 @@ public class RetinaResourceManager
     private final int totalVirtualNodeNum;
 
     private final Map<Long, AtomicInteger> checkpointRefCounts;
-
-    private static class CheckpointEntry
-    {
-        final long fileId;
-        final int rgId;
-        final int recordNum;
-        final long[] bitmap;
-
-        CheckpointEntry(long fileId, int rgId, int recordNum, long[] bitmap)
-        {
-            this.fileId = fileId;
-            this.rgId = rgId;
-            this.recordNum = recordNum;
-            this.bitmap = bitmap;
-        }
-    }
 
     private enum CheckpointType
     {
@@ -324,7 +309,7 @@ public class RetinaResourceManager
 
         // 2. Use a BlockingQueue for producer-consumer pattern
         // Limit capacity to avoid excessive memory usage if writing is slow
-        BlockingQueue<CheckpointEntry> queue = new LinkedBlockingQueue<>(1024);
+        BlockingQueue<CheckpointFileIO.CheckpointEntry> queue = new LinkedBlockingQueue<>(1024);
 
         // 3. Start producer tasks to fetch bitmaps in parallel
         for (Map.Entry<String, RGVisibility> entry : entries)
@@ -338,7 +323,7 @@ public class RetinaResourceManager
                     int rgId = Integer.parseInt(parts[1]);
                     RGVisibility rgVisibility = entry.getValue();
                     long[] bitmap = rgVisibility.getVisibilityBitmap(timestamp);
-                    queue.put(new CheckpointEntry(fileId, rgId, (int) rgVisibility.getRecordNum(), bitmap));
+                    queue.put(new CheckpointFileIO.CheckpointEntry(fileId, rgId, (int) rgVisibility.getRecordNum(), bitmap));
                 } catch (Exception e)
                 {
                     logger.error("Failed to fetch visibility bitmap for checkpoint", e);
@@ -364,27 +349,8 @@ public class RetinaResourceManager
                 long startWrite = System.currentTimeMillis();
                 try
                 {
-                    Storage storage = StorageFactory.Instance().getStorage(filePath);
-                    // Use a temporary file to ensure atomic commit
-                    // Although LocalFS lacks rename, using a synchronized block here 
-                    // makes it safe within this JVM instance.
-                    try (DataOutputStream out = storage.create(filePath, true, 8 * 1024 * 1024))
-                    {
-                        out.writeInt(totalRgs);
-                        for (int i = 0; i < totalRgs; i++)
-                        {
-                            CheckpointEntry entry = queue.take();
-                            out.writeLong(entry.fileId);
-                            out.writeInt(entry.rgId);
-                            out.writeInt(entry.recordNum);
-                            out.writeInt(entry.bitmap.length);
-                            for (long l : entry.bitmap)
-                            {
-                                out.writeLong(l);
-                            }
-                        }
-                        out.flush();
-                    }
+                    // Use CheckpointFileIO for unified write logic
+                    CheckpointFileIO.writeCheckpoint(filePath, totalRgs, queue);
                     long endWrite = System.currentTimeMillis();
                     logger.info("Writing {} checkpoint file to {} took {} ms", type, filePath, (endWrite - startWrite));
 
@@ -736,23 +702,14 @@ public class RetinaResourceManager
                 Storage latestStorage = StorageFactory.Instance().getStorage(latestPath);
                 if (latestStorage.exists(latestPath))
                 {
-                    try (DataInputStream in = latestStorage.open(latestPath))
-                    {
-                        int rgCount = in.readInt();
-                        for (int i = 0; i < rgCount; i++)
-                        {
-                            long fileId = in.readLong();
-                            int rgId = in.readInt();
-                            int recordNum = in.readInt();
-                            int len = in.readInt();
-                            long[] bitmap = new long[len];
-                            for (int j = 0; j < len; j++)
-                            {
-                                bitmap[j] = in.readLong();
-                            }
-                            rgVisibilityMap.put(fileId + "_" + rgId, new RGVisibility(recordNum, latestTs, bitmap));
-                        }
-                    }
+                    // Use CheckpointFileIO for unified read + parallel parsing logic
+                    final long ts = latestTs;
+                    int rgCount = CheckpointFileIO.readCheckpointParallel(latestPath, entry -> {
+                        rgVisibilityMap.put(entry.fileId + "_" + entry.rgId,
+                                new RGVisibility(entry.recordNum, ts, entry.bitmap));
+                    }, checkpointExecutor);
+
+                    logger.info("Recovered {} RG entries from GC checkpoint", rgCount);
                 }
             } catch (IOException e)
             {
