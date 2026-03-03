@@ -162,12 +162,14 @@
                             <goal>run</goal>
                         </goals>
                         <configuration>
-                            <target>
-                                <loadproperties srcFile="${env.PIXELS_HOME}/etc/pixels.properties"/>
+                            <target xmlns:if="ant:if">
+                                <!-- 仅当 pixels.properties 文件存在时才加载配置 -->
+                                <available file="${env.PIXELS_HOME}/etc/pixels.properties" property="pixels.properties.exists"/>
+                                <loadproperties srcFile="${env.PIXELS_HOME}/etc/pixels.properties" if:set="pixels.properties.exists"/>
                                 <exec executable="cmake" failonerror="true" outputproperty="cmake.output" errorproperty="cmake.error">
                                     <arg line="-B ${project.basedir}/../cpp/pixels-retina/build"/>
                                     <arg line="-S ${project.basedir}/../cpp/pixels-retina"/>
-                                    <arg line="-DRETINA_CAPACITY=${retina.tile.visibility.capacity}"/>
+                                    <arg line="-DRETINA_CAPACITY=${retina.tile.visibility.capacity}" if:set="retina.tile.visibility.capacity"/>
                                     <arg line="-DENABLE_JEMALLOC=OFF"/>
                                 </exec>
                                 <exec executable="make" dir="${project.basedir}/../cpp/pixels-retina/build" failonerror="true" outputproperty="make.output" errorproperty="make.error">
