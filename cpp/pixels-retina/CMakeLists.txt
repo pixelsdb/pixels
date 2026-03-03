@@ -33,6 +33,7 @@ if(ENABLE_JEMALLOC)
             URL https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
             CONFIGURE_COMMAND <SOURCE_DIR>/configure
             --prefix=${JEMALLOC_INSTALL_DIR}
+            --with-jemalloc-prefix=je_
             --enable-prof
             --enable-stats
             --enable-shared
@@ -51,7 +52,6 @@ if(ENABLE_JEMALLOC)
     add_dependencies(jemalloc_lib jemalloc_ext)
 
     add_definitions(-DENABLE_JEMALLOC)
-    add_definitions(-DJEMALLOC_MANGLE)
 endif()
 
 # Disable gtest installation
