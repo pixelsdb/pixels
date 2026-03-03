@@ -93,9 +93,18 @@ add_library(pixels-retina SHARED ${SOURCES})
 set_target_properties(pixels-retina PROPERTIES
         OUTPUT_NAME "pixels-retina"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        # Set the rpath to the current directory, so that the jemalloc library can be found at runtime
+        INSTALL_RPATH "$ORIGIN"
+        BUILD_RPATH "$ORIGIN"
 )
 
 target_link_libraries(pixels-retina PRIVATE ${JNI_LIBRARIES})
+
+# Disable rpath
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+set_target_properties(pixels-retina PROPERTIES
+        INSTALL_RPATH_USE_LINK_PATH FALSE
+)
 
 if(ENABLE_JEMALLOC)
     target_link_libraries(pixels-retina PRIVATE jemalloc_lib pthread dl)
