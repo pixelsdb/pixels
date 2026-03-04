@@ -351,12 +351,15 @@ public class RocksDBFactory
 
                 // 3. Format string with both RocksDB and JVM data
                 // We use GiB for all units to keep the Shell script calculations simple
+                // 3. Get Current Timestamp (ms)
+                long timestamp = System.currentTimeMillis();
                 double GiB = 1024.0 * 1024.0 * 1024.0;
 
                 String formattedMetrics = String.format(
                         "Timestamp=%d RocksDB_Native[Total=%.4f GiB (%d Bytes), MemTable=%.4f GiB (%d Bytes), " +
                                 "BlockCache=%.4f GiB (%d Bytes)]" +
                                 "JVM_Heap[Used=%.4f GiB (%d Bytes), Committed=%.4f GiB (%d Bytes), Max=%.4f GiB (%d Bytes)]",
+                        timestamp,
                         totalNativeBytes / GiB,
                         memTable / GiB,
                         blockCacheOnly / GiB,
