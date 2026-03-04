@@ -15,7 +15,6 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.source>1.8</maven.compiler.source>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <pixels.retina.capacity>10240</pixels.retina.capacity>
     </properties>
 
     <dependencies>
@@ -163,11 +162,14 @@
                             <goal>run</goal>
                         </goals>
                         <configuration>
-                            <target>
+                            <target xmlns:if="ant:if">
+                                <!-- Load only if pixels.properties exists, and only when the configuration file contains the retina tile visibility capacity setting. -->
+                                <available file="${env.PIXELS_HOME}/etc/pixels.properties" property="pixels.properties.exists"/>
+                                <loadproperties srcFile="${env.PIXELS_HOME}/etc/pixels.properties" if:set="pixels.properties.exists"/>
                                 <exec executable="cmake" failonerror="true" outputproperty="cmake.output" errorproperty="cmake.error">
                                     <arg line="-B ${project.basedir}/../cpp/pixels-retina/build"/>
                                     <arg line="-S ${project.basedir}/../cpp/pixels-retina"/>
-                                    <arg line="-DRETINA_CAPACITY=${pixels.retina.capacity}"/>
+                                    <arg line="-DRETINA_CAPACITY=${retina.tile.visibility.capacity}" if:set="retina.tile.visibility.capacity"/>
                                 </exec>
                                 <exec executable="make" dir="${project.basedir}/../cpp/pixels-retina/build" failonerror="true" outputproperty="make.output" errorproperty="make.error">
                                     <arg value="install"/>

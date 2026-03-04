@@ -155,13 +155,13 @@ JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getNativeMem
 
     // 1. Try to refresh jemalloc epoch to ensure stats are current.
     // Return -2 if this fails, as defined in Java's handleMemoryMetric.
-    if (mallctl("epoch", NULL, NULL, &epoch, sizeof(uint64_t)) != 0) {
+    if (je_mallctl("epoch", NULL, NULL, &epoch, sizeof(uint64_t)) != 0) {
         return -2;
     }
 
     // 2. Try to read the actual allocated bytes.
     // Return -3 if this fails, which often implies a config/prefix mismatch.
-    if (mallctl("stats.allocated", &allocated, &sz, NULL, 0) != 0) {
+    if (je_mallctl("stats.allocated", &allocated, &sz, NULL, 0) != 0) {
         return -3;
     }
 

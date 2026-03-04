@@ -33,6 +33,7 @@ if(ENABLE_JEMALLOC)
             URL https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
             CONFIGURE_COMMAND <SOURCE_DIR>/configure
             --prefix=${JEMALLOC_INSTALL_DIR}
+            --with-jemalloc-prefix=je_
             --enable-prof
             --enable-stats
             --enable-shared
@@ -51,7 +52,6 @@ if(ENABLE_JEMALLOC)
     add_dependencies(jemalloc_lib jemalloc_ext)
 
     add_definitions(-DENABLE_JEMALLOC)
-    add_definitions(-DJEMALLOC_MANGLE)
 endif()
 
 # Disable gtest installation
@@ -93,9 +93,18 @@ add_library(pixels-retina SHARED ${SOURCES})
 set_target_properties(pixels-retina PROPERTIES
         OUTPUT_NAME "pixels-retina"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        # Set the rpath to the current directory, so that the jemalloc library can be found at runtime
+        INSTALL_RPATH "$ORIGIN"
+        BUILD_RPATH "$ORIGIN"
 )
 
 target_link_libraries(pixels-retina PRIVATE ${JNI_LIBRARIES})
+
+# Disable rpath
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+set_target_properties(pixels-retina PROPERTIES
+        INSTALL_RPATH_USE_LINK_PATH FALSE
+)
 
 if(ENABLE_JEMALLOC)
     target_link_libraries(pixels-retina PRIVATE jemalloc_lib pthread dl)
