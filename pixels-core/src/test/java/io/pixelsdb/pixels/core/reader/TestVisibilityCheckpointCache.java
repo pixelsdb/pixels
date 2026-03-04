@@ -21,16 +21,13 @@ package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.LongAdder;
 
 import static org.junit.Assert.assertNotNull;
@@ -65,30 +62,28 @@ public class TestVisibilityCheckpointCache
     /**
      * Helper to create a dummy checkpoint file.
      */
-    private void createDummyCheckpoint(String path, int numFiles, int rgsPerFile, long[] bitmap) throws IOException
+    private void createDummyCheckpoint(String path, int numFiles, int rgsPerFile, long[] bitmap) throws Exception
     {
-        try (DataOutputStream out = storage.create(path, true, 8 * 1024 * 1024))
+        // Default recordNum = bitmap.length * 64 (each long represents 64 rows)
+        createDummyCheckpoint(path, numFiles, rgsPerFile, bitmap, bitmap.length * 64);
+    }
+
+    private void createDummyCheckpoint(String path, int numFiles, int rgsPerFile, long[] bitmap, int recordNum) throws Exception
+    {
+        int totalRgs = numFiles * rgsPerFile;
+        BlockingQueue<CheckpointFileIO.CheckpointEntry> queue = new LinkedBlockingQueue<>(totalRgs);
+        for (int f = 0; f < numFiles; f++)
         {
-            out.writeInt(numFiles * rgsPerFile);
-            for (int f = 0; f < numFiles; f++)
+            for (int r = 0; r < rgsPerFile; r++)
             {
-                for (int r = 0; r < rgsPerFile; r++)
-                {
-                    out.writeLong((long)f);
-                    out.writeInt(r);
-                    out.writeInt(bitmap.length);
-                    for (long l : bitmap)
-                    {
-                        out.writeLong(l);
-                    }
-                }
+                queue.put(new CheckpointFileIO.CheckpointEntry((long) f, r, recordNum, bitmap));
             }
-            out.flush();
         }
+        CheckpointFileIO.writeCheckpoint(path, totalRgs, queue);
     }
 
     @Test
-    public void testCacheLoading() throws IOException
+    public void testCacheLoading() throws Exception
     {
         long timestamp = 1000L;
         String checkpointPath = resolve(testCheckpointDir, "vis_gc_tencent_100.bin");
@@ -108,7 +103,7 @@ public class TestVisibilityCheckpointCache
      * Migrated and adapted performance test.
      */
     @Test
-    public void testCheckpointPerformance() throws InterruptedException, IOException
+    public void testCheckpointPerformance() throws Exception
     {
         // 1. Configuration parameters
         int numFiles = 5000;

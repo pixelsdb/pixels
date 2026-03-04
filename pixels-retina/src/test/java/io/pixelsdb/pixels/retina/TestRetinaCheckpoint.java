@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -382,6 +383,132 @@ public class TestRetinaCheckpoint
 
         assertTrue("Timeout waiting for concurrency test", finished);
         assertFalse("Errors occurred during concurrency test", errorOccurred.get());
+    }
+
+    @Test
+    public void testCheckpointPerformance() throws RetinaException, IOException, InterruptedException
+    {
+        // 1. Performance Test Configuration
+        double targetDeleteRatio = 0.0; // @TARGET_DELETE_RATIO@
+        int numFiles = 50000;
+        int rowsPerRg = 200000;
+        long totalRows = (long) numFiles * rowsPerRg;
+        long timestamp = System.currentTimeMillis();
+
+        System.out.printf("Target Delete Ratio: %.2f%%%n", targetDeleteRatio * 100);
+        System.out.printf("Total Rows: %,d%n", totalRows);
+
+        // 2. Populate Visibility Data
+        System.out.println("[Perf] Populating visibility data...");
+        for (int i = 0; i < numFiles; i++)
+        {
+            retinaManager.addVisibility(i, 0, rowsPerRg);
+        }
+
+        // 3. Delete Records based on Ratio
+        System.out.println("[Perf] Deleting records...");
+        long totalDeleted = 0;
+        if (targetDeleteRatio > 0)
+        {
+            // Delete contiguous block for performance stability
+            int rowsToDeletePerRg = (int) (rowsPerRg * targetDeleteRatio);
+            for (int i = 0; i < numFiles; i++)
+            {
+                // Delete rows 0 to rowsToDeletePerRg - 1
+                for (int j = 0; j < rowsToDeletePerRg; j++)
+                {
+                    retinaManager.deleteRecord(i, 0, j, timestamp);
+                }
+                totalDeleted += rowsToDeletePerRg;
+            }
+        }
+        double actualRatio = (double) totalDeleted / totalRows;
+        System.out.printf("Actual Ratio: %.2f%%%n", actualRatio * 100);
+
+        // Measure Memory before Offload
+        System.gc();
+        Thread.sleep(1000);
+        long memBeforeOffload = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+
+        // 4. Register Offload (Checkpoint Creation)
+        System.out.println("[Perf] Starting Offload...");
+        long startOffload = System.nanoTime();
+        retinaManager.registerOffload(timestamp);
+        long endOffload = System.nanoTime();
+        double offloadTimeMs = (endOffload - startOffload) / 1_000_000.0;
+        System.out.printf("Total Offload Time: %.2f ms%n", offloadTimeMs);
+
+        // Measure Peak Memory (Approximation: Current - Before)
+        long memAfterOffload = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        double peakMemMb = Math.max(0, (memAfterOffload - memBeforeOffload) / (1024.0 * 1024.0));
+        System.out.printf("Offload Peak Mem Overhead: %.2f MB%n", peakMemMb);
+
+        // File Size
+        String checkpointPath = resolve(testCheckpointDir, getOffloadFileName(timestamp));
+        long fileSizeBytes = storage.getStatus(checkpointPath).getLength();
+        double fileSizeMb = fileSizeBytes / (1024.0 * 1024.0);
+        System.out.printf("Checkpoint File Size: %.2f MB%n", fileSizeMb);
+
+        // Write Throughput
+        double writeThroughput = fileSizeMb / (offloadTimeMs / 1000.0);
+        System.out.printf("Write Throughput: %.2f MB/s%n", writeThroughput);
+
+        // 5. Simulate System Restart (Cold Load)
+        System.out.println("[Perf] Simulating restart...");
+        // Rename to GC file to simulate persisted state
+        String gcPath = resolve(testCheckpointDir, getGcFileName(timestamp));
+        // Simple copy since no rename
+        try (DataInputStream in = storage.open(checkpointPath);
+             DataOutputStream out = storage.create(gcPath, true, 8 * 1024 * 1024))
+        {
+            byte[] buffer = new byte[64 * 1024]; // 64KB copy buffer
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1)
+            {
+                out.write(buffer, 0, bytesRead);
+            }
+        }
+        storage.delete(checkpointPath, false);
+
+        resetSingletonState();
+        System.gc();
+        Thread.sleep(1000);
+        long memBeforeLoad = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+
+        // Recover
+        long startLoad = System.nanoTime();
+        retinaManager.recoverCheckpoints();
+        long endLoad = System.nanoTime();
+        double loadTimeMs = (endLoad - startLoad) / 1_000_000.0;
+        System.out.printf("First Load Time (Cold): %.2f ms%n", loadTimeMs);
+
+        // Load Memory Overhead
+        long memAfterLoad = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        double loadMemMb = Math.max(0, (memAfterLoad - memBeforeLoad) / (1024.0 * 1024.0));
+        System.out.printf("Load Memory Overhead: %.2f MB%n", loadMemMb);
+
+        // Read Throughput
+        double readThroughput = fileSizeMb / (loadTimeMs / 1000.0);
+        System.out.printf("Read/Parse Throughput: %.2f MB/s%n", readThroughput);
+
+        // 6. Avg Memory Hit Latency
+        System.out.println("[Perf] Measuring Memory Hit Latency...");
+        long totalLatencyNs = 0;
+        int latencySamples = 10000;
+        for (int i = 0; i < latencySamples; i++)
+        {
+            // Random file query
+            long randomFileId = ThreadLocalRandom.current().nextInt(numFiles);
+            long startQuery = System.nanoTime();
+            retinaManager.queryVisibility(randomFileId, 0, timestamp);
+            long endQuery = System.nanoTime();
+            totalLatencyNs += (endQuery - startQuery);
+        }
+        double avgLatencyMs = (totalLatencyNs / (double) latencySamples) / 1_000_000.0;
+        System.out.printf("Avg Memory Hit Latency: %.4f ms%n", avgLatencyMs);
+
+        // Cleanup
+        storage.delete(gcPath, false);
     }
 
     /**

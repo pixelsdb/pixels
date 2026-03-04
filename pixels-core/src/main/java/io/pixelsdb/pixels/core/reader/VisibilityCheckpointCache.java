@@ -21,18 +21,12 @@ package io.pixelsdb.pixels.core.reader;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import io.pixelsdb.pixels.common.physical.PhysicalReader;
-import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
-import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -88,47 +82,18 @@ public class VisibilityCheckpointCache
 
     private Map<String, long[]> loadCheckpointFile(String path) throws IOException
     {
-        long start = System.currentTimeMillis();
-        Storage storage = StorageFactory.Instance().getStorage(path);
-        long fileLength = storage.getStatus(path).getLength();
+        long startTime = System.currentTimeMillis();
 
-        byte[] content;
-        try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(storage, path))
-        {
-            ByteBuffer buffer = reader.readFully((int) fileLength);
-            if (buffer.hasArray())
-            {
-                content = buffer.array();
-            }
-            else
-            {
-                content = new byte[(int) fileLength];
-                buffer.get(content);
-            }
-        }
+        // Use ConcurrentHashMap to support concurrent writes from parallel parsing
+        Map<String, long[]> timestampCache = new ConcurrentHashMap<>();
 
-        Map<String, long[]> timestampCache;
-        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(content)))
-        {
-            int rgCount = in.readInt();
-            // Initial capacity: count / 0.75 + 1 to avoid rehash
-            timestampCache = new ConcurrentHashMap<>((int) (rgCount / 0.75) + 1);
-            
-            for (int i = 0; i < rgCount; i++)
-            {
-                long fileId = in.readLong();
-                int rgId = in.readInt();
-                int len = in.readInt();
-                long[] bitmap = new long[len];
-                for (int j = 0; j < len; j++)
-                {
-                    bitmap[j] = in.readLong();
-                }
-                timestampCache.put(fileId + "_" + rgId, bitmap);
-            }
-        }
-        long end = System.currentTimeMillis();
-        logger.info("Loaded visibility checkpoint from {} in {} ms, RG count: {}", path, (end - start), timestampCache.size());
+        // Use CheckpointFileIO for unified read + parallel parsing logic
+        int rgCount = CheckpointFileIO.readCheckpointParallel(path, entry -> {
+            timestampCache.put(entry.fileId + "_" + entry.rgId, entry.bitmap);
+        });
+
+        long endTime = System.currentTimeMillis();
+        logger.info("Loaded visibility checkpoint from {} in {} ms, RG count: {}", path, (endTime - startTime), timestampCache.size());
         return timestampCache;
     }
 }
