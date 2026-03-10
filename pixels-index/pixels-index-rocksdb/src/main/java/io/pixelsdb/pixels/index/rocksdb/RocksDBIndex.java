@@ -61,7 +61,7 @@ public class RocksDBIndex extends CachingSinglePointIndex
     private final AtomicBoolean removed = new AtomicBoolean(false);
     private static final boolean multiCF = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rocksdb.multicf"));
 
-    public RocksDBIndex(long tableId, long indexId, boolean unique, IndexOption indexOption) throws RocksDBException
+    public RocksDBIndex(long tableId, long indexId, boolean unique, IndexOption indexOption) throws RocksDBException,SinglePointIndexException
     {
         super();
         this.tableId = tableId;

@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.index.rocksdb;
 import org.junit.Test;
 import org.rocksdb.*;
 import org.rocksdb.util.SizeUnit;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -347,7 +348,7 @@ public class TestRocksDB
     }
 
     @Test
-    public void testFullCompaction() throws RocksDBException
+    public void testFullCompaction() throws RocksDBException,SinglePointIndexException
     {
         // List of RocksDB storage paths
         List<String> dbPaths = new ArrayList<>();
@@ -376,7 +377,7 @@ public class TestRocksDB
                         {
                             executeSingleDbCompaction(dbPath);
                         }
-                        catch (RocksDBException e)
+                        catch (RocksDBException | SinglePointIndexException e)
                         {
                             throw new RuntimeException("Compaction failed for " + dbPath, e);
                         }
@@ -395,7 +396,7 @@ public class TestRocksDB
         System.out.println("All compactions finished. Total Duration: " + (totalEnd - totalStart) + "ms");
     }
 
-    private void executeSingleDbCompaction(String dbPath) throws RocksDBException
+    private void executeSingleDbCompaction(String dbPath) throws RocksDBException,SinglePointIndexException
     {
         long startTime = System.currentTimeMillis();
         System.out.println("Thread [" + Thread.currentThread().getName() + "] Opening DB: " + dbPath);

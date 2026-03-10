@@ -17,6 +17,7 @@
 package io.pixelsdb.pixels.index.rocksdb;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.IndexUtils;
@@ -67,7 +68,7 @@ public class RocksDBFactory
 
     private RocksDBFactory() { }
 
-    static RocksDB createRocksDB(String rocksDBPath) throws RocksDBException
+    static RocksDB createRocksDB(String rocksDBPath) throws RocksDBException,SinglePointIndexException
     {
         // 1. Get existing column families (returns empty list for new database)
         List<byte[]> existingColumnFamilies;
@@ -104,7 +105,7 @@ public class RocksDBFactory
         List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
         for(byte[] existingColumnFamily: existingColumnFamilies)
         {
-            long[] ids = parseTableAndIndexId(existingColumnFamily);
+            long[] ids = IndexUtils.parseTableAndIndexId(existingColumnFamily);
             Integer keyLen = null;
             if(ids != null)
             {
@@ -188,11 +189,7 @@ public class RocksDBFactory
         int fixedLengthPrefix = Integer.parseInt(config.getProperty("index.rocksdb.prefix.length"));
         if (keyLen != null)
         {
-            fixedLengthPrefix = keyLen;
-            if (!multiCF)
-            {
-                fixedLengthPrefix +=  Long.BYTES; // index id + key buffer
-            }
+            fixedLengthPrefix = keyLen + Long.BYTES; // key buffer + index id
         }
         CompactionStyle compactionStyle = CompactionStyle.valueOf(config.getProperty("index.rocksdb.compaction.style"));
 
@@ -222,9 +219,9 @@ public class RocksDBFactory
     /**
      * Get or create a ColumnFamily for (tableId, indexId).
      */
-    public static synchronized ColumnFamilyHandle getOrCreateColumnFamily(long tableId, long indexId, int vNodeId) throws RocksDBException
+    public static synchronized ColumnFamilyHandle getOrCreateColumnFamily(long tableId, long indexId, int vNodeId) throws RocksDBException,SinglePointIndexException
     {
-        String cfName = getCFName(tableId, indexId, vNodeId);
+        String cfName = IndexUtils.getCFName(tableId, indexId, vNodeId, multiCF);
 
         // Return cached handle if exists
         if (cfHandles.containsKey(cfName))
@@ -253,116 +250,7 @@ public class RocksDBFactory
         return cfHandles;
     }
 
-    private static String getCFName(long tableId, long indexId, int vNodeId)
-    {
-        if(multiCF)
-        {
-            return "t" + tableId + "_i" + indexId + "_v" + vNodeId;
-        }
-        else
-        {
-            return defaultColumnFamily;
-        }
-    }
-
-    private static long[] parseTableAndIndexId(byte[] cfNameBytes) throws RocksDBException
-    {
-        if (cfNameBytes == null || Arrays.equals(cfNameBytes, RocksDB.DEFAULT_COLUMN_FAMILY))
-        {
-            return null;
-        }
-
-        String name = new String(cfNameBytes, StandardCharsets.UTF_8);
-
-        try
-        {
-            // Expected format: "t{tableId}_i{indexId}_v{vNodeId}"
-            // Example: "t100_i200_v5" -> ["100", "200", "30"]
-            if (name.startsWith("t") && name.contains("_i") && name.contains("_v"))
-            {
-                // Remove the leading 't'
-                String content = name.substring(1);
-
-                // Split using regex for multiple delimiters: _i and _v
-                String[] parts = content.split("_i|_v");
-
-                if (parts.length == 3)
-                {
-                    long tableId = Long.parseLong(parts[0]);
-                    long indexId = Long.parseLong(parts[1]);
-                    long vNodeId = Long.parseLong(parts[2]);
-
-                    return new long[]{tableId, indexId, vNodeId};
-                }
-                else
-                {
-                    throw new RocksDBException("Failed to parse CF name (invalid segments): " + name);
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            throw new RocksDBException("Failed to parse CF name: " + name);
-        }
-
-        return null;
-    }
-
-    private static Integer getIndexKeyLen(long tableId, long indexId) throws MetadataException
-    {
-        // Try to retrieve from cache using only indexId
-        Integer cachedLen = indexKeyLenCache.get(indexId);
-        if (cachedLen != null)
-        {
-            return cachedLen.equals(VARIABLE_LEN_SENTINEL) ? null : cachedLen;
-        }
-
-        // Cache miss: Perform the metadata lookup
-        List<Column> keyColumns = IndexUtils.extractInfoFromIndex(tableId, indexId);
-        TypeDescription keySchema = TypeDescription.createSchemaFromColumns(keyColumns);
-
-        int keyLen = 0;
-        Integer result = null;
-
-        if (keySchema.getChildren() != null)
-        {
-            boolean isFixedLen = true;
-            for (TypeDescription typeDescription : keySchema.getChildren())
-            {
-                int colLen = keyLengthOf(typeDescription.getCategory().getExternalJavaType());
-                if (colLen == -1)
-                {
-                    isFixedLen = false;
-                    break;
-                }
-                keyLen += colLen;
-            }
-
-            if (isFixedLen)
-            {
-                result = keyLen;
-            }
-        }
-
-        // Update cache (store result or sentinel)
-        indexKeyLenCache.put(indexId, result == null ? VARIABLE_LEN_SENTINEL : result);
-
-        return result;
-    }
-
-    public static int keyLengthOf(Class<?> clazz) {
-        if (clazz == boolean.class) return 1;
-        if (clazz == byte.class)    return 1;
-        if (clazz == short.class)   return 2;
-        if (clazz == int.class)     return 4;
-        if (clazz == long.class)    return 8;
-        if (clazz == float.class)   return 4;
-        if (clazz == double.class)  return 8;
-
-        // Not Primitive
-        return -1;
-    }
-    public static synchronized RocksDB getRocksDB() throws RocksDBException
+    public static synchronized RocksDB getRocksDB() throws RocksDBException,SinglePointIndexException
     {
         if (instance == null || instance.isClosed())
         {
@@ -396,9 +284,51 @@ public class RocksDBFactory
         return dbPath;
     }
 
+    private static Integer getIndexKeyLen(long tableId, long indexId) throws MetadataException
+    {
+        // Try to retrieve from cache using only indexId
+        Integer cachedLen = indexKeyLenCache.get(indexId);
+        if (cachedLen != null)
+        {
+            return cachedLen.equals(VARIABLE_LEN_SENTINEL) ? null : cachedLen;
+        }
+
+        // Cache miss: Perform the metadata lookup
+        List<Column> keyColumns = IndexUtils.extractInfoFromIndex(tableId, indexId);
+        TypeDescription keySchema = TypeDescription.createSchemaFromColumns(keyColumns);
+
+        int keyLen = 0;
+        Integer result = null;
+
+        if (keySchema.getChildren() != null)
+        {
+            boolean isFixedLen = true;
+            for (TypeDescription typeDescription : keySchema.getChildren())
+            {
+                int colLen = IndexUtils.keyLengthOf(typeDescription.getCategory().getExternalJavaType());
+                if (colLen == -1)
+                {
+                    isFixedLen = false;
+                    break;
+                }
+                keyLen += colLen;
+            }
+
+            if (isFixedLen)
+            {
+                result = keyLen;
+            }
+        }
+
+        // Update cache (store result or sentinel)
+        indexKeyLenCache.put(indexId, result == null ? VARIABLE_LEN_SENTINEL : result);
+
+        return result;
+    }
+
     private static void startRocksDBLogThread(RocksDB db)
     {
-        int logInterval = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.metrics.log.interval"));
+        int logInterval = Integer.parseInt(ConfigFactory.Instance().getProperty("index.rocksdb.log.interval"));
         List<RocksDB> dbList = Collections.singletonList(db);
 
         scheduler.scheduleAtFixedRate(() ->
@@ -410,7 +340,8 @@ public class RocksDBFactory
                 long tableReaders = memoryUsage.getOrDefault(MemoryUsageType.kTableReadersTotal, 0L);
                 long memTable = memoryUsage.getOrDefault(MemoryUsageType.kMemTableTotal, 0L);
                 long blockCacheOnly = db.getLongProperty("rocksdb.block-cache-usage");
-                long totalNativeBytes = tableReaders + memTable + blockCacheOnly;
+                long indexFilterOnly = Math.max(0, tableReaders - blockCacheOnly);
+                long totalNativeBytes = tableReaders + memTable;
 
                 // 2. Get JVM Heap Metrics
                 Runtime runtime = Runtime.getRuntime();
@@ -418,10 +349,10 @@ public class RocksDBFactory
                 long heapCommitted = runtime.totalMemory();
                 long heapUsed = heapCommitted - runtime.freeMemory();
 
+                // 3. Format string with both RocksDB and JVM data
+                // We use GiB for all units to keep the Shell script calculations simple
                 // 3. Get Current Timestamp (ms)
                 long timestamp = System.currentTimeMillis();
-
-                // 4. Formatting
                 double GiB = 1024.0 * 1024.0 * 1024.0;
 
                 String formattedMetrics = String.format(
@@ -429,12 +360,13 @@ public class RocksDBFactory
                                 "BlockCache=%.4f GiB (%d Bytes)]" +
                                 "JVM_Heap[Used=%.4f GiB (%d Bytes), Committed=%.4f GiB (%d Bytes), Max=%.4f GiB (%d Bytes)]",
                         timestamp,
-                        totalNativeBytes / GiB, totalNativeBytes,
-                        memTable / GiB, memTable,
-                        blockCacheOnly / GiB, blockCacheOnly,
-                        heapUsed / GiB, heapUsed,
-                        heapCommitted / GiB, heapCommitted,
-                        heapMax / GiB, heapMax
+                        totalNativeBytes / GiB,
+                        memTable / GiB,
+                        blockCacheOnly / GiB,
+                        indexFilterOnly / GiB,
+                        heapUsed / GiB,
+                        heapCommitted / GiB,
+                        heapMax / GiB
                 );
 
                 logger.info("[RocksDB Metrics] {}", formattedMetrics);

@@ -50,7 +50,7 @@ public class TestRocksDBIndex
     private SinglePointIndex nonUniqueIndex;
 
     @BeforeEach
-    public void setUp() throws RocksDBException
+    public void setUp() throws RocksDBException,SinglePointIndexException
     {
         IndexOption option = IndexOption.builder()
                 .vNodeId(0)

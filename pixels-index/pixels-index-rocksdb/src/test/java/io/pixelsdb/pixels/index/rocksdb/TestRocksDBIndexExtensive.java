@@ -51,7 +51,7 @@ public class TestRocksDBIndexExtensive
     private RocksDBIndex nonUniqueIndex;
 
     @Before
-    public void setUp() throws RocksDBException
+    public void setUp() throws RocksDBException, SinglePointIndexException
     {
         IndexOption option = IndexOption.builder()
                 .vNodeId(0)

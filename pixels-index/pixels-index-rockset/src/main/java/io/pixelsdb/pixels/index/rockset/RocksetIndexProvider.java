@@ -51,7 +51,7 @@ public class RocksetIndexProvider implements SinglePointIndexProvider
                  CloudDBOptions dbOptions = new CloudDBOptions().setBucketName(bucketName).setS3Prefix(s3Prefix)
                          .setLocalDbPath(localDbPath).setPersistentCachePath(persistentCachePath)
                          .setPersistentCacheSizeGB(persistentCacheSizeGB).setReadOnly(readOnly);
-                 return new RocksetIndex(tableId, indexId, dbOptions, unique);
+                 return new RocksetIndex(tableId, indexId, unique, indexOption);
              }
              catch (Exception e)
              {
