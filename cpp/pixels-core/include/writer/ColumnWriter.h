@@ -29,9 +29,6 @@
 #include "physical/natives/ByteBuffer.h"
 #include "pixels-common/pixels.pb.h"
 #include <cmath>
-#include <cmath>
-#include "duckdb.h"
-#include "duckdb/common/types/vector.hpp"
 #include "PixelsFilter.h"
 #include "writer/PixelsWriterOption.h"
 #include "stats/StatsRecorder.h"

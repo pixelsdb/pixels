@@ -1,40 +1,16 @@
-/*
- * Copyright 2023 PixelsDB.
- *
- * This file is part of Pixels.
- *
- * Pixels is free software: you can redistribute it and/or modify
- * it under the terms of the Affero GNU General Public License as
- * published by the Free Software Foundation, either version 3 of
- * the License, or (at your option) any later version.
- *
- * Pixels is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * Affero GNU General Public License for more details.
- *
- * You should have received a copy of the Affero GNU General Public
- * License along with Pixels.  If not, see
- * <https://www.gnu.org/licenses/>.
- */
-
-/*
- * @author liyu
- * @create 2023-03-15
- */
 #include "reader/PixelsReaderOption.h"
 
 PixelsReaderOption::PixelsReaderOption()
 {
-    // TODO: pixelsPredicate
     skipCorruptRecords = false;
     tolerantSchemaEvolution = true;
     enableEncodedColumnVector = true;
-    enableFilterPushDown = false;
+    enableFilterPushDown = false; 
     queryId = -1L;
     batchSize = 0;
     rgStart = 0;
     rgLen = -1;  // -1 means reading to the end of the file
+    ringIndex = 0; // 显式初始化
 }
 
 void PixelsReaderOption::setIncludeCols(const std::vector <std::string> &columnNames)
@@ -121,14 +97,18 @@ bool PixelsReaderOption::isEnabledFilterPushDown()
     return this->enableFilterPushDown;
 }
 
-void PixelsReaderOption::setFilter(duckdb::TableFilterSet *filter)
-{
-    this->filter = filter;
+
+void PixelsReaderOption::setFilter(pixels::TableFilterSet f) {
+    //std::cout<<"at set filter"<<f.filters.size()<<std::endl;
+    filter = std::move(f);
 }
 
-duckdb::TableFilterSet *PixelsReaderOption::getFilter()
-{
-    return this->filter;
+pixels::TableFilterSet PixelsReaderOption::extractFilter() {
+    return std::move(filter);
+}
+
+int PixelsReaderOption::getfiltersize(){
+    return filter.filters.size();
 }
 
 void PixelsReaderOption::setBatchSize(int batchSize)
@@ -140,13 +120,3 @@ int PixelsReaderOption::getBatchSize() const
 {
     return batchSize;
 }
-
-
-
-
-
-
-
-
-
-

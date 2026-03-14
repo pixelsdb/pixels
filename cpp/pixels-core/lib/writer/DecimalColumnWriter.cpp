@@ -38,7 +38,7 @@ int DecimalColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
         throw std::invalid_argument("Invalid vector type");
     }
 
-    long *values = columnVector->vector;
+    long *values = (long*)columnVector->vector;
     EncodingUtils encodingUtils;
 
     for (int i = 0; i < size; i++)

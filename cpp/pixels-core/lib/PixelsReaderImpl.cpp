@@ -52,6 +52,7 @@ std::shared_ptr <PixelsRecordReader> PixelsReaderImpl::read(PixelsReaderOption o
                     physicalReader, postScript,
                     footer, option, pixelsFooterCache);
     recordReaders.emplace_back(recordReader);
+    //std::cout<<"at the end of reader move the size of filters is "<<option.getfiltersize()<<std::endl;
     return recordReader;
 }
 

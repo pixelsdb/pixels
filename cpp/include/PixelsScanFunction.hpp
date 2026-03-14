@@ -87,6 +87,8 @@
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
 #include "duckdb/common/multi_file/multi_file_reader.hpp"
+#include "filter/table_filter.hpp"//转换filter
+#include "filter/constant_filter.hpp"
 
 #endif
 
@@ -117,9 +119,8 @@ namespace duckdb
                                             PixelsReadLocalState &scan_data, PixelsReadGlobalState &parallel_state,
                                             bool is_init_state = false);
 
-        static PixelsReaderOption
-        GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state);
-
+        static PixelsReaderOption GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state);
+        static pixels::TableFilterSet ConvertDuckDBFilter(TableFilterSet *filters);
     private:
         static void TransformDuckdbType(const std::shared_ptr <TypeDescription> &type,
                                         vector <LogicalType> &return_types);

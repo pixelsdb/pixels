@@ -37,9 +37,6 @@
  * The fields are public by design since this is a performance-critical
  * structure that is used in the inner loop of query execution.
  */
-
-#include "duckdb.h"
-
 #include "exception/InvalidArgumentException.h"
 #include <iostream>
 #include <memory>
@@ -57,6 +54,10 @@
  * structure that is used in the inner loop of query execution.
  */
 
+#include <cstdint> // 确保包含了基础类型定义
+
+// ✅ 添加这一行，定义 idx_t
+using idx_t = uint64_t;
 class ColumnVector
 {
 public:

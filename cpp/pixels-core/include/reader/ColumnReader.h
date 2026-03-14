@@ -28,10 +28,11 @@
 #include "TypeDescription.h"
 #include "physical/natives/ByteBuffer.h"
 #include "pixels-common/pixels.pb.h"
-#include "math.h"
-#include "duckdb.h"
-#include "duckdb/common/types/vector.hpp"
+#include <cmath>
+#include <memory>
 #include "PixelsFilter.h"
+#include "PixelsBitMask.h"
+#include "vector/ColumnVector.h" // ✅ 显式包含 Pixels 自己的 ColumnVector
 
 class ColumnReader
 {
@@ -41,10 +42,10 @@ public:
     static std::shared_ptr <ColumnReader> newColumnReader(std::shared_ptr <TypeDescription> type);
 
     /**
-       * Closes this column reader and releases any resources associated
-       * with it. If the column reader is already closed then invoking this
-       * method has no effect.
-       */
+     * Closes this column reader and releases any resources associated
+     * with it. If the column reader is already closed then invoking this
+     * method has no effect.
+     */
     virtual void close() = 0;
 
     /**
@@ -59,6 +60,7 @@ public:
      * @param vectorIndex the index from where we start reading values into the vector
      * @param vector   vector to read values into
      * @param chunkIndex the metadata of the column chunk to read.
+     * @param filterMask the bitmask to store filter results
      */
     virtual void read(std::shared_ptr <ByteBuffer> input,
                       pixels::proto::ColumnEncoding &encoding,

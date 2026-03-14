@@ -133,7 +133,7 @@ void PixelsBitMask::And(long index, uint8_t value)
 
 void PixelsBitMask::setByteAligned(long index, uint8_t value)
 {
-    mask[index / 8] = value;
+    mask[index / 8] &= value;  
 }
 
 
