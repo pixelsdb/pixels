@@ -131,7 +131,7 @@ public final class PixelsFileNameUtils
      *   <li>timestamp — exactly 14 digits (yyyyMMddHHmmss)</li>
      *   <li>atomicCount</li>
      *   <li>virtualNodeId — non-negative integer, or {@code -1} for single files</li>
-     *   <li>type label — one of {@code retina|ordered|compact|single}</li>
+     *   <li>type label — one of {@code retina|ordered|compact|single|copy}</li>
      * </ol>
      */
     private static final Pattern PXL_PATTERN = Pattern.compile(
