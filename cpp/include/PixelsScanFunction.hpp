@@ -70,10 +70,8 @@
 #include "duckdb/catalog/catalog.hpp"
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/enums/file_compression_type.hpp"
-//#include "duckdb/common/field_writer.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/hive_partitioning.hpp"
-//#include "duckdb/common/types/chunk_collection.hpp"
 #include "duckdb/function/copy_function.hpp"
 #include "duckdb/function/table_function.hpp"
 #include "duckdb/main/client_context.hpp"
@@ -87,6 +85,8 @@
 #include "duckdb/storage/statistics/base_statistics.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
 #include "duckdb/common/multi_file/multi_file_reader.hpp"
+#include "filter/table_filter.hpp"//转换filter
+#include "filter/constant_filter.hpp"
 
 #endif
 
@@ -117,9 +117,8 @@ namespace duckdb
                                             PixelsReadLocalState &scan_data, PixelsReadGlobalState &parallel_state,
                                             bool is_init_state = false);
 
-        static PixelsReaderOption
-        GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state);
-
+        static PixelsReaderOption GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state);
+        static pixels::TableFilterSet ConvertDuckDBFilter(TableFilterSet *filters);
     private:
         static void TransformDuckdbType(const std::shared_ptr <TypeDescription> &type,
                                         vector <LogicalType> &return_types);

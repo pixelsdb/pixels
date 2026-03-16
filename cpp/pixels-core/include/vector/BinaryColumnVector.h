@@ -27,57 +27,34 @@
 
 #include "vector/ColumnVector.h"
 #include "vector/VectorizedRowBatch.h"
-#include "duckdb.h"
-#include "duckdb/common/types/vector.hpp"
+#include "PixelsTypes.h" 
+#include <string>
+#include <vector>
 
 /**
- * BinaryColumnVector derived from org.apache.hadoop.hive.ql.exec.vector.
- * <p>
- * This class supports string and binary data by value reference -- i.e. each field is
- * explicitly present, as opposed to provided by a dictionary reference.
- * In some cases, all the values will be in the same byte array to begin with,
- * but this need not be the case. If each value is in a separate byte
- * array to start with, or not all the values are in the same original
- * byte array, you can still assign data by reference into this column vector.
- * This gives flexibility to use this in multiple situations.
- * <p>
- * When setting data by reference, the caller
- * is responsible for allocating the byte arrays used to hold the data.
- * You can also set data by value, as long as you call the initBuffer() method first.
- * You can mix "by value" and "by reference" in the same column vector,
- * though that use is probably not typical.
+ * BinaryColumnVector 
+ * 作用：存储字符串或二进制数据的引用。原本项目同时保存duckdb的string和std的string，有点和稀泥，这里先改为仅保存std的string
+ * 后续要实现一个类似duckdb的string_t结构体，包含指针和长度，来避免std::string的内存分配和复制开销。
  */
+// BinaryColumnVector.h
+
 class BinaryColumnVector : public ColumnVector
 {
- public:
-  duckdb::string_t *vector;
+public:
+    BinaryColumnVector(uint64_t len, bool encoding);
+    ~BinaryColumnVector();
 
-  std::vector<std::string> str_vec;
+    void close() override;
 
-  /**
-  * Use this constructor by default. All column vectors
-  * should normally be the default size.
-  */
-  explicit BinaryColumnVector(uint64_t len = VectorizedRowBatch::DEFAULT_SIZE, bool encoding = false);
-
-  ~BinaryColumnVector();
-  /**
-   * Set a field by reference.
-   *
-   * @param elementNum index within column vector to set
-   * @param sourceBuf  container of source data
-   * @param start      start byte position within source
-   * @param length     length of source byte sequence
-   */
-  void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
-  void *current() override;
-  void close() override;
-  void print(int rowCount) override;
-
-  void add(std::string &value) override;
-  void add(uint8_t *v, int length);
-  //void setVal(int elemnetNum,uint8_t* sourceBuf);
-  void setVal(int elementNum, uint8_t *sourceBuf, int start, int length);
-  void ensureSize(uint64_t size, bool preserveData) override;
+    void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
+    void setVal(int elementNum, uint8_t *sourceBuf, int start, int length);
+    void ensureSize(uint64_t size, bool preserveData) override;
+    void add(std::string &value);
+    void add(uint8_t *v, int len);
+    void *current() override;
+    const std::string &getValue(idx_t i) const;
+    bool isNullAt(idx_t i) const;
+    std::vector<std::string> str_vec;   // 唯一字符串存储
 };
+
 #endif //PIXELS_BINARYCOLUMNVECTOR_H
