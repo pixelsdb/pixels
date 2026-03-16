@@ -29,14 +29,14 @@ std::mutex PixelsRecordReaderImpl::mutex_;
 PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> reader,
                                                const pixels::proto::PostScript &pixelsPostScript,
                                                const pixels::proto::Footer &pixelsFooter,
-                                               const PixelsReaderOption &opt,
+                                               PixelsReaderOption &opt,
                                                std::shared_ptr <PixelsFooterCache> pixelsFooterCache)
 {
     physicalReader = reader;
     footer = pixelsFooter;
     postScript = pixelsPostScript;
     footerCache = pixelsFooterCache;
-    option = opt;
+    option = std::move(opt);
     // TODO: intialize all kinds of variable
     queryId = option.getQueryId();
     RGStart = option.getRGStart();
@@ -46,13 +46,12 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> 
     // for test purpose, can we comment it temporarily
     // assert(batchSize >= STANDARD_VECTOR_SIZE);
     enabledFilterPushDown = option.isEnabledFilterPushDown();
-    if (enabledFilterPushDown)
-    {
-        filter = option.getFilter();
-    }
-    else
-    {
-        filter = nullptr;
+    if (enabledFilterPushDown) {
+        // 从 option 中把含有 unique_ptr 的 map 彻底移动到当前类的成员 filter 中
+        this->filter = option.extractFilter(); 
+    } else {
+        // 如果 TableFilterSet 内部是 map，清除即可
+        this->filter.filters.clear(); 
     }
     filterMask = nullptr;
     everRead = false;
@@ -222,37 +221,40 @@ std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reus
     }
 
     auto columnVectors = resultRowBatch->cols;
-    if (filterMask != nullptr)
-    {
+    if (filterMask != nullptr) {
         filterMask->set();
     }
 
-    if(asyncReadRequestNum > 0)
-    {
+    if(asyncReadRequestNum > 0) {
         asyncReadComplete(asyncReadRequestNum);
     }
 
     std::vector<int> filterColumnIndex;
-    if (filter != nullptr)
+    //std::cout << "filter size: " << filter.filters.size() << std::endl;
+    if (!filter.filters.empty())//reader的filter没有了duckdb的tablefilterset，改成自己的tablefilterset
     {
-        for (auto &filterCol: filter->filters)
+        for (auto const& [col_idx, filter_ptr] : filter.filters) 
         {
-            if (filterMask->isNone())
-            {
-                break;
-            }
-            int i = filterCol.first;
-            int index = curChunkBufferIndex.at(i);
-            auto &encoding = curEncoding.at(i);
-            auto &chunkIndex = curChunkIndex.at(i);
-            readers.at(i)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
-                                postScript.pixelstride(), resultRowBatch->rowCount,
-                                columnVectors.at(i), *chunkIndex, filterMask);
+            // col_idx 是 idx_t 类型
+            // filter_ptr 是 std::unique_ptr<TableFilter>& 类型
+            //printf("filter column index: %d\n", col_idx);
+            int index = curChunkBufferIndex.at(col_idx);
+            auto &encoding = curEncoding.at(col_idx);
+            auto &chunkIndex = curChunkIndex.at(col_idx);
+            readers.at(col_idx)->read(chunkBuffers.at(index), *encoding, curRowInRG, curBatchSize,
+                                postScript.pixelstride(), resultRowBatch->rowCount,columnVectors.at(col_idx), *chunkIndex, filterMask);
             filterColumnIndex.emplace_back(index);
-            PixelsFilter::ApplyFilter(columnVectors.at(i), *filterCol.second, *filterMask,
-                                      resultSchema->getChildren().at(i));
+
+            // 注意：传给 ApplyFilter 时，需要解引用指针以获取对象引用
+            PixelsFilter::ApplyFilter(
+                columnVectors.at(col_idx), 
+                *filter_ptr,  // 这里解引用 unique_ptr 得到 TableFilter&
+                *filterMask, 
+                resultSchema->getChildren().at(col_idx)
+            );
         }
     }
+
 
     // read vectors
     for (int i = 0; i < resultColumns.size(); i++)
@@ -571,4 +573,3 @@ void PixelsRecordReaderImpl::close()
     includedColumnTypes.clear();
     endOfFile = true;
 }
-

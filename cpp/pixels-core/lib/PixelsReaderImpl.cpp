@@ -22,72 +22,148 @@
  * @author liyu
  * @create 2023-03-06
  */
-#ifndef PIXELS_PIXELSREADERIMPL_H
-#define PIXELS_PIXELSREADERIMPL_H
+#include "PixelsReaderImpl.h"
 
-#include "PixelsReader.h"
-#include "reader/PixelsRecordReaderImpl.h"
-#include <iostream>
-#include <vector>
-#include "pixels-common/pixels.pb.h"
-#include "PixelsFooterCache.h"
-#include "reader/PixelsReaderOption.h"
-
-
-class PixelsReaderBuilder;
-
-class PixelsReaderImpl : public PixelsReader
+PixelsReaderImpl::PixelsReaderImpl(std::shared_ptr <TypeDescription> fileSchema,
+                                   std::shared_ptr <PhysicalReader> reader,
+                                   std::shared_ptr <pixels::proto::FileTail> fileTail,
+                                   std::shared_ptr <PixelsFooterCache> footerCache)
 {
-public:
-    std::shared_ptr <PixelsRecordReader> read(PixelsReaderOption option);
+    this->fileSchema = fileSchema;
+    this->physicalReader = reader;
+    this->footer = fileTail->footer();
+    this->postScript = fileTail->postscript();
+    this->pixelsFooterCache = footerCache;
+    this->closed = false;
+}
 
-    PixelsReaderImpl(std::shared_ptr <TypeDescription> fileSchema,
-                     std::shared_ptr <PhysicalReader> reader,
-                     std::shared_ptr <pixels::proto::FileTail> fileTail,
-                     std::shared_ptr <PixelsFooterCache> footerCache);
 
-    ~PixelsReaderImpl();
+/**
+ * Prepare for the next row batch. This method is independent from readBatch().
+ *
+ * @param batchSize the willing batch size
+ * @return the real batch size
+ */
+std::shared_ptr <PixelsRecordReader> PixelsReaderImpl::read(PixelsReaderOption option)
+{
+    // TODO: add a function parameter, and the code before creating PixelsRecordReaderImpl
+    std::shared_ptr <PixelsRecordReader> recordReader =
+            std::make_shared<PixelsRecordReaderImpl>(
+                    physicalReader, postScript,
+                    footer, option, pixelsFooterCache);
+    recordReaders.emplace_back(recordReader);
+    //std::cout<<"at the end of reader move the size of filters is "<<option.getfiltersize()<<std::endl;
+    return recordReader;
+}
 
-    std::shared_ptr <TypeDescription> getFileSchema() override;
+std::shared_ptr <TypeDescription> PixelsReaderImpl::getFileSchema()
+{
+    return fileSchema;
+}
 
-    PixelsVersion::Version getFileVersion() override;
+PixelsVersion::Version PixelsReaderImpl::getFileVersion()
+{
+    return PixelsVersion::from(postScript.version());
+}
 
-    long getNumberOfRows() override;
+long PixelsReaderImpl::getNumberOfRows()
+{
+    return postScript.numberofrows();
+}
 
-    pixels::proto::CompressionKind getCompressionKind() override;
+pixels::proto::CompressionKind PixelsReaderImpl::getCompressionKind()
+{
+    return postScript.compression();
+}
 
-    long getCompressionBlockSize() override;
+long PixelsReaderImpl::getCompressionBlockSize()
+{
+    return postScript.compressionblocksize();
+}
 
-    long getPixelStride() override;
+long PixelsReaderImpl::getPixelStride()
+{
+    return postScript.pixelstride();
+}
 
-    std::string getWriterTimeZone() override;
+std::string PixelsReaderImpl::getWriterTimeZone()
+{
+    return postScript.writertimezone();
+}
 
-    int getRowGroupNum() override;
+int PixelsReaderImpl::getRowGroupNum()
+{
+    return footer.rowgroupinfos_size();
+}
 
-    bool isPartitioned() override;
+bool PixelsReaderImpl::isPartitioned()
+{
+    return postScript.has_partitioned() && postScript.partitioned();
+}
 
-    ColumnStatisticList getColumnStats() override;
+ColumnStatisticList PixelsReaderImpl::getColumnStats()
+{
+    return footer.columnstats();
+}
 
-    pixels::proto::ColumnStatistic getColumnStat(std::string columnName) override;
+pixels::proto::ColumnStatistic PixelsReaderImpl::getColumnStat(std::string columnName)
+{
+    auto fieldNames = fileSchema->getFieldNames();
+    auto fieldIter = std::find(fieldNames.begin(), fieldNames.end(), columnName);
+    if (fieldIter == fieldNames.end())
+    {
+        throw InvalidArgumentException("the column " +
+                                       columnName + " is not the field name!");
+    }
+    int fieldId = fieldIter - fieldNames.begin();
+    return footer.columnstats().Get(fieldId);
+}
 
-    RowGroupInfoList getRowGroupInfos() override;
+RowGroupInfoList PixelsReaderImpl::getRowGroupInfos()
+{
+    return footer.rowgroupinfos();
+}
 
-    pixels::proto::RowGroupInformation getRowGroupInfo(int rowGroupId) override;
+pixels::proto::RowGroupInformation PixelsReaderImpl::getRowGroupInfo(int rowGroupId)
+{
+    if (rowGroupId < 0 || rowGroupId >= footer.columnstats_size())
+    {
+        throw InvalidArgumentException("row group id is out of bound.");
+    }
+    return footer.rowgroupinfos().Get(rowGroupId);
+}
 
-    pixels::proto::RowGroupStatistic getRowGroupStat(int rowGroupId) override;
+pixels::proto::RowGroupStatistic PixelsReaderImpl::getRowGroupStat(int rowGroupId)
+{
+    if (rowGroupId < 0 || rowGroupId >= footer.columnstats_size())
+    {
+        throw InvalidArgumentException("row group id is out of bound.");
+    }
+    return footer.rowgroupstats().Get(rowGroupId);
+}
 
-    RowGroupStatList getRowGroupStats() override;
+RowGroupStatList PixelsReaderImpl::getRowGroupStats()
+{
+    return footer.rowgroupstats();
+}
 
-    void close() override;
+PixelsReaderImpl::~PixelsReaderImpl()
+{
+    if (!closed)
+    {
+        PixelsReaderImpl::close();
+    }
+}
 
-private:
-    std::vector <std::shared_ptr<PixelsRecordReader>> recordReaders;
-    std::shared_ptr <TypeDescription> fileSchema;
-    std::shared_ptr <PhysicalReader> physicalReader;
-    std::shared_ptr <PixelsFooterCache> pixelsFooterCache;
-    pixels::proto::PostScript postScript;
-    pixels::proto::Footer footer;
-    bool closed;
-};
-
-#endif //PIXELS_PIXELSREADERIMPL_H
+void PixelsReaderImpl::close()
+{
+    if (!closed)
+    {
+        for (auto recordReader: recordReaders)
+        {
+            recordReader->close();
+        }
+        recordReaders.clear();
+        physicalReader->close();
+    }
+}

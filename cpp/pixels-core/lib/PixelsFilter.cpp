@@ -107,7 +107,7 @@ int PixelsFilter::CompareAvx2(void *data, T constant)
 template<class OP>
 void PixelsFilter::IntFilterOperation(std::shared_ptr <ColumnVector> vector,
                                     const pixels::Scalar &constant, PixelsBitMask &filter_mask){
-    int32_t constant_value=std::get<int32_t>(constant);
+    int32_t constant_value=constant.get_int32();
     auto intColumnVector = std::static_pointer_cast<IntColumnVector>(vector);
     int i = 0;
 #ifdef  ENABLE_SIMD_FILTER
@@ -126,7 +126,7 @@ template<class OP>
 void PixelsFilter::LongFilterOperation(std::shared_ptr <ColumnVector> vector,const pixels::Scalar &constant, PixelsBitMask &filter_mask){
     //printf("enter long filter operation\n");
     // 传入地址 &constant
-    int64_t constant_value=std::get<int64_t>(constant); 
+    int64_t constant_value=constant.get_int64(); 
     //printf("long filter constant value: %lld\n", constant_value);
     auto longColumnVector = std::static_pointer_cast<LongColumnVector>(vector);
     int i = 0;
@@ -146,7 +146,7 @@ void PixelsFilter::LongFilterOperation(std::shared_ptr <ColumnVector> vector,con
 template<class OP>
 void PixelsFilter::DateFilterOperation(std::shared_ptr <ColumnVector> vector,
                                     const pixels::Scalar &constant, PixelsBitMask &filter_mask){
-    int32_t constant_value=std::get<int32_t>(constant);
+    int32_t constant_value=constant.get_int32(); //date的constant传入时已经转换为int32了
     auto dateColumnVector = std::static_pointer_cast<DateColumnVector>(vector);
     int i = 0;
 #ifdef ENABLE_SIMD_FILTER
@@ -164,7 +164,7 @@ void PixelsFilter::DateFilterOperation(std::shared_ptr <ColumnVector> vector,
 template<class OP>
 void PixelsFilter::DecimalFilterOperation(std::shared_ptr <ColumnVector> vector,
                                     const pixels::Scalar &constant, PixelsBitMask &filter_mask){
-    int64_t constant_value=std::get<int64_t>(constant);
+    int64_t constant_value=constant.get_int64(); //decimal的constant传入时已经转换为int64了
     //std::cout<<"in filter the decimal is "<<constant_value<<std::endl;
     auto decimalColumnVector = std::static_pointer_cast<DecimalColumnVector>(vector);
     int i = 0;
@@ -184,7 +184,7 @@ void PixelsFilter::DecimalFilterOperation(std::shared_ptr <ColumnVector> vector,
 template<class OP>
 void PixelsFilter::StringFilterOperation(std::shared_ptr <ColumnVector> vector,//string目前只能并行比较，原项目也是这样，沿用，后续再想办法
                                     const pixels::Scalar &constant, PixelsBitMask &filter_mask){
-    std::string constant_value=std::get<std::string>(constant);
+    std::string constant_value=constant.get_string();
     auto binaryColumnVector = std::static_pointer_cast<BinaryColumnVector>(vector);
     for (int i = 0; i < vector->length; i++)
     {
