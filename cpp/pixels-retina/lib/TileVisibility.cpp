@@ -199,14 +199,33 @@ void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* ou
         size_t currentTailUsed = tailUsed.load(std::memory_order_relaxed);
         size_t count = (blk == currentTail) ? currentTailUsed : DeleteIndexBlock::BLOCK_CAPACITY;
 
+        // Same tail/tailUsed race as in collectTileGarbage: count may be 0 or
+        // a stale BLOCK_CAPACITY for a newly-created tail block.  count == 0
+        // means no items to read; skip cleanly.  The stale-count case (items
+        // beyond the first being zero-initialised) is handled in the scalar
+        // path below via the item == 0 sentinel check.
+        if (count == 0) {
+            blk = blk->next.load(std::memory_order_relaxed);
+            continue;
+        }
+
         uint64_t i = 0;
 #ifdef RETINA_SIMD
+        // NOTE: the SIMD path does not check for zero-initialised (item == 0)
+        // sentinel values.  In the extremely rare stale-tailUsed race window,
+        // up to BLOCK_CAPACITY-1 zero items may cause row 0 to be transiently
+        // marked as deleted in the output bitmap.  This is a known limitation
+        // of the SIMD fast path; the effect is transient (not persisted) and
+        // self-correcting on the next query once tailUsed is fully updated.
         for (; i + 4 <= count; i += 4) {
             process_bitmap_block_256(blk, i, outBitmap, vThrFlip, tsMask, signBit);
         }
 #endif
         for (; i < count; i++) {
             uint64_t item = blk->items[i];
+            // Sentinel: zero item signals an uninitialised slot (see
+            // collectTileGarbage for the full race description).
+            if (item == 0) return;
             if (extractTimestamp(item) <= ts) {
                 SET_BITMAP_BIT(outBitmap, extractRowId(item));
             } else {
@@ -232,6 +251,14 @@ void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts) {
         size_t count = (blk == tail.load(std::memory_order_acquire))
                            ? tailUsed.load(std::memory_order_acquire)
                            : DeleteIndexBlock::BLOCK_CAPACITY;
+        // Guard: deleteTileRecord updates `tail` and `tailUsed` non-atomically.
+        // In the narrow window after `tail` is advanced to a new block but before
+        // `tailUsed.store(1)` completes, we may observe count == 0 (empty-list
+        // path: tailUsed transitions 0 → 1) or a stale BLOCK_CAPACITY (full-block
+        // path: tailUsed transitions BLOCK_CAPACITY → 1 via store, not CAS).
+        // When count == 0 there is nothing to compact; stop here and let the next
+        // GC cycle handle the block once it is fully initialised.
+        if (count == 0) break;
         uint64_t lastItemTs = extractTimestamp(blk->items[count - 1]);
         if (lastItemTs <= ts) {
             lastFullBlk = blk;
@@ -253,6 +280,14 @@ void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts) {
         size_t count = (blk == lastFullBlk && blk == tail.load()) ? tailUsed.load() : DeleteIndexBlock::BLOCK_CAPACITY;
         for (size_t i = 0; i < count; i++) {
             uint64_t item = blk->items[i];
+            // Guard: a zero item means an uninitialised slot in a newly-created
+            // tail block observed under the same tail/tailUsed race described
+            // above (full-block path: tailUsed is still BLOCK_CAPACITY while
+            // only items[0] is valid; items[1..n] remain zero-initialised).
+            // item == 0 encodes makeDeleteIndex(rowId=0, ts=0); since all valid
+            // transaction timestamps are > 0, this value is never a legitimate
+            // deletion record and safely identifies the end of valid items.
+            if (item == 0) break;
             if (extractTimestamp(item) <= ts) {
                 SET_BITMAP_BIT(newBaseBitmap, extractRowId(item));
             }
