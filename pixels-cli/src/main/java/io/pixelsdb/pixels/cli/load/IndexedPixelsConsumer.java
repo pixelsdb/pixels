@@ -34,8 +34,8 @@
  import io.pixelsdb.pixels.common.physical.Storage;
  import io.pixelsdb.pixels.common.physical.StorageFactory;
  import io.pixelsdb.pixels.common.utils.ConfigFactory;
- import io.pixelsdb.pixels.common.utils.DateUtil;
  import io.pixelsdb.pixels.common.utils.IndexUtils;
+ import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
  import io.pixelsdb.pixels.common.utils.RetinaUtils;
  import io.pixelsdb.pixels.core.PixelsWriter;
  import io.pixelsdb.pixels.core.TypeDescription;
@@ -183,7 +183,7 @@
          {
              targetDirPath += "/";
          }
-         String targetFileName = targetNode.getAddress() + "_" + DateUtil.getCurTime() + "_" + bucketId + ".pxl";
+         String targetFileName = PixelsFileNameUtils.buildOrderedFileName(targetNode.getAddress(), targetNode.getVirtualNodeId());
          String targetFilePath = targetDirPath + targetFileName;
 
          PixelsWriter pixelsWriter = getPixelsWriter(targetStorage, targetFilePath);

@@ -32,6 +32,7 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.transaction.TransService;
 import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.NetUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -40,8 +41,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.*;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Paths;
@@ -123,18 +123,7 @@ public class RetinaResourceManager
         }
         this.gcExecutor = executor;
         totalVirtualNodeNum = Integer.parseInt(ConfigFactory.Instance().getProperty("node.virtual.num"));
-        this.retinaHostName = System.getenv("HOSTNAME");
-        if (retinaHostName == null)
-        {
-            try
-            {
-                this.retinaHostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: {}", retinaHostName);
-            } catch (UnknownHostException e)
-            {
-                logger.error("Failed to get retina hostname", e);
-            }
-        }
+        this.retinaHostName = NetUtils.getLocalHostName();
     }
 
     private static final class InstanceHolder

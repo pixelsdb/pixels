@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.common.node.VnodeIdentifier;
 import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.daemon.NodeProto;
 
- public class RetinaUtils
+public class RetinaUtils
 {
     public static final String CHECKPOINT_PREFIX_GC = "vis_gc_";
     public static final String CHECKPOINT_PREFIX_OFFLOAD = "vis_offload_";
@@ -107,10 +107,14 @@ import io.pixelsdb.pixels.daemon.NodeProto;
         return RetinaService.CreateInstance(retinaHost, getInstance().defaultRetinaPort);
     }
 
-     public static RetinaService getRetinaServiceFromPath(String path)
+    public static RetinaService getRetinaServiceFromPath(String path)
     {
-        String retinaHost = extractRetinaHostNameFromPath(path);
-        if(retinaHost == null || retinaHost.equals(Constants.LOAD_DEFAULT_RETINA_PREFIX))
+        if (!PixelsFileNameUtils.isGcEligible(path))
+        {
+            return RetinaService.Instance();
+        }
+        String retinaHost = PixelsFileNameUtils.extractHostName(path);
+        if (retinaHost == null)
         {
             return RetinaService.Instance();
         }
@@ -125,20 +129,5 @@ import io.pixelsdb.pixels.daemon.NodeProto;
     public static String getCheckpointPrefix(String typePrefix, String hostname)
     {
         return typePrefix + hostname + "_";
-    }
-
-    private static String extractRetinaHostNameFromPath(String path)
-    {
-        if (path == null || path.isEmpty()) {
-            return null;
-        }
-        int lastSlashIndex = path.lastIndexOf('/');
-        String baseName = (lastSlashIndex == -1) ? path : path.substring(lastSlashIndex + 1);
-        int firstUnderscoreIndex = baseName.indexOf('_');
-        if (firstUnderscoreIndex > 0) {
-            // The substring from the start of baseName up to (but not including) the first underscore is the hostname.
-            return baseName.substring(0, firstUnderscoreIndex);
-        }
-        return null;
     }
 }

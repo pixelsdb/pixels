@@ -26,7 +26,8 @@ import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.physical.Status;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.DateUtil;
+import io.pixelsdb.pixels.common.utils.NetUtils;
+import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsReaderImpl;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -69,7 +70,6 @@ public class TestPixelsCompactor
         List<Status> statuses = storage.listStatus("hdfs://node01:9000/pixels/pixels/test_105/v_0_order");
 
         // compact
-        int NO = 0;
         for (int i = 0; i < statuses.size(); i += 16)
         {
             List<String> sourcePaths = new ArrayList<>();
@@ -80,9 +80,7 @@ public class TestPixelsCompactor
             long start = System.currentTimeMillis();
 
             String filePath = "hdfs://node01:9000/pixels/pixels/test_105/v_0_compact/" +
-                    NO + "_" +
-                    DateUtil.getCurTime() +
-                    ".compact.pxl";
+                    PixelsFileNameUtils.buildCompactFileName(NetUtils.getLocalHostName(), 0);
             PixelsCompactor pixelsCompactor =
                     PixelsCompactor.newBuilder()
                             .setSourcePaths(sourcePaths)
@@ -96,8 +94,6 @@ public class TestPixelsCompactor
                             .build();
             pixelsCompactor.compact();
             pixelsCompactor.close();
-
-            NO++;
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }
@@ -131,22 +127,18 @@ public class TestPixelsCompactor
                 layout.getVersion() + "_order");
 
         // compact
-        int NO = 0;
         for (int i = 0; i + compact.getNumRowGroupInFile() < statuses.size(); i += compact.getNumRowGroupInFile())
         {
             List<String> sourcePaths = new ArrayList<>();
             for (int j = 0; j < compact.getNumRowGroupInFile(); ++j)
             {
-                //System.out.println(statuses[i+j].getPath().toString());
                 sourcePaths.add(statuses.get(i + j).getPath());
             }
 
             long start = System.currentTimeMillis();
 
             String filePath = "hdfs://node01:9000/pixels/pixels/test_105/v_" + layout.getVersion() + "_compact/" +
-                    NO + "_" +
-                    DateUtil.getCurTime() +
-                    ".compact.pxl";
+                    PixelsFileNameUtils.buildCompactFileName(NetUtils.getLocalHostName(), 0);
             PixelsCompactor pixelsCompactor =
                     PixelsCompactor.newBuilder()
                             .setSourcePaths(sourcePaths)
@@ -160,8 +152,6 @@ public class TestPixelsCompactor
                             .build();
             pixelsCompactor.compact();
             pixelsCompactor.close();
-
-            NO++;
 
             System.out.println(((System.currentTimeMillis() - start) / 1000.0) + " s for [" + filePath + "]");
         }
