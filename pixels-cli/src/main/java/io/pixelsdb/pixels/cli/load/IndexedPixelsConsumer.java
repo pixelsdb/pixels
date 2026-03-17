@@ -183,7 +183,7 @@
          {
              targetDirPath += "/";
          }
-         String targetFileName = PixelsFileNameUtils.buildOrderedFileName(targetNode.getAddress(), bucketId);
+         String targetFileName = PixelsFileNameUtils.buildOrderedFileName(targetNode.getAddress(), targetNode.getVirtualNodeId());
          String targetFilePath = targetDirPath + targetFileName;
 
          PixelsWriter pixelsWriter = getPixelsWriter(targetStorage, targetFilePath);
