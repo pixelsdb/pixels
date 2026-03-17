@@ -27,32 +27,39 @@
 
 #include "vector/ColumnVector.h"
 #include "vector/VectorizedRowBatch.h"
-#include "duckdb/common/types.hpp"
+#include "PixelsTypes.h"  //引入中立类型
 
-using PhysicalType = duckdb::PhysicalType;
+#pragma once
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <stdexcept>
+#include <string>
+#include <algorithm>
+
 class DecimalColumnVector : public ColumnVector
 {
- public:
-  long *vector;
-  int precision;
-  int scale;
-  PhysicalType physical_type_;
-  static long DEFAULT_UNSCALED_VALUE;
-  /**
-  * Use this constructor by default. All column vectors
-  * should normally be the default size.
-  */
-  DecimalColumnVector(int precision, int scale, bool encoding = false);
-  DecimalColumnVector(uint64_t len, int precision, int scale, bool encoding = false);
-  ~DecimalColumnVector();
-  void print(int rowCount) override;
-  void close() override;
-  void *current() override;
-  int getPrecision();
-  int getScale();
+public:
+    DecimalColumnVector(uint64_t len, int precision, int scale, bool encoding);
+    ~DecimalColumnVector();
 
-  void add(std::string &value) override;
-  void add(long value) override;
-  void ensureSize(uint64_t size, bool preserveData) override;
+    void add(long value);
+    void add(const std::string& value);
+
+    void* current();
+    void close();
+
+    int getPrecision() const { return precision_; }
+    int getScale() const { return scale_; }
+    void* getData() const { return vector; }
+    pixels::PhysicalType getPhysicalType() const { return physical_type_; }
+    size_t ElementSize() const;
+    void ensureSize(uint64_t size, bool preserveData);
+    void* vector;//这里改为void，之后根据大小调整
+    int precision_;
+    int scale_;
+
+    pixels::PhysicalType physical_type_;
 };
+
 #endif //PIXELS_DECIMALCOLUMNVECTOR_H
