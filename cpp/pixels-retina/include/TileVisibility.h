@@ -108,7 +108,22 @@ class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     std::atomic<VersionedData<CAPACITY>*> currentVersion;
     std::atomic<DeleteIndexBlock *> tail;
     std::atomic<size_t> tailUsed;
-    std::vector<RetiredVersion<CAPACITY>> retired;  // Protected by GC (single writer)
+    
+    // Retired versions awaiting epoch-based reclamation.  Only the GC thread
+    // (collectTileGarbage / reclaimRetiredVersions) reads and writes this vector,
+    // so no locking is needed.
+    std::vector<RetiredVersion<CAPACITY>> retired;
+
+    // Lock-free staging slot between deleteTileRecord (CDC threads) and GC.
+    // deleteTileRecord's empty-chain path replaces currentVersion but cannot
+    // write `retired` directly — that would race with the GC thread.  Instead
+    // it atomically stores oldVer here.  The GC thread drains this slot at the
+    // start of collectTileGarbage, moving it into `retired` with a proper epoch.
+    // Flow:  deleteTileRecord → pendingRetire.store → collectTileGarbage →
+    //        pendingRetire.exchange(nullptr) → retired.emplace_back → reclaimRetiredVersions
+    // At most one version is pending per GC cycle (the empty-chain path fires
+    // at most once between consecutive GC compactions).
+    std::atomic<VersionedData<CAPACITY>*> pendingRetire{nullptr};
 };
 
 #endif // PIXELS_RETINA_TILE_VISIBILITY_H

@@ -139,12 +139,7 @@ public class RetinaResourceManager
     public void addVisibility(long fileId, int rgId, int recordNum)
     {
         String rgKey = fileId + "_" + rgId;
-        if (rgVisibilityMap.containsKey(rgKey))
-        {
-            return;
-        }
-
-        rgVisibilityMap.put(rgKey, new RGVisibility(recordNum));
+        rgVisibilityMap.computeIfAbsent(rgKey, k -> new RGVisibility(recordNum));
     }
 
     public void addVisibility(String filePath) throws RetinaException
@@ -323,14 +318,15 @@ public class RetinaResourceManager
         // 4. Async Write: perform IO in background thread (Consumer)
         // Use commonPool to avoid deadlocks with checkpointExecutor
         return CompletableFuture.runAsync(() -> {
-            // Lock on filePath string intern to ensure only one thread writes to the same file
+            // Lock on filePath string intern to ensure only one thread writes to the same file.
+            // For OFFLOAD type this guards against concurrent requests for the same timestamp.
+            // For GC type runGC() is single-threaded, so the lock is a no-op in practice.
             synchronized (filePath.intern())
             {
+                // Deduplicate concurrent OFFLOAD checkpoint requests for the same timestamp.
+                // GC type deduplication is handled upstream in runGC() via the
+                // `timestamp <= latestGcTimestamp` guard, so no check is needed here.
                 if (type == CheckpointType.OFFLOAD && offloadedCheckpoints.containsKey(timestamp))
-                {
-                    return;
-                }
-                if (type == CheckpointType.GC && timestamp <= latestGcTimestamp)
                 {
                     return;
                 }
@@ -346,15 +342,10 @@ public class RetinaResourceManager
                     if (type == CheckpointType.OFFLOAD)
                     {
                         offloadedCheckpoints.put(timestamp, filePath);
-                    } else
-                    {
-                        long oldGcTs = this.latestGcTimestamp;
-                        this.latestGcTimestamp = timestamp;
-                        if (oldGcTs != -1 && oldGcTs != timestamp)
-                        {
-                            removeCheckpointFile(oldGcTs, CheckpointType.GC);
-                        }
                     }
+                    // GC type: latestGcTimestamp update and old checkpoint cleanup are
+                    // handled by runGC() after the full GC cycle (Memory GC + checkpoint
+                    // + Storage GC) completes successfully. Do not update here.
                 } catch (Exception e)
                 {
                     logger.error("Failed to commit {} checkpoint file for timestamp: {}", type, timestamp, e);
@@ -592,7 +583,30 @@ public class RetinaResourceManager
     }
 
     /**
-     * Run garbage collection on all registered RGVisibility.
+     * Run a full GC cycle: Memory GC → checkpoint → Storage GC (future).
+     *
+     * <p>Ordering rationale:
+     * <ol>
+     *   <li><b>Memory GC first</b>: {@code collectTileGarbage} compacts Deletion Chain blocks
+     *       whose last item ts ≤ lwm into {@code baseBitmap}. After compaction, the remaining
+     *       chain starts at the first block that straddles the lwm boundary, so the subsequent
+     *       {@code getVisibilityBitmap(lwm)} call traverses at most one partial block
+     *       (≤ {@code BLOCK_CAPACITY} items) instead of the entire pre-GC chain. This makes
+     *       checkpoint bitmap serialisation significantly cheaper.</li>
+     *   <li><b>Checkpoint second, blocking</b>: we call {@code .join()} so that
+     *       {@code runGC()} does not return until the checkpoint file is fully written to disk.
+     *       {@code gcExecutor} is a single-threaded scheduler; because {@code runGC()} must
+     *       complete before the next invocation begins, this blocking join is the simplest way
+     *       to guarantee that no two GC cycles ever overlap — no additional lock is required.</li>
+     *   <li><b>Storage GC third</b>: requires an up-to-date {@code baseBitmap} (hence after
+     *       Memory GC) and its own WAL for crash recovery. Placing it after the checkpoint
+     *       keeps the two recovery paths independent: on restart, the GC checkpoint restores
+     *       the post-Memory-GC visibility state, and the GcWal resumes any in-progress Storage
+     *       GC task separately.</li>
+     *   <li><b>Advance {@code latestGcTimestamp} last</b>: updated only after the entire cycle
+     *       succeeds (Memory GC + checkpoint + Storage GC). If any step throws, the timestamp
+     *       is not advanced and the next scheduled invocation will retry the full cycle.</li>
+     * </ol>
      */
     private void runGC()
     {
@@ -613,13 +627,27 @@ public class RetinaResourceManager
 
         try
         {
-            // 1. Persist first
-            createCheckpoint(timestamp, CheckpointType.GC);
-            // 2. Then clean memory
-            for (Map.Entry<String, RGVisibility> entry: this.rgVisibilityMap.entrySet())
+            // Step 1: Memory GC — compact Deletion Chain into baseBitmap.
+            for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
             {
-                RGVisibility rgVisibility = entry.getValue();
-                rgVisibility.garbageCollect(timestamp);
+                entry.getValue().garbageCollect(timestamp);
+            }
+
+            // Step 2: Persist the post-Memory-GC visibility state. Block until the
+            // checkpoint file is fully written (see Javadoc above for why we join here).
+            createCheckpoint(timestamp, CheckpointType.GC).join();
+
+            // Step 3: Storage GC — rewrite high-deletion-ratio files (TODO).
+            // if (storageGcEnabled) storageGarbageCollector.runStorageGC();
+
+            // Step 4: Advance the timestamp only after the full cycle succeeds.
+            // latestGcTimestamp is no longer updated inside createCheckpoint's async
+            // callback for GC type; this is the single authoritative update point.
+            long oldGcTs = this.latestGcTimestamp;
+            this.latestGcTimestamp = timestamp;
+            if (oldGcTs != -1 && oldGcTs != timestamp)
+            {
+                removeCheckpointFile(oldGcTs, CheckpointType.GC);
             }
         } catch (Exception e)
         {

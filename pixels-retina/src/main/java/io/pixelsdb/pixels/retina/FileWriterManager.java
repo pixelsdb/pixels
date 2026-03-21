@@ -76,7 +76,7 @@ public class FileWriterManager
         this.virtualNodeId = virtualNodeId;
 
         // Create pixels writer.
-        String targetFileName = PixelsFileNameUtils.buildRetinaFileName(hostName, virtualNodeId);
+        String targetFileName = PixelsFileNameUtils.buildOrderedFileName(hostName, virtualNodeId);
         String targetFilePath = targetOrderedDirPath.getUri() + "/" + targetFileName;
         try
         {
