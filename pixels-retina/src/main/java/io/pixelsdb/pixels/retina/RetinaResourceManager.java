@@ -139,12 +139,7 @@ public class RetinaResourceManager
     public void addVisibility(long fileId, int rgId, int recordNum)
     {
         String rgKey = fileId + "_" + rgId;
-        if (rgVisibilityMap.containsKey(rgKey))
-        {
-            return;
-        }
-
-        rgVisibilityMap.put(rgKey, new RGVisibility(recordNum));
+        rgVisibilityMap.computeIfAbsent(rgKey, k -> new RGVisibility(recordNum));
     }
 
     public void addVisibility(String filePath) throws RetinaException
