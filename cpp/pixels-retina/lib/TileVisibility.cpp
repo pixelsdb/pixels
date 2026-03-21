@@ -26,12 +26,6 @@
 
 #include <immintrin.h>
 
-#include "TileVisibility.h"
-#include "EpochManager.h"
-#include <cstring>
-#include <stdexcept>
-#include <immintrin.h>
-
 template<size_t CAPACITY>
 TileVisibility<CAPACITY>::TileVisibility() {
     VersionedData<CAPACITY>* initialVersion = new VersionedData<CAPACITY>();
@@ -59,6 +53,12 @@ TileVisibility<CAPACITY>::~TileVisibility() {
             blk = next;
         }
         delete ver;
+    }
+
+    // Clean up any version left in the pending retirement slot
+    VersionedData<CAPACITY>* pending = pendingRetire.load(std::memory_order_acquire);
+    if (pending) {
+        delete pending;
     }
 
     // Clean up retired versions and their delete chains
@@ -97,8 +97,9 @@ void TileVisibility<CAPACITY>::deleteTileRecord(uint16_t rowId, uint64_t ts) {
             VersionedData<CAPACITY>* newVer = new VersionedData<CAPACITY>(oldVer->baseTimestamp, oldVer->baseBitmap, newBlk);
 
             if (currentVersion.compare_exchange_strong(oldVer, newVer, std::memory_order_acq_rel)) {
-                // Success: retire old version (no chain to delete since head was nullptr)
-                delete oldVer;
+                // Defer retirement: a concurrent reader may still hold oldVer under EpochGuard.
+                // collectTileGarbage will drain this slot and epoch-retire it properly.
+                pendingRetire.store(oldVer, std::memory_order_release);
                 tailUsed.store(1, std::memory_order_release);
                 return;
             } else {
@@ -238,6 +239,13 @@ void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* ou
 
 template<size_t CAPACITY>
 void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts) {
+    // Drain the pending retirement slot left by deleteTileRecord's empty-chain path.
+    VersionedData<CAPACITY>* pending = pendingRetire.exchange(nullptr, std::memory_order_acquire);
+    if (pending) {
+        uint64_t retireEpoch = EpochManager::getInstance().advanceEpoch();
+        retired.emplace_back(pending, nullptr, retireEpoch);
+    }
+
     // Load old version
     VersionedData<CAPACITY>* oldVer = currentVersion.load(std::memory_order_acquire);
     if (ts <= oldVer->baseTimestamp) return;
