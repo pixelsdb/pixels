@@ -62,11 +62,14 @@ RGVisibility<CAPACITY>::~RGVisibility() {
 }
 
 template<size_t CAPACITY>
-void RGVisibility<CAPACITY>::collectRGGarbage(uint64_t timestamp) {
-// TileVisibility::collectTileGarbage uses COW + Epoch, so it's safe to call concurrently
-    for (uint64_t i = 0; i < tileCount; i++) {
-        tileVisibilities[i].collectTileGarbage(timestamp);
+std::vector<uint64_t> RGVisibility<CAPACITY>::collectRGGarbage(uint64_t timestamp) {
+    size_t totalWords = tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
+    std::vector<uint64_t> rgSnapshot(totalWords, 0);
+    for (uint32_t t = 0; t < tileCount; t++) {
+        tileVisibilities[t].collectTileGarbage(timestamp,
+            rgSnapshot.data() + t * BITMAP_SIZE_PER_TILE_VISIBILITY);
     }
+    return rgSnapshot;
 }
 
 template<size_t CAPACITY>

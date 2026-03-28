@@ -57,7 +57,16 @@ public class TestRGVisibility
         long timestamp1 = 100;
         long timestamp2 = 200;
 
-        long[] bitmap = {1, 0, 0, 0};
+        // Probe the native library to determine per-tile bitmap size,
+        // which depends on RETINA_CAPACITY set at compile time.
+        int bitmapWords;
+        try (RGVisibility probe = new RGVisibility(1))
+        {
+            bitmapWords = probe.getVisibilityBitmap(0).length;
+        }
+
+        long[] bitmap = new long[bitmapWords];
+        bitmap[0] = 1;
         RGVisibility rgVisibilityInitialized = new RGVisibility(256, 0, bitmap);
 
         rgVisibilityInitialized.deleteRecord(5, timestamp1);
@@ -69,6 +78,8 @@ public class TestRGVisibility
 
         long[] bitmap2 = rgVisibilityInitialized.getVisibilityBitmap(timestamp2);
         assertEquals(0b1000010000100001L, bitmap2[0]);
+
+        rgVisibilityInitialized.close();
     }
 
     @Test
@@ -387,5 +398,220 @@ public class TestRGVisibility
         }
 
         verifyBitmap.accept(maxTimestamp.get(), finalBitmap);
+    }
+
+    // =====================================================================
+    // gcSnapshotBitmap JNI round-trip tests
+    //
+    // Verify that garbageCollect() (now returning long[]) produces a bitmap
+    // identical to getVisibilityBitmap() called BEFORE GC — the independent
+    // ground truth computed from the full, unmodified deletion chain.
+    // =====================================================================
+
+    private static void assertBitmapsEqual(String msg, long[] expected, long[] actual)
+    {
+        assertEquals(msg + ": length mismatch", expected.length, actual.length);
+        for (int i = 0; i < expected.length; i++)
+        {
+            if (expected[i] != actual[i])
+            {
+                fail(String.format("%s: word %d (rows %d-%d) mismatch%n  expected: %s%n  actual:   %s",
+                        msg, i, i * 64, i * 64 + 63,
+                        String.format("%64s", Long.toBinaryString(expected[i])).replace(' ', '0'),
+                        String.format("%64s", Long.toBinaryString(actual[i])).replace(' ', '0')));
+            }
+        }
+    }
+
+    @Test
+    public void testGcSnapshotEarlyReturnA()
+    {
+        // Empty chain → all-zero snapshot
+        long[] preRef0 = rgVisibility.getVisibilityBitmap(100);
+        long[] snap0 = rgVisibility.garbageCollect(100);
+        assertBitmapsEqual("empty chain", preRef0, snap0);
+        for (long w : snap0)
+        {
+            assertEquals(0L, w);
+        }
+
+        // Add deletes and compact to advance baseTimestamp
+        rgVisibility.deleteRecord(5, 100);
+        rgVisibility.deleteRecord(10, 100);
+        rgVisibility.deleteRecord(15, 200);
+
+        // First GC at ts=200 → compact all items
+        long[] preRef1 = rgVisibility.getVisibilityBitmap(200);
+        long[] snap1 = rgVisibility.garbageCollect(200);
+        assertBitmapsEqual("first compact", preRef1, snap1);
+
+        // Second GC at ts=200 → early return A (ts == baseTimestamp)
+        long[] preRef2 = rgVisibility.getVisibilityBitmap(200);
+        long[] snap2 = rgVisibility.garbageCollect(200);
+        assertBitmapsEqual("repeat GC", preRef2, snap2);
+
+        // Both snapshots must be identical
+        assertBitmapsEqual("snap1 vs snap2", snap1, snap2);
+    }
+
+    @Test
+    public void testGcSnapshotEarlyReturnB()
+    {
+        // 5 items in one block: ts 1,2,3,8,10.  Block last ts=10 > safeGcTs=5
+        rgVisibility.deleteRecord(0, 1);
+        rgVisibility.deleteRecord(1, 2);
+        rgVisibility.deleteRecord(2, 3);
+        rgVisibility.deleteRecord(3, 8);
+        rgVisibility.deleteRecord(4, 10);
+
+        long[] preRef = rgVisibility.getVisibilityBitmap(5);
+        long[] snapshot = rgVisibility.garbageCollect(5);
+        assertBitmapsEqual("early return B", preRef, snapshot);
+
+        // Rows 0,1,2 marked (ts ≤ 5); rows 3,4 not
+        assertEquals(0b111L, snapshot[0]);
+    }
+
+    @Test
+    public void testGcSnapshotCompactWithBoundary()
+    {
+        // 10 items: rows 0-9, ts 1-10
+        // Block 1 (8 items, ts 1-8): compactable at safeGcTs=9
+        // Block 2 (2 items, ts 9-10): boundary block (tail)
+        for (int i = 0; i < 10; i++)
+        {
+            rgVisibility.deleteRecord(i, i + 1);
+        }
+
+        long[] preRef = rgVisibility.getVisibilityBitmap(9);
+        long[] snapshot = rgVisibility.garbageCollect(9);
+        assertBitmapsEqual("compact with boundary", preRef, snapshot);
+
+        // Rows 0-8 marked, row 9 not
+        assertEquals(0x1FFL, snapshot[0]);
+    }
+
+    @Test
+    public void testGcSnapshotCompactAllBlocks()
+    {
+        // 8 items fill one block: rows 0-7, ts 1-8
+        for (int i = 0; i < 8; i++)
+        {
+            rgVisibility.deleteRecord(i, i + 1);
+        }
+
+        // safeGcTs=10 > all item ts → entire block compacted
+        long[] preRef = rgVisibility.getVisibilityBitmap(10);
+        long[] snapshot = rgVisibility.garbageCollect(10);
+        assertBitmapsEqual("compact all blocks", preRef, snapshot);
+
+        assertEquals(0xFFL, snapshot[0]);
+    }
+
+    @Test
+    public void testGcSnapshotCompactMultiBlock()
+    {
+        // 20 items: rows 0-19, ts 1-20
+        // Block 1 (ts 1-8), Block 2 (ts 9-16), Block 3 tail (ts 17-20)
+        for (int i = 0; i < 20; i++)
+        {
+            rgVisibility.deleteRecord(i, i + 1);
+        }
+
+        // safeGcTs=18: blocks 1,2 compacted, block 3 is boundary
+        long[] preRef = rgVisibility.getVisibilityBitmap(18);
+        long[] snapshot = rgVisibility.garbageCollect(18);
+        assertBitmapsEqual("compact multi-block", preRef, snapshot);
+
+        // Rows 0-17 marked
+        assertEquals((1L << 18) - 1, snapshot[0]);
+    }
+
+    @Test
+    public void testGcSnapshotCrossTile()
+    {
+        // Tile 0: rows 0-255    Tile 1: rows 256-511    Tile 2: rows 512-767
+        rgVisibility.deleteRecord(5, 1);
+        rgVisibility.deleteRecord(10, 2);
+        rgVisibility.deleteRecord(260, 3);   // tile 1
+        rgVisibility.deleteRecord(600, 4);   // tile 2
+        rgVisibility.deleteRecord(100, 5);   // tile 0
+        rgVisibility.deleteRecord(300, 6);   // tile 1
+
+        long[] preRef1 = rgVisibility.getVisibilityBitmap(4);
+        long[] snap1 = rgVisibility.garbageCollect(4);
+        assertBitmapsEqual("cross-tile ts=4", preRef1, snap1);
+
+        long[] preRef2 = rgVisibility.getVisibilityBitmap(6);
+        long[] snap2 = rgVisibility.garbageCollect(6);
+        assertBitmapsEqual("cross-tile ts=6", preRef2, snap2);
+    }
+
+    @Test
+    public void testGcSnapshotProgressiveRounds()
+    {
+        // Phase 1: 20 deletes at ts 1-20
+        for (int i = 0; i < 20; i++)
+        {
+            rgVisibility.deleteRecord(i, i + 1);
+        }
+
+        long[] preRef1 = rgVisibility.getVisibilityBitmap(5);
+        long[] snap1 = rgVisibility.garbageCollect(5);
+        assertBitmapsEqual("round 1", preRef1, snap1);
+
+        long[] preRef2 = rgVisibility.getVisibilityBitmap(12);
+        long[] snap2 = rgVisibility.garbageCollect(12);
+        assertBitmapsEqual("round 2", preRef2, snap2);
+
+        // Phase 2: 10 more deletes at ts 21-30
+        for (int i = 20; i < 30; i++)
+        {
+            rgVisibility.deleteRecord(i, i + 1);
+        }
+
+        long[] preRef3 = rgVisibility.getVisibilityBitmap(25);
+        long[] snap3 = rgVisibility.garbageCollect(25);
+        assertBitmapsEqual("round 3", preRef3, snap3);
+
+        long[] preRef4 = rgVisibility.getVisibilityBitmap(100);
+        long[] snap4 = rgVisibility.garbageCollect(100);
+        assertBitmapsEqual("round 4", preRef4, snap4);
+
+        // All 30 rows marked
+        assertEquals((1L << 30) - 1, snap4[0]);
+    }
+
+    @Test
+    public void testGcSnapshotRandomized()
+    {
+        Random rng = new Random(42);
+        boolean[] deleted = new boolean[ROW_COUNT];
+        long ts = 1;
+        long lastGcTs = 0;
+
+        for (int round = 0; round < 10; round++)
+        {
+            for (int d = 0; d < 100; d++)
+            {
+                int rowId;
+                do { rowId = rng.nextInt(ROW_COUNT); } while (deleted[rowId]);
+                deleted[rowId] = true;
+                rgVisibility.deleteRecord(rowId, ts);
+                ts++;
+            }
+
+            long gcTs = lastGcTs + 51;
+            if (gcTs >= ts) gcTs = ts - 1;
+
+            long[] preRef = rgVisibility.getVisibilityBitmap(gcTs);
+            long[] snapshot = rgVisibility.garbageCollect(gcTs);
+            assertBitmapsEqual("randomized round " + round, preRef, snapshot);
+            lastGcTs = gcTs;
+        }
+
+        long[] preRefFinal = rgVisibility.getVisibilityBitmap(ts + 100);
+        long[] finalSnap = rgVisibility.garbageCollect(ts + 100);
+        assertBitmapsEqual("randomized final", preRefFinal, finalSnap);
     }
 }

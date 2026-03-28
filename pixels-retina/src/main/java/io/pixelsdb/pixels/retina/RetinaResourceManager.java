@@ -282,6 +282,12 @@ public class RetinaResourceManager
 
     private CompletableFuture<Void> createCheckpoint(long timestamp, CheckpointType type) throws RetinaException
     {
+        return createCheckpoint(timestamp, type, null);
+    }
+
+    private CompletableFuture<Void> createCheckpoint(
+            long timestamp, CheckpointType type, Map<String, long[]> precomputedBitmaps) throws RetinaException
+    {
         String prefix = (type == CheckpointType.GC) ? RetinaUtils.CHECKPOINT_PREFIX_GC : RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD;
         String fileName = RetinaUtils.getCheckpointFileName(prefix, retinaHostName, timestamp);
         String filePath = checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
@@ -292,10 +298,9 @@ public class RetinaResourceManager
         logger.info("Starting {} checkpoint for {} RGs at timestamp {}", type, totalRgs, timestamp);
 
         // 2. Use a BlockingQueue for producer-consumer pattern
-        // Limit capacity to avoid excessive memory usage if writing is slow
         BlockingQueue<CheckpointFileIO.CheckpointEntry> queue = new LinkedBlockingQueue<>(1024);
 
-        // 3. Start producer tasks to fetch bitmaps in parallel
+        // 3. Start producer tasks to fetch bitmaps
         for (Map.Entry<String, RGVisibility> entry : entries)
         {
             checkpointExecutor.submit(() -> {
@@ -306,7 +311,14 @@ public class RetinaResourceManager
                     long fileId = Long.parseLong(parts[0]);
                     int rgId = Integer.parseInt(parts[1]);
                     RGVisibility rgVisibility = entry.getValue();
-                    long[] bitmap = rgVisibility.getVisibilityBitmap(timestamp);
+                    long[] bitmap;
+                    if (precomputedBitmaps != null && precomputedBitmaps.containsKey(key))
+                    {
+                        bitmap = precomputedBitmaps.get(key);
+                    } else
+                    {
+                        bitmap = rgVisibility.getVisibilityBitmap(timestamp);
+                    }
                     queue.put(new CheckpointFileIO.CheckpointEntry(fileId, rgId, (int) rgVisibility.getRecordNum(), bitmap));
                 } catch (Exception e)
                 {
@@ -628,14 +640,17 @@ public class RetinaResourceManager
         try
         {
             // Step 1: Memory GC — compact Deletion Chain into baseBitmap.
+            // Collect gcSnapshotBitmaps produced as a side-effect of compaction.
+            Map<String, long[]> gcSnapshotBitmaps = new HashMap<>();
             for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
             {
-                entry.getValue().garbageCollect(timestamp);
+                long[] bitmap = entry.getValue().garbageCollect(timestamp);
+                gcSnapshotBitmaps.put(entry.getKey(), bitmap);
             }
 
-            // Step 2: Persist the post-Memory-GC visibility state. Block until the
-            // checkpoint file is fully written (see Javadoc above for why we join here).
-            createCheckpoint(timestamp, CheckpointType.GC).join();
+            // Step 2: Persist the post-Memory-GC visibility state using precomputed
+            // bitmaps (zero chain traversal). Block until fully written.
+            createCheckpoint(timestamp, CheckpointType.GC, gcSnapshotBitmaps).join();
 
             // Step 3: Storage GC — rewrite high-deletion-ratio files (TODO).
             // if (storageGcEnabled) storageGarbageCollector.runStorageGC();

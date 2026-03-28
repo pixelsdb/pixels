@@ -68,6 +68,11 @@ protected:
         return true;
     }
 
+    void collectGarbage(uint64_t ts) {
+        uint64_t buf[BITMAP_SIZE] = {0};
+        v->collectTileGarbage(ts, buf);
+    }
+
     TileVisibility<RETINA_CAPACITY>* v;
 };
 
@@ -89,7 +94,7 @@ TEST_F(TileVisibilityTest, BaseFunction) {
     SET_BITMAP_BIT(expectedBitmap, 2);
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 
-    v->collectTileGarbage(101);
+    collectGarbage(101);
     v->getTileVisibilityBitmap(101, actualBitmap);
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
@@ -111,7 +116,7 @@ TEST_F(TileVisibilityTest, GarbageCollect) {
     for (int i = 0; i < count; i++) {
         v->deleteTileRecord(i, i + 100);
     }
-    v->collectTileGarbage(150);
+    collectGarbage(150);
     uint64_t actualBitmap[BITMAP_SIZE] = {0};
     uint64_t expectedBitmap[BITMAP_SIZE] = {0};
 
@@ -123,7 +128,7 @@ TEST_F(TileVisibilityTest, GarbageCollect) {
     for (int i = 51; i < count; i++) {
         SET_BITMAP_BIT(expectedBitmap, i);
     }
-    v->collectTileGarbage(100 + count);
+    collectGarbage(100 + count);
     v->getTileVisibilityBitmap(100 + count, actualBitmap);
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
@@ -300,7 +305,7 @@ TEST_F(TileVisibilityTest, ZeroSentinelInGarbageCollect) {
     // during the Scenario-2 race if tailUsed were stale at BLOCK_CAPACITY.
     v->deleteTileRecord(0, 0);
 
-    v->collectTileGarbage(100);
+    collectGarbage(100);
 
     uint64_t actualBitmap[BITMAP_SIZE] = {0};
     v->getTileVisibilityBitmap(100, actualBitmap);
@@ -355,7 +360,7 @@ TEST_F(TileVisibilityTest, ConcurrentGCAndFirstInsert) {
         // then immediately fires GC to maximise the chance of hitting the race window.
         auto gcThread = std::thread([&]() {
             while (!deleteStarted.load(std::memory_order_acquire)) {}
-            v->collectTileGarbage(1000);
+            collectGarbage(1000);
             gcDone.store(true, std::memory_order_release);
         });
 
@@ -369,7 +374,7 @@ TEST_F(TileVisibilityTest, ConcurrentGCAndFirstInsert) {
 
         // After both operations complete, GC with a ts that covers the inserted item
         // and verify the bitmap is exactly {row 5 deleted}.
-        v->collectTileGarbage(1000);
+        collectGarbage(1000);
         uint64_t actualBitmap[BITMAP_SIZE] = {0};
         v->getTileVisibilityBitmap(1000, actualBitmap);
 
@@ -429,7 +434,7 @@ TEST_F(TileVisibilityTest, ConcurrentGCAndBlockTransition) {
         // then fires GC immediately to race with tail/tailUsed update.
         auto gcThread = std::thread([&]() {
             while (!insertReady.load(std::memory_order_acquire)) {}
-            v->collectTileGarbage(GC_TS);
+            collectGarbage(GC_TS);
         });
 
         // Insert thread: signal then insert the (BLOCK_CAPACITY+1)-th item to force
@@ -440,7 +445,7 @@ TEST_F(TileVisibilityTest, ConcurrentGCAndBlockTransition) {
         gcThread.join();
 
         // Run one more clean GC to ensure everything that should be compacted is.
-        v->collectTileGarbage(GC_TS);
+        collectGarbage(GC_TS);
 
         // Check the canary: bit 0 must be 0 because row 0 was never deleted.
         uint64_t bitmap[BITMAP_SIZE] = {0};

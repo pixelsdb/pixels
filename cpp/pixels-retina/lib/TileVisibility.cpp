@@ -238,7 +238,7 @@ void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* ou
 }
 
 template<size_t CAPACITY>
-void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts) {
+void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts, uint64_t* gcSnapshotBitmap) {
     // Drain the pending retirement slot left by deleteTileRecord's empty-chain path.
     VersionedData<CAPACITY>* pending = pendingRetire.exchange(nullptr, std::memory_order_acquire);
     if (pending) {
@@ -248,7 +248,12 @@ void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts) {
 
     // Load old version
     VersionedData<CAPACITY>* oldVer = currentVersion.load(std::memory_order_acquire);
-    if (ts <= oldVer->baseTimestamp) return;
+
+    // Early return A: safeGcTs <= baseTimestamp, nothing to compact
+    if (ts <= oldVer->baseTimestamp) {
+        std::memcpy(gcSnapshotBitmap, oldVer->baseBitmap, NUM_WORDS * sizeof(uint64_t));
+        return;
+    }
 
     // Find the last block that should be compacted
     DeleteIndexBlock *blk = oldVer->head;
@@ -275,7 +280,22 @@ void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts) {
         blk = blk->next.load(std::memory_order_acquire);
     }
 
-    if (!lastFullBlk) return;
+    // Early return B: no compactable block
+    if (!lastFullBlk) {
+        std::memcpy(gcSnapshotBitmap, oldVer->baseBitmap, NUM_WORDS * sizeof(uint64_t));
+        if (oldVer->head) {
+            auto* tailSnap = tail.load(std::memory_order_acquire);
+            size_t tailUsedSnap = tailUsed.load(std::memory_order_acquire);
+            size_t cnt = (oldVer->head == tailSnap) ? tailUsedSnap : DeleteIndexBlock::BLOCK_CAPACITY;
+            for (size_t i = 0; i < cnt; i++) {
+                uint64_t item = oldVer->head->items[i];
+                if (item == 0) break;
+                if (extractTimestamp(item) <= ts) SET_BITMAP_BIT(gcSnapshotBitmap, extractRowId(item));
+                else break;
+            }
+        }
+        return;
+    }
 
     // Create new version with Copy-on-Write
     // Manually compute the new base bitmap from oldVer
@@ -304,8 +324,22 @@ void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts) {
         blk = blk->next.load(std::memory_order_acquire);
     }
 
-    // Get new head and break the chain to avoid double-free
+    // Compact path: build gcSnapshotBitmap by scanning the boundary block
     DeleteIndexBlock* newHead = lastFullBlk->next.load(std::memory_order_acquire);
+    std::memcpy(gcSnapshotBitmap, newBaseBitmap, NUM_WORDS * sizeof(uint64_t));
+    if (newHead) {
+        auto* tailSnap = tail.load(std::memory_order_acquire);
+        size_t tailUsedSnap = tailUsed.load(std::memory_order_acquire);
+        size_t cnt = (newHead == tailSnap) ? tailUsedSnap : DeleteIndexBlock::BLOCK_CAPACITY;
+        for (size_t i = 0; i < cnt; i++) {
+            uint64_t item = newHead->items[i];
+            if (item == 0) break;
+            if (extractTimestamp(item) <= ts) SET_BITMAP_BIT(gcSnapshotBitmap, extractRowId(item));
+            else break;
+        }
+    }
+
+    // Break the chain to avoid double-free
     lastFullBlk->next.store(nullptr, std::memory_order_release);
 
     // Create new version with new head - this is the atomic COW update

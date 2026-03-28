@@ -50,9 +50,9 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    garbageCollect
- * Signature: (JJ)V
+ * Signature: (JJ)[J
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollect
+JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollect
   (JNIEnv *, jobject, jlong, jlong);
 
 /*

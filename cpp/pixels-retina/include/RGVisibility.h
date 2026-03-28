@@ -33,7 +33,7 @@ public:
     void deleteRGRecord(uint32_t rowId, uint64_t timestamp);
     uint64_t* getRGVisibilityBitmap(uint64_t timestamp);
 
-    void collectRGGarbage(uint64_t timestamp);
+    std::vector<uint64_t> collectRGGarbage(uint64_t timestamp);
 
     uint64_t getBitmapSize() const;
 

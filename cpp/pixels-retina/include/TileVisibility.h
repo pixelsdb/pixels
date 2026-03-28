@@ -97,7 +97,7 @@ class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     ~TileVisibility() override;
     void deleteTileRecord(uint16_t rowId, uint64_t ts);
     void getTileVisibilityBitmap(uint64_t ts, uint64_t* outBitmap) const;
-    void collectTileGarbage(uint64_t ts);
+    void collectTileGarbage(uint64_t ts, uint64_t* gcSnapshotBitmap);
 
   private:
     TileVisibility(const TileVisibility &) = delete;

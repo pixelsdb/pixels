@@ -129,15 +129,20 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    garbageCollect
- * Signature: (JJ)V
+ * Signature: (JJ)[J
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollect
+JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollect
   (JNIEnv* env, jobject, jlong timestamp, jlong handle) {
     try {
         auto* rgVisibility = reinterpret_cast<RGVisibilityInstance*>(handle);
-        rgVisibility->collectRGGarbage(timestamp);
+        std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(timestamp);
+        jlongArray result = env->NewLongArray(snapshot.size());
+        env->SetLongArrayRegion(result, 0, snapshot.size(),
+            reinterpret_cast<const jlong*>(snapshot.data()));
+        return result;
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
+        return nullptr;
     }
 }
 
