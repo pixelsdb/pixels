@@ -65,13 +65,13 @@ struct VersionedData : public pixels::RetinaBase<VersionedData<CAPACITY>> {
     uint64_t baseTimestamp;
     DeleteIndexBlock* head; // Delete chain head, part of the version
 
-    VersionedData() : baseTimestamp(0), head(nullptr) {
-        std::memset(baseBitmap, 0, sizeof(baseBitmap));
-    }
-
-    VersionedData(uint64_t ts, const uint64_t* bitmap, DeleteIndexBlock* h)
+    // timestamp defaults to 0; bitmap defaults to all-zeros.
+    explicit VersionedData(uint64_t ts = 0, const uint64_t* bitmap = nullptr, DeleteIndexBlock* h = nullptr)
         : baseTimestamp(ts), head(h) {
-        std::memcpy(baseBitmap, bitmap, NUM_WORDS * sizeof(uint64_t));
+        if (bitmap)
+            std::memcpy(baseBitmap, bitmap, NUM_WORDS * sizeof(uint64_t));
+        else
+            std::memset(baseBitmap, 0, sizeof(baseBitmap));
     }
 };
 
@@ -92,8 +92,8 @@ template<size_t CAPACITY>
 class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     static constexpr size_t NUM_WORDS = BITMAP_WORDS(CAPACITY);
  public:
-    TileVisibility();
-    TileVisibility(uint64_t ts, const uint64_t* bitmap);
+    // timestamp defaults to 0; bitmap defaults to all-zeros.
+    explicit TileVisibility(uint64_t timestamp = 0, const uint64_t* bitmap = nullptr);
     ~TileVisibility() override;
     void deleteTileRecord(uint16_t rowId, uint64_t ts);
     void getTileVisibilityBitmap(uint64_t ts, uint64_t* outBitmap) const;

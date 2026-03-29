@@ -26,8 +26,8 @@
 template<size_t CAPACITY>
 class RGVisibility : public pixels::RetinaBase<RGVisibility<CAPACITY>> {
 public:
-    explicit RGVisibility(uint64_t rgRecordNum);
-    explicit RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap);
+    explicit RGVisibility(uint64_t rgRecordNum, uint64_t timestamp = 0,
+                          const std::vector<uint64_t>* initialBitmap = nullptr);
     ~RGVisibility() override;
 
     void deleteRGRecord(uint32_t rowId, uint64_t timestamp);

@@ -27,20 +27,9 @@
 #include <immintrin.h>
 
 template<size_t CAPACITY>
-TileVisibility<CAPACITY>::TileVisibility() {
-    VersionedData<CAPACITY>* initialVersion = new VersionedData<CAPACITY>();
-    currentVersion.store(initialVersion, std::memory_order_release);
-    tail.store(nullptr, std::memory_order_release);
-    tailUsed.store(0, std::memory_order_release);
-}
-
-template<size_t CAPACITY>
-TileVisibility<CAPACITY>::TileVisibility(uint64_t ts, const uint64_t* bitmap) {
-    VersionedData<CAPACITY>* initialVersion = new VersionedData<CAPACITY>(ts, bitmap, nullptr);
-    currentVersion.store(initialVersion, std::memory_order_release);
-    tail.store(nullptr, std::memory_order_release);
-    tailUsed.store(0, std::memory_order_release);
-}
+TileVisibility<CAPACITY>::TileVisibility(uint64_t timestamp, const uint64_t* bitmap)
+    : currentVersion(new VersionedData<CAPACITY>(timestamp, bitmap)),
+      tail(nullptr), tailUsed(0) {}
 
 template<size_t CAPACITY>
 TileVisibility<CAPACITY>::~TileVisibility() {

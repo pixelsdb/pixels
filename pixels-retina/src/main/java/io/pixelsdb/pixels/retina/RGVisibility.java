@@ -68,19 +68,32 @@ public class RGVisibility implements AutoCloseable
     public RGVisibility(long rgRecordNum)
     {
         this.recordNum = rgRecordNum;
-        this.nativeHandle.set(createNativeObject(rgRecordNum));
+        this.nativeHandle.set(createNativeObject(rgRecordNum, 0L, null));
+    }
+
+    public RGVisibility(long rgRecordNum, long timestamp)
+    {
+        if (timestamp <= 0)
+        {
+            throw new IllegalArgumentException("timestamp must be positive when provided");
+        }
+        this.recordNum = rgRecordNum;
+        this.nativeHandle.set(createNativeObject(rgRecordNum, timestamp, null));
     }
 
     public RGVisibility(long rgRecordNum, long timestamp, long[] initialBitmap)
     {
-        this.recordNum = rgRecordNum;
+        if (timestamp <= 0)
+        {
+            throw new IllegalArgumentException("timestamp must be positive when provided");
+        }
+        
         if (initialBitmap == null)
         {
-            this.nativeHandle.set(createNativeObject(rgRecordNum));
-        } else
-        {
-            this.nativeHandle.set(createNativeObjectInitialized(rgRecordNum, timestamp, initialBitmap));
+            throw new IllegalArgumentException("initial bitmap must not be null");
         }
+        this.recordNum = rgRecordNum;
+        this.nativeHandle.set(createNativeObject(rgRecordNum, timestamp, initialBitmap));
     }
 
     public long getRecordNum()
@@ -99,8 +112,7 @@ public class RGVisibility implements AutoCloseable
     }
 
     // native methods
-    private native long createNativeObject(long rgRecordNum);
-    private native long createNativeObjectInitialized(long rgRecordNum, long timestamp, long[] bitmap);
+    private native long createNativeObject(long rgRecordNum, long timestamp, long[] bitmap);
     private native void destroyNativeObject(long nativeHandle);
     private native void deleteRecord(int rgRowOffset, long timestamp, long nativeHandle);
     private native long[] getVisibilityBitmap(long timestamp, long nativeHandle);

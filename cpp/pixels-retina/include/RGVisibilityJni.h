@@ -10,17 +10,9 @@ extern "C" {
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    createNativeObject
- * Signature: (J)J
- */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNativeObject
-  (JNIEnv *, jobject, jlong);
-
-/*
- * Class:     io_pixelsdb_pixels_retina_RGVisibility
- * Method:    createNativeObjectInitialized
  * Signature: (JJ[J)J
  */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNativeObjectInitialized
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNativeObject
   (JNIEnv *, jobject, jlong, jlong, jlongArray);
 
 /*
