@@ -63,6 +63,8 @@ public class RetinaResourceManager
 
     // GC related fields
     private final ScheduledExecutorService gcExecutor;
+    private final boolean storageGcEnabled;
+    private final StorageGarbageCollector storageGarbageCollector;
 
     // Checkpoint related fields
     private final ExecutorService checkpointExecutor;
@@ -91,7 +93,7 @@ public class RetinaResourceManager
         ConfigFactory config = ConfigFactory.Instance();
 
         this.checkpointRefCounts = new ConcurrentHashMap<>();
-        this.checkpointDir = config.getProperty("pixels.retina.checkpoint.dir");
+        this.checkpointDir = config.getProperty("retina.checkpoint.dir");
 
         int cpThreads = Integer.parseInt(config.getProperty("retina.checkpoint.threads"));
         this.checkpointExecutor = Executors.newFixedThreadPool(cpThreads, r -> {
@@ -124,6 +126,31 @@ public class RetinaResourceManager
         this.gcExecutor = executor;
         totalVirtualNodeNum = Integer.parseInt(ConfigFactory.Instance().getProperty("node.virtual.num"));
         this.retinaHostName = NetUtils.getLocalHostName();
+
+        boolean gcEnabled = false;
+        StorageGarbageCollector gc = null;
+        try
+        {
+            gcEnabled = Boolean.parseBoolean(config.getProperty("retina.storage.gc.enabled"));
+            if (gcEnabled)
+            {
+                double threshold = Double.parseDouble(config.getProperty("retina.storage.gc.threshold"));
+                long targetFileSize = Long.parseLong(config.getProperty("retina.storage.gc.target.file.size"));
+                int maxGroups = Integer.parseInt(config.getProperty("retina.storage.gc.max.file.groups.per.run"));
+                gc = new StorageGarbageCollector(this, this.metadataService,
+                        threshold, targetFileSize, maxGroups);
+                logger.info("Storage GC enabled (threshold={}, targetFileSize={}, maxGroups={})",
+                        threshold, targetFileSize, maxGroups);
+            }
+        }
+        catch (Exception e)
+        {
+            logger.error("Failed to initialise StorageGarbageCollector, Storage GC will be disabled", e);
+            gcEnabled = false;
+            gc = null;
+        }
+        this.storageGcEnabled = gcEnabled;
+        this.storageGarbageCollector = gc;
     }
 
     private static final class InstanceHolder
@@ -595,7 +622,7 @@ public class RetinaResourceManager
     }
 
     /**
-     * Run a full GC cycle: Memory GC → checkpoint → Storage GC (future).
+     * Run a full GC cycle: Memory GC → checkpoint → Storage GC (S1 scan + future S2-S6).
      *
      * <p>Ordering rationale:
      * <ol>
@@ -605,16 +632,18 @@ public class RetinaResourceManager
      *       {@code getVisibilityBitmap(lwm)} call traverses at most one partial block
      *       (≤ {@code BLOCK_CAPACITY} items) instead of the entire pre-GC chain. This makes
      *       checkpoint bitmap serialisation significantly cheaper.</li>
-     *   <li><b>Checkpoint second, blocking</b>: we call {@code .join()} so that
-     *       {@code runGC()} does not return until the checkpoint file is fully written to disk.
-     *       {@code gcExecutor} is a single-threaded scheduler; because {@code runGC()} must
-     *       complete before the next invocation begins, this blocking join is the simplest way
-     *       to guarantee that no two GC cycles ever overlap — no additional lock is required.</li>
+     *   <li><b>Checkpoint second, unconditional and blocking</b>: written regardless of whether
+     *       Storage GC finds any candidate files. The {@code .join()} ensures the checkpoint
+     *       file is fully on disk before Storage GC begins rewriting any files, so crash
+     *       recovery can always restore the post-Memory-GC visibility state independently of
+     *       any in-progress Storage GC rewrite. {@code gcExecutor} is single-threaded, so the
+     *       blocking join is also the simplest way to guarantee no two GC cycles overlap.</li>
      *   <li><b>Storage GC third</b>: requires an up-to-date {@code baseBitmap} (hence after
      *       Memory GC) and its own WAL for crash recovery. Placing it after the checkpoint
      *       keeps the two recovery paths independent: on restart, the GC checkpoint restores
      *       the post-Memory-GC visibility state, and the GcWal resumes any in-progress Storage
-     *       GC task separately.</li>
+     *       GC task separately. Once scan completes, bitmaps for non-candidate files are
+     *       immediately released from memory (they are no longer needed by S2-S6).</li>
      *   <li><b>Advance {@code latestGcTimestamp} last</b>: updated only after the entire cycle
      *       succeeds (Memory GC + checkpoint + Storage GC). If any step throws, the timestamp
      *       is not advanced and the next scheduled invocation will retry the full cycle.</li>
@@ -640,20 +669,38 @@ public class RetinaResourceManager
         try
         {
             // Step 1: Memory GC — compact Deletion Chain into baseBitmap.
-            // Collect gcSnapshotBitmaps produced as a side-effect of compaction.
+            // In the same pass, pre-compute per-RG stats (recordNum, invalidCount) that
+            // Storage GC needs for S1 candidate selection, avoiding a second traversal.
             Map<String, long[]> gcSnapshotBitmaps = new HashMap<>();
+            Map<String, long[]> rgStats = new HashMap<>();  // rgKey → {recordNum, invalidCount}
             for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
             {
                 long[] bitmap = entry.getValue().garbageCollect(timestamp);
                 gcSnapshotBitmaps.put(entry.getKey(), bitmap);
+
+                long recordNum = entry.getValue().getRecordNum();
+                long invalidCount = 0;
+                for (long word : bitmap) invalidCount += Long.bitCount(word);
+                rgStats.put(entry.getKey(), new long[]{recordNum, invalidCount});
             }
 
-            // Step 2: Persist the post-Memory-GC visibility state using precomputed
-            // bitmaps (zero chain traversal). Block until fully written.
+            // Step 2: Checkpoint — always written unconditionally with the full visibility
+            // snapshot before any Storage GC rewriting begins.
             createCheckpoint(timestamp, CheckpointType.GC, gcSnapshotBitmaps).join();
 
-            // Step 3: Storage GC — rewrite high-deletion-ratio files (TODO).
-            // if (storageGcEnabled) storageGarbageCollector.runStorageGC();
+            // Step 3: Storage GC — scan for high-deletion-ratio files; on finding candidates,
+            // trim non-candidate bitmaps from memory and log (S2-S6 added in Tasks 3-6).
+            if (storageGcEnabled && storageGarbageCollector != null)
+            {
+                try
+                {
+                    storageGarbageCollector.runStorageGC(timestamp, rgStats, gcSnapshotBitmaps);
+                }
+                catch (Exception e)
+                {
+                    logger.error("Storage GC failed", e);
+                }
+            }
 
             // Step 4: Advance the timestamp only after the full cycle succeeds.
             // latestGcTimestamp is no longer updated inside createCheckpoint's async

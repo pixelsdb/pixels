@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.retina;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import org.junit.Before;
@@ -31,8 +32,12 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,7 +45,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -59,7 +67,7 @@ public class TestRetinaCheckpoint
     @Before
     public void setUp() throws IOException, RetinaException
     {
-        testCheckpointDir = ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir");
+        testCheckpointDir = ConfigFactory.Instance().getProperty("retina.checkpoint.dir");
         storage = StorageFactory.Instance().getStorage(testCheckpointDir);
 
         if (!storage.exists(testCheckpointDir))
@@ -554,5 +562,168 @@ public class TestRetinaCheckpoint
         if (longIndex >= bitmap.length) return false;
 
         return (bitmap[longIndex] & (1L << bitOffset)) != 0;
+    }
+
+    // -----------------------------------------------------------------------
+    // GC checkpoint: completeness + bitmap correctness
+    // -----------------------------------------------------------------------
+
+    /**
+     * Creates a {@code long[]} GC snapshot bitmap for one RG where exactly {@code deletedRows}
+     * out of {@code totalRows} rows are marked deleted (rows 0..deletedRows-1 are set).
+     */
+    private static long[] makeBitmap(int totalRows, int deletedRows)
+    {
+        int words = (totalRows + 63) / 64;
+        long[] bitmap = new long[words];
+        for (int r = 0; r < deletedRows; r++)
+        {
+            bitmap[r / 64] |= (1L << (r % 64));
+        }
+        return bitmap;
+    }
+
+    /**
+     * Calls {@code RetinaResourceManager.createCheckpoint(ts, CheckpointType.GC, bitmaps)}
+     * via reflection and blocks until the write completes.
+     */
+    @SuppressWarnings("unchecked")
+    private void invokeCreateGCCheckpoint(long ts, Map<String, long[]> bitmaps) throws Exception
+    {
+        // Locate the private CheckpointType enum class
+        Class<?> cpTypeClass = Arrays.stream(RetinaResourceManager.class.getDeclaredClasses())
+                .filter(c -> c.getSimpleName().equals("CheckpointType"))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("CheckpointType enum not found"));
+
+        // Get the GC constant
+        Object gcConstant = Arrays.stream(cpTypeClass.getEnumConstants())
+                .filter(e -> e.toString().equals("GC"))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("CheckpointType.GC not found"));
+
+        // Get the overloaded createCheckpoint(long, CheckpointType, Map) method
+        Method method = RetinaResourceManager.class.getDeclaredMethod(
+                "createCheckpoint", long.class, cpTypeClass, Map.class);
+        method.setAccessible(true);
+
+        CompletableFuture<Void> future = (CompletableFuture<Void>) method.invoke(
+                retinaManager, ts, gcConstant, bitmaps);
+        future.join();
+    }
+
+    /**
+     * Verifies that a GC checkpoint written with a full {@code gcSnapshotBitmaps} map
+     * contains ALL RG entries — including those that would not be selected as Storage GC
+     * candidates — because the checkpoint is written before S1 scanning begins.
+     *
+     * <p>Setup: 3 files in {@code rgVisibilityMap}:
+     * <ul>
+     *   <li>File A: 80 % deleted (would be a candidate)</li>
+     *   <li>File B: 60 % deleted (would be a candidate)</li>
+     *   <li>File C: 20 % deleted (non-candidate)</li>
+     * </ul>
+     *
+     * <p>Expected: checkpoint rgCount = 3; all three entries present with correct
+     * {@code recordNum} and bitmap content.
+     */
+    @Test
+    public void testGCCheckpoint_containsAllRGs() throws Exception
+    {
+        final long fileIdA  = 77001L;
+        final long fileIdB  = 77002L;
+        final long fileIdC  = 77003L;
+        final int  rows     = 100;
+        final long safeGcTs = 500L;
+
+        retinaManager.addVisibility(fileIdA, 0, rows);
+        retinaManager.addVisibility(fileIdB, 0, rows);
+        retinaManager.addVisibility(fileIdC, 0, rows);
+
+        long[] bitmapA = makeBitmap(rows, 80);
+        long[] bitmapB = makeBitmap(rows, 60);
+        long[] bitmapC = makeBitmap(rows, 20);
+
+        Map<String, long[]> gcBitmaps = new HashMap<>();
+        gcBitmaps.put(fileIdA + "_0", bitmapA);
+        gcBitmaps.put(fileIdB + "_0", bitmapB);
+        gcBitmaps.put(fileIdC + "_0", bitmapC);
+
+        invokeCreateGCCheckpoint(safeGcTs, gcBitmaps);
+
+        String cpPath = resolve(testCheckpointDir, getGcFileName(safeGcTs));
+        assertTrue("GC checkpoint file must exist", storage.exists(cpPath));
+
+        Map<String, CheckpointFileIO.CheckpointEntry> entries = new HashMap<>();
+        int rgCount = CheckpointFileIO.readCheckpointParallel(cpPath,
+                e -> entries.put(e.fileId + "_" + e.rgId, e));
+
+        assertEquals("checkpoint must contain all 3 RGs (not just candidates)", 3, rgCount);
+        assertEquals("entries map size must be 3", 3, entries.size());
+
+        CheckpointFileIO.CheckpointEntry entA = entries.get(fileIdA + "_0");
+        assertNotNull("fileIdA must be present", entA);
+        assertEquals("fileIdA recordNum", rows, entA.recordNum);
+        assertArrayEquals("fileIdA bitmap must match", bitmapA, entA.bitmap);
+
+        CheckpointFileIO.CheckpointEntry entB = entries.get(fileIdB + "_0");
+        assertNotNull("fileIdB must be present", entB);
+        assertEquals("fileIdB recordNum", rows, entB.recordNum);
+        assertArrayEquals("fileIdB bitmap must match", bitmapB, entB.bitmap);
+
+        CheckpointFileIO.CheckpointEntry entC = entries.get(fileIdC + "_0");
+        assertNotNull("fileIdC (non-candidate) must be present", entC);
+        assertEquals("fileIdC recordNum", rows, entC.recordNum);
+        assertArrayEquals("fileIdC bitmap must match", bitmapC, entC.bitmap);
+    }
+
+    /**
+     * Verifies that the GC checkpoint bitmap content faithfully matches the
+     * {@code gcSnapshotBitmaps} passed to {@code createCheckpoint}: each word of each
+     * per-RG bitmap must be preserved exactly, with no cross-RG contamination.
+     *
+     * <p>Uses a 2-RG file with deliberately complementary bitmaps:
+     * <ul>
+     *   <li>RG 0: first word all-ones ({@code rows 0-63} deleted), second word zero</li>
+     *   <li>RG 1: first word zero, second word all-ones ({@code rows 64-127} deleted)</li>
+     * </ul>
+     */
+    @Test
+    public void testGCCheckpoint_bitmapContentIsExact() throws Exception
+    {
+        final long fileId   = 88001L;
+        final int  rows     = 128;   // 2 words per RG
+        final long safeGcTs = 600L;
+
+        retinaManager.addVisibility(fileId, 0, rows);
+        retinaManager.addVisibility(fileId, 1, rows);
+
+        long[] bitmapRg0 = new long[]{-1L, 0L};   // rows 0-63 deleted
+        long[] bitmapRg1 = new long[]{0L, -1L};   // rows 64-127 deleted
+
+        Map<String, long[]> gcBitmaps = new HashMap<>();
+        gcBitmaps.put(fileId + "_0", bitmapRg0);
+        gcBitmaps.put(fileId + "_1", bitmapRg1);
+
+        invokeCreateGCCheckpoint(safeGcTs, gcBitmaps);
+
+        String cpPath = resolve(testCheckpointDir, getGcFileName(safeGcTs));
+        assertTrue("GC checkpoint file must exist", storage.exists(cpPath));
+
+        Map<String, CheckpointFileIO.CheckpointEntry> entries = new HashMap<>();
+        int rgCount = CheckpointFileIO.readCheckpointParallel(cpPath,
+                e -> entries.put(e.fileId + "_" + e.rgId, e));
+
+        assertEquals("checkpoint must contain 2 RGs", 2, rgCount);
+
+        CheckpointFileIO.CheckpointEntry rg0 = entries.get(fileId + "_0");
+        assertNotNull("RG 0 must be present", rg0);
+        assertEquals("RG 0 word 0 must be all-ones (rows 0-63 deleted)",  -1L, rg0.bitmap[0]);
+        assertEquals("RG 0 word 1 must be zero (rows 64-127 live)",        0L, rg0.bitmap[1]);
+
+        CheckpointFileIO.CheckpointEntry rg1 = entries.get(fileId + "_1");
+        assertNotNull("RG 1 must be present", rg1);
+        assertEquals("RG 1 word 0 must be zero (rows 0-63 live)",          0L, rg1.bitmap[0]);
+        assertEquals("RG 1 word 1 must be all-ones (rows 64-127 deleted)", -1L, rg1.bitmap[1]);
     }
 }

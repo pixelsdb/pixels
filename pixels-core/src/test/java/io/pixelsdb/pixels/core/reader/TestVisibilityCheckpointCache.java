@@ -46,7 +46,7 @@ public class TestVisibilityCheckpointCache
     @Before
     public void setUp() throws IOException
     {
-        testCheckpointDir = ConfigFactory.Instance().getProperty("pixels.retina.checkpoint.dir");
+        testCheckpointDir = ConfigFactory.Instance().getProperty("retina.checkpoint.dir");
         storage = StorageFactory.Instance().getStorage(testCheckpointDir);
 
         if (!storage.exists(testCheckpointDir))
