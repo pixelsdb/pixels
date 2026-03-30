@@ -42,7 +42,7 @@ public class TestRGVisibility
     @Before
     public void setUp()
     {
-        rgVisibility = new RGVisibility(ROW_COUNT);
+        rgVisibility = new RGVisibility(ROW_COUNT, 0L, null);
     }
 
     @After
@@ -60,7 +60,7 @@ public class TestRGVisibility
         // Probe the native library to determine per-tile bitmap size,
         // which depends on RETINA_CAPACITY set at compile time.
         int bitmapWords;
-        try (RGVisibility probe = new RGVisibility(1))
+        try (RGVisibility probe = new RGVisibility(1, 0L, null))
         {
             bitmapWords = probe.getVisibilityBitmap(0).length;
         }

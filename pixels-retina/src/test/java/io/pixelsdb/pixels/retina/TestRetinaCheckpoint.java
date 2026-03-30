@@ -112,7 +112,7 @@ public class TestRetinaCheckpoint
     public void testRegisterOffload() throws RetinaException, IOException
     {
         System.out.println("\n[Test] Starting testRegisterOffload...");
-        retinaManager.addVisibility(fileId, rgId, numRows);
+        retinaManager.addVisibility(fileId, rgId, numRows, 0L, null, false);
         long timestamp = 100L;
 
         // Register offload
@@ -137,7 +137,7 @@ public class TestRetinaCheckpoint
     public void testMultipleOffloads() throws RetinaException, IOException
     {
         System.out.println("\n[Test] Starting testMultipleOffloads...");
-        retinaManager.addVisibility(fileId, rgId, numRows);
+        retinaManager.addVisibility(fileId, rgId, numRows, 0L, null, false);
         long timestamp1 = 100L;
         long timestamp1_dup = 100L; // same timestamp
 
@@ -166,7 +166,7 @@ public class TestRetinaCheckpoint
     public void testCheckpointRecovery() throws RetinaException, IOException
     {
         System.out.println("\n[Test] Starting testCheckpointRecovery...");
-        retinaManager.addVisibility(fileId, rgId, numRows);
+        retinaManager.addVisibility(fileId, rgId, numRows, 0L, null, false);
         long timestamp = 100L;
 
         // 1. Delete row 10
@@ -217,7 +217,7 @@ public class TestRetinaCheckpoint
 
         // 7. Re-add Visibility, at this point it should see that it already exists in rgVisibilityMap
         System.out.println("Re-adding visibility for file (should skip as it already exists)...");
-        retinaManager.addVisibility(fileId, rgId, numRows);
+        retinaManager.addVisibility(fileId, rgId, numRows, 0L, null, false);
 
         // 8. Verify state still correct
         long[] finalBitmap = retinaManager.queryVisibility(fileId, rgId, timestamp);
@@ -229,7 +229,7 @@ public class TestRetinaCheckpoint
     public void testCheckpointRetryAfterFailure() throws RetinaException, IOException
     {
         System.out.println("\n[Test] Starting testCheckpointRetryAfterFailure...");
-        retinaManager.addVisibility(fileId, rgId, numRows);
+        retinaManager.addVisibility(fileId, rgId, numRows, 0L, null, false);
         long timestamp = 123L;
 
         String expectedFile = resolve(testCheckpointDir, getOffloadFileName(timestamp));
@@ -267,7 +267,7 @@ public class TestRetinaCheckpoint
         int numRgs = 3;
         for (int i = 0; i < numRgs; i++)
         {
-            retinaManager.addVisibility(fileId, i, numRows);
+            retinaManager.addVisibility(fileId, i, numRows, 0L, null, false);
         }
         long timestamp = 200L;
 
@@ -312,7 +312,7 @@ public class TestRetinaCheckpoint
         int numRgs = 5;
         for (int i = 0; i < numRgs; i++)
         {
-            retinaManager.addVisibility(fileId, i, numRows);
+            retinaManager.addVisibility(fileId, i, numRows, 0L, null, false);
         }
         long timestamp = 300L;
 
@@ -332,7 +332,7 @@ public class TestRetinaCheckpoint
     public void testConcurrency() throws InterruptedException, RetinaException
     {
         System.out.println("\n[Test] Starting testConcurrency with 20 threads...");
-        retinaManager.addVisibility(fileId, rgId, numRows);
+        retinaManager.addVisibility(fileId, rgId, numRows, 0L, null, false);
         int numThreads = 20;
         int operationsPerThread = 50;
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
@@ -410,7 +410,7 @@ public class TestRetinaCheckpoint
         System.out.println("[Perf] Populating visibility data...");
         for (int i = 0; i < numFiles; i++)
         {
-            retinaManager.addVisibility(i, 0, rowsPerRg);
+            retinaManager.addVisibility(i, 0, rowsPerRg, 0L, null, false);
         }
 
         // 3. Delete Records based on Ratio
@@ -636,9 +636,9 @@ public class TestRetinaCheckpoint
         final int  rows     = 100;
         final long safeGcTs = 500L;
 
-        retinaManager.addVisibility(fileIdA, 0, rows);
-        retinaManager.addVisibility(fileIdB, 0, rows);
-        retinaManager.addVisibility(fileIdC, 0, rows);
+        retinaManager.addVisibility(fileIdA, 0, rows, 0L, null, false);
+        retinaManager.addVisibility(fileIdB, 0, rows, 0L, null, false);
+        retinaManager.addVisibility(fileIdC, 0, rows, 0L, null, false);
 
         long[] bitmapA = makeBitmap(rows, 80);
         long[] bitmapB = makeBitmap(rows, 60);
@@ -695,8 +695,8 @@ public class TestRetinaCheckpoint
         final int  rows     = 128;   // 2 words per RG
         final long safeGcTs = 600L;
 
-        retinaManager.addVisibility(fileId, 0, rows);
-        retinaManager.addVisibility(fileId, 1, rows);
+        retinaManager.addVisibility(fileId, 0, rows, 0L, null, false);
+        retinaManager.addVisibility(fileId, 1, rows, 0L, null, false);
 
         long[] bitmapRg0 = new long[]{-1L, 0L};   // rows 0-63 deleted
         long[] bitmapRg1 = new long[]{0L, -1L};   // rows 64-127 deleted

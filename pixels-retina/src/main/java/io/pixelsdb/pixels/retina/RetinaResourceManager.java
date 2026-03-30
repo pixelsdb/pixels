@@ -163,10 +163,18 @@ public class RetinaResourceManager
         return InstanceHolder.instance;
     }
 
-    public void addVisibility(long fileId, int rgId, int recordNum)
+    public void addVisibility(long fileId, int rgId, int recordNum, long timestamp,
+                              long[] bitmap, boolean overwrite)
     {
         String rgKey = fileId + "_" + rgId;
-        rgVisibilityMap.computeIfAbsent(rgKey, k -> new RGVisibility(recordNum));
+        if (overwrite)
+        {
+            rgVisibilityMap.put(rgKey, new RGVisibility(recordNum, timestamp, bitmap));
+        }
+        else
+        {
+            rgVisibilityMap.computeIfAbsent(rgKey, k -> new RGVisibility(recordNum, timestamp, bitmap));
+        }
     }
 
     public void addVisibility(String filePath) throws RetinaException
@@ -189,7 +197,7 @@ public class RetinaResourceManager
                 for (int rgId = 0; rgId < footer.getRowGroupInfosCount(); rgId++)
                 {
                     int recordNum = footer.getRowGroupInfos(rgId).getNumberOfRows();
-                    addVisibility(fileId, rgId, recordNum);
+                    addVisibility(fileId, rgId, recordNum, 0L, null, false);
                 }
             }
         } catch (Exception e)
@@ -784,8 +792,7 @@ public class RetinaResourceManager
                     // Use CheckpointFileIO for unified read + parallel parsing logic
                     final long ts = latestTs;
                     int rgCount = CheckpointFileIO.readCheckpointParallel(latestPath, entry -> {
-                        rgVisibilityMap.put(entry.fileId + "_" + entry.rgId,
-                                new RGVisibility(entry.recordNum, ts, entry.bitmap));
+                        addVisibility(entry.fileId, entry.rgId, entry.recordNum, ts, entry.bitmap, true);
                     }, checkpointExecutor);
 
                     logger.info("Recovered {} RG entries from GC checkpoint", rgCount);

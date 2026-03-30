@@ -65,32 +65,11 @@ public class RGVisibility implements AutoCloseable
     private final AtomicLong nativeHandle = new AtomicLong();
     private final long recordNum;
 
-    public RGVisibility(long rgRecordNum)
-    {
-        this.recordNum = rgRecordNum;
-        this.nativeHandle.set(createNativeObject(rgRecordNum, 0L, null));
-    }
-
-    public RGVisibility(long rgRecordNum, long timestamp)
-    {
-        if (timestamp <= 0)
-        {
-            throw new IllegalArgumentException("timestamp must be positive when provided");
-        }
-        this.recordNum = rgRecordNum;
-        this.nativeHandle.set(createNativeObject(rgRecordNum, timestamp, null));
-    }
-
     public RGVisibility(long rgRecordNum, long timestamp, long[] initialBitmap)
     {
-        if (timestamp <= 0)
+        if (timestamp < 0)
         {
-            throw new IllegalArgumentException("timestamp must be positive when provided");
-        }
-        
-        if (initialBitmap == null)
-        {
-            throw new IllegalArgumentException("initial bitmap must not be null");
+            throw new IllegalArgumentException("timestamp must not be negative");
         }
         this.recordNum = rgRecordNum;
         this.nativeHandle.set(createNativeObject(rgRecordNum, timestamp, initialBitmap));
