@@ -34,6 +34,7 @@ public class PixelsReaderOption
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
     private boolean enableEncodedColumnVector = false; // whether read encoded column vectors directly when possible
     private boolean readIntColumnAsIntVector = false; // whether read int32 columns as int32 column vectors
+    private boolean exposeHiddenColumn = false; // whether expose the hidden commit timestamp column in the result batch
     private long transId = -1L;
     private long transTimestamp = -1L; // -1 means no need to consider the timestamp when reading data
     private int rgStart = 0;
@@ -152,5 +153,16 @@ public class PixelsReaderOption
     public boolean isReadIntColumnAsIntVector()
     {
         return readIntColumnAsIntVector;
+    }
+
+    public PixelsReaderOption exposeHiddenColumn(boolean exposeHiddenColumn)
+    {
+        this.exposeHiddenColumn = exposeHiddenColumn;
+        return this;
+    }
+
+    public boolean isExposeHiddenColumn()
+    {
+        return exposeHiddenColumn;
     }
 }
