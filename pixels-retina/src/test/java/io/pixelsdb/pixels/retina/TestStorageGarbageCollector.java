@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -481,6 +482,120 @@ public class TestStorageGarbageCollector
         assertEquals(0.80, groups.get(0).files.get(0).invalidRatio, 1e-9);
     }
 
+    /**
+     * Greedy splitting: a file whose effective data size exactly equals
+     * {@code targetFileSize} must NOT be treated as oversized (the check
+     * uses strict {@code >}, not {@code >=}).  Two such files should merge
+     * until the cumulative effective bytes exceeds the target.
+     *
+     * <p>File A: 100 MB on disk, 50 % deleted → 50 MB effective == target.
+     * File B: 100 MB on disk, 50 % deleted → 50 MB effective.
+     * Cumulative A+B = 100 MB > 50 MB → flush A alone, then B alone → 2 groups.
+     * But neither is "oversized" individually.
+     */
+    @Test
+    public void testGroupAndMerge_effectiveSizeExactlyEqualsTarget()
+    {
+        long target = 50 * 1024 * 1024L; // 50 MB
+        StorageGarbageCollector gc = new StorageGarbageCollector(
+                null, null, 0.5, target, Integer.MAX_VALUE, 10);
+
+        List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 1000, 0.50, 100 * 1024 * 1024L),
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 1000, 0.50, 100 * 1024 * 1024L)
+        );
+
+        List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
+
+        assertEquals("effective == target → not oversized; A+B > target → 2 groups", 2, groups.size());
+        for (StorageGarbageCollector.FileGroup g : groups)
+        {
+            assertEquals(1, g.files.size());
+        }
+    }
+
+    /**
+     * With {@code maxFilesPerGroup=1}, every file must form its own group
+     * regardless of size.
+     */
+    @Test
+    public void testGroupAndMerge_maxFilesPerGroupOne()
+    {
+        StorageGarbageCollector gc = new StorageGarbageCollector(
+                null, null, 0.5, 0L, 1, 100);
+
+        List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 100, 0.90, 0L),
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 100, 0.80, 0L),
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(3, 1), "f3", 3, 1, 1L, 0, 100, 0.70, 0L)
+        );
+
+        List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
+
+        assertEquals("maxFilesPerGroup=1 → every file its own group", 3, groups.size());
+        for (StorageGarbageCollector.FileGroup g : groups)
+        {
+            assertEquals(1, g.files.size());
+        }
+    }
+
+    /**
+     * When all groups have the same average invalidRatio, sorting is stable
+     * and the correct number of groups is returned.
+     */
+    @Test
+    public void testGroupAndMerge_equalRatioSorting()
+    {
+        StorageGarbageCollector gc = new StorageGarbageCollector(
+                null, null, 0.5, 0L, Integer.MAX_VALUE, 10);
+
+        List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 100, 0.70, 0L),
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(2, 1), "f2", 2, 1, 2L, 0, 100, 0.70, 0L),
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(3, 1), "f3", 3, 1, 3L, 0, 100, 0.70, 0L)
+        );
+
+        List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
+
+        assertEquals("3 distinct tableIds, all same ratio → 3 groups", 3, groups.size());
+        for (StorageGarbageCollector.FileGroup g : groups)
+        {
+            assertEquals(0.70, g.files.get(0).invalidRatio, 1e-9);
+        }
+    }
+
+    /**
+     * When both {@code targetFileSize} and {@code maxFilesPerGroup} are disabled
+     * (both {@code <= 0}), all files in the same {@code (tableId, virtualNodeId)}
+     * form a single group — the fast path in {@code splitIntoGroups}.
+     */
+    @Test
+    public void testGroupAndMerge_bothLimitsDisabled()
+    {
+        StorageGarbageCollector gc = new StorageGarbageCollector(
+                null, null, 0.5, 0L, 0, 10);
+
+        List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
+        for (int i = 0; i < 5; i++)
+        {
+            candidates.add(new StorageGarbageCollector.FileCandidate(
+                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 100, 0.80 - i * 0.05, 0L));
+        }
+
+        List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
+
+        assertEquals("both limits disabled → all 5 files in 1 group", 1, groups.size());
+        assertEquals(5, groups.get(0).files.size());
+    }
+
     // =======================================================================
     // Section 2: threshold filtering via DirectScanStorageGC
     // =======================================================================
@@ -771,6 +886,47 @@ public class TestStorageGarbageCollector
     }
 
     // =======================================================================
+    // Section 4b: processFileGroups error handling
+    // =======================================================================
+
+    /**
+     * When {@code rewriteFileGroup} throws for the first FileGroup,
+     * {@code processFileGroups} must catch the exception, clean up that
+     * group's bitmap entries, and continue processing the second group.
+     *
+     * <p>Uses {@link FailFirstGroupGC} to inject a deterministic failure
+     * on the first {@code rewriteFileGroup} call while the real
+     * {@code processFileGroups} loop executes.
+     */
+    @Test
+    public void testProcessFileGroups_firstGroupFailsSecondContinues()
+    {
+        long fileIdA = 88001L;
+        long fileIdB = 88002L;
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileIdA + "_0", makeBitmap(100, 60));
+        bitmaps.put(fileIdB + "_0", makeBitmap(100, 60));
+
+        StorageGarbageCollector.FileGroup groupA = new StorageGarbageCollector.FileGroup(
+                1L, 0, Collections.singletonList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(fileIdA, 1), "fake_a", fileIdA, 1, 1L, 0, 100, 0.60, 0L)));
+        StorageGarbageCollector.FileGroup groupB = new StorageGarbageCollector.FileGroup(
+                2L, 0, Collections.singletonList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(fileIdB, 1), "fake_b", fileIdB, 1, 2L, 0, 100, 0.60, 0L)));
+
+        FailFirstGroupGC failGc = new FailFirstGroupGC();
+        failGc.processFileGroups(Arrays.asList(groupA, groupB), 300L, bitmaps);
+
+        assertFalse("failed group A's bitmap must be cleaned up by catch block",
+                bitmaps.containsKey(fileIdA + "_0"));
+        assertFalse("successful group B's bitmap must be cleaned up by rewrite stub",
+                bitmaps.containsKey(fileIdB + "_0"));
+    }
+
+    // =======================================================================
     // Section 5: data rewrite functional tests
     // =======================================================================
 
@@ -841,6 +997,8 @@ public class TestStorageGarbageCollector
         {
             assertEquals("id mismatch at row " + i, ids[i], rows[i][0]);
         }
+
+        assertRewriteResultConsistency(result, 5);
     }
 
     /**
@@ -907,6 +1065,8 @@ public class TestStorageGarbageCollector
             assertEquals("id mismatch at row "      + i, expectedIds[i], rows[i][0]);
             assertEquals("create_ts mismatch at row " + i, expectedTs[i], rows[i][1]);
         }
+
+        assertRewriteResultConsistency(result, 3);
     }
 
     /**
@@ -940,6 +1100,8 @@ public class TestStorageGarbageCollector
         assertEquals("row 3 survives → 1",  1, fwdMapping[3]);
         assertEquals("row 4 deleted → -1", -1, fwdMapping[4]);
         assertEquals("row 5 survives → 2",  2, fwdMapping[5]);
+
+        assertRewriteResultConsistency(result, 3);
     }
 
     // =======================================================================
@@ -1001,6 +1163,8 @@ public class TestStorageGarbageCollector
 
         assertFalse("bitmap A must be removed", bitmaps.containsKey(fileIdA + "_0"));
         assertFalse("bitmap B must be removed", bitmaps.containsKey(fileIdB + "_0"));
+
+        assertRewriteResultConsistency(result, 6);
     }
 
     /**
@@ -1041,6 +1205,8 @@ public class TestStorageGarbageCollector
             assertEquals("id mismatch at row " + i, expectedIds[i], rows[i][0]);
             assertEquals("create_ts mismatch at row " + i, expectedTs[i], rows[i][1]);
         }
+
+        assertRewriteResultConsistency(result, 4);
     }
 
     /**
@@ -1108,6 +1274,8 @@ public class TestStorageGarbageCollector
 
         assertFalse("bitmap rg0 must be removed", bitmaps.containsKey(fileId + "_0"));
         assertFalse("bitmap rg1 must be removed", bitmaps.containsKey(fileId + "_1"));
+
+        assertRewriteResultConsistency(result, 6);
     }
 
     /**
@@ -1144,6 +1312,8 @@ public class TestStorageGarbageCollector
             assertEquals("id mismatch at row " + i, expectedIds[i], rows[i][0]);
             assertEquals("create_ts mismatch at row " + i, expectedTs[i], rows[i][1]);
         }
+
+        assertRewriteResultConsistency(result, 4);
     }
 
     // =======================================================================
@@ -1243,6 +1413,8 @@ public class TestStorageGarbageCollector
         assertEquals(-1, fwd[127]);
         assertTrue("row 1 should map to a valid new offset", fwd[1] >= 0);
         assertTrue("row 65 should map to a valid new offset", fwd[65] >= 0);
+
+        assertRewriteResultConsistency(result, 124);
     }
 
     /**
@@ -1287,6 +1459,130 @@ public class TestStorageGarbageCollector
         assertEquals(0, fwdB[0]);
         assertEquals(-1, fwdB[1]);
         assertEquals(1, fwdB[2]);
+
+        assertRewriteResultConsistency(result, 2);
+    }
+
+    /**
+     * Multi-file group where BOTH files have ALL rows deleted.
+     * Triggers the {@code globalNewRowOffset == 0} path with multiple source files:
+     * the empty output file is deleted and {@code newFileId == -1}.
+     * Forward mappings for both files must be all {@code -1}.
+     */
+    @Test
+    public void testMultiFileGroupRewrite_allFilesAllDeleted() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long fileIdA = 42L;
+        long fileIdB = 43L;
+        long[] idsA = {10L, 11L, 12L};
+        long[] idsB = {20L, 21L, 22L};
+
+        String pathA = writeTestFile("src_all_del_multi_a.pxl", schema, idsA, false, null);
+        String pathB = writeTestFile("src_all_del_multi_b.pxl", schema, idsB, false, null);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileIdA + "_0", makeBitmapForRows(3, 0, 1, 2));
+        bitmaps.put(fileIdB + "_0", makeBitmapForRows(3, 0, 1, 2));
+
+        StorageGarbageCollector.FileGroup group =
+                makeMultiFileGroup(schema, fileIdA, pathA, fileIdB, pathB);
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(group, 100L, bitmaps);
+
+        assertEquals("newFileId should be -1 for all-deleted multi-file group", -1, result.newFileId);
+        assertEquals("newFileRgCount should be 0", 0, result.newFileRgCount);
+        assertEquals(0, result.newFileRgActualRecordNums.length);
+
+        int[] fwdA = result.perFileRgMappings.get(fileIdA).get(0);
+        for (int i = 0; i < fwdA.length; i++)
+        {
+            assertEquals("file A: all rows deleted → mapping must be -1", -1, fwdA[i]);
+        }
+
+        int[] fwdB = result.perFileRgMappings.get(fileIdB).get(0);
+        for (int i = 0; i < fwdB.length; i++)
+        {
+            assertEquals("file B: all rows deleted → mapping must be -1", -1, fwdB[i]);
+        }
+
+        assertFalse("bitmap A must be removed", bitmaps.containsKey(fileIdA + "_0"));
+        assertFalse("bitmap B must be removed", bitmaps.containsKey(fileIdB + "_0"));
+    }
+
+    /**
+     * Non-null all-zero bitmap: the bitmap exists but has no bits set (no deletions).
+     * All rows must survive.  This exercises a distinct code path from a null bitmap:
+     * {@code gcBitmap != null} evaluates to {@code true} but no bit check succeeds.
+     */
+    @Test
+    public void testAllZeroBitmapKeepsAllRows() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {10L, 20L, 30L, 40L, 50L};
+        long fileId = 33L;
+        String srcPath = writeTestFile("src_allzero_bitmap.pxl", schema, ids, false, null);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", new long[]{0L});
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+
+        long[][] rows = readAllRows(result.newFilePath, schema, false);
+        assertEquals("all 5 rows should survive with all-zero bitmap", 5, rows.length);
+        for (int i = 0; i < 5; i++)
+        {
+            assertEquals("id mismatch at row " + i, ids[i], rows[i][0]);
+        }
+
+        int[] fwd = result.perFileRgMappings.get(fileId).get(0);
+        for (int i = 0; i < fwd.length; i++)
+        {
+            assertEquals("no deletions → mapping must be identity", i, fwd[i]);
+        }
+
+        assertRewriteResultConsistency(result, 5);
+    }
+
+    /**
+     * Bitmap with exactly 64 rows (one bitmap word): delete the first row (bit 0)
+     * and the last row (bit 63, the highest bit in the word).
+     * Verifies correct handling when the bitmap is exactly one {@code long} word.
+     */
+    @Test
+    public void testBitmapExactOneWord_64Rows() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        int totalRows = 64;
+        long[] ids = new long[totalRows];
+        for (int i = 0; i < totalRows; i++)
+        {
+            ids[i] = i;
+        }
+        long fileId = 34L;
+        String srcPath = writeTestFile("src_64rows.pxl", schema, ids, false, null);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(totalRows, 0, 63));
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+
+        long[][] rows = readAllRows(result.newFilePath, schema, false);
+        assertEquals("62 rows should survive (64 - 2 deleted)", 62, rows.length);
+
+        int[] fwd = result.perFileRgMappings.get(fileId).get(0);
+        assertEquals("row 0 deleted → -1", -1, fwd[0]);
+        assertEquals("row 63 deleted → -1", -1, fwd[63]);
+        assertEquals("row 1 survives → 0", 0, fwd[1]);
+        assertEquals("row 62 survives → 61", 61, fwd[62]);
+
+        assertEquals("first survivor should be id=1", 1L, rows[0][0]);
+        assertEquals("last survivor should be id=62", 62L, rows[rows.length - 1][0]);
+
+        assertRewriteResultConsistency(result, 62);
     }
 
     // =======================================================================
@@ -1445,6 +1741,36 @@ public class TestStorageGarbageCollector
         {
             throw new RuntimeException("Failed to reset RetinaResourceManager state", e);
         }
+    }
+
+    // =======================================================================
+    // Helpers: RewriteResult validation
+    // =======================================================================
+
+    /**
+     * Verifies the structural consistency of a {@link StorageGarbageCollector.RewriteResult}:
+     * <ul>
+     *   <li>{@code newFileRgActualRecordNums} has exactly {@code newFileRgCount} entries, all positive</li>
+     *   <li>{@code newFileRgRowStart} has {@code newFileRgCount + 1} entries forming a cumulative sum</li>
+     *   <li>The sentinel entry equals the expected total surviving rows</li>
+     * </ul>
+     */
+    private static void assertRewriteResultConsistency(
+            StorageGarbageCollector.RewriteResult result, int expectedTotalRows)
+    {
+        assertTrue("newFileRgCount must be at least 1", result.newFileRgCount >= 1);
+        assertEquals(result.newFileRgCount, result.newFileRgActualRecordNums.length);
+        assertEquals(result.newFileRgCount + 1, result.newFileRgRowStart.length);
+        int totalRecords = 0;
+        for (int i = 0; i < result.newFileRgCount; i++)
+        {
+            assertTrue("RG record count must be positive", result.newFileRgActualRecordNums[i] > 0);
+            assertEquals("rgRowStart must be cumulative sum", totalRecords, result.newFileRgRowStart[i]);
+            totalRecords += result.newFileRgActualRecordNums[i];
+        }
+        assertEquals("sentinel rgRowStart must equal total surviving rows",
+                expectedTotalRows, totalRecords);
+        assertEquals(totalRecords, result.newFileRgRowStart[result.newFileRgCount]);
     }
 
     // =======================================================================
@@ -1808,6 +2134,43 @@ public class TestStorageGarbageCollector
         void processFileGroups(List<FileGroup> fileGroups, long safeGcTs,
                                Map<String, long[]> gcSnapshotBitmaps)
         {
+        }
+    }
+
+    /**
+     * StorageGarbageCollector subclass where {@code rewriteFileGroup} throws on
+     * the first call and succeeds (cleaning up bitmaps) on subsequent calls.
+     * Used by {@link #testProcessFileGroups_firstGroupFailsSecondContinues} to
+     * verify that {@code processFileGroups} catches per-group failures, cleans
+     * up bitmaps, and continues to the next group.
+     */
+    static class FailFirstGroupGC extends StorageGarbageCollector
+    {
+        private boolean firstCall = true;
+
+        FailFirstGroupGC()
+        {
+            super(null, null, 0.5, 0L, Integer.MAX_VALUE, 10);
+        }
+
+        @Override
+        RewriteResult rewriteFileGroup(FileGroup group, long safeGcTs,
+                                       Map<String, long[]> gcSnapshotBitmaps) throws Exception
+        {
+            if (firstCall)
+            {
+                firstCall = false;
+                throw new RuntimeException("simulated rewrite failure");
+            }
+            for (FileCandidate fc : group.files)
+            {
+                for (int rgId = 0; rgId < fc.rgCount; rgId++)
+                {
+                    gcSnapshotBitmaps.remove(RetinaUtils.buildRgKey(fc.fileId, rgId));
+                }
+            }
+            return new RewriteResult(group, "stub", -1,
+                    0, new int[0], new int[]{0}, new HashMap<>());
         }
     }
 }
