@@ -26,25 +26,43 @@ import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.metadata.domain.Schema;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
+import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.NetUtils;
 import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
+import io.pixelsdb.pixels.common.utils.RetinaUtils;
+import io.pixelsdb.pixels.core.PixelsFooterCache;
+import io.pixelsdb.pixels.core.PixelsReader;
+import io.pixelsdb.pixels.core.PixelsReaderImpl;
+import io.pixelsdb.pixels.core.PixelsWriter;
+import io.pixelsdb.pixels.core.PixelsWriterImpl;
+import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
+import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.LongColumnVector;
+import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Storage GC: identifies high-deletion-ratio files and (in later tasks) rewrites them
+ * Storage GC: identifies high-deletion-ratio files and rewrites them
  * to reclaim physical storage while keeping active queries unaffected.
- *
- * <p>In Task 2, only S1 (scan + grouping) and in-memory bitmap trimming are implemented;
- * S2-S6 rewrite steps are added in Tasks 3-6.
  *
  * <p>Checkpoint ownership: the GC checkpoint is <em>always</em> written unconditionally
  * by {@link RetinaResourceManager#runGC()} after Memory GC and <em>before</em> this
@@ -56,15 +74,10 @@ public class StorageGarbageCollector
 
     private final RetinaResourceManager resourceManager;
     private final MetadataService metadataService;
-    final double gcThreshold;
+    private final double gcThreshold;
     private final long targetFileSize;
+    private final int maxFilesPerGroup;
     private final int maxFileGroupsPerRun;
-
-    /**
-     * Tracks file IDs currently being processed by an ongoing Storage GC cycle.
-     * Prevents the same file from being picked up by a second concurrent scan.
-     */
-    private final ConcurrentHashMap<Long, Boolean> processingFiles = new ConcurrentHashMap<>();
 
     // -------------------------------------------------------------------------
     // Value types
@@ -84,9 +97,12 @@ public class StorageGarbageCollector
         final int virtualNodeId;
         final long totalRows;
         final double invalidRatio;
+        /** Physical file size in bytes, used for greedy group splitting. 0 if unknown. */
+        final long fileSizeBytes;
 
         FileCandidate(File file, String filePath, long fileId, int rgCount,
-                      long tableId, int virtualNodeId, long totalRows, double invalidRatio)
+                      long tableId, int virtualNodeId, long totalRows, double invalidRatio,
+                      long fileSizeBytes)
         {
             this.file = file;
             this.filePath = filePath;
@@ -96,6 +112,7 @@ public class StorageGarbageCollector
             this.virtualNodeId = virtualNodeId;
             this.totalRows = totalRows;
             this.invalidRatio = invalidRatio;
+            this.fileSizeBytes = fileSizeBytes;
         }
     }
 
@@ -111,9 +128,41 @@ public class StorageGarbageCollector
 
         FileGroup(long tableId, int virtualNodeId, List<FileCandidate> files)
         {
+            assert files.stream().allMatch(f -> f.virtualNodeId == virtualNodeId)
+                    : "All files in a FileGroup must share the same virtualNodeId";
             this.tableId = tableId;
             this.virtualNodeId = virtualNodeId;
             this.files = files;
+        }
+    }
+
+    /**
+     * Carries everything produced by {@link #rewriteFileGroup}: file metadata,
+     * per-RG row counts and forward row mappings.
+     */
+    static final class RewriteResult
+    {
+        final FileGroup group;
+        final String newFilePath;
+        final long newFileId;
+        final int newFileRgCount;
+        final int[] newFileRgActualRecordNums;
+        /** Sentinel array: newFileRgRowStart[i] = global row offset of first row in RG i. */
+        final int[] newFileRgRowStart;
+        /** oldFileId → (oldRgId → fwdMapping[oldRgRowOffset] = newGlobalRowOffset, or -1 if deleted) */
+        final Map<Long, Map<Integer, int[]>> perFileRgMappings;
+
+        RewriteResult(FileGroup group, String newFilePath, long newFileId,
+                      int newFileRgCount, int[] newFileRgActualRecordNums, int[] newFileRgRowStart,
+                      Map<Long, Map<Integer, int[]>> perFileRgMappings)
+        {
+            this.group = group;
+            this.newFilePath = newFilePath;
+            this.newFileId = newFileId;
+            this.newFileRgCount = newFileRgCount;
+            this.newFileRgActualRecordNums = newFileRgActualRecordNums;
+            this.newFileRgRowStart = newFileRgRowStart;
+            this.perFileRgMappings = perFileRgMappings;
         }
     }
 
@@ -125,12 +174,14 @@ public class StorageGarbageCollector
                             MetadataService metadataService,
                             double gcThreshold,
                             long targetFileSize,
+                            int maxFilesPerGroup,
                             int maxFileGroupsPerRun)
     {
         this.resourceManager = resourceManager;
         this.metadataService = metadataService;
         this.gcThreshold = gcThreshold;
         this.targetFileSize = targetFileSize;
+        this.maxFilesPerGroup = maxFilesPerGroup;
         this.maxFileGroupsPerRun = maxFileGroupsPerRun;
     }
 
@@ -139,46 +190,65 @@ public class StorageGarbageCollector
     // -------------------------------------------------------------------------
 
     /**
-     * Runs one Storage GC cycle: S1 scan → group → process candidates.
+     * Runs one Storage GC cycle: identify candidates, trim non-candidate bitmaps,
+     * then scan metadata and process candidate file groups.
      *
      * <p>The GC checkpoint has already been written unconditionally by
      * {@link RetinaResourceManager#runGC()} before this method is called.
-     * This method is solely responsible for identifying candidate files and
-     * processing them (S2-S6 added in Tasks 3-6).
      *
      * @param safeGcTs          safe GC timestamp produced by Memory GC
-     * @param rgStats           per-RG visibility statistics pre-computed during Memory GC;
-     *                          key = {@code "<fileId>_<rgId>"},
-     *                          value = {@code long[]{recordNum, invalidCount}}
-     * @param gcSnapshotBitmaps per-RG snapshot bitmaps (mutated in-place by
-     *                          {@link #processFileGroups}: non-candidate entries removed)
+     * @param fileStats         file-level visibility statistics pre-computed during Memory GC;
+     *                          key = fileId, value = {@code long[]{totalRows, totalInvalidCount}}.
+     *                          Replaces the old per-RG {@code rgStats} map, eliminating the
+     *                          per-RG aggregation loop in candidate selection.
+     * @param gcSnapshotBitmaps per-RG snapshot bitmaps (mutated in-place: non-candidate
+     *                          entries removed to reduce memory pressure)
      */
-    void runStorageGC(long safeGcTs, Map<String, long[]> rgStats,
+    void runStorageGC(long safeGcTs, Map<Long, long[]> fileStats,
                       Map<String, long[]> gcSnapshotBitmaps)
     {
-        List<FileGroup> fileGroups = scanAndGroupFiles(rgStats);
+        // Pre-compute candidate file IDs from file-level stats (O(1) per file).
+        Set<Long> candidateFileIds = new HashSet<>();
+        for (Map.Entry<Long, long[]> entry : fileStats.entrySet())
+        {
+            long[] stats = entry.getValue();
+            if (stats[0] > 0 && (double) stats[1] / stats[0] > gcThreshold)
+            {
+                candidateFileIds.add(entry.getKey());
+            }
+        }
+        if (candidateFileIds.isEmpty())
+        {
+            return;
+        }
+
+        // Trim non-candidate bitmap entries immediately.  The checkpoint has already been
+        // written with the full snapshot, so only candidate bitmaps are needed for rewriting.
+        gcSnapshotBitmaps.entrySet().removeIf(e ->
+                !candidateFileIds.contains(RetinaUtils.parseFileIdFromRgKey(e.getKey())));
+
+        List<FileGroup> fileGroups = scanAndGroupFiles(candidateFileIds, fileStats);
         if (!fileGroups.isEmpty())
         {
             processFileGroups(fileGroups, safeGcTs, gcSnapshotBitmaps);
         }
     }
 
-    // -------------------------------------------------------------------------
-    // S1 — scan and group
-    // -------------------------------------------------------------------------
-
     /**
      * Scans all schemas/tables and returns at most {@link #maxFileGroupsPerRun} groups of
      * candidate files, sorted by average {@code invalidRatio} descending.
      *
-     * @param rgStats per-RG visibility statistics pre-computed by
-     *                {@link RetinaResourceManager#runGC()} during the Memory GC pass;
-     *                key = {@code "<fileId>_<rgId>"}, value = {@code long[]{recordNum, invalidCount}}
-     *                where {@code invalidCount} is the number of deleted rows (bitmap popcount).
-     *                Using pre-computed stats avoids re-traversing the visibility map and
-     *                re-computing bitcounts that were already produced during Memory GC.
+     * <p>Only files whose ID appears in {@code candidateFileIds} are considered; all others
+     * are skipped immediately.  File-level stats (totalRows, invalidCount) are read from
+     * {@code fileStats} in O(1) — the old per-RG aggregation loop is eliminated.
+     *
+     * @param candidateFileIds file IDs that exceed the {@link #gcThreshold}, pre-computed
+     *                         in {@link #runStorageGC}
+     * @param fileStats        file-level visibility statistics; key = fileId,
+     *                         value = {@code long[]{totalRows, totalInvalidCount}}
      */
-    List<FileGroup> scanAndGroupFiles(Map<String, long[]> rgStats)
+    List<FileGroup> scanAndGroupFiles(Set<Long> candidateFileIds,
+                                      Map<Long, long[]> fileStats)
     {
         List<FileCandidate> candidates = new ArrayList<>();
 
@@ -189,8 +259,8 @@ public class StorageGarbageCollector
         }
         catch (MetadataException e)
         {
-            logger.error("Storage GC S1: failed to retrieve schemas", e);
-            return new ArrayList<>();
+            logger.error("Storage GC: failed to retrieve schemas", e);
+            return Collections.emptyList();
         }
 
         for (Schema schema : schemas)
@@ -202,7 +272,7 @@ public class StorageGarbageCollector
             }
             catch (MetadataException e)
             {
-                logger.warn("Storage GC S1: failed to get tables for schema '{}', skipping",
+                logger.warn("Storage GC: failed to get tables for schema '{}', skipping",
                         schema.getName(), e);
                 continue;
             }
@@ -216,7 +286,7 @@ public class StorageGarbageCollector
                 }
                 catch (MetadataException e)
                 {
-                    logger.warn("Storage GC S1: failed to get layout for {}.{}, skipping",
+                    logger.warn("Storage GC: failed to get layout for {}.{}, skipping",
                             schema.getName(), table.getName(), e);
                     continue;
                 }
@@ -225,8 +295,6 @@ public class StorageGarbageCollector
                     continue;
                 }
 
-                // Scan both ordered and compact paths; single/copy files are filtered
-                // by isGcEligible() inside the inner loop.
                 List<Path> paths = new ArrayList<>();
                 paths.addAll(layout.getOrderedPaths());
                 paths.addAll(layout.getCompactPaths());
@@ -240,54 +308,49 @@ public class StorageGarbageCollector
                     }
                     catch (MetadataException e)
                     {
-                        logger.warn("Storage GC S1: failed to get files for pathId={}, skipping",
+                        logger.warn("Storage GC: failed to get files for pathId={}, skipping",
                                 path.getId(), e);
                         continue;
                     }
 
                     for (File file : files)
                     {
+                        if (!candidateFileIds.contains(file.getId()))
+                        {
+                            continue;
+                        }
+
                         String filePath = File.getFilePath(path, file);
 
-                        // Skip non-GC-eligible types (single, copy) and already-processing files.
                         if (!PixelsFileNameUtils.isGcEligible(filePath))
                         {
                             continue;
                         }
-                        if (processingFiles.containsKey(file.getId()))
+
+                        long[] stats = fileStats.get(file.getId());
+                        if (stats == null || stats[0] == 0)
                         {
                             continue;
                         }
+                        double invalidRatio = (double) stats[1] / stats[0];
 
-                        // Aggregate file-level stats from the pre-computed per-RG rgStats.
-                        // rgStats[rgKey] = {recordNum, invalidCount}; entries absent from the
-                        // map mean the RG has no visibility record and should be skipped.
-                        long totalRows = 0;
-                        long invalidCount = 0;
-                        for (int rgId = 0; rgId < file.getNumRowGroup(); rgId++)
+                        long sizeBytes;
+                        try
                         {
-                            String rgKey = file.getId() + "_" + rgId;
-                            long[] stats = rgStats.get(rgKey);
-                            if (stats == null)
-                            {
-                                continue;
-                            }
-                            totalRows    += stats[0];
-                            invalidCount += stats[1];
+                            Storage storage = StorageFactory.Instance().getStorage(filePath);
+                            sizeBytes = storage.getStatus(filePath).getLength();
                         }
-                        if (totalRows == 0)
+                        catch (IOException ex)
                         {
+                            logger.error("Storage GC: cannot stat file {}, skipping candidate",
+                                    filePath, ex);
                             continue;
                         }
 
-                        double invalidRatio = (double) invalidCount / totalRows;
-                        if (invalidRatio > gcThreshold)
-                        {
-                            int vNodeId = PixelsFileNameUtils.extractVirtualNodeId(filePath);
-                            candidates.add(new FileCandidate(
-                                    file, filePath, file.getId(), file.getNumRowGroup(),
-                                    table.getId(), vNodeId, totalRows, invalidRatio));
-                        }
+                        int vNodeId = PixelsFileNameUtils.extractVirtualNodeId(filePath);
+                        candidates.add(new FileCandidate(
+                                file, filePath, file.getId(), file.getNumRowGroup(),
+                                table.getId(), vNodeId, stats[0], invalidRatio, sizeBytes));
                     }
                 }
             }
@@ -298,12 +361,22 @@ public class StorageGarbageCollector
 
     /**
      * Groups candidates by {@code (tableId, virtualNodeId)}, sorts each group by
-     * {@code invalidRatio} descending, then returns the top-N groups (by average
-     * {@code invalidRatio}) capped at {@link #maxFileGroupsPerRun}.
+     * {@code invalidRatio} descending, then greedily splits each group into sub-groups
+     * whose estimated effective data size does not exceed {@link #targetFileSize}.
+     *
+     * <p>Effective data size per file is estimated as
+     * {@code fileSizeBytes * (1 - invalidRatio)}.  When {@code fileSizeBytes} is
+     * unknown (0), the file is treated as fitting within any remaining budget —
+     * i.e. splitting degrades to the old "all-in-one-group" behaviour.
+     *
+     * <p>If a single file's effective data already exceeds {@code targetFileSize},
+     * it forms its own {@link FileGroup}.
+     *
+     * <p>The returned list is sorted by average {@code invalidRatio} descending and
+     * capped at {@link #maxFileGroupsPerRun}.
      */
     List<FileGroup> groupAndMerge(List<FileCandidate> candidates)
     {
-        // Two-level map: tableId → virtualNodeId → files
         Map<Long, Map<Integer, List<FileCandidate>>> grouped = new LinkedHashMap<>();
         for (FileCandidate c : candidates)
         {
@@ -315,15 +388,16 @@ public class StorageGarbageCollector
         List<FileGroup> groups = new ArrayList<>();
         for (Map.Entry<Long, Map<Integer, List<FileCandidate>>> tableEntry : grouped.entrySet())
         {
+            long tableId = tableEntry.getKey();
             for (Map.Entry<Integer, List<FileCandidate>> vnodeEntry : tableEntry.getValue().entrySet())
             {
+                int vNodeId = vnodeEntry.getKey();
                 List<FileCandidate> files = vnodeEntry.getValue();
                 files.sort(Comparator.comparingDouble((FileCandidate c) -> c.invalidRatio).reversed());
-                groups.add(new FileGroup(tableEntry.getKey(), vnodeEntry.getKey(), files));
+                splitIntoGroups(groups, tableId, vNodeId, files);
             }
         }
 
-        // Sort groups by average invalidRatio descending so the worst groups are processed first.
         groups.sort(Comparator.comparingDouble(
                 (FileGroup g) -> g.files.stream().mapToDouble(c -> c.invalidRatio).average().orElse(0.0))
                 .reversed());
@@ -336,64 +410,336 @@ public class StorageGarbageCollector
     }
 
     /**
-     * Processes the candidate file groups produced by S1.
+     * Greedily packs {@code files} (already sorted by invalidRatio desc) into
+     * sub-groups bounded by both {@link #targetFileSize} (effective output bytes)
+     * and {@link #maxFilesPerGroup} (old file count).  Whichever limit is reached
+     * first triggers a group flush.
+     */
+    private void splitIntoGroups(List<FileGroup> out, long tableId, int vNodeId,
+                                 List<FileCandidate> files)
+    {
+        if (targetFileSize <= 0 && maxFilesPerGroup <= 0)
+        {
+            out.add(new FileGroup(tableId, vNodeId, files));
+            return;
+        }
+
+        List<FileCandidate> current = new ArrayList<>();
+        long currentEffectiveBytes = 0;
+
+        for (FileCandidate fc : files)
+        {
+            long effectiveBytes = fc.fileSizeBytes > 0
+                    ? (long) (fc.fileSizeBytes * (1.0 - fc.invalidRatio)) : 0L;
+
+            boolean singleFileOversized = targetFileSize > 0 && effectiveBytes > targetFileSize;
+            if (singleFileOversized)
+            {
+                if (!current.isEmpty())
+                {
+                    out.add(new FileGroup(tableId, vNodeId, current));
+                    current = new ArrayList<>();
+                    currentEffectiveBytes = 0;
+                }
+                out.add(new FileGroup(tableId, vNodeId, Collections.singletonList(fc)));
+                continue;
+            }
+
+            boolean sizeWouldExceed = targetFileSize > 0
+                    && currentEffectiveBytes + effectiveBytes > targetFileSize;
+            boolean fileCountFull = maxFilesPerGroup > 0
+                    && current.size() >= maxFilesPerGroup;
+
+            if ((sizeWouldExceed || fileCountFull) && !current.isEmpty())
+            {
+                out.add(new FileGroup(tableId, vNodeId, current));
+                current = new ArrayList<>();
+                currentEffectiveBytes = 0;
+            }
+            current.add(fc);
+            currentEffectiveBytes += effectiveBytes;
+        }
+        if (!current.isEmpty())
+        {
+            out.add(new FileGroup(tableId, vNodeId, current));
+        }
+    }
+
+
+
+    /**
+     * Processes the candidate file groups produced by {@link #scanAndGroupFiles}.
+     * Non-candidate bitmap entries have already been trimmed in {@link #runStorageGC}.
      *
-     * <p>Because the GC checkpoint has already been written unconditionally in
-     * {@link RetinaResourceManager#runGC()} with the <em>full</em> visibility snapshot
-     * before this method is called, bitmaps for non-candidate files are no longer needed
-     * for S2-S6. This method therefore immediately trims {@code gcSnapshotBitmaps} to
-     * retain only the entries for candidate files, releasing memory for files that were
-     * either below the threshold or excluded by the {@link #maxFileGroupsPerRun} cap.
-     *
-     * <p>Currently (Task 2) only logging is performed after the trim; S2-S6 rewrite steps
-     * will be added in Tasks 3-6.
-     *
-     * @param fileGroups        non-empty list of candidate groups from {@link #scanAndGroupFiles}
+     * @param fileGroups        non-empty list of candidate groups
      * @param safeGcTs          safe GC timestamp produced by Memory GC
-     * @param gcSnapshotBitmaps per-RG snapshot bitmaps (mutated in-place: non-candidate
-     *                          entries are removed to reduce memory pressure)
+     * @param gcSnapshotBitmaps per-RG snapshot bitmaps (already trimmed to candidates)
      */
     void processFileGroups(List<FileGroup> fileGroups, long safeGcTs,
                            Map<String, long[]> gcSnapshotBitmaps)
     {
-        // Release bitmap entries for files that were not selected (below threshold or
-        // over the maxFileGroupsPerRun cap). The checkpoint has already been written with
-        // the full snapshot, so S2-S6 only needs bitmaps for candidate files.
-        Set<String> candidateRgKeys = collectCandidateRgKeys(fileGroups);
-        gcSnapshotBitmaps.entrySet().removeIf(e -> !candidateRgKeys.contains(e.getKey()));
-
-        // Log candidate groups; S2-S6 will be added in later tasks.
         for (FileGroup group : fileGroups)
         {
-            double avgRatio = group.files.stream()
-                    .mapToDouble(c -> c.invalidRatio).average().orElse(0.0);
-            logger.info("StorageGC candidate: table={}, vNodeId={}, files={}, avgInvalidRatio={:.4f}",
-                    group.tableId, group.virtualNodeId, group.files.size(), avgRatio);
-            // TODO Task 3+: processFileGroup(group, safeGcTs, gcSnapshotBitmaps)
-            // Note: gcSnapshotBitmaps entries for this group must be released inside
-            // processFileGroup() *after* S2 (row-filtering rewrite) completes,
-            // because S2 reads the bitmaps to determine which rows are alive.
-        }
-    }
-
-    /**
-     * Collects all {@code "<fileId>_<rgId>"} keys for every RG in every candidate file
-     * across all groups. Used by {@link #processFileGroups} to trim the
-     * {@code gcSnapshotBitmaps} map after the checkpoint has been written.
-     */
-    Set<String> collectCandidateRgKeys(List<FileGroup> fileGroups)
-    {
-        Set<String> keys = new HashSet<>();
-        for (FileGroup group : fileGroups)
-        {
-            for (FileCandidate c : group.files)
+            try
             {
-                for (int rgId = 0; rgId < c.rgCount; rgId++)
+                rewriteFileGroup(group, safeGcTs, gcSnapshotBitmaps);
+            }
+            catch (Exception e)
+            {
+                logger.error("StorageGC rewrite failed for table={}, vNodeId={}", group.tableId, group.virtualNodeId, e);
+                for (FileCandidate fc : group.files)
                 {
-                    keys.add(c.fileId + "_" + rgId);
+                    for (int rgId = 0; rgId < fc.rgCount; rgId++)
+                    {
+                        gcSnapshotBitmaps.remove(RetinaUtils.buildRgKey(fc.fileId, rgId));
+                    }
                 }
             }
         }
-        return keys;
     }
+
+    
+    /**
+     * Rewrites all files in one {@link FileGroup} into a single new file, filtering out
+     * rows marked as deleted in {@code gcSnapshotBitmaps}.
+     *
+     * <p>The new file is registered as {@code TEMPORARY} in the catalog and its
+     * {@link RGVisibility} objects are initialised with {@code baseTimestamp = safeGcTs}.
+     *
+     * <p>After rewriting completes the {@code gcSnapshotBitmaps} entries for this group
+     * are removed (they are no longer needed by subsequent steps).
+     *
+     * @param group             candidate file group produced by {@link #scanAndGroupFiles}
+     * @param safeGcTs          safe GC timestamp; used as the base timestamp for new-file Visibility
+     * @param gcSnapshotBitmaps per-RG deletion bitmaps; entries for this group are removed on exit
+     * @return rewrite result carrying file metadata and row mappings
+     */
+    RewriteResult rewriteFileGroup(FileGroup group, long safeGcTs,
+                                   Map<String, long[]> gcSnapshotBitmaps) throws Exception
+    {
+        String firstFilePath = group.files.get(0).filePath;
+        Storage storage = StorageFactory.Instance().getStorage(firstFilePath);
+        String dirUri = firstFilePath.substring(0, firstFilePath.lastIndexOf("/"));
+        String newFileName = PixelsFileNameUtils.buildOrderedFileName(
+                NetUtils.getLocalHostName(), group.virtualNodeId);
+        String newFilePath = dirUri + "/" + newFileName;
+
+        // Open the first old file once to read schema + writer parameters.
+        // hasHiddenColumn is read here and propagated to the new-file writer so that
+        // the hidden create_ts column is preserved in the rewritten file.  Without it,
+        // queries reading the new file would lose the ability to filter by create_ts,
+        // making rows with create_ts > safeGcTs incorrectly visible to snapshots between
+        // safeGcTs and their actual create_ts.
+        // One footer cache per rewrite call; shared across all readers for this file group.
+        PixelsFooterCache footerCache = new PixelsFooterCache();
+
+        TypeDescription schema;
+        int pixelStride;
+        int compressionBlockSize;
+        boolean hasHiddenColumn;
+        try (PixelsReader firstReader = PixelsReaderImpl.newBuilder()
+                .setStorage(storage).setPath(firstFilePath)
+                .setPixelsFooterCache(footerCache).build())
+        {
+            schema = firstReader.getFileSchema();
+            pixelStride = (int) firstReader.getPixelStride();
+            compressionBlockSize = (int) firstReader.getCompressionBlockSize();
+            hasHiddenColumn = firstReader.getPostScript().getHasHiddenColumn();
+        }
+
+        int rowGroupSize = Integer.parseInt(ConfigFactory.Instance().getProperty("row.group.size"));
+        EncodingLevel encodingLevel = EncodingLevel.from(
+                Integer.parseInt(ConfigFactory.Instance().getProperty("retina.storage.gc.encoding.level")));
+
+        int globalNewRowOffset = 0;
+        Map<Long, Map<Integer, int[]>> perFileRgMappings = new HashMap<>();
+        List<TypeDescription> columnSchemas = schema.getChildren();
+
+        try (PixelsWriter writer = PixelsWriterImpl.newBuilder()
+                .setSchema(schema).setPixelStride(pixelStride)
+                .setRowGroupSize(rowGroupSize).setStorage(storage)
+                .setPath(newFilePath).setOverwrite(false)
+                .setEncodingLevel(encodingLevel)
+                .setCompressionBlockSize(compressionBlockSize)
+                .setHasHiddenColumn(hasHiddenColumn)
+                .build())
+        {
+            for (FileCandidate fc : group.files)
+            {
+                try (PixelsReader reader = PixelsReaderImpl.newBuilder()
+                        .setStorage(storage).setPath(fc.filePath)
+                        .setPixelsFooterCache(footerCache).build())
+                {
+                    for (int oldRgId = 0; oldRgId < reader.getRowGroupNum(); oldRgId++)
+                    {
+                        long[] gcBitmap = gcSnapshotBitmaps.get(RetinaUtils.buildRgKey(fc.fileId, oldRgId));
+                        int rgRecordNum = reader.getRowGroupInfo(oldRgId).getNumberOfRows();
+
+                        // No transTimestamp is set intentionally.  GC row filtering uses
+                        // gcSnapshotBitmap (delete_ts <= safeGcTs) exclusively, which is
+                        // unrelated to create_ts.  Setting transTimestamp would activate
+                        // PixelsRecordReaderImpl's hidden-timestamp filter (create_ts <=
+                        // transTimestamp), wrongly excluding rows whose create_ts > safeGcTs
+                        // but which are still alive.  exposeHiddenColumn is set only to
+                        // expose the create_ts value for PK index entry capture below,
+                        // and only when the file actually contains a hidden column.
+                        PixelsReaderOption opt = new PixelsReaderOption();
+                        opt.rgRange(oldRgId, 1);
+                        opt.includeCols(schema.getFieldNames().toArray(new String[0]));
+                        opt.exposeHiddenColumn(hasHiddenColumn);
+
+                        int oldRgRowOffset = 0;
+                        int[] fwdMapping = new int[rgRecordNum];
+                        int batchCapacity = VectorizedRowBatch.DEFAULT_SIZE;
+                        int[] selected = new int[batchCapacity];
+                        // schema.createRowBatch produces a batch whose cols[] covers only user
+                        // columns.  PixelsWriterImpl.addRowBatch writes the hidden column from
+                        // cols[commonColumnLength] (= cols[nUserCols]) when hasHiddenColumn=true,
+                        // so we extend cols[] with one extra LongColumnVector slot for create_ts.
+                        // VectorizedRowBatch.addSelected cannot be used for this extended batch
+                        // because it loops over cols.length and would attempt to index batch.cols
+                        // at position nUserCols, which does not exist in the source batch.
+                        // The manual per-column copy below handles this correctly.
+                        VectorizedRowBatch filteredBatch = schema.createRowBatch(batchCapacity);
+                        int nUserCols = columnSchemas.size();
+                        if (hasHiddenColumn)
+                        {
+                            ColumnVector[] ext = Arrays.copyOf(filteredBatch.cols, nUserCols + 1);
+                            ext[nUserCols] = new LongColumnVector(batchCapacity);
+                            filteredBatch.cols = ext;
+                        }
+
+                        try (PixelsRecordReader recordReader = reader.read(opt))
+                        {
+                            VectorizedRowBatch batch;
+                            while ((batch = recordReader.readBatch()) != null && batch.size > 0)
+                            {
+                                // GC row filter: a row is excluded iff its bit is set in
+                                // gcSnapshotBitmap, meaning delete_ts <= safeGcTs.  Rows with
+                                // create_ts > safeGcTs are kept as long as their bit is 0
+                                // (not yet deleted or deleted after safeGcTs).
+                                int kept = 0;
+                                for (int r = 0; r < batch.size; r++, oldRgRowOffset++)
+                                {
+                                    // Check if the row's bit is set in the deletion bitmap (each long holds 64 bits)
+                                    if (gcBitmap != null && (gcBitmap[oldRgRowOffset >>> 6] & (1L << (oldRgRowOffset & 63))) != 0)
+                                    {
+                                        fwdMapping[oldRgRowOffset] = -1;
+                                    }
+                                    else
+                                    {
+                                        selected[kept++] = r;
+                                        fwdMapping[oldRgRowOffset] = globalNewRowOffset;
+                                        // TODO(Task 5/6): capture PK bytes + create_ts here for
+                                        // IndexKey reconstruction in S5 index sync.  Requires
+                                        // IndexService integration (pkColumnIds, extractPkBytes).
+                                        globalNewRowOffset++;
+                                    }
+                                }
+                                if (kept > 0)
+                                {
+                                    // Copy surviving rows into filteredBatch column-by-column.
+                                    // User columns are sourced from batch.cols[i]; the hidden
+                                    // create_ts column is sourced from batch.hiddenColumnVector
+                                    // and written into the extra slot at filteredBatch.cols[nUserCols].
+                                    // ColumnVector.writeIndex is advanced by addSelected so that
+                                    // filteredBatch.reset() (which zeroes writeIndex) correctly
+                                    // resets all slots for the next iteration.
+                                    for (int i = 0; i < nUserCols; i++)
+                                    {
+                                        filteredBatch.cols[i].addSelected(selected, 0, kept, batch.cols[i]);
+                                    }
+                                    if (hasHiddenColumn)
+                                    {
+                                        ((LongColumnVector) filteredBatch.cols[nUserCols])
+                                                .addSelected(selected, 0, kept, batch.getHiddenColumnVector());
+                                    }
+                                    filteredBatch.size = kept;
+                                    writer.addRowBatch(filteredBatch);
+                                    filteredBatch.reset();
+                                }
+                            }
+                        }
+                        perFileRgMappings.computeIfAbsent(fc.fileId, k -> new HashMap<>()).put(oldRgId, fwdMapping);
+                    }
+                }
+            }
+        } // writer.close()
+
+        // Release the gcSnapshotBitmaps for this group; rewriting is done.
+        for (FileCandidate fc : group.files)
+        {
+            for (int rgId = 0; rgId < fc.rgCount; rgId++)
+            {
+                gcSnapshotBitmaps.remove(RetinaUtils.buildRgKey(fc.fileId, rgId));
+            }
+        }
+
+        // Edge case: all rows in the group were deleted — skip catalog registration,
+        // delete the empty file, and return early.  The old files will be cleaned up
+        // by the delayed-cleanup phase once it is implemented.
+        if (globalNewRowOffset == 0)
+        {
+            logger.info("StorageGC: all rows deleted for table={}, vNodeId={}, skipping empty file",
+                    group.tableId, group.virtualNodeId);
+            try
+            {
+                storage.delete(newFilePath, false);
+            }
+            catch (IOException e)
+            {
+                logger.warn("StorageGC: failed to delete empty rewrite file {}", newFilePath, e);
+            }
+            return new RewriteResult(group, newFilePath, -1,
+                    0, new int[0], new int[]{0}, perFileRgMappings);
+        }
+
+        // Read the new file's Footer to get per-RG row counts.
+        int newFileRgCount;
+        int[] newFileRgActualRecordNums;
+        int[] newFileRgRowStart;
+        try (PixelsReader newReader = PixelsReaderImpl.newBuilder()
+                .setStorage(storage).setPath(newFilePath)
+                .setPixelsFooterCache(footerCache).build())
+        {
+            newFileRgCount = newReader.getRowGroupNum();
+            newFileRgActualRecordNums = new int[newFileRgCount];
+            newFileRgRowStart = new int[newFileRgCount + 1];
+            int accum = 0;
+            for (int rgId = 0; rgId < newFileRgCount; rgId++)
+            {
+                newFileRgActualRecordNums[rgId] = newReader.getRowGroupInfo(rgId).getNumberOfRows();
+                newFileRgRowStart[rgId] = accum;
+                accum += newFileRgActualRecordNums[rgId];
+            }
+            newFileRgRowStart[newFileRgCount] = accum;
+        }
+
+        // Register the new file as TEMPORARY in the catalog and initialise Visibility.
+        long minRowId = Long.MAX_VALUE, maxRowId = Long.MIN_VALUE;
+        for (FileCandidate fc : group.files)
+        {
+            minRowId = Math.min(minRowId, fc.file.getMinRowId());
+            maxRowId = Math.max(maxRowId, fc.file.getMaxRowId());
+        }
+        File newFile = new File();
+        newFile.setName(Paths.get(newFilePath).getFileName().toString());
+        newFile.setType(File.Type.TEMPORARY);
+        newFile.setNumRowGroup(newFileRgCount);
+        newFile.setMinRowId(minRowId);
+        newFile.setMaxRowId(maxRowId);
+        newFile.setPathId(group.files.get(0).file.getPathId());
+        metadataService.addFiles(Collections.singletonList(newFile));
+        long newFileId = metadataService.getFileId(newFilePath);
+
+        for (int rgId = 0; rgId < newFileRgCount; rgId++)
+        {
+            resourceManager.addVisibility(newFileId, rgId, newFileRgActualRecordNums[rgId], safeGcTs, null, false);
+        }
+
+        return new RewriteResult(group, newFilePath, newFileId,
+                newFileRgCount, newFileRgActualRecordNums, newFileRgRowStart,
+                perFileRgMappings);
+    }
+
 }

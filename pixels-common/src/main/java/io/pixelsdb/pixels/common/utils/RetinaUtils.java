@@ -130,4 +130,54 @@ public class RetinaUtils
     {
         return typePrefix + hostname + "_";
     }
+
+    /**
+     * Builds the checkpoint file path from a directory, prefix, hostname and timestamp.
+     *
+     * @param checkpointDir directory where checkpoint files reside (may or may not end with '/')
+     * @param prefix        {@link #CHECKPOINT_PREFIX_GC} or {@link #CHECKPOINT_PREFIX_OFFLOAD}
+     * @param hostname      the retina host name
+     * @param timestamp     the GC or offload timestamp
+     */
+    public static String buildCheckpointPath(String checkpointDir, String prefix, String hostname, long timestamp)
+    {
+        String fileName = getCheckpointFileName(prefix, hostname, timestamp);
+        return checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
+    }
+
+    // ── writeBufferKey utilities ────────────────────────────────────
+
+    /**
+     * Builds the canonical key for {@code pixelsWriteBufferMap} from schema and table name.
+     */
+    public static String buildWriteBufferKey(String schemaName, String tableName)
+    {
+        return schemaName + "." + tableName;
+    }
+
+    // ── rgKey utilities ──────────────────────────────────────────────
+
+    /**
+     * Builds the canonical {@code rgVisibilityMap} key for a row group.
+     */
+    public static String buildRgKey(long fileId, int rgId)
+    {
+        return fileId + "_" + rgId;
+    }
+
+    /**
+     * Extracts the file ID from an rgKey ({@code "<fileId>_<rgId>"}).
+     */
+    public static long parseFileIdFromRgKey(String rgKey)
+    {
+        return Long.parseLong(rgKey.substring(0, rgKey.indexOf('_')));
+    }
+
+    /**
+     * Extracts the row group ID from an rgKey ({@code "<fileId>_<rgId>"}).
+     */
+    public static int parseRgIdFromRgKey(String rgKey)
+    {
+        return Integer.parseInt(rgKey.substring(rgKey.indexOf('_') + 1));
+    }
 }
