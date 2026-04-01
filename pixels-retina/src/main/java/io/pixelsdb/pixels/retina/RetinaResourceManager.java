@@ -875,14 +875,22 @@ public class RetinaResourceManager
                 gcSnapshotBitmaps.put(rgKey, bitmap);
 
                 long recordNum = entry.getValue().getRecordNum();
-                long invalidCount = 0;
+                long rgInvalidCount = 0;
                 for (long word : bitmap)
                 {
-                    invalidCount += Long.bitCount(word);
+                    rgInvalidCount += Long.bitCount(word);
                 }
+                final long invalidCount = rgInvalidCount;
 
-                fileStats.merge(fileId, new long[]{recordNum, invalidCount},
-                        (a, b) -> new long[]{a[0] + b[0], a[1] + b[1]});
+                fileStats.compute(fileId, (k, existing) -> {
+                    if (existing == null)
+                    {
+                        return new long[]{recordNum, invalidCount};
+                    }
+                    existing[0] += recordNum;
+                    existing[1] += invalidCount;
+                    return existing;
+                });
 
                 checkpointEntries.add(
                         new CheckpointFileIO.CheckpointEntry(fileId, rgId, (int) recordNum, bitmap));

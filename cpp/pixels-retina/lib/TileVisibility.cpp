@@ -247,14 +247,18 @@ void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts, uint64_t* gcSnaps
         return;
     }
 
-    // Find the last block that should be compacted
+    // Find the last block that should be compacted.
+    // Snapshot tail/tailUsed once and reuse in both the scan loop and the
+    // compact loop to guarantee a consistent view of the chain endpoint.
     DeleteIndexBlock *blk = oldVer->head;
     DeleteIndexBlock *lastFullBlk = nullptr;
     uint64_t newBaseTimestamp = oldVer->baseTimestamp;
+    auto* tailSnap1 = tail.load(std::memory_order_acquire);
+    size_t tailUsedSnap1 = tailUsed.load(std::memory_order_acquire);
 
     while (blk) {
-        size_t count = (blk == tail.load(std::memory_order_acquire))
-                           ? tailUsed.load(std::memory_order_acquire)
+        size_t count = (blk == tailSnap1)
+                           ? tailUsedSnap1
                            : DeleteIndexBlock::BLOCK_CAPACITY;
         // Guard: deleteTileRecord updates `tail` and `tailUsed` non-atomically.
         // In the narrow window after `tail` is advanced to a new block but before
@@ -297,7 +301,7 @@ void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts, uint64_t* gcSnaps
     // Apply deletes from oldVer->head up to lastFullBlk
     blk = oldVer->head;
     while (blk) {
-        size_t count = (blk == lastFullBlk && blk == tail.load()) ? tailUsed.load() : DeleteIndexBlock::BLOCK_CAPACITY;
+        size_t count = (blk == lastFullBlk && blk == tailSnap1) ? tailUsedSnap1 : DeleteIndexBlock::BLOCK_CAPACITY;
         for (size_t i = 0; i < count; i++) {
             uint64_t item = blk->items[i];
             // Guard: a zero item means an uninitialised slot in a newly-created
@@ -316,13 +320,13 @@ void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts, uint64_t* gcSnaps
         blk = blk->next.load(std::memory_order_acquire);
     }
 
-    // Compact path: build gcSnapshotBitmap by scanning the boundary block
+    // Compact path: build gcSnapshotBitmap by scanning the boundary block.
+    // Reuse the same tail/tailUsed snapshot (tailSnap1/tailUsedSnap1) taken at
+    // the start of this GC cycle to ensure consistent chain-end semantics.
     DeleteIndexBlock* newHead = lastFullBlk->next.load(std::memory_order_acquire);
     std::memcpy(gcSnapshotBitmap, newBaseBitmap, NUM_WORDS * sizeof(uint64_t));
     if (newHead) {
-        auto* tailSnap = tail.load(std::memory_order_acquire);
-        size_t tailUsedSnap = tailUsed.load(std::memory_order_acquire);
-        size_t cnt = (newHead == tailSnap) ? tailUsedSnap : DeleteIndexBlock::BLOCK_CAPACITY;
+        size_t cnt = (newHead == tailSnap1) ? tailUsedSnap1 : DeleteIndexBlock::BLOCK_CAPACITY;
         for (size_t i = 0; i < cnt; i++) {
             uint64_t item = newHead->items[i];
             if (item == 0) break;

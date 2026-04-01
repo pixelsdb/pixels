@@ -795,25 +795,37 @@ public class StorageGarbageCollector
         }
 
         // Register the new file as TEMPORARY in the catalog and initialise Visibility.
-        long minRowId = Long.MAX_VALUE, maxRowId = Long.MIN_VALUE;
-        for (FileCandidate fc : group.files)
+        // Track registration progress so that partial state can be cleaned up on failure.
+        long newFileId = -1;
+        int registeredRgCount = 0;
+        try
         {
-            minRowId = Math.min(minRowId, fc.file.getMinRowId());
-            maxRowId = Math.max(maxRowId, fc.file.getMaxRowId());
-        }
-        File newFile = new File();
-        newFile.setName(Paths.get(newFilePath).getFileName().toString());
-        newFile.setType(File.Type.TEMPORARY);
-        newFile.setNumRowGroup(newFileRgCount);
-        newFile.setMinRowId(minRowId);
-        newFile.setMaxRowId(maxRowId);
-        newFile.setPathId(group.files.get(0).file.getPathId());
-        metadataService.addFiles(Collections.singletonList(newFile));
-        long newFileId = metadataService.getFileId(newFilePath);
+            long minRowId = Long.MAX_VALUE, maxRowId = Long.MIN_VALUE;
+            for (FileCandidate fc : group.files)
+            {
+                minRowId = Math.min(minRowId, fc.file.getMinRowId());
+                maxRowId = Math.max(maxRowId, fc.file.getMaxRowId());
+            }
+            File newFile = new File();
+            newFile.setName(Paths.get(newFilePath).getFileName().toString());
+            newFile.setType(File.Type.TEMPORARY);
+            newFile.setNumRowGroup(newFileRgCount);
+            newFile.setMinRowId(minRowId);
+            newFile.setMaxRowId(maxRowId);
+            newFile.setPathId(group.files.get(0).file.getPathId());
+            metadataService.addFiles(Collections.singletonList(newFile));
+            newFileId = metadataService.getFileId(newFilePath);
 
-        for (int rgId = 0; rgId < newFileRgCount; rgId++)
+            for (int rgId = 0; rgId < newFileRgCount; rgId++)
+            {
+                resourceManager.addVisibility(newFileId, rgId, newFileRgActualRecordNums[rgId], safeGcTs, null, false);
+                registeredRgCount = rgId + 1;
+            }
+        }
+        catch (Exception e)
         {
-            resourceManager.addVisibility(newFileId, rgId, newFileRgActualRecordNums[rgId], safeGcTs, null, false);
+            cleanupTemporaryFile(storage, newFilePath, newFileId, registeredRgCount);
+            throw e;
         }
 
         return new RewriteResult(group, newFilePath, newFileId,
@@ -821,8 +833,51 @@ public class StorageGarbageCollector
                 forwardRgMappings, backwardInfos);
     }
 
+    /**
+     * Best-effort cleanup of a partially-created TEMPORARY file.  Removes the
+     * catalog record, the physical file, and any RGVisibility keys that were
+     * registered before the failure.
+     */
+    private void cleanupTemporaryFile(Storage storage, String newFilePath,
+                                      long newFileId, int registeredRgCount)
+    {
+        if (newFileId > 0)
+        {
+            for (int rgId = 0; rgId < registeredRgCount; rgId++)
+            {
+                try
+                {
+                    resourceManager.reclaimVisibility(newFileId, rgId, 0);
+                }
+                catch (Exception ex)
+                {
+                    logger.warn("StorageGC cleanup: failed to remove Visibility for fileId={}, rgId={}", newFileId, rgId, ex);
+                }
+            }
+            try
+            {
+                metadataService.deleteFiles(Collections.singletonList(newFileId));
+            }
+            catch (Exception ex)
+            {
+                logger.warn("StorageGC cleanup: failed to delete catalog entry for fileId={}", newFileId, ex);
+            }
+        }
+        try
+        {
+            if (storage.exists(newFilePath))
+            {
+                storage.delete(newFilePath, false);
+            }
+        }
+        catch (IOException ex)
+        {
+            logger.warn("StorageGC cleanup: failed to delete physical file {}", newFilePath, ex);
+        }
+    }
+
     // -------------------------------------------------------------------------
-    // S4. Visibility Synchronization
+    // Visibility Synchronization
     // -------------------------------------------------------------------------
 
     /**
@@ -834,64 +889,63 @@ public class StorageGarbageCollector
      */
     void syncVisibility(RewriteResult result, long safeGcTs) throws RetinaException
     {
-        // 1. Export chain items from each old file RG
-        Map<String, long[]> allChainItems = new HashMap<>();
+        // Buckets keyed by new RG id; values are interleaved (newRgRowOffset, timestamp) pairs
+        // stored in a single flat list to avoid per-pair long[2] allocations.
+        Map<Integer, List<Long>> newRgBuckets = new HashMap<>();
+
+        // 1. Export chain items from each old file RG, then coordinate-transform in place.
         for (FileCandidate fc : result.group.files)
         {
-            for (int rgId = 0; rgId < fc.rgCount; rgId++)
-            {
-                long[] items = resourceManager.exportChainItemsAfter(fc.fileId, rgId, safeGcTs);
-                if (items != null && items.length > 0)
-                {
-                    allChainItems.put(fc.fileId + "_" + rgId, items);
-                }
-            }
-        }
-
-        // 2. Coordinate transformation: map old positions to new, bucket by new RG
-        Map<Integer, List<long[]>> newRgBuckets = new HashMap<>();
-        for (Map.Entry<String, long[]> entry : allChainItems.entrySet())
-        {
-            String[] parts = entry.getKey().split("_");
-            long oldFileId = Long.parseLong(parts[0]);
-            int oldRgId = Integer.parseInt(parts[1]);
-            long[] items = entry.getValue();
-            Map<Integer, int[]> fileMapping = result.forwardRgMappings.get(oldFileId);
-            int[] fwdMapping = (fileMapping != null) ? fileMapping.get(oldRgId) : null;
-            if (fwdMapping == null)
+            Map<Integer, int[]> fileMapping = result.forwardRgMappings.get(fc.fileId);
+            if (fileMapping == null)
             {
                 continue;
             }
-            for (int i = 0; i < items.length; i += 2)
+            for (int rgId = 0; rgId < fc.rgCount; rgId++)
             {
-                int oldRgRowOffset = (int) items[i];
-                long timestamp = items[i + 1];
-                if (oldRgRowOffset < 0 || oldRgRowOffset >= fwdMapping.length)
+                long[] items = resourceManager.exportChainItemsAfter(fc.fileId, rgId, safeGcTs);
+                if (items == null || items.length == 0)
                 {
                     continue;
                 }
-                int newGlobal = fwdMapping[oldRgRowOffset];
-                if (newGlobal < 0)
+                int[] fwdMapping = fileMapping.get(rgId);
+                if (fwdMapping == null)
                 {
                     continue;
                 }
-                int newRgId = RetinaResourceManager.rgIdForGlobalRowOffset(newGlobal, result.newFileRgRowStart);
-                int newRgOff = newGlobal - result.newFileRgRowStart[newRgId];
-                newRgBuckets.computeIfAbsent(newRgId, k -> new ArrayList<>())
-                        .add(new long[]{newRgOff, timestamp});
+
+                // 2. Coordinate transformation: map old positions to new, bucket by new RG
+                for (int i = 0; i < items.length; i += 2)
+                {
+                    int oldRgRowOffset = (int) items[i];
+                    long timestamp = items[i + 1];
+                    if (oldRgRowOffset < 0 || oldRgRowOffset >= fwdMapping.length)
+                    {
+                        continue;
+                    }
+                    int newGlobal = fwdMapping[oldRgRowOffset];
+                    if (newGlobal < 0)
+                    {
+                        continue;
+                    }
+                    int newRgId = RetinaResourceManager.rgIdForGlobalRowOffset(newGlobal, result.newFileRgRowStart);
+                    int newRgOff = newGlobal - result.newFileRgRowStart[newRgId];
+                    List<Long> bucket = newRgBuckets.computeIfAbsent(newRgId, k -> new ArrayList<>());
+                    bucket.add((long) newRgOff);
+                    bucket.add(timestamp);
+                }
             }
         }
 
         // 3. Import into each new RG
-        for (Map.Entry<Integer, List<long[]>> entry : newRgBuckets.entrySet())
+        for (Map.Entry<Integer, List<Long>> entry : newRgBuckets.entrySet())
         {
             int newRgId = entry.getKey();
-            List<long[]> pairs = entry.getValue();
-            long[] interleaved = new long[pairs.size() * 2];
-            for (int i = 0; i < pairs.size(); i++)
+            List<Long> flat = entry.getValue();
+            long[] interleaved = new long[flat.size()];
+            for (int i = 0; i < flat.size(); i++)
             {
-                interleaved[2 * i] = pairs.get(i)[0];
-                interleaved[2 * i + 1] = pairs.get(i)[1];
+                interleaved[i] = flat.get(i);
             }
             resourceManager.importDeletionChain(result.newFileId, newRgId, interleaved);
         }

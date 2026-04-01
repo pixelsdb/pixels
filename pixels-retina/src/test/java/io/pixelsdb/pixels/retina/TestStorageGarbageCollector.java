@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.metadata.MetadataService;
+import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.File;
@@ -45,6 +46,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -55,6 +57,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -1939,6 +1946,297 @@ public class TestStorageGarbageCollector
                 assertEquals("snap_ts=" + snapTs + " oldRow=" + oldRow + " newRow=" + newRow
                                 + ": visibility mismatch",
                         oldDeleted, newDeleted);
+            }
+        }
+
+        gc.unregisterDualWrite(result);
+    }
+
+    // =======================================================================
+    // Section 7b: rgIdForGlobalRowOffset boundary tests
+    // =======================================================================
+
+    /**
+     * Single RG: any offset within [0, totalRows) must return rgId=0.
+     */
+    @Test
+    public void testRgIdForGlobalRowOffset_singleRg()
+    {
+        int[] rgRowStart = {0, 256};
+        assertEquals(0, RetinaResourceManager.rgIdForGlobalRowOffset(0, rgRowStart));
+        assertEquals(0, RetinaResourceManager.rgIdForGlobalRowOffset(128, rgRowStart));
+        assertEquals(0, RetinaResourceManager.rgIdForGlobalRowOffset(255, rgRowStart));
+    }
+
+    /**
+     * Multiple RGs: offsets on exact boundaries should return the correct rgId.
+     * rgRowStart = [0, 100, 250, 400]  →  RG0=[0..99], RG1=[100..249], RG2=[250..399]
+     */
+    @Test
+    public void testRgIdForGlobalRowOffset_boundaries()
+    {
+        int[] rgRowStart = {0, 100, 250, 400};
+        assertEquals(0, RetinaResourceManager.rgIdForGlobalRowOffset(0, rgRowStart));
+        assertEquals(0, RetinaResourceManager.rgIdForGlobalRowOffset(99, rgRowStart));
+        assertEquals(1, RetinaResourceManager.rgIdForGlobalRowOffset(100, rgRowStart));
+        assertEquals(1, RetinaResourceManager.rgIdForGlobalRowOffset(249, rgRowStart));
+        assertEquals(2, RetinaResourceManager.rgIdForGlobalRowOffset(250, rgRowStart));
+        assertEquals(2, RetinaResourceManager.rgIdForGlobalRowOffset(399, rgRowStart));
+    }
+
+    /**
+     * Last valid offset (sentinel - 1) returns the last RG id.
+     */
+    @Test
+    public void testRgIdForGlobalRowOffset_lastOffset()
+    {
+        int[] rgRowStart = {0, 50, 100, 150};
+        assertEquals(2, RetinaResourceManager.rgIdForGlobalRowOffset(149, rgRowStart));
+    }
+
+    /**
+     * Many equal-sized RGs: stress the binary search across many intervals.
+     */
+    @Test
+    public void testRgIdForGlobalRowOffset_manyRgs()
+    {
+        int numRgs = 64;
+        int rowsPerRg = 256;
+        int[] rgRowStart = new int[numRgs + 1];
+        for (int i = 0; i <= numRgs; i++)
+        {
+            rgRowStart[i] = i * rowsPerRg;
+        }
+        for (int rg = 0; rg < numRgs; rg++)
+        {
+            int first = rg * rowsPerRg;
+            int last = first + rowsPerRg - 1;
+            assertEquals("first offset of rg=" + rg, rg,
+                    RetinaResourceManager.rgIdForGlobalRowOffset(first, rgRowStart));
+            assertEquals("last offset of rg=" + rg, rg,
+                    RetinaResourceManager.rgIdForGlobalRowOffset(last, rgRowStart));
+        }
+    }
+
+    // =======================================================================
+    // Section 7c: createCheckpointDirect vs createCheckpoint consistency
+    // =======================================================================
+
+    /**
+     * Both checkpoint paths (queued via rgVisibilityMap traversal and direct via
+     * pre-built entries) must produce byte-identical files when given the same
+     * visibility state.
+     */
+    @Test
+    public void testCheckpointDirect_matchesStandardCheckpoint() throws Exception
+    {
+        long ts = 500L;
+        int numFiles = 3;
+        int rowsPerRg = 64;
+
+        for (int fid = 1; fid <= numFiles; fid++)
+        {
+            retinaManager.addVisibility(fid, 0, rowsPerRg, 0L, null, false);
+            for (int d = 0; d < fid; d++)
+            {
+                retinaManager.deleteRecord(fid, 0, d, ts - 100);
+            }
+        }
+
+        // Build pre-built entries identical to what runGC() would construct.
+        List<CheckpointFileIO.CheckpointEntry> entries = new ArrayList<>();
+        Field rgMapField = RetinaResourceManager.class.getDeclaredField("rgVisibilityMap");
+        rgMapField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, RGVisibility> rgMap =
+                (Map<String, RGVisibility>) rgMapField.get(retinaManager);
+        for (Map.Entry<String, RGVisibility> e : rgMap.entrySet())
+        {
+            long fileId = RetinaUtils.parseFileIdFromRgKey(e.getKey());
+            int rgId = RetinaUtils.parseRgIdFromRgKey(e.getKey());
+            long[] bitmap = e.getValue().getVisibilityBitmap(ts);
+            entries.add(new CheckpointFileIO.CheckpointEntry(
+                    fileId, rgId, (int) e.getValue().getRecordNum(), bitmap));
+        }
+
+        // Obtain the private CheckpointType.GC enum value via reflection.
+        @SuppressWarnings("unchecked")
+        Class<? extends Enum<?>> checkpointTypeClass = (Class<? extends Enum<?>>)
+                Class.forName("io.pixelsdb.pixels.retina.RetinaResourceManager$CheckpointType");
+        Object gcType = null;
+        for (Object constant : checkpointTypeClass.getEnumConstants())
+        {
+            if (constant.toString().equals("GC"))
+            {
+                gcType = constant;
+                break;
+            }
+        }
+        assertNotNull("CheckpointType.GC must exist", gcType);
+
+        // Call createCheckpoint (standard path)
+        Method createCheckpointMethod = RetinaResourceManager.class.getDeclaredMethod(
+                "createCheckpoint", long.class, checkpointTypeClass);
+        createCheckpointMethod.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        CompletableFuture<Void> f1 = (CompletableFuture<Void>) createCheckpointMethod.invoke(
+                retinaManager, ts, gcType);
+        f1.join();
+
+        // Call createCheckpointDirect (optimized path) with a different timestamp to get a different file name
+        long ts2 = ts + 1;
+        Method createCheckpointDirectMethod = RetinaResourceManager.class.getDeclaredMethod(
+                "createCheckpointDirect", long.class, checkpointTypeClass, List.class);
+        createCheckpointDirectMethod.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        CompletableFuture<Void> f2 = (CompletableFuture<Void>) createCheckpointDirectMethod.invoke(
+                retinaManager, ts2, gcType, entries);
+        f2.join();
+
+        // Read both checkpoint files and compare entries.
+        // Files may have entries in different order (due to producer-consumer concurrency),
+        // so we normalize by sorting entries by (fileId, rgId) before comparing.
+        Field checkpointDirField = RetinaResourceManager.class.getDeclaredField("checkpointDir");
+        checkpointDirField.setAccessible(true);
+        String checkpointDir = (String) checkpointDirField.get(retinaManager);
+
+        Field hostField = RetinaResourceManager.class.getDeclaredField("retinaHostName");
+        hostField.setAccessible(true);
+        String hostName = (String) hostField.get(retinaManager);
+
+        String path1 = RetinaUtils.buildCheckpointPath(
+                checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_GC, hostName, ts);
+        String path2 = RetinaUtils.buildCheckpointPath(
+                checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_GC, hostName, ts2);
+
+        Map<String, long[]> standard = new HashMap<>();
+        CheckpointFileIO.readCheckpointParallel(path1, entry ->
+                standard.put(entry.fileId + "_" + entry.rgId,
+                        Arrays.copyOf(entry.bitmap, entry.bitmap.length)));
+
+        Map<String, long[]> direct = new HashMap<>();
+        CheckpointFileIO.readCheckpointParallel(path2, entry ->
+                direct.put(entry.fileId + "_" + entry.rgId,
+                        Arrays.copyOf(entry.bitmap, entry.bitmap.length)));
+
+        assertEquals("entry count must match", standard.size(), direct.size());
+        for (Map.Entry<String, long[]> e : standard.entrySet())
+        {
+            long[] directBitmap = direct.get(e.getKey());
+            assertNotNull("direct checkpoint must contain key=" + e.getKey(), directBitmap);
+            assertTrue("bitmaps must be identical for key=" + e.getKey(),
+                    Arrays.equals(e.getValue(), directBitmap));
+        }
+    }
+
+    // =======================================================================
+    // Section 7d: concurrent dual-write pressure test
+    // =======================================================================
+
+    /**
+     * Multi-threaded stress test: concurrent {@code deleteRecord} calls with
+     * dual-write active.  Verifies that all deletes are correctly propagated
+     * in both forward and backward directions under contention.
+     */
+    @Test
+    public void testDualWrite_concurrentPressure() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        int numRows = 64;
+        long[] ids = new long[numRows];
+        for (int i = 0; i < numRows; i++)
+        {
+            ids[i] = i;
+        }
+        long fileId = 50L;
+        String srcPath = writeTestFile("dw_conc_src.pxl", schema, ids, false, null);
+
+        long[] gcBitmap = makeBitmapForRows(numRows);
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", gcBitmap);
+
+        retinaManager.addVisibility(fileId, 0, numRows, 0L, null, false);
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+        long newFileId = result.newFileId;
+        assertTrue("new file should be registered", newFileId > 0);
+
+        gc.registerDualWrite(result);
+
+        int numThreads = 8;
+        int deletesPerThread = numRows / numThreads;
+        CyclicBarrier barrier = new CyclicBarrier(numThreads);
+        AtomicInteger errors = new AtomicInteger(0);
+        ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+
+        List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+        for (int t = 0; t < numThreads; t++)
+        {
+            int threadId = t;
+            futures.add(executor.submit(() ->
+            {
+                try
+                {
+                    barrier.await();
+                    for (int d = 0; d < deletesPerThread; d++)
+                    {
+                        int rowOffset = threadId * deletesPerThread + d;
+                        long deleteTs = 200L + rowOffset;
+                        if (rowOffset % 2 == 0)
+                        {
+                            retinaManager.deleteRecord(fileId, 0, rowOffset, deleteTs);
+                        }
+                        else
+                        {
+                            int newOff = result.forwardRgMappings.get(fileId).get(0)[rowOffset];
+                            if (newOff >= 0)
+                            {
+                                int newRgId = RetinaResourceManager.rgIdForGlobalRowOffset(
+                                        newOff, result.newFileRgRowStart);
+                                int newRgOff = newOff - result.newFileRgRowStart[newRgId];
+                                retinaManager.deleteRecord(newFileId, newRgId, newRgOff, deleteTs);
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    errors.incrementAndGet();
+                }
+            }));
+        }
+
+        for (java.util.concurrent.Future<?> f : futures)
+        {
+            f.get();
+        }
+        executor.shutdown();
+
+        assertEquals("no errors during concurrent deletes", 0, errors.get());
+
+        long queryTs = 200L + numRows;
+
+        // Verify all rows are deleted in old file
+        long[] oldBitmap = retinaManager.queryVisibility(fileId, 0, queryTs, 0L);
+        for (int r = 0; r < numRows; r++)
+        {
+            assertTrue("old file row " + r + " should be deleted",
+                    (oldBitmap[r / 64] & (1L << (r % 64))) != 0);
+        }
+
+        // Verify all corresponding rows are deleted in new file
+        for (int r = 0; r < numRows; r++)
+        {
+            int newGlobal = result.forwardRgMappings.get(fileId).get(0)[r];
+            if (newGlobal >= 0)
+            {
+                int newRgId = RetinaResourceManager.rgIdForGlobalRowOffset(
+                        newGlobal, result.newFileRgRowStart);
+                int newRgOff = newGlobal - result.newFileRgRowStart[newRgId];
+                long[] newBitmap = retinaManager.queryVisibility(newFileId, newRgId, queryTs, 0L);
+                assertTrue("new file rgId=" + newRgId + " row " + newRgOff + " (from old row " + r + ") should be deleted",
+                        (newBitmap[newRgOff / 64] & (1L << (newRgOff % 64))) != 0);
             }
         }
 
