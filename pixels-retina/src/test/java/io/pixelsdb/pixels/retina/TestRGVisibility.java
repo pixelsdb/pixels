@@ -614,4 +614,99 @@ public class TestRGVisibility
         long[] finalSnap = rgVisibility.garbageCollect(ts + 100);
         assertBitmapsEqual("randomized final", preRefFinal, finalSnap);
     }
+
+    // =====================================================================
+    // exportChainItemsAfter / importDeletionChain JNI tests
+    // =====================================================================
+
+    @Test
+    public void testExportChainItemsAfter()
+    {
+        rgVisibility.deleteRecord(5, 50);
+        rgVisibility.deleteRecord(10, 100);
+        rgVisibility.deleteRecord(15, 150);
+        rgVisibility.deleteRecord(20, 200);
+        rgVisibility.deleteRecord(300, 250);
+
+        long[] items = rgVisibility.exportChainItemsAfter(100);
+
+        assertNotNull("export should return non-null", items);
+        assertEquals("interleaved pairs: 3 items × 2", 6, items.length);
+
+        Set<Long> exportedTs = new HashSet<>();
+        for (int i = 0; i < items.length; i += 2)
+        {
+            exportedTs.add(items[i + 1]);
+        }
+        assertTrue("should contain ts=150", exportedTs.contains(150L));
+        assertTrue("should contain ts=200", exportedTs.contains(200L));
+        assertTrue("should contain ts=250", exportedTs.contains(250L));
+        assertFalse("should NOT contain ts=50", exportedTs.contains(50L));
+        assertFalse("should NOT contain ts=100", exportedTs.contains(100L));
+    }
+
+    @Test
+    public void testImportDeletionChain()
+    {
+        long safeGcTs = 100;
+        try (RGVisibility newVis = new RGVisibility(ROW_COUNT, safeGcTs, null))
+        {
+            long[] items = {5, 150, 10, 200, 300, 250};
+            newVis.importDeletionChain(items);
+
+            long[] bitmap = newVis.getVisibilityBitmap(300);
+            assertTrue("row 5 should be deleted",
+                    (bitmap[5 / 64] & (1L << (5 % 64))) != 0);
+            assertTrue("row 10 should be deleted",
+                    (bitmap[10 / 64] & (1L << (10 % 64))) != 0);
+            assertTrue("row 300 should be deleted",
+                    (bitmap[300 / 64] & (1L << (300 % 64))) != 0);
+
+            long[] partialBitmap = newVis.getVisibilityBitmap(180);
+            assertTrue("row 5 at ts=180 should be deleted",
+                    (partialBitmap[5 / 64] & (1L << (5 % 64))) != 0);
+            assertFalse("row 10 at ts=180 should NOT be deleted",
+                    (partialBitmap[10 / 64] & (1L << (10 % 64))) != 0);
+        }
+    }
+
+    @Test
+    public void testExportImportRoundTrip()
+    {
+        long safeGcTs = 100;
+
+        rgVisibility.deleteRecord(5, 50);
+        rgVisibility.deleteRecord(10, 80);
+        rgVisibility.deleteRecord(15, 150);
+        rgVisibility.deleteRecord(20, 200);
+        rgVisibility.deleteRecord(300, 250);
+
+        long[] exported = rgVisibility.exportChainItemsAfter(safeGcTs);
+        assertEquals("3 items exported (ts=150,200,250)", 6, exported.length);
+
+        try (RGVisibility newVis = new RGVisibility(ROW_COUNT, safeGcTs, null))
+        {
+            newVis.importDeletionChain(exported);
+
+            for (long snapTs : new long[]{150, 200, 250, 500})
+            {
+                long[] oldBitmap = rgVisibility.getVisibilityBitmap(snapTs);
+                long[] newBitmap = newVis.getVisibilityBitmap(snapTs);
+
+                for (int row : new int[]{15, 20, 300})
+                {
+                    boolean oldDel = (oldBitmap[row / 64] & (1L << (row % 64))) != 0;
+                    boolean newDel = (newBitmap[row / 64] & (1L << (row % 64))) != 0;
+                    assertEquals("snap_ts=" + snapTs + " row=" + row, oldDel, newDel);
+                }
+
+                for (int row : new int[]{5, 10})
+                {
+                    boolean newDel = (newBitmap[row / 64] & (1L << (row % 64))) != 0;
+                    assertFalse("row " + row + " (ts<=safeGcTs) should NOT be in new at snap=" + snapTs,
+                            newDel);
+                }
+            }
+        }
+    }
 }

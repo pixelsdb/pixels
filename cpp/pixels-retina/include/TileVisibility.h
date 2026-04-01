@@ -32,6 +32,7 @@
 #include <cstring>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 // rowId supports up to 65535, timestamp uses 48 bits
@@ -98,6 +99,9 @@ class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     void deleteTileRecord(uint16_t rowId, uint64_t ts);
     void getTileVisibilityBitmap(uint64_t ts, uint64_t* outBitmap) const;
     void collectTileGarbage(uint64_t ts, uint64_t* gcSnapshotBitmap);
+    void exportChainItemsAfter(uint32_t tileId, uint64_t safeGcTs,
+        std::vector<std::pair<uint32_t, uint64_t>>& gcChainItems) const;
+    void importDeletionItems(std::vector<uint64_t>& bucket);
 
   private:
     TileVisibility(const TileVisibility &) = delete;

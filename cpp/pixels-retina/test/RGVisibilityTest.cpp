@@ -516,3 +516,158 @@ TEST_F(RGVisibilityTest, GcSnapshot_Randomized) {
     verifyGcSnapshot(rgVisibility, ts + 100, preRefFinal, finalSnap);
     delete[] preRefFinal;
 }
+
+// =====================================================================
+// exportChainItemsAfter tests
+// =====================================================================
+
+TEST_F(RGVisibilityTest, ExportChainItemsAfter_Basic) {
+    rgVisibility->deleteRGRecord(5, 50);
+    rgVisibility->deleteRGRecord(10, 100);
+    rgVisibility->deleteRGRecord(300, 150);
+    rgVisibility->deleteRGRecord(500, 200);
+
+    std::vector<uint64_t> items = rgVisibility->exportChainItemsAfter(100);
+
+    ASSERT_EQ(items.size(), 4u);
+    EXPECT_EQ(items[0], 300u);
+    EXPECT_EQ(items[1], 150u);
+    EXPECT_EQ(items[2], 500u);
+    EXPECT_EQ(items[3], 200u);
+}
+
+TEST_F(RGVisibilityTest, ExportChainItemsAfter_Empty) {
+    std::vector<uint64_t> items = rgVisibility->exportChainItemsAfter(100);
+    EXPECT_EQ(items.size(), 0u);
+}
+
+// =====================================================================
+// importDeletionChain tests
+// =====================================================================
+
+TEST_F(RGVisibilityTest, ImportDeletionChain_Basic) {
+    uint64_t items[] = {5, 100, 10, 200, 300, 300};
+    rgVisibility->importDeletionChain(items, 3);
+
+    uint64_t* bitmap = rgVisibility->getRGVisibilityBitmap(400);
+    EXPECT_NE(bitmap[5 / 64] & (1ULL << (5 % 64)), 0u);
+    EXPECT_NE(bitmap[10 / 64] & (1ULL << (10 % 64)), 0u);
+    EXPECT_NE(bitmap[300 / 64] & (1ULL << (300 % 64)), 0u);
+    delete[] bitmap;
+}
+
+TEST_F(RGVisibilityTest, ImportDeletionChain_CrossTile) {
+    uint64_t items[] = {
+        0, 100,
+        RETINA_CAPACITY - 1, 200,
+        RETINA_CAPACITY, 300,
+        RETINA_CAPACITY * 2 + 5, 400
+    };
+    rgVisibility->importDeletionChain(items, 4);
+
+    uint64_t* bitmap = rgVisibility->getRGVisibilityBitmap(500);
+    EXPECT_NE(bitmap[0 / 64] & (1ULL << (0 % 64)), 0u);
+    uint32_t r1 = RETINA_CAPACITY - 1;
+    EXPECT_NE(bitmap[r1 / 64] & (1ULL << (r1 % 64)), 0u);
+    uint32_t r2 = RETINA_CAPACITY;
+    EXPECT_NE(bitmap[r2 / 64] & (1ULL << (r2 % 64)), 0u);
+    uint32_t r3 = RETINA_CAPACITY * 2 + 5;
+    EXPECT_NE(bitmap[r3 / 64] & (1ULL << (r3 % 64)), 0u);
+    delete[] bitmap;
+}
+
+// =====================================================================
+// Export → Import end-to-end with coordinate mapping
+// =====================================================================
+
+TEST_F(RGVisibilityTest, ExportImportEndToEnd) {
+    uint64_t safeGcTs = 100;
+
+    rgVisibility->deleteRGRecord(5, 50);
+    rgVisibility->deleteRGRecord(10, 80);
+    rgVisibility->deleteRGRecord(15, 150);
+    rgVisibility->deleteRGRecord(20, 200);
+    rgVisibility->deleteRGRecord(300, 250);
+
+    std::vector<uint64_t> exported = rgVisibility->exportChainItemsAfter(safeGcTs);
+    ASSERT_EQ(exported.size(), 6u);
+
+    RGVisibilityInstance newRgVis(ROW_COUNT, safeGcTs, nullptr);
+
+    newRgVis.importDeletionChain(exported.data(), exported.size() / 2);
+
+    for (uint64_t snapTs : {150ULL, 200ULL, 250ULL, 500ULL}) {
+        uint64_t* oldBitmap = rgVisibility->getRGVisibilityBitmap(snapTs);
+        uint64_t* newBitmap = newRgVis.getRGVisibilityBitmap(snapTs);
+
+        for (uint32_t row : {15u, 20u, 300u}) {
+            bool oldSet = (oldBitmap[row / 64] & (1ULL << (row % 64))) != 0;
+            bool newSet = (newBitmap[row / 64] & (1ULL << (row % 64))) != 0;
+            EXPECT_EQ(oldSet, newSet)
+                << "Mismatch at row=" << row << " snapTs=" << snapTs;
+        }
+
+        for (uint32_t row : {5u, 10u}) {
+            uint64_t* newCheck = newRgVis.getRGVisibilityBitmap(snapTs);
+            bool newSet = (newCheck[row / 64] & (1ULL << (row % 64))) != 0;
+            EXPECT_FALSE(newSet)
+                << "Row " << row << " (ts<=safeGcTs) should NOT be in new chain at snapTs=" << snapTs;
+            delete[] newCheck;
+        }
+
+        delete[] oldBitmap;
+        delete[] newBitmap;
+    }
+}
+
+// =====================================================================
+// Concurrent dual-write + importDeletionChain
+// =====================================================================
+
+TEST_F(RGVisibilityTest, ImportDeletionChain_ConcurrentDualWrite) {
+    constexpr int IMPORT_ITEMS = 50;
+    constexpr int DUAL_WRITE_ITEMS = 200;
+    uint64_t safeGcTs = 100;
+
+    RGVisibilityInstance newRgVis(ROW_COUNT, safeGcTs, nullptr);
+
+    std::vector<uint64_t> importItems;
+    importItems.reserve(IMPORT_ITEMS * 2);
+    for (int i = 0; i < IMPORT_ITEMS; i++) {
+        uint32_t row = 1000 + i;
+        uint64_t ts = safeGcTs + 1 + i;
+        importItems.push_back(row);
+        importItems.push_back(ts);
+    }
+
+    std::atomic<bool> importDone{false};
+
+    std::thread dualWriteThread([&]() {
+        for (int i = 0; i < DUAL_WRITE_ITEMS; i++) {
+            uint32_t row = 2000 + i;
+            uint64_t ts = safeGcTs + 500 + i;
+            newRgVis.deleteRGRecord(row, ts);
+        }
+    });
+
+    newRgVis.importDeletionChain(importItems.data(), IMPORT_ITEMS);
+    importDone.store(true, std::memory_order_release);
+
+    dualWriteThread.join();
+
+    uint64_t queryTs = safeGcTs + 500 + DUAL_WRITE_ITEMS + 100;
+    uint64_t* bitmap = newRgVis.getRGVisibilityBitmap(queryTs);
+
+    for (int i = 0; i < IMPORT_ITEMS; i++) {
+        uint32_t row = 1000 + i;
+        EXPECT_NE(bitmap[row / 64] & (1ULL << (row % 64)), 0u)
+            << "Imported row " << row << " missing from bitmap";
+    }
+    for (int i = 0; i < DUAL_WRITE_ITEMS; i++) {
+        uint32_t row = 2000 + i;
+        EXPECT_NE(bitmap[row / 64] & (1ULL << (row % 64)), 0u)
+            << "Dual-write row " << row << " missing from bitmap";
+    }
+
+    delete[] bitmap;
+}

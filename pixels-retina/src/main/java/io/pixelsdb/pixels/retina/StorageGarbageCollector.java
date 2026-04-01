@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.exception.MetadataException;
+import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -818,6 +819,82 @@ public class StorageGarbageCollector
         return new RewriteResult(group, newFilePath, newFileId,
                 newFileRgCount, newFileRgActualRecordNums, newFileRgRowStart,
                 forwardRgMappings, backwardInfos);
+    }
+
+    // -------------------------------------------------------------------------
+    // S4. Visibility Synchronization
+    // -------------------------------------------------------------------------
+
+    /**
+     * Exports deletion chain items from old files, performs coordinate transformation,
+     * and imports them into the corresponding new file RGs.
+     *
+     * @param result   the rewrite result containing forward mappings and new file metadata
+     * @param safeGcTs the safe GC timestamp; only chain items with ts > safeGcTs are exported
+     */
+    void syncVisibility(RewriteResult result, long safeGcTs) throws RetinaException
+    {
+        // 1. Export chain items from each old file RG
+        Map<String, long[]> allChainItems = new HashMap<>();
+        for (FileCandidate fc : result.group.files)
+        {
+            for (int rgId = 0; rgId < fc.rgCount; rgId++)
+            {
+                long[] items = resourceManager.exportChainItemsAfter(fc.fileId, rgId, safeGcTs);
+                if (items != null && items.length > 0)
+                {
+                    allChainItems.put(fc.fileId + "_" + rgId, items);
+                }
+            }
+        }
+
+        // 2. Coordinate transformation: map old positions to new, bucket by new RG
+        Map<Integer, List<long[]>> newRgBuckets = new HashMap<>();
+        for (Map.Entry<String, long[]> entry : allChainItems.entrySet())
+        {
+            String[] parts = entry.getKey().split("_");
+            long oldFileId = Long.parseLong(parts[0]);
+            int oldRgId = Integer.parseInt(parts[1]);
+            long[] items = entry.getValue();
+            Map<Integer, int[]> fileMapping = result.forwardRgMappings.get(oldFileId);
+            int[] fwdMapping = (fileMapping != null) ? fileMapping.get(oldRgId) : null;
+            if (fwdMapping == null)
+            {
+                continue;
+            }
+            for (int i = 0; i < items.length; i += 2)
+            {
+                int oldRgRowOffset = (int) items[i];
+                long timestamp = items[i + 1];
+                if (oldRgRowOffset < 0 || oldRgRowOffset >= fwdMapping.length)
+                {
+                    continue;
+                }
+                int newGlobal = fwdMapping[oldRgRowOffset];
+                if (newGlobal < 0)
+                {
+                    continue;
+                }
+                int newRgId = RetinaResourceManager.rgIdForGlobalRowOffset(newGlobal, result.newFileRgRowStart);
+                int newRgOff = newGlobal - result.newFileRgRowStart[newRgId];
+                newRgBuckets.computeIfAbsent(newRgId, k -> new ArrayList<>())
+                        .add(new long[]{newRgOff, timestamp});
+            }
+        }
+
+        // 3. Import into each new RG
+        for (Map.Entry<Integer, List<long[]>> entry : newRgBuckets.entrySet())
+        {
+            int newRgId = entry.getKey();
+            List<long[]> pairs = entry.getValue();
+            long[] interleaved = new long[pairs.size() * 2];
+            for (int i = 0; i < pairs.size(); i++)
+            {
+                interleaved[2 * i] = pairs.get(i)[0];
+                interleaved[2 * i + 1] = pairs.get(i)[1];
+            }
+            resourceManager.importDeletionChain(result.newFileId, newRgId, interleaved);
+        }
     }
 
 }

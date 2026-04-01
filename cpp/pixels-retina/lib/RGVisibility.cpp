@@ -95,5 +95,32 @@ uint64_t RGVisibility<CAPACITY>::getBitmapSize() const {
     return tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
 }
 
+template<size_t CAPACITY>
+std::vector<uint64_t> RGVisibility<CAPACITY>::exportChainItemsAfter(uint64_t safeGcTs) const {
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    for (uint32_t t = 0; t < tileCount; t++)
+        tileVisibilities[t].exportChainItemsAfter(t, safeGcTs, items);
+    std::vector<uint64_t> result;
+    result.reserve(items.size() * 2);
+    for (auto& [off, ts] : items) { result.push_back(off); result.push_back(ts); }
+    return result;
+}
+
+template<size_t CAPACITY>
+void RGVisibility<CAPACITY>::importDeletionChain(const uint64_t* items, size_t pairCount) {
+    std::vector<std::vector<uint64_t>> tileBuckets(tileCount);
+    for (size_t i = 0; i < pairCount; i++) {
+        uint32_t rgRowOffset = static_cast<uint32_t>(items[2 * i]);
+        uint64_t ts = items[2 * i + 1];
+        uint32_t tileId = rgRowOffset / CAPACITY;
+        uint16_t localRowId = static_cast<uint16_t>(rgRowOffset % CAPACITY);
+        tileBuckets[tileId].push_back(makeDeleteIndex(localRowId, ts));
+    }
+    for (uint32_t t = 0; t < tileCount; t++) {
+        if (tileBuckets[t].empty()) continue;
+        tileVisibilities[t].importDeletionItems(tileBuckets[t]);
+    }
+}
+
 // Explicit Instantiations for JNI use
 template class RGVisibility<RETINA_CAPACITY>;

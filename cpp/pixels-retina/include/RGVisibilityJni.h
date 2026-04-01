@@ -49,6 +49,22 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbage
 
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    exportChainItemsAfter
+ * Signature: (JJ)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_exportChainItemsAfter
+  (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    importDeletionChain
+ * Signature: ([JJ)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_importDeletionChain
+  (JNIEnv *, jobject, jlongArray, jlong);
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    getNativeMemoryUsage
  * Signature: ()J
  */

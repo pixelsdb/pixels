@@ -21,6 +21,9 @@
 #include "TileVisibility.h"
 #include "EpochManager.h"
 
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 
@@ -377,6 +380,109 @@ void TileVisibility<CAPACITY>::reclaimRetiredVersions() {
         } else {
             ++it;
         }
+    }
+}
+
+template<size_t CAPACITY>
+void TileVisibility<CAPACITY>::exportChainItemsAfter(
+    uint32_t tileId, uint64_t safeGcTs,
+    std::vector<std::pair<uint32_t, uint64_t>>& gcChainItems) const {
+    auto* ver = currentVersion.load(std::memory_order_acquire);
+    auto* tailSnap = tail.load(std::memory_order_acquire);
+    size_t tailUsedSnap = tailUsed.load(std::memory_order_acquire);
+
+    auto* blk = ver->head;
+    bool pastBoundary = false;
+    while (blk != nullptr) {
+        size_t count = (blk == tailSnap) ? tailUsedSnap : DeleteIndexBlock::BLOCK_CAPACITY;
+        for (size_t i = 0; i < count; i++) {
+            uint64_t item = blk->items[i];
+            if (item == 0) return;
+            if (pastBoundary) {
+                uint32_t rgOffset = tileId * CAPACITY + extractRowId(item);
+                gcChainItems.push_back({rgOffset, extractTimestamp(item)});
+            } else {
+                uint64_t ts = extractTimestamp(item);
+                if (ts > safeGcTs) {
+                    pastBoundary = true;
+                    uint32_t rgOffset = tileId * CAPACITY + extractRowId(item);
+                    gcChainItems.push_back({rgOffset, ts});
+                }
+            }
+        }
+        if (blk == tailSnap) return;
+        blk = blk->next.load(std::memory_order_acquire);
+    }
+}
+
+template<size_t CAPACITY>
+void TileVisibility<CAPACITY>::importDeletionItems(std::vector<uint64_t>& bucket) {
+    std::sort(bucket.begin(), bucket.end(), [](uint64_t a, uint64_t b) {
+        return extractTimestamp(a) < extractTimestamp(b);
+    });
+
+    bool tailClaimed = false;
+    while (true) {
+        auto* ver = currentVersion.load(std::memory_order_acquire);
+
+        uint64_t ts_head = UINT64_MAX;
+        if (ver->head != nullptr) {
+            uint64_t firstItem = ver->head->items[0];
+            if (firstItem != 0) ts_head = extractTimestamp(firstItem);
+        }
+
+        size_t keepCount = bucket.size();
+        if (ts_head != UINT64_MAX) {
+            keepCount = std::upper_bound(bucket.begin(), bucket.end(), ts_head,
+                [](uint64_t val, uint64_t item) {
+                    return val < extractTimestamp(item);
+                }) - bucket.begin();
+        }
+        if (keepCount == 0) return;
+
+        uint64_t lastValidItem = bucket[keepCount - 1];
+        std::vector<DeleteIndexBlock*> blocks;
+        for (size_t i = 0; i < keepCount; i += DeleteIndexBlock::BLOCK_CAPACITY) {
+            auto* blk = new DeleteIndexBlock();
+            for (size_t j = 0; j < DeleteIndexBlock::BLOCK_CAPACITY; j++) {
+                size_t idx = i + j;
+                blk->items[j] = (idx < keepCount) ? bucket[idx] : lastValidItem;
+            }
+            blocks.push_back(blk);
+        }
+        for (size_t i = 0; i + 1 < blocks.size(); i++)
+            blocks[i]->next.store(blocks[i + 1], std::memory_order_release);
+        blocks.back()->next.store(ver->head, std::memory_order_release);
+
+        if (ver->head == nullptr && !tailClaimed) {
+            size_t lastBlockItems = keepCount % DeleteIndexBlock::BLOCK_CAPACITY;
+            if (lastBlockItems == 0) lastBlockItems = DeleteIndexBlock::BLOCK_CAPACITY;
+
+            DeleteIndexBlock* expectedTail = nullptr;
+            if (tail.compare_exchange_strong(expectedTail, blocks.back(),
+                                             std::memory_order_release, std::memory_order_relaxed)) {
+                tailUsed.store(lastBlockItems, std::memory_order_release);
+                tailClaimed = true;
+            } else {
+                for (auto* blk : blocks) delete blk;
+                continue;
+            }
+        }
+
+        auto* newVer = new VersionedData<CAPACITY>(ver->baseTimestamp, ver->baseBitmap, blocks[0]);
+
+        if (currentVersion.compare_exchange_strong(ver, newVer, std::memory_order_acq_rel)) {
+            uint64_t retireEpoch = EpochManager::getInstance().advanceEpoch();
+            retired.emplace_back(ver, nullptr, retireEpoch);
+            reclaimRetiredVersions();
+            return;
+        }
+        if (tailClaimed) {
+            std::fprintf(stderr, "importDeletionItems: CAS failed with tailClaimed — invariant violation\n");
+            std::abort();
+        }
+        delete newVer;
+        for (auto* blk : blocks) delete blk;
     }
 }
 

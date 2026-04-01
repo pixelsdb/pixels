@@ -463,3 +463,235 @@ TEST_F(TileVisibilityTest, ConcurrentGCAndBlockTransition) {
         << "Row 0 was spuriously marked deleted by GC processing "
            "zero-initialised slots of a newly created tail block.";
 }
+
+// =========================================================================
+// exportChainItemsAfter tests
+// =========================================================================
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_Basic) {
+    v->deleteTileRecord(1, 50);
+    v->deleteTileRecord(2, 100);
+    v->deleteTileRecord(3, 150);
+    v->deleteTileRecord(4, 200);
+    v->deleteTileRecord(5, 250);
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+
+    ASSERT_EQ(items.size(), 3u);
+    EXPECT_EQ(items[0].second, 150u);
+    EXPECT_EQ(items[1].second, 200u);
+    EXPECT_EQ(items[2].second, 250u);
+    EXPECT_EQ(items[0].first, 0u * RETINA_CAPACITY + 3u);
+    EXPECT_EQ(items[1].first, 0u * RETINA_CAPACITY + 4u);
+    EXPECT_EQ(items[2].first, 0u * RETINA_CAPACITY + 5u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_AllAbove) {
+    v->deleteTileRecord(1, 200);
+    v->deleteTileRecord(2, 300);
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+
+    ASSERT_EQ(items.size(), 2u);
+    EXPECT_EQ(items[0].second, 200u);
+    EXPECT_EQ(items[1].second, 300u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_AllBelow) {
+    v->deleteTileRecord(1, 50);
+    v->deleteTileRecord(2, 80);
+    v->deleteTileRecord(3, 100);
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+    EXPECT_EQ(items.size(), 0u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_EmptyChain) {
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+    EXPECT_EQ(items.size(), 0u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_AfterGC) {
+    v->deleteTileRecord(1, 50);
+    v->deleteTileRecord(2, 100);
+    v->deleteTileRecord(3, 150);
+    v->deleteTileRecord(4, 200);
+
+    collectGarbage(100);
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+
+    ASSERT_EQ(items.size(), 2u);
+    EXPECT_EQ(items[0].second, 150u);
+    EXPECT_EQ(items[1].second, 200u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_MultiBlock) {
+    for (uint16_t i = 0; i < 20; i++) {
+        v->deleteTileRecord(i + 10, (i + 1) * 10);
+    }
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+
+    ASSERT_EQ(items.size(), 10u);
+    for (size_t i = 0; i < 10; i++) {
+        EXPECT_EQ(items[i].second, (i + 11) * 10);
+        EXPECT_EQ(items[i].first, 0u * RETINA_CAPACITY + (i + 20));
+    }
+}
+
+// =========================================================================
+// importDeletionItems tests
+// =========================================================================
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_Basic) {
+    std::vector<uint64_t> bucket;
+    bucket.push_back(makeDeleteIndex(1, 100));
+    bucket.push_back(makeDeleteIndex(2, 200));
+    bucket.push_back(makeDeleteIndex(5, 300));
+    bucket.push_back(makeDeleteIndex(10, 400));
+
+    v->importDeletionItems(bucket);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(500, actualBitmap);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    SET_BITMAP_BIT(expectedBitmap, 2);
+    SET_BITMAP_BIT(expectedBitmap, 5);
+    SET_BITMAP_BIT(expectedBitmap, 10);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_EmptyBucket) {
+    v->deleteTileRecord(1, 100);
+
+    std::vector<uint64_t> empty;
+    v->importDeletionItems(empty);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(200, actualBitmap);
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_MultiBlock) {
+    std::vector<uint64_t> bucket;
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    for (uint16_t i = 0; i < 20; i++) {
+        bucket.push_back(makeDeleteIndex(i + 10, (i + 1) * 10));
+        SET_BITMAP_BIT(expectedBitmap, i + 10);
+    }
+
+    v->importDeletionItems(bucket);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(300, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_Padding) {
+    std::vector<uint64_t> bucket;
+    for (uint16_t i = 0; i < 5; i++) {
+        bucket.push_back(makeDeleteIndex(i + 1, (i + 1) * 100));
+    }
+
+    v->importDeletionItems(bucket);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    for (uint16_t i = 0; i < 5; i++) SET_BITMAP_BIT(expectedBitmap, i + 1);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(600, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+
+    uint64_t partialBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(250, partialBitmap);
+    uint64_t partialExpected[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(partialExpected, 1);
+    SET_BITMAP_BIT(partialExpected, 2);
+    EXPECT_TRUE(checkBitmap(partialBitmap, partialExpected));
+}
+
+// =========================================================================
+// importDeletionItems — truncation dedup
+// =========================================================================
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_TruncationDedup) {
+    v->deleteTileRecord(20, 300);
+    v->deleteTileRecord(21, 400);
+
+    std::vector<uint64_t> bucket;
+    bucket.push_back(makeDeleteIndex(1, 100));
+    bucket.push_back(makeDeleteIndex(2, 200));
+    bucket.push_back(makeDeleteIndex(3, 300));
+    bucket.push_back(makeDeleteIndex(4, 400));
+    bucket.push_back(makeDeleteIndex(5, 500));
+
+    v->importDeletionItems(bucket);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    SET_BITMAP_BIT(expectedBitmap, 2);
+    SET_BITMAP_BIT(expectedBitmap, 3);
+    SET_BITMAP_BIT(expectedBitmap, 20);
+    SET_BITMAP_BIT(expectedBitmap, 21);
+    SET_BITMAP_BIT(expectedBitmap, 4);
+    SET_BITMAP_BIT(expectedBitmap, 5);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(600, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_FullOverlap) {
+    v->deleteTileRecord(20, 100);
+    v->deleteTileRecord(21, 200);
+
+    std::vector<uint64_t> bucket;
+    bucket.push_back(makeDeleteIndex(1, 200));
+    bucket.push_back(makeDeleteIndex(2, 300));
+
+    v->importDeletionItems(bucket);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 20);
+    SET_BITMAP_BIT(expectedBitmap, 21);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(500, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+// =========================================================================
+// importDeletionItems — empty chain tail claim + subsequent deletes
+// =========================================================================
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_EmptyChainTailClaim) {
+    std::vector<uint64_t> bucket;
+    bucket.push_back(makeDeleteIndex(1, 100));
+    bucket.push_back(makeDeleteIndex(2, 200));
+
+    v->importDeletionItems(bucket);
+
+    v->deleteTileRecord(5, 300);
+    v->deleteTileRecord(6, 400);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    SET_BITMAP_BIT(expectedBitmap, 2);
+    SET_BITMAP_BIT(expectedBitmap, 5);
+    SET_BITMAP_BIT(expectedBitmap, 6);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(500, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}

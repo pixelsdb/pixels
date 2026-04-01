@@ -1754,35 +1754,195 @@ public class TestStorageGarbageCollector
     }
 
     // =======================================================================
-    // Section 7: visibility synchronization tests (placeholder)
+    // Section 7: visibility synchronization tests
     // =======================================================================
 
-    /** exportChainItemsAfter returns only items with ts &gt; safeGcTs. */
-    @Ignore("visibility sync not yet implemented")
+    /**
+     * exportChainItemsAfter returns only items with ts > safeGcTs.
+     * Setup: 6-row file, delete rows at ts=50 (before) and ts=200,300 (after safeGcTs=100).
+     * After rewrite, export from old file should only return the ts>100 items.
+     */
     @Test
     public void testVisibilitySync_exportChainItemsAfterSafeGcTs() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0L, 1L, 2L, 3L, 4L, 5L};
+        long fileId = 40L;
+        writeTestFile("vis_export_src.pxl", schema, ids, false, null);
+
+        retinaManager.addVisibility(fileId, 0, 6, 0L, null, false);
+        retinaManager.deleteRecord(fileId, 0, 0, 50L);
+        retinaManager.deleteRecord(fileId, 0, 1, 200L);
+        retinaManager.deleteRecord(fileId, 0, 2, 300L);
+
+        long[] exported = retinaManager.exportChainItemsAfter(fileId, 0, 100L);
+
+        assertNotNull("exported items should not be null", exported);
+        assertTrue("should have items (interleaved pairs)", exported.length >= 4);
+
+        Set<Long> exportedTs = new HashSet<>();
+        for (int i = 0; i < exported.length; i += 2)
+        {
+            exportedTs.add(exported[i + 1]);
+        }
+        assertTrue("should contain ts=200", exportedTs.contains(200L));
+        assertTrue("should contain ts=300", exportedTs.contains(300L));
+        assertFalse("should NOT contain ts=50", exportedTs.contains(50L));
     }
 
-    /** importDeletionItems correctly marks rows in new file bitmap. */
-    @Ignore("visibility sync not yet implemented")
+    /**
+     * importDeletionChain correctly marks rows in new file bitmap.
+     * Rewrite a file, then import known items into the new file's RGVisibility
+     * and verify via queryVisibility.
+     */
     @Test
     public void testVisibilitySync_importDeletionItemsCorrect() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0L, 1L, 2L, 3L, 4L, 5L};
+        long fileId = 41L;
+        String srcPath = writeTestFile("vis_import_src.pxl", schema, ids, false, null);
+
+        retinaManager.addVisibility(fileId, 0, 6, 0L, null, false);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(6, 0, 5));
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+        long newFileId = result.newFileId;
+        assertTrue("new file should be registered", newFileId > 0);
+
+        long[] items = {0, 200, 1, 300};
+        retinaManager.importDeletionChain(newFileId, 0, items);
+
+        long[] bitmap = retinaManager.queryVisibility(newFileId, 0, 350L, 0L);
+        assertTrue("new file row 0 should be deleted at ts=350",
+                (bitmap[0 / 64] & (1L << (0 % 64))) != 0);
+        assertTrue("new file row 1 should be deleted at ts=350",
+                (bitmap[1 / 64] & (1L << (1 % 64))) != 0);
+        assertFalse("new file row 2 should NOT be deleted",
+                (bitmap[2 / 64] & (1L << (2 % 64))) != 0);
     }
 
-    /** Overlapping dual-write and import items are correctly deduplicated. */
-    @Ignore("visibility sync not yet implemented")
+    /**
+     * Overlapping dual-write and import items are correctly deduplicated.
+     * After registerDualWrite, a delete goes to both old and new files.
+     * syncVisibility exports from old (capturing the overlap) and imports
+     * to new. The truncation-dedup ensures no corruption.
+     */
     @Test
     public void testVisibilitySync_truncationDedup() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0L, 1L, 2L, 3L, 4L, 5L};
+        long fileId = 42L;
+        String srcPath = writeTestFile("vis_dedup_src.pxl", schema, ids, false, null);
+
+        retinaManager.addVisibility(fileId, 0, 6, 0L, null, false);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(6, 0, 5));
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+        long newFileId = result.newFileId;
+
+        gc.registerDualWrite(result);
+
+        retinaManager.deleteRecord(fileId, 0, 1, 200L);
+
+        gc.syncVisibility(result, 100L);
+
+        long[] newBitmap = retinaManager.queryVisibility(newFileId, 0, 250L, 0L);
+        int[] fwd = result.forwardRgMappings.get(fileId).get(0);
+        int newRow1 = fwd[1];
+        assertTrue("row mapped from old row 1 should be deleted in new file",
+                newRow1 >= 0 && (newBitmap[newRow1 / 64] & (1L << (newRow1 % 64))) != 0);
+
+        gc.unregisterDualWrite(result);
     }
 
-    /** Full export → coordinate transform → import → multi-snap_ts consistency. */
-    @Ignore("visibility sync not yet implemented")
+    /**
+     * Full realistic end-to-end: S2 rewrite → S3 dual-write → deletes at various phases →
+     * S4 syncVisibility → multi-snap_ts consistency verification between old and new files.
+     *
+     * Timeline:
+     *   Phase 1 (ts<=100): rows 0,9 deleted → physically removed by rewrite
+     *   Phase 2 (100<ts<dual-write): rows 1,2 deleted → only in old chain, need export
+     *   S3: registerDualWrite
+     *   Phase 3 (dual-write window): rows 3,4 deleted → in both chains (overlap)
+     *   S4: syncVisibility → export + coord transform + truncation dedup + import
+     *   Phase 4 (post-sync): row 5 deleted → dual-write keeps both in sync
+     *   Verify: for every snap_ts, old and new visibility match through forward mapping.
+     */
     @Test
     public void testVisibilitySync_exportImportEndToEnd() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L};
+        long fileId = 43L;
+        String srcPath = writeTestFile("vis_e2e_src.pxl", schema, ids, false, null);
+
+        retinaManager.addVisibility(fileId, 0, 10, 0L, null, false);
+
+        // Phase 1: deletes at ts <= safeGcTs (will be physically removed by rewrite)
+        retinaManager.deleteRecord(fileId, 0, 0, 50L);
+        retinaManager.deleteRecord(fileId, 0, 9, 80L);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(10, 0, 9));
+
+        // S2: rewrite — rows 0,9 excluded, rows 1-8 survive as new rows 0-7
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+        long newFileId = result.newFileId;
+        assertTrue("new file should be registered", newFileId > 0);
+        assertRewriteResultConsistency(result, 8);
+
+        int[] fwd = result.forwardRgMappings.get(fileId).get(0);
+        assertEquals("old row 0 should be deleted (-1)", -1, fwd[0]);
+        assertEquals("old row 9 should be deleted (-1)", -1, fwd[9]);
+
+        // Phase 2: deletes after safeGcTs but BEFORE dual-write registration
+        // These only go to the old file's chain — must be exported
+        retinaManager.deleteRecord(fileId, 0, 1, 150L);
+        retinaManager.deleteRecord(fileId, 0, 2, 180L);
+
+        // S3: register dual-write
+        gc.registerDualWrite(result);
+
+        // Phase 3: deletes during dual-write window — written to BOTH old and new
+        retinaManager.deleteRecord(fileId, 0, 3, 200L);
+        retinaManager.deleteRecord(fileId, 0, 4, 250L);
+
+        // S4: syncVisibility — export old chain → coord transform → truncation dedup → import
+        gc.syncVisibility(result, 100L);
+
+        // Phase 4: post-sync delete — dual-write keeps both files in sync
+        retinaManager.deleteRecord(fileId, 0, 5, 300L);
+
+        // ---- Verification: multi-snap_ts consistency ----
+        // For every surviving old row (1-8), check that old and new visibility agree
+        for (long snapTs : new long[]{100L, 150L, 180L, 200L, 250L, 300L, 500L})
+        {
+            long[] oldBitmap = retinaManager.queryVisibility(fileId, 0, snapTs, 0L);
+            long[] newBitmap = retinaManager.queryVisibility(newFileId, 0, snapTs, 0L);
+
+            for (int oldRow = 1; oldRow <= 8; oldRow++)
+            {
+                int newRow = fwd[oldRow];
+                assertTrue("old row " + oldRow + " should map to valid new row", newRow >= 0);
+
+                boolean oldDeleted = (oldBitmap[oldRow / 64] & (1L << (oldRow % 64))) != 0;
+                boolean newDeleted = (newBitmap[newRow / 64] & (1L << (newRow % 64))) != 0;
+                assertEquals("snap_ts=" + snapTs + " oldRow=" + oldRow + " newRow=" + newRow
+                                + ": visibility mismatch",
+                        oldDeleted, newDeleted);
+            }
+        }
+
+        gc.unregisterDualWrite(result);
     }
 
     // =======================================================================

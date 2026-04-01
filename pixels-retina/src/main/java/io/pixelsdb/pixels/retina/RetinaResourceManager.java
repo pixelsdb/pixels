@@ -601,6 +601,16 @@ public class RetinaResourceManager
         }
     }
 
+    long[] exportChainItemsAfter(long fileId, int rgId, long safeGcTs) throws RetinaException
+    {
+        return checkRGVisibility(fileId, rgId).exportChainItemsAfter(safeGcTs);
+    }
+
+    void importDeletionChain(long fileId, int rgId, long[] items) throws RetinaException
+    {
+        checkRGVisibility(fileId, rgId).importDeletionChain(items);
+    }
+
     public void addWriteBuffer(String schemaName, String tableName) throws RetinaException
     {
         try

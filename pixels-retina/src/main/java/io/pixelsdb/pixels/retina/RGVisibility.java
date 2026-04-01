@@ -96,6 +96,8 @@ public class RGVisibility implements AutoCloseable
     private native void deleteRecord(int rgRowOffset, long timestamp, long nativeHandle);
     private native long[] getVisibilityBitmap(long timestamp, long nativeHandle);
     private native long[] garbageCollect(long timestamp, long nativeHandle);
+    private native long[] exportChainItemsAfter(long safeGcTs, long nativeHandle);
+    private native void importDeletionChain(long[] items, long nativeHandle);
     private static native long getNativeMemoryUsage();
     private static native long getRetinaTrackedMemoryUsage();
     private static native long getRetinaObjectCount();
@@ -132,6 +134,26 @@ public class RGVisibility implements AutoCloseable
         }
 
         return garbageCollect(timestamp, handle);
+    }
+
+    public long[] exportChainItemsAfter(long safeGcTs)
+    {
+        long handle = this.nativeHandle.get();
+        if (handle == 0)
+        {
+            throw new IllegalStateException("RGVisibility instance has been closed.");
+        }
+        return exportChainItemsAfter(safeGcTs, handle);
+    }
+
+    public void importDeletionChain(long[] items)
+    {
+        long handle = this.nativeHandle.get();
+        if (handle == 0)
+        {
+            throw new IllegalStateException("RGVisibility instance has been closed.");
+        }
+        importDeletionChain(items, handle);
     }
 
     /**

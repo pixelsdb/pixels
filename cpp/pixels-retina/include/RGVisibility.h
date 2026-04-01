@@ -21,6 +21,7 @@
 #define RG_VISIBILITY_H
 #include "RetinaBase.h"
 #include "TileVisibility.h"
+#include <utility>
 #include <vector>
 
 template<size_t CAPACITY>
@@ -34,6 +35,9 @@ public:
     uint64_t* getRGVisibilityBitmap(uint64_t timestamp);
 
     std::vector<uint64_t> collectRGGarbage(uint64_t timestamp);
+
+    std::vector<uint64_t> exportChainItemsAfter(uint64_t safeGcTs) const;
+    void importDeletionChain(const uint64_t* items, size_t pairCount);
 
     uint64_t getBitmapSize() const;
 

@@ -136,6 +136,43 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbage
 
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    exportChainItemsAfter
+ * Signature: (JJ)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_exportChainItemsAfter
+  (JNIEnv* env, jobject, jlong safeGcTs, jlong handle) {
+    try {
+        auto* rgVis = reinterpret_cast<RGVisibilityInstance*>(handle);
+        std::vector<uint64_t> items = rgVis->exportChainItemsAfter(static_cast<uint64_t>(safeGcTs));
+        jlongArray result = env->NewLongArray(items.size());
+        env->SetLongArrayRegion(result, 0, items.size(), reinterpret_cast<const jlong*>(items.data()));
+        return result;
+    } catch (const std::exception& e) {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
+        return nullptr;
+    }
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    importDeletionChain
+ * Signature: ([JJ)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_importDeletionChain
+  (JNIEnv* env, jobject, jlongArray items, jlong handle) {
+    try {
+        auto* rgVis = reinterpret_cast<RGVisibilityInstance*>(handle);
+        jsize len = env->GetArrayLength(items);
+        jlong* body = env->GetLongArrayElements(items, nullptr);
+        rgVis->importDeletionChain(reinterpret_cast<const uint64_t*>(body), len / 2);
+        env->ReleaseLongArrayElements(items, body, JNI_ABORT);
+    } catch (const std::exception& e) {
+        env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
+    }
+}
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    getNativeMemoryUsage
  * Returns the total bytes currently allocated by the process as tracked by jemalloc.
  */
