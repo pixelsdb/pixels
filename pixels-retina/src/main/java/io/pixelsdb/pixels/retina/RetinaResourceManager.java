@@ -36,6 +36,7 @@ import io.pixelsdb.pixels.common.utils.NetUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -48,6 +49,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 /**
@@ -75,6 +78,12 @@ public class RetinaResourceManager
     private final int totalVirtualNodeNum;
 
     private final Map<Long, AtomicInteger> checkpointRefCounts;
+
+    // Dual-write: oldFileId → result AND newFileId → result in a single map.
+    // Direction is distinguished by checking fileId == result.newFileId.
+    private final Map<Long, StorageGarbageCollector.RewriteResult> dualWriteLookup = new HashMap<>();
+    private final ReadWriteLock redirectionLock = new ReentrantReadWriteLock();
+    private volatile boolean isDualWriteActive = false;
 
     private enum CheckpointType
     {
@@ -138,8 +147,12 @@ public class RetinaResourceManager
                 long targetFileSize = Long.parseLong(config.getProperty("retina.storage.gc.target.file.size"));
                 int maxFilesPerGroup = Integer.parseInt(config.getProperty("retina.storage.gc.max.files.per.group"));
                 int maxGroups = Integer.parseInt(config.getProperty("retina.storage.gc.max.file.groups.per.run"));
+                int rowGroupSize = Integer.parseInt(config.getProperty("row.group.size"));
+                EncodingLevel encodingLevel = EncodingLevel.from(
+                        Integer.parseInt(config.getProperty("retina.storage.gc.encoding.level")));
                 gc = new StorageGarbageCollector(this, this.metadataService,
-                        threshold, targetFileSize, maxFilesPerGroup, maxGroups);
+                        threshold, targetFileSize, maxFilesPerGroup, maxGroups,
+                        rowGroupSize, encodingLevel);
                 logger.info("Storage GC enabled (threshold={}, targetFileSize={}, maxFilesPerGroup={}, maxGroups={})",
                         threshold, targetFileSize, maxFilesPerGroup, maxGroups);
             }
@@ -487,13 +500,105 @@ public class RetinaResourceManager
 
     public void deleteRecord(long fileId, int rgId, int rgRowOffset, long timestamp) throws RetinaException
     {
-        RGVisibility rgVisibility = checkRGVisibility(fileId, rgId);
-        rgVisibility.deleteRecord(rgRowOffset, timestamp);
+        checkRGVisibility(fileId, rgId).deleteRecord(rgRowOffset, timestamp);
+
+        if (!isDualWriteActive)
+        {
+            return;
+        }
+
+        redirectionLock.readLock().lock();
+        try
+        {
+            StorageGarbageCollector.RewriteResult result = dualWriteLookup.get(fileId);
+            if (result == null)
+            {
+                return;
+            }
+
+            if (fileId == result.newFileId)
+            {
+                // Backward: new file delete → sync to each old file
+                for (StorageGarbageCollector.BackwardInfo bwd : result.backwardInfos)
+                {
+                    int[] bwdMapping = bwd.backwardRgMappings.get(rgId);
+                    if (bwdMapping != null && rgRowOffset < bwdMapping.length && bwdMapping[rgRowOffset] >= 0)
+                    {
+                        int oldGlobal = bwdMapping[rgRowOffset];
+                        int oldRgId = rgIdForGlobalRowOffset(oldGlobal, bwd.oldFileRgRowStart);
+                        int oldRgOff = oldGlobal - bwd.oldFileRgRowStart[oldRgId];
+                        checkRGVisibility(bwd.oldFileId, oldRgId).deleteRecord(oldRgOff, timestamp);
+                    }
+                }
+            }
+            else
+            {
+                // Forward: old file delete → sync to new file
+                Map<Integer, int[]> fileMapping = result.forwardRgMappings.get(fileId);
+                int[] fwdMapping = (fileMapping != null) ? fileMapping.get(rgId) : null;
+                if (fwdMapping != null && rgRowOffset < fwdMapping.length && fwdMapping[rgRowOffset] >= 0)
+                {
+                    int newGlobal = fwdMapping[rgRowOffset];
+                    int newRgId = rgIdForGlobalRowOffset(newGlobal, result.newFileRgRowStart);
+                    int newRgOff = newGlobal - result.newFileRgRowStart[newRgId];
+                    checkRGVisibility(result.newFileId, newRgId).deleteRecord(newRgOff, timestamp);
+                }
+            }
+        }
+        finally
+        {
+            redirectionLock.readLock().unlock();
+        }
     }
 
     public void deleteRecord(IndexProto.RowLocation rowLocation, long timestamp) throws RetinaException
     {
         deleteRecord(rowLocation.getFileId(), rowLocation.getRgId(), rowLocation.getRgRowOffset(), timestamp);
+    }
+
+    /**
+     * Registers dual-write redirection so that {@link #deleteRecord} propagates
+     * deletes between old and new files.  The write lock acts as a barrier: all
+     * prior deletes have completed before this returns, and all subsequent deletes
+     * will see the new mappings.
+     */
+    void registerDualWrite(StorageGarbageCollector.RewriteResult result)
+    {
+        redirectionLock.writeLock().lock();
+        try
+        {
+            for (Long oldFileId : result.forwardRgMappings.keySet())
+            {
+                dualWriteLookup.put(oldFileId, result);
+            }
+            dualWriteLookup.put(result.newFileId, result);
+            isDualWriteActive = true;
+        }
+        finally
+        {
+            redirectionLock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Removes the dual-write redirection for the given rewrite result.
+     */
+    void unregisterDualWrite(StorageGarbageCollector.RewriteResult result)
+    {
+        redirectionLock.writeLock().lock();
+        try
+        {
+            for (Long oldFileId : result.forwardRgMappings.keySet())
+            {
+                dualWriteLookup.remove(oldFileId);
+            }
+            dualWriteLookup.remove(result.newFileId);
+            isDualWriteActive = !dualWriteLookup.isEmpty();
+        }
+        finally
+        {
+            redirectionLock.writeLock().unlock();
+        }
     }
 
     public void addWriteBuffer(String schemaName, String tableName) throws RetinaException
@@ -656,6 +761,28 @@ public class RetinaResourceManager
             throw new RetinaException(String.format("RGVisibility not found for fileId: %s, rgId: %s", fileId, rgId));
         }
         return rgVisibility;
+    }
+
+    /**
+     * Binary-searches {@code rgRowStart} (a sentinel-terminated cumulative array) to find
+     * the RG id that contains the given global row offset.
+     */
+    static int rgIdForGlobalRowOffset(int globalOffset, int[] rgRowStart)
+    {
+        int lo = 0, hi = rgRowStart.length - 2;
+        while (lo < hi)
+        {
+            int mid = (lo + hi + 1) >>> 1;
+            if (rgRowStart[mid] <= globalOffset)
+            {
+                lo = mid;
+            }
+            else
+            {
+                hi = mid - 1;
+            }
+        }
+        return lo;
     }
 
     /**

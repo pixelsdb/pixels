@@ -150,7 +150,8 @@ public class TestStorageGarbageCollector
     {
         retinaManager = RetinaResourceManager.Instance();
         resetManagerState();
-        gc = new StorageGarbageCollector(retinaManager, metadataService, 0.5, 134_217_728L, Integer.MAX_VALUE, 10);
+        gc = new StorageGarbageCollector(retinaManager, metadataService, 0.5, 134_217_728L, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
     }
 
     @After
@@ -171,7 +172,8 @@ public class TestStorageGarbageCollector
     public void testGroupAndMerge_threeDistinctGroups()
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, Integer.MAX_VALUE, 10);
+                null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 0, 100, 0.60, 0L),
@@ -199,7 +201,8 @@ public class TestStorageGarbageCollector
     public void testGroupAndMerge_twoFilesInSameGroup()
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, Integer.MAX_VALUE, 10);
+                null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 5, 100, 0.60, 0L),
@@ -228,7 +231,8 @@ public class TestStorageGarbageCollector
     {
         int max = 3;
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, Integer.MAX_VALUE, max);
+                null, null, 0.5, 0L, Integer.MAX_VALUE, max,
+                1048576, EncodingLevel.EL2);
 
         // Build 5 groups with different tableIds and clear invalidRatios (0.55..0.99)
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
@@ -256,7 +260,8 @@ public class TestStorageGarbageCollector
     public void testGroupAndMerge_emptyCandidates()
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, Integer.MAX_VALUE, 10);
+                null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
         List<StorageGarbageCollector.FileGroup> groups =
                 gc.groupAndMerge(Collections.emptyList());
         assertTrue("empty candidates → empty groups", groups.isEmpty());
@@ -276,7 +281,8 @@ public class TestStorageGarbageCollector
     {
         long target = 100 * 1024 * 1024L; // 100 MB
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, target, Integer.MAX_VALUE, 10);
+                null, null, 0.5, target, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         // Each file is 100 MB on disk with 40% deleted → 60 MB effective
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
@@ -306,7 +312,8 @@ public class TestStorageGarbageCollector
     {
         long target = 100 * 1024 * 1024L; // 100 MB
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, target, Integer.MAX_VALUE, 10);
+                null, null, 0.5, target, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
@@ -333,7 +340,8 @@ public class TestStorageGarbageCollector
     {
         long target = 100 * 1024 * 1024L;
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, target, Integer.MAX_VALUE, 10);
+                null, null, 0.5, target, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
@@ -366,7 +374,8 @@ public class TestStorageGarbageCollector
     {
         long target = 100 * 1024 * 1024L;
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, target, Integer.MAX_VALUE, 10);
+                null, null, 0.5, target, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         // fileSizeBytes = 0 (unknown) — no splitting occurs
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
@@ -391,7 +400,8 @@ public class TestStorageGarbageCollector
     public void testGroupAndMerge_maxFilesPerGroupSplit()
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, 2, 100);
+                null, null, 0.5, 0L, 2, 100,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 5; i++)
@@ -417,7 +427,8 @@ public class TestStorageGarbageCollector
     {
         long hugeTarget = Long.MAX_VALUE;
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, hugeTarget, 3, 100);
+                null, null, 0.5, hugeTarget, 3, 100,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 6; i++)
@@ -444,7 +455,8 @@ public class TestStorageGarbageCollector
     {
         long target = 100 * 1024 * 1024L;
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, target, Integer.MAX_VALUE, 100);
+                null, null, 0.5, target, Integer.MAX_VALUE, 100,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 3; i++)
@@ -470,7 +482,8 @@ public class TestStorageGarbageCollector
     public void testGroupAndMerge_singleCandidate()
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, Integer.MAX_VALUE, 10);
+                null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Collections.singletonList(
                 new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 0, 100, 0.80, 0L));
@@ -498,7 +511,8 @@ public class TestStorageGarbageCollector
     {
         long target = 50 * 1024 * 1024L; // 50 MB
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, target, Integer.MAX_VALUE, 10);
+                null, null, 0.5, target, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
@@ -524,7 +538,8 @@ public class TestStorageGarbageCollector
     public void testGroupAndMerge_maxFilesPerGroupOne()
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, 1, 100);
+                null, null, 0.5, 0L, 1, 100,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
@@ -552,7 +567,8 @@ public class TestStorageGarbageCollector
     public void testGroupAndMerge_equalRatioSorting()
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, Integer.MAX_VALUE, 10);
+                null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
@@ -581,7 +597,8 @@ public class TestStorageGarbageCollector
     public void testGroupAndMerge_bothLimitsDisabled()
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
-                null, null, 0.5, 0L, 0, 10);
+                null, null, 0.5, 0L, 0, 10,
+                1048576, EncodingLevel.EL2);
 
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 5; i++)
@@ -1024,7 +1041,7 @@ public class TestStorageGarbageCollector
         assertEquals("newFileRgCount should be 0", 0, result.newFileRgCount);
         assertEquals(0, result.newFileRgActualRecordNums.length);
 
-        int[] fwd = result.perFileRgMappings.get(fileId).get(0);
+        int[] fwd = result.forwardRgMappings.get(fileId).get(0);
         assertNotNull("fwdMapping must exist even for all-deleted RG", fwd);
         for (int i = 0; i < fwd.length; i++)
         {
@@ -1089,9 +1106,9 @@ public class TestStorageGarbageCollector
         StorageGarbageCollector.RewriteResult result =
                 gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
 
-        assertNotNull("perFileRgMappings must contain the source fileId",
-                result.perFileRgMappings.get(fileId));
-        int[] fwdMapping = result.perFileRgMappings.get(fileId).get(0);
+        assertNotNull("forwardRgMappings must contain the source fileId",
+                result.forwardRgMappings.get(fileId));
+        int[] fwdMapping = result.forwardRgMappings.get(fileId).get(0);
         assertNotNull("fwdMapping for rg0 must be present", fwdMapping);
 
         assertEquals("row 0 deleted → -1", -1, fwdMapping[0]);
@@ -1146,7 +1163,7 @@ public class TestStorageGarbageCollector
         }
 
         // Forward mapping for file A: row 0 → -1, 1 → 0, 2 → -1, 3 → 1, 4 → 2
-        int[] fwdA = result.perFileRgMappings.get(fileIdA).get(0);
+        int[] fwdA = result.forwardRgMappings.get(fileIdA).get(0);
         assertEquals(-1, fwdA[0]);
         assertEquals(0, fwdA[1]);
         assertEquals(-1, fwdA[2]);
@@ -1154,7 +1171,7 @@ public class TestStorageGarbageCollector
         assertEquals(2, fwdA[4]);
 
         // Forward mapping for file B: row 0 → 3, 1 → -1, 2 → 4, 3 → -1, 4 → 5
-        int[] fwdB = result.perFileRgMappings.get(fileIdB).get(0);
+        int[] fwdB = result.forwardRgMappings.get(fileIdB).get(0);
         assertEquals(3, fwdB[0]);
         assertEquals(-1, fwdB[1]);
         assertEquals(4, fwdB[2]);
@@ -1255,7 +1272,7 @@ public class TestStorageGarbageCollector
         }
 
         // Forward mapping for RG0: row 0→0, 1→-1, 2→1, 3→-1, 4→2
-        int[] fwdRg0 = result.perFileRgMappings.get(fileId).get(0);
+        int[] fwdRg0 = result.forwardRgMappings.get(fileId).get(0);
         assertNotNull("fwdMapping for rg0 must exist", fwdRg0);
         assertEquals(0, fwdRg0[0]);
         assertEquals(-1, fwdRg0[1]);
@@ -1264,7 +1281,7 @@ public class TestStorageGarbageCollector
         assertEquals(2, fwdRg0[4]);
 
         // Forward mapping for RG1: row 0→-1, 1→3, 2→4, 3→5, 4→-1
-        int[] fwdRg1 = result.perFileRgMappings.get(fileId).get(1);
+        int[] fwdRg1 = result.forwardRgMappings.get(fileId).get(1);
         assertNotNull("fwdMapping for rg1 must exist", fwdRg1);
         assertEquals(-1, fwdRg1[0]);
         assertEquals(3, fwdRg1[1]);
@@ -1338,7 +1355,7 @@ public class TestStorageGarbageCollector
 
         assertEquals(-1, result.newFileId);
         assertEquals(0, result.newFileRgCount);
-        int[] fwd = result.perFileRgMappings.get(fileId).get(0);
+        int[] fwd = result.forwardRgMappings.get(fileId).get(0);
         assertEquals(1, fwd.length);
         assertEquals(-1, fwd[0]);
     }
@@ -1361,7 +1378,7 @@ public class TestStorageGarbageCollector
         long[][] rows = readAllRows(result.newFilePath, schema, false);
         assertEquals(1, rows.length);
         assertEquals(99L, rows[0][0]);
-        int[] fwd = result.perFileRgMappings.get(fileId).get(0);
+        int[] fwd = result.forwardRgMappings.get(fileId).get(0);
         assertEquals(1, fwd.length);
         assertEquals(0, fwd[0]);
     }
@@ -1406,7 +1423,7 @@ public class TestStorageGarbageCollector
         }
         assertEquals(124, survivorIdx);
 
-        int[] fwd = result.perFileRgMappings.get(fileId).get(0);
+        int[] fwd = result.forwardRgMappings.get(fileId).get(0);
         assertEquals(-1, fwd[0]);
         assertEquals(-1, fwd[63]);
         assertEquals(-1, fwd[64]);
@@ -1449,13 +1466,13 @@ public class TestStorageGarbageCollector
         assertEquals(20L, rows[0][0]);
         assertEquals(22L, rows[1][0]);
 
-        int[] fwdA = result.perFileRgMappings.get(fileIdA).get(0);
+        int[] fwdA = result.forwardRgMappings.get(fileIdA).get(0);
         for (int i = 0; i < fwdA.length; i++)
         {
             assertEquals("file A all deleted → every mapping must be -1", -1, fwdA[i]);
         }
 
-        int[] fwdB = result.perFileRgMappings.get(fileIdB).get(0);
+        int[] fwdB = result.forwardRgMappings.get(fileIdB).get(0);
         assertEquals(0, fwdB[0]);
         assertEquals(-1, fwdB[1]);
         assertEquals(1, fwdB[2]);
@@ -1495,13 +1512,13 @@ public class TestStorageGarbageCollector
         assertEquals("newFileRgCount should be 0", 0, result.newFileRgCount);
         assertEquals(0, result.newFileRgActualRecordNums.length);
 
-        int[] fwdA = result.perFileRgMappings.get(fileIdA).get(0);
+        int[] fwdA = result.forwardRgMappings.get(fileIdA).get(0);
         for (int i = 0; i < fwdA.length; i++)
         {
             assertEquals("file A: all rows deleted → mapping must be -1", -1, fwdA[i]);
         }
 
-        int[] fwdB = result.perFileRgMappings.get(fileIdB).get(0);
+        int[] fwdB = result.forwardRgMappings.get(fileIdB).get(0);
         for (int i = 0; i < fwdB.length; i++)
         {
             assertEquals("file B: all rows deleted → mapping must be -1", -1, fwdB[i]);
@@ -1537,7 +1554,7 @@ public class TestStorageGarbageCollector
             assertEquals("id mismatch at row " + i, ids[i], rows[i][0]);
         }
 
-        int[] fwd = result.perFileRgMappings.get(fileId).get(0);
+        int[] fwd = result.forwardRgMappings.get(fileId).get(0);
         for (int i = 0; i < fwd.length; i++)
         {
             assertEquals("no deletions → mapping must be identity", i, fwd[i]);
@@ -1573,7 +1590,7 @@ public class TestStorageGarbageCollector
         long[][] rows = readAllRows(result.newFilePath, schema, false);
         assertEquals("62 rows should survive (64 - 2 deleted)", 62, rows.length);
 
-        int[] fwd = result.perFileRgMappings.get(fileId).get(0);
+        int[] fwd = result.forwardRgMappings.get(fileId).get(0);
         assertEquals("row 0 deleted → -1", -1, fwd[0]);
         assertEquals("row 63 deleted → -1", -1, fwd[63]);
         assertEquals("row 1 survives → 0", 0, fwd[1]);
@@ -1586,35 +1603,154 @@ public class TestStorageGarbageCollector
     }
 
     // =======================================================================
-    // Section 6: dual-write functional tests (placeholder)
+    // Section 6: dual-write functional tests
     // =======================================================================
 
-    /** Forward dual-write — delete on old file propagates to new file. */
-    @Ignore("dual-write not yet implemented")
+    /**
+     * Forward dual-write: a delete on the old file propagates to the new file.
+     * Setup: 6-row file, delete rows 0,2,4 via rewrite (3 survivors at new offsets 0,1,2).
+     * After registerDualWrite, deleteRecord(oldFile, rg0, row1, ts) should also mark
+     * new file's corresponding position as deleted.
+     */
     @Test
     public void testDualWrite_forwardPropagation() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0L, 1L, 2L, 3L, 4L, 5L};
+        long fileId = 30L;
+        String srcPath = writeTestFile("dw_fwd_src.pxl", schema, ids, false, null);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(6, 0, 2, 4));
+
+        // Also register old file's Visibility so deleteRecord can operate on it
+        retinaManager.addVisibility(fileId, 0, 6, 0L, null, false);
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+        long newFileId = result.newFileId;
+        assertTrue("new file should be registered", newFileId > 0);
+
+        gc.registerDualWrite(result);
+
+        // Survivor row 1 in old file → new global offset 0 → new rg0, offset 0
+        long deleteTs = 200L;
+        retinaManager.deleteRecord(fileId, 0, 1, deleteTs);
+
+        // Verify: old file should show row 1 deleted at ts=200
+        long[] oldBitmap = retinaManager.queryVisibility(fileId, 0, deleteTs, 0L);
+        assertTrue("old file row 1 should be deleted",
+                (oldBitmap[1 / 64] & (1L << (1 % 64))) != 0);
+
+        // Verify: new file rg0 offset 0 should also be deleted at ts=200
+        long[] newBitmap = retinaManager.queryVisibility(newFileId, 0, deleteTs, 0L);
+        assertTrue("new file row 0 should be deleted via forward dual-write",
+                (newBitmap[0 / 64] & (1L << (0 % 64))) != 0);
+
+        gc.unregisterDualWrite(result);
     }
 
-    /** Backward dual-write — delete on new file propagates to old file. */
-    @Ignore("dual-write not yet implemented")
+    /**
+     * Backward dual-write: a delete on the new file propagates back to the old file.
+     * Same setup as forward test but delete is issued against the new file.
+     */
     @Test
     public void testDualWrite_backwardPropagation() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0L, 1L, 2L, 3L, 4L, 5L};
+        long fileId = 31L;
+        String srcPath = writeTestFile("dw_bwd_src.pxl", schema, ids, false, null);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(6, 0, 2, 4));
+
+        retinaManager.addVisibility(fileId, 0, 6, 0L, null, false);
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+        long newFileId = result.newFileId;
+
+        gc.registerDualWrite(result);
+
+        // New file row 2 corresponds to old file row 5 (the third survivor).
+        // Backward mapping: newRg0 offset 2 → old global offset 5 → old rg0 offset 5.
+        long deleteTs = 200L;
+        retinaManager.deleteRecord(newFileId, 0, 2, deleteTs);
+
+        // Verify: new file row 2 deleted
+        long[] newBitmap = retinaManager.queryVisibility(newFileId, 0, deleteTs, 0L);
+        assertTrue("new file row 2 should be deleted",
+                (newBitmap[2 / 64] & (1L << (2 % 64))) != 0);
+
+        // Verify: old file row 5 should also be deleted via backward dual-write
+        long[] oldBitmap = retinaManager.queryVisibility(fileId, 0, deleteTs, 0L);
+        assertTrue("old file row 5 should be deleted via backward dual-write",
+                (oldBitmap[5 / 64] & (1L << (5 % 64))) != 0);
+
+        gc.unregisterDualWrite(result);
     }
 
-    /** After unregisterRedirection, dual-write stops. */
-    @Ignore("dual-write not yet implemented")
+    /**
+     * After unregisterDualWrite, deletes no longer propagate.
+     */
     @Test
     public void testDualWrite_unregisterStops() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0L, 1L, 2L, 3L};
+        long fileId = 32L;
+        String srcPath = writeTestFile("dw_unreg_src.pxl", schema, ids, false, null);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(4, 0));
+
+        retinaManager.addVisibility(fileId, 0, 4, 0L, null, false);
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
+        long newFileId = result.newFileId;
+
+        gc.registerDualWrite(result);
+        gc.unregisterDualWrite(result);
+
+        // Old file row 1 → new file row 0 (first survivor).
+        // After unregister, delete should NOT propagate.
+        long deleteTs = 200L;
+        retinaManager.deleteRecord(fileId, 0, 1, deleteTs);
+
+        // Old file: row 1 should be deleted (direct write always works)
+        long[] oldBitmap = retinaManager.queryVisibility(fileId, 0, deleteTs, 0L);
+        assertTrue("old file row 1 should be deleted (direct write)",
+                (oldBitmap[1 / 64] & (1L << (1 % 64))) != 0);
+
+        // New file: row 0 should NOT be deleted (dual-write is off)
+        long[] newBitmap = retinaManager.queryVisibility(newFileId, 0, deleteTs, 0L);
+        assertFalse("new file row 0 should NOT be deleted after unregister",
+                (newBitmap[0 / 64] & (1L << (0 % 64))) != 0);
     }
 
-    /** When isDualWriteActive=false, deleteRecord has no extra overhead. */
-    @Ignore("dual-write not yet implemented")
+    /**
+     * When isDualWriteActive is false, deleteRecord has no extra overhead
+     * beyond a single volatile read.  Verified by issuing deletes without
+     * any registration and confirming they succeed with no side effects.
+     */
     @Test
     public void testDualWrite_volatileFastPath() throws Exception
     {
+        long fileId = 33L;
+        retinaManager.addVisibility(fileId, 0, 4, 0L, null, false);
+
+        // No dual-write registered — isDualWriteActive is false.
+        // deleteRecord should work without errors and without trying to forward.
+        long deleteTs = 200L;
+        retinaManager.deleteRecord(fileId, 0, 1, deleteTs);
+
+        long[] bitmap = retinaManager.queryVisibility(fileId, 0, deleteTs, 0L);
+        assertTrue("direct delete should work on fast path",
+                (bitmap[1 / 64] & (1L << (1 % 64))) != 0);
+        assertFalse("row 0 should not be affected",
+                (bitmap[0 / 64] & (1L << (0 % 64))) != 0);
     }
 
     // =======================================================================
@@ -1736,6 +1872,14 @@ public class TestStorageGarbageCollector
             Field gcTsField = RetinaResourceManager.class.getDeclaredField("latestGcTimestamp");
             gcTsField.setAccessible(true);
             gcTsField.setLong(retinaManager, -1L);
+
+            Field dwField = RetinaResourceManager.class.getDeclaredField("dualWriteLookup");
+            dwField.setAccessible(true);
+            ((Map<?, ?>) dwField.get(retinaManager)).clear();
+
+            Field dualWriteField = RetinaResourceManager.class.getDeclaredField("isDualWriteActive");
+            dualWriteField.setAccessible(true);
+            dualWriteField.setBoolean(retinaManager, false);
         }
         catch (Exception e)
         {
@@ -2099,7 +2243,8 @@ public class TestStorageGarbageCollector
         DirectScanStorageGC(RetinaResourceManager rm, double threshold,
                             int maxGroups, List<FakeFileEntry> fakeEntries)
         {
-            super(rm, null, threshold, 134_217_728L, Integer.MAX_VALUE, maxGroups);
+            super(rm, null, threshold, 134_217_728L, Integer.MAX_VALUE, maxGroups,
+                    1048576, EncodingLevel.EL2);
             this.fakeEntries = fakeEntries;
         }
 
@@ -2150,7 +2295,8 @@ public class TestStorageGarbageCollector
 
         FailFirstGroupGC()
         {
-            super(null, null, 0.5, 0L, Integer.MAX_VALUE, 10);
+            super(null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                    1048576, EncodingLevel.EL2);
         }
 
         @Override
@@ -2170,7 +2316,7 @@ public class TestStorageGarbageCollector
                 }
             }
             return new RewriteResult(group, "stub", -1,
-                    0, new int[0], new int[]{0}, new HashMap<>());
+                    0, new int[0], new int[]{0}, new HashMap<>(), Collections.emptyList());
         }
     }
 }

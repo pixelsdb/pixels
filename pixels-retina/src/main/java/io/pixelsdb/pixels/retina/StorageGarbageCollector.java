@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.common.metadata.domain.Schema;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.NetUtils;
 import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
@@ -78,6 +77,8 @@ public class StorageGarbageCollector
     private final long targetFileSize;
     private final int maxFilesPerGroup;
     private final int maxFileGroupsPerRun;
+    private final int rowGroupSize;
+    private final EncodingLevel encodingLevel;
 
     // -------------------------------------------------------------------------
     // Value types
@@ -137,8 +138,28 @@ public class StorageGarbageCollector
     }
 
     /**
+     * Reverse mapping for one old file: maps new-file coordinates back to old-file
+     * global row offsets.  One {@code BackwardInfo} per old file in the group.
+     */
+    static final class BackwardInfo
+    {
+        final long oldFileId;
+        /** newRgId → bwdMapping[newRgRowOffset] = oldGlobalRowOffset, or -1 if no mapping */
+        final Map<Integer, int[]> backwardRgMappings;
+        /** oldFileRgRowStart[rgId] = global row offset of first row in that RG; length = rgCount + 1 */
+        final int[] oldFileRgRowStart;
+
+        BackwardInfo(long oldFileId, Map<Integer, int[]> backwardRgMappings, int[] oldFileRgRowStart)
+        {
+            this.oldFileId = oldFileId;
+            this.backwardRgMappings = backwardRgMappings;
+            this.oldFileRgRowStart = oldFileRgRowStart;
+        }
+    }
+
+    /**
      * Carries everything produced by {@link #rewriteFileGroup}: file metadata,
-     * per-RG row counts and forward row mappings.
+     * per-RG row counts, forward row mappings, and backward row mappings.
      */
     static final class RewriteResult
     {
@@ -150,11 +171,14 @@ public class StorageGarbageCollector
         /** Sentinel array: newFileRgRowStart[i] = global row offset of first row in RG i. */
         final int[] newFileRgRowStart;
         /** oldFileId → (oldRgId → fwdMapping[oldRgRowOffset] = newGlobalRowOffset, or -1 if deleted) */
-        final Map<Long, Map<Integer, int[]>> perFileRgMappings;
+        final Map<Long, Map<Integer, int[]>> forwardRgMappings;
+        /** One {@link BackwardInfo} per old file; empty list when all rows were deleted. */
+        final List<BackwardInfo> backwardInfos;
 
         RewriteResult(FileGroup group, String newFilePath, long newFileId,
                       int newFileRgCount, int[] newFileRgActualRecordNums, int[] newFileRgRowStart,
-                      Map<Long, Map<Integer, int[]>> perFileRgMappings)
+                      Map<Long, Map<Integer, int[]>> forwardRgMappings,
+                      List<BackwardInfo> backwardInfos)
         {
             this.group = group;
             this.newFilePath = newFilePath;
@@ -162,7 +186,8 @@ public class StorageGarbageCollector
             this.newFileRgCount = newFileRgCount;
             this.newFileRgActualRecordNums = newFileRgActualRecordNums;
             this.newFileRgRowStart = newFileRgRowStart;
-            this.perFileRgMappings = perFileRgMappings;
+            this.forwardRgMappings = forwardRgMappings;
+            this.backwardInfos = backwardInfos;
         }
     }
 
@@ -175,7 +200,9 @@ public class StorageGarbageCollector
                             double gcThreshold,
                             long targetFileSize,
                             int maxFilesPerGroup,
-                            int maxFileGroupsPerRun)
+                            int maxFileGroupsPerRun,
+                            int rowGroupSize,
+                            EncodingLevel encodingLevel)
     {
         this.resourceManager = resourceManager;
         this.metadataService = metadataService;
@@ -183,6 +210,8 @@ public class StorageGarbageCollector
         this.targetFileSize = targetFileSize;
         this.maxFilesPerGroup = maxFilesPerGroup;
         this.maxFileGroupsPerRun = maxFileGroupsPerRun;
+        this.rowGroupSize = rowGroupSize;
+        this.encodingLevel = encodingLevel;
     }
 
     // -------------------------------------------------------------------------
@@ -468,6 +497,43 @@ public class StorageGarbageCollector
 
 
     /**
+     * Computes the cumulative row-start offsets for an old file's RGs.
+     * {@code starts[rgId]} = global row offset of the first row in RG {@code rgId};
+     * {@code starts[rgCount]} = total row count (sentinel).
+     */
+    private static int[] computeOldFileRgRowStart(Map<Integer, int[]> rgMappings, int rgCount)
+    {
+        int[] starts = new int[rgCount + 1];
+        int accum = 0;
+        for (int rgId = 0; rgId < rgCount; rgId++)
+        {
+            starts[rgId] = accum;
+            int[] mapping = rgMappings.get(rgId);
+            accum += (mapping != null) ? mapping.length : 0;
+        }
+        starts[rgCount] = accum;
+        return starts;
+    }
+
+    /**
+     * Registers dual-write for the given rewrite result so that subsequent
+     * {@link RetinaResourceManager#deleteRecord} calls propagate deletes
+     * between old and new files.
+     */
+    void registerDualWrite(RewriteResult result)
+    {
+        resourceManager.registerDualWrite(result);
+    }
+
+    /**
+     * Removes dual-write for the given rewrite result.
+     */
+    void unregisterDualWrite(RewriteResult result)
+    {
+        resourceManager.unregisterDualWrite(result);
+    }
+
+    /**
      * Processes the candidate file groups produced by {@link #scanAndGroupFiles}.
      * Non-candidate bitmap entries have already been trimmed in {@link #runStorageGC}.
      *
@@ -547,13 +613,10 @@ public class StorageGarbageCollector
             hasHiddenColumn = firstReader.getPostScript().getHasHiddenColumn();
         }
 
-        int rowGroupSize = Integer.parseInt(ConfigFactory.Instance().getProperty("row.group.size"));
-        EncodingLevel encodingLevel = EncodingLevel.from(
-                Integer.parseInt(ConfigFactory.Instance().getProperty("retina.storage.gc.encoding.level")));
-
         int globalNewRowOffset = 0;
-        Map<Long, Map<Integer, int[]>> perFileRgMappings = new HashMap<>();
-        List<TypeDescription> columnSchemas = schema.getChildren();
+        Map<Long, Map<Integer, int[]>> forwardRgMappings = new HashMap<>();
+        int nUserCols = schema.getChildren().size();
+        String[] includeColNames = schema.getFieldNames().toArray(new String[0]);
 
         try (PixelsWriter writer = PixelsWriterImpl.newBuilder()
                 .setSchema(schema).setPixelStride(pixelStride)
@@ -564,6 +627,22 @@ public class StorageGarbageCollector
                 .setHasHiddenColumn(hasHiddenColumn)
                 .build())
         {
+            int batchCapacity = VectorizedRowBatch.DEFAULT_SIZE;
+            int[] selected = new int[batchCapacity];
+            // filteredBatch extends cols[] with one extra LongColumnVector for create_ts
+            // when hasHiddenColumn=true.  Per-column addSelected is used because the
+            // source batch's cols[] does not include the hidden column slot.
+            VectorizedRowBatch filteredBatch = schema.createRowBatch(batchCapacity);
+            if (hasHiddenColumn)
+            {
+                ColumnVector[] ext = Arrays.copyOf(filteredBatch.cols, nUserCols + 1);
+                ext[nUserCols] = new LongColumnVector(batchCapacity);
+                filteredBatch.cols = ext;
+            }
+            PixelsReaderOption opt = new PixelsReaderOption();
+            opt.includeCols(includeColNames);
+            opt.exposeHiddenColumn(hasHiddenColumn);
+
             for (FileCandidate fc : group.files)
             {
                 try (PixelsReader reader = PixelsReaderImpl.newBuilder()
@@ -575,39 +654,13 @@ public class StorageGarbageCollector
                         long[] gcBitmap = gcSnapshotBitmaps.get(RetinaUtils.buildRgKey(fc.fileId, oldRgId));
                         int rgRecordNum = reader.getRowGroupInfo(oldRgId).getNumberOfRows();
 
-                        // No transTimestamp is set intentionally.  GC row filtering uses
-                        // gcSnapshotBitmap (delete_ts <= safeGcTs) exclusively, which is
-                        // unrelated to create_ts.  Setting transTimestamp would activate
-                        // PixelsRecordReaderImpl's hidden-timestamp filter (create_ts <=
-                        // transTimestamp), wrongly excluding rows whose create_ts > safeGcTs
-                        // but which are still alive.  exposeHiddenColumn is set only to
-                        // expose the create_ts value for PK index entry capture below,
-                        // and only when the file actually contains a hidden column.
-                        PixelsReaderOption opt = new PixelsReaderOption();
+                        // transTimestamp is not set: GC filtering uses gcSnapshotBitmap
+                        // exclusively.  Setting it would activate the hidden-timestamp
+                        // filter and wrongly exclude alive rows with create_ts > safeGcTs.
                         opt.rgRange(oldRgId, 1);
-                        opt.includeCols(schema.getFieldNames().toArray(new String[0]));
-                        opt.exposeHiddenColumn(hasHiddenColumn);
 
                         int oldRgRowOffset = 0;
                         int[] fwdMapping = new int[rgRecordNum];
-                        int batchCapacity = VectorizedRowBatch.DEFAULT_SIZE;
-                        int[] selected = new int[batchCapacity];
-                        // schema.createRowBatch produces a batch whose cols[] covers only user
-                        // columns.  PixelsWriterImpl.addRowBatch writes the hidden column from
-                        // cols[commonColumnLength] (= cols[nUserCols]) when hasHiddenColumn=true,
-                        // so we extend cols[] with one extra LongColumnVector slot for create_ts.
-                        // VectorizedRowBatch.addSelected cannot be used for this extended batch
-                        // because it loops over cols.length and would attempt to index batch.cols
-                        // at position nUserCols, which does not exist in the source batch.
-                        // The manual per-column copy below handles this correctly.
-                        VectorizedRowBatch filteredBatch = schema.createRowBatch(batchCapacity);
-                        int nUserCols = columnSchemas.size();
-                        if (hasHiddenColumn)
-                        {
-                            ColumnVector[] ext = Arrays.copyOf(filteredBatch.cols, nUserCols + 1);
-                            ext[nUserCols] = new LongColumnVector(batchCapacity);
-                            filteredBatch.cols = ext;
-                        }
 
                         try (PixelsRecordReader recordReader = reader.read(opt))
                         {
@@ -630,21 +683,14 @@ public class StorageGarbageCollector
                                     {
                                         selected[kept++] = r;
                                         fwdMapping[oldRgRowOffset] = globalNewRowOffset;
-                                        // TODO(Task 5/6): capture PK bytes + create_ts here for
-                                        // IndexKey reconstruction in S5 index sync.  Requires
-                                        // IndexService integration (pkColumnIds, extractPkBytes).
+                                        // TODO: capture PK bytes + create_ts here for IndexKey
+                                        // reconstruction in index sync.  Requires IndexService
+                                        // integration (pkColumnIds, extractPkBytes).
                                         globalNewRowOffset++;
                                     }
                                 }
                                 if (kept > 0)
                                 {
-                                    // Copy surviving rows into filteredBatch column-by-column.
-                                    // User columns are sourced from batch.cols[i]; the hidden
-                                    // create_ts column is sourced from batch.hiddenColumnVector
-                                    // and written into the extra slot at filteredBatch.cols[nUserCols].
-                                    // ColumnVector.writeIndex is advanced by addSelected so that
-                                    // filteredBatch.reset() (which zeroes writeIndex) correctly
-                                    // resets all slots for the next iteration.
                                     for (int i = 0; i < nUserCols; i++)
                                     {
                                         filteredBatch.cols[i].addSelected(selected, 0, kept, batch.cols[i]);
@@ -660,7 +706,7 @@ public class StorageGarbageCollector
                                 }
                             }
                         }
-                        perFileRgMappings.computeIfAbsent(fc.fileId, k -> new HashMap<>()).put(oldRgId, fwdMapping);
+                        forwardRgMappings.computeIfAbsent(fc.fileId, k -> new HashMap<>()).put(oldRgId, fwdMapping);
                     }
                 }
             }
@@ -691,7 +737,7 @@ public class StorageGarbageCollector
                 logger.warn("StorageGC: failed to delete empty rewrite file {}", newFilePath, e);
             }
             return new RewriteResult(group, newFilePath, -1,
-                    0, new int[0], new int[]{0}, perFileRgMappings);
+                    0, new int[0], new int[]{0}, forwardRgMappings, Collections.emptyList());
         }
 
         // Read the new file's Footer to get per-RG row counts.
@@ -713,6 +759,38 @@ public class StorageGarbageCollector
                 accum += newFileRgActualRecordNums[rgId];
             }
             newFileRgRowStart[newFileRgCount] = accum;
+        }
+
+        // Build backward mappings by inverting the forward mappings.
+        List<BackwardInfo> backwardInfos = new ArrayList<>();
+        for (FileCandidate fc : group.files)
+        {
+            Map<Integer, int[]> rgMappings = forwardRgMappings.get(fc.fileId);
+            int[] oldFileRgRowStart = computeOldFileRgRowStart(rgMappings, fc.rgCount);
+            Map<Integer, int[]> bwdMappings = new HashMap<>();
+            for (Map.Entry<Integer, int[]> entry : rgMappings.entrySet())
+            {
+                int oldRgId = entry.getKey();
+                int[] fwdMapping = entry.getValue();
+                for (int oldOff = 0; oldOff < fwdMapping.length; oldOff++)
+                {
+                    int newGlobal = fwdMapping[oldOff];
+                    if (newGlobal < 0)
+                    {
+                        continue;
+                    }
+                    int newRgId = RetinaResourceManager.rgIdForGlobalRowOffset(newGlobal, newFileRgRowStart);
+                    int newRgOff = newGlobal - newFileRgRowStart[newRgId];
+                    int oldGlobal = oldFileRgRowStart[oldRgId] + oldOff;
+                    bwdMappings.computeIfAbsent(newRgId, k ->
+                    {
+                        int[] arr = new int[newFileRgActualRecordNums[k]];
+                        Arrays.fill(arr, -1);
+                        return arr;
+                    })[newRgOff] = oldGlobal;
+                }
+            }
+            backwardInfos.add(new BackwardInfo(fc.fileId, bwdMappings, oldFileRgRowStart));
         }
 
         // Register the new file as TEMPORARY in the catalog and initialise Visibility.
@@ -739,7 +817,7 @@ public class StorageGarbageCollector
 
         return new RewriteResult(group, newFilePath, newFileId,
                 newFileRgCount, newFileRgActualRecordNums, newFileRgRowStart,
-                perFileRgMappings);
+                forwardRgMappings, backwardInfos);
     }
 
 }
