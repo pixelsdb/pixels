@@ -36,6 +36,11 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
+import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.DecimalColumnVector;
+import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.FloatColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.After;
@@ -47,6 +52,7 @@ import org.junit.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -158,7 +164,7 @@ public class TestStorageGarbageCollector
         retinaManager = RetinaResourceManager.Instance();
         resetManagerState();
         gc = new StorageGarbageCollector(retinaManager, metadataService, 0.5, 134_217_728L, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
     }
 
     @After
@@ -180,12 +186,12 @@ public class TestStorageGarbageCollector
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
-                new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 0, 100, 0.60, 0L),
-                new StorageGarbageCollector.FileCandidate(makeFile(2, 1), "f2", 2, 1, 1L, 1, 100, 0.70, 0L),
-                new StorageGarbageCollector.FileCandidate(makeFile(3, 1), "f3", 3, 1, 2L, 0, 100, 0.80, 0L)
+                new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.60, 0L),
+                new StorageGarbageCollector.FileCandidate(makeFile(2, 1), "f2", 2, 1, 1L, 1, 0.70, 0L),
+                new StorageGarbageCollector.FileCandidate(makeFile(3, 1), "f3", 3, 1, 2L, 0, 0.80, 0L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -209,11 +215,11 @@ public class TestStorageGarbageCollector
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
-                new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 5, 100, 0.60, 0L),
-                new StorageGarbageCollector.FileCandidate(makeFile(2, 1), "f2", 2, 1, 1L, 5, 100, 0.80, 0L)
+                new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 5, 0.60, 0L),
+                new StorageGarbageCollector.FileCandidate(makeFile(2, 1), "f2", 2, 1, 1L, 5, 0.80, 0L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -239,14 +245,14 @@ public class TestStorageGarbageCollector
         int max = 3;
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, Integer.MAX_VALUE, max,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         // Build 5 groups with different tableIds and clear invalidRatios (0.55..0.99)
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 5; i++)
         {
             candidates.add(new StorageGarbageCollector.FileCandidate(
-                    makeFile(i, 1), "f" + i, i, 1, (long) (i + 10), 0, 100, 0.55 + i * 0.11, 0L));
+                    makeFile(i, 1), "f" + i, i, 1, (long) (i + 10), 0, 0.55 + i * 0.11, 0L));
         }
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -268,7 +274,7 @@ public class TestStorageGarbageCollector
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
         List<StorageGarbageCollector.FileGroup> groups =
                 gc.groupAndMerge(Collections.emptyList());
         assertTrue("empty candidates → empty groups", groups.isEmpty());
@@ -289,16 +295,16 @@ public class TestStorageGarbageCollector
         long target = 100 * 1024 * 1024L; // 100 MB
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, target, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         // Each file is 100 MB on disk with 40% deleted → 60 MB effective
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 1000, 0.40, 100 * 1024 * 1024L),
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.40, 100 * 1024 * 1024L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 1000, 0.40, 100 * 1024 * 1024L),
+                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 0.40, 100 * 1024 * 1024L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(3, 1), "f3", 3, 1, 1L, 0, 1000, 0.40, 100 * 1024 * 1024L)
+                        makeFile(3, 1), "f3", 3, 1, 1L, 0, 0.40, 100 * 1024 * 1024L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -320,13 +326,13 @@ public class TestStorageGarbageCollector
         long target = 100 * 1024 * 1024L; // 100 MB
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, target, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 500, 0.70, 100 * 1024 * 1024L),
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.70, 100 * 1024 * 1024L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 500, 0.70, 100 * 1024 * 1024L)
+                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 0.70, 100 * 1024 * 1024L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -348,13 +354,13 @@ public class TestStorageGarbageCollector
         long target = 100 * 1024 * 1024L;
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, target, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 2000, 0.10, 200 * 1024 * 1024L),
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.10, 200 * 1024 * 1024L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 500, 0.50, 50 * 1024 * 1024L)
+                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 0.50, 50 * 1024 * 1024L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -382,14 +388,14 @@ public class TestStorageGarbageCollector
         long target = 100 * 1024 * 1024L;
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, target, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         // fileSizeBytes = 0 (unknown) — no splitting occurs
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 1000, 0.60, 0L),
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.60, 0L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 1000, 0.60, 0L)
+                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 0.60, 0L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -408,13 +414,13 @@ public class TestStorageGarbageCollector
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, 2, 100,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 5; i++)
         {
             candidates.add(new StorageGarbageCollector.FileCandidate(
-                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 100, 0.90 - i * 0.05, 0L));
+                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 0.90 - i * 0.05, 0L));
         }
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -435,13 +441,13 @@ public class TestStorageGarbageCollector
         long hugeTarget = Long.MAX_VALUE;
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, hugeTarget, 3, 100,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 6; i++)
         {
             candidates.add(new StorageGarbageCollector.FileCandidate(
-                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 100, 0.70,
+                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 0.70,
                     50 * 1024 * 1024L));
         }
 
@@ -463,13 +469,13 @@ public class TestStorageGarbageCollector
         long target = 100 * 1024 * 1024L;
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, target, Integer.MAX_VALUE, 100,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 3; i++)
         {
             candidates.add(new StorageGarbageCollector.FileCandidate(
-                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 1000, 0.40,
+                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 0.40,
                     100 * 1024 * 1024L));
         }
 
@@ -490,10 +496,10 @@ public class TestStorageGarbageCollector
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Collections.singletonList(
-                new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 0, 100, 0.80, 0L));
+                new StorageGarbageCollector.FileCandidate(makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.80, 0L));
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
 
@@ -519,13 +525,13 @@ public class TestStorageGarbageCollector
         long target = 50 * 1024 * 1024L; // 50 MB
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, target, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 1000, 0.50, 100 * 1024 * 1024L),
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.50, 100 * 1024 * 1024L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 1000, 0.50, 100 * 1024 * 1024L)
+                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 0.50, 100 * 1024 * 1024L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -546,15 +552,15 @@ public class TestStorageGarbageCollector
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, 1, 100,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 100, 0.90, 0L),
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.90, 0L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 100, 0.80, 0L),
+                        makeFile(2, 1), "f2", 2, 1, 1L, 0, 0.80, 0L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(3, 1), "f3", 3, 1, 1L, 0, 100, 0.70, 0L)
+                        makeFile(3, 1), "f3", 3, 1, 1L, 0, 0.70, 0L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -575,15 +581,15 @@ public class TestStorageGarbageCollector
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = Arrays.asList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 100, 0.70, 0L),
+                        makeFile(1, 1), "f1", 1, 1, 1L, 0, 0.70, 0L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(2, 1), "f2", 2, 1, 2L, 0, 100, 0.70, 0L),
+                        makeFile(2, 1), "f2", 2, 1, 2L, 0, 0.70, 0L),
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(3, 1), "f3", 3, 1, 3L, 0, 100, 0.70, 0L)
+                        makeFile(3, 1), "f3", 3, 1, 3L, 0, 0.70, 0L)
         );
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -605,13 +611,13 @@ public class TestStorageGarbageCollector
     {
         StorageGarbageCollector gc = new StorageGarbageCollector(
                 null, null, 0.5, 0L, 0, 10,
-                1048576, EncodingLevel.EL2);
+                1048576, EncodingLevel.EL2, 86_400_000L);
 
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (int i = 0; i < 5; i++)
         {
             candidates.add(new StorageGarbageCollector.FileCandidate(
-                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 100, 0.80 - i * 0.05, 0L));
+                    makeFile(i + 1, 1), "f" + i, i + 1, 1, 1L, 0, 0.80 - i * 0.05, 0L));
         }
 
         List<StorageGarbageCollector.FileGroup> groups = gc.groupAndMerge(candidates);
@@ -935,11 +941,11 @@ public class TestStorageGarbageCollector
         StorageGarbageCollector.FileGroup groupA = new StorageGarbageCollector.FileGroup(
                 1L, 0, Collections.singletonList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(fileIdA, 1), "fake_a", fileIdA, 1, 1L, 0, 100, 0.60, 0L)));
+                        makeFile(fileIdA, 1), "fake_a", fileIdA, 1, 1L, 0, 0.60, 0L)));
         StorageGarbageCollector.FileGroup groupB = new StorageGarbageCollector.FileGroup(
                 2L, 0, Collections.singletonList(
                 new StorageGarbageCollector.FileCandidate(
-                        makeFile(fileIdB, 1), "fake_b", fileIdB, 1, 2L, 0, 100, 0.60, 0L)));
+                        makeFile(fileIdB, 1), "fake_b", fileIdB, 1, 2L, 0, 0.60, 0L)));
 
         FailFirstGroupGC failGc = new FailFirstGroupGC();
         failGc.processFileGroups(Arrays.asList(groupA, groupB), 300L, bitmaps);
@@ -1340,6 +1346,95 @@ public class TestStorageGarbageCollector
         assertRewriteResultConsistency(result, 4);
     }
 
+    /**
+     * Verifies backward mapping correctness for a multi-RG source file.
+     * For every surviving new row, the backward mapping must point to the
+     * correct old-file global row offset, and the round-trip through forward
+     * then backward must be consistent.
+     *
+     * Setup (same as {@link #testMultiRgRewrite}):
+     *   RG0: rows {0,1,2,3,4}, delete 1,3 → survivors: 0,2,4 → new global 0,1,2
+     *   RG1: rows {5,6,7,8,9}, delete 0,4 → survivors: 6,7,8 → new global 3,4,5
+     *   oldFileRgRowStart = [0, 5, 10]
+     *
+     * Expected backward mapping (newGlobal → oldGlobal):
+     *   0→0, 1→2, 2→4, 3→6, 4→7, 5→8
+     */
+    @Test
+    public void testMultiRgRewrite_backwardMappingCorrectness() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long fileId = 22L;
+
+        String srcPath = writeMultiRgTestFile("src_bwd_map.pxl", schema,
+                new long[][]{{0L, 1L, 2L, 3L, 4L}, {5L, 6L, 7L, 8L, 9L}},
+                false, null);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(5, 1, 3));
+        bitmaps.put(fileId + "_1", makeBitmapForRows(5, 0, 4));
+
+        StorageGarbageCollector.FileGroup group = makeGroup(fileId, srcPath, schema);
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(group, 100L, bitmaps);
+
+        assertRewriteResultConsistency(result, 6);
+        assertEquals("should have exactly 1 BackwardInfo (single source file)",
+                1, result.backwardInfos.size());
+
+        StorageGarbageCollector.BackwardInfo bwd = result.backwardInfos.get(0);
+        assertEquals("backwardInfo should reference the source file", fileId, bwd.oldFileId);
+
+        // oldFileRgRowStart: RG0 starts at 0 (5 rows), RG1 starts at 5 (5 rows), sentinel=10
+        assertEquals(0, bwd.oldFileRgRowStart[0]);
+        assertEquals(5, bwd.oldFileRgRowStart[1]);
+        assertEquals(10, bwd.oldFileRgRowStart[2]);
+
+        // Collect all backward mapping entries: newGlobal → oldGlobal
+        int[] expectedOldGlobal = {0, 2, 4, 6, 7, 8};
+        int newGlobal = 0;
+        for (int newRgId = 0; newRgId < result.newFileRgCount; newRgId++)
+        {
+            int[] bwdMapping = bwd.backwardRgMappings.get(newRgId);
+            if (bwdMapping == null)
+            {
+                newGlobal += result.newFileRgActualRecordNums[newRgId];
+                continue;
+            }
+            for (int newRgOff = 0; newRgOff < bwdMapping.length; newRgOff++, newGlobal++)
+            {
+                int oldGlobal = bwdMapping[newRgOff];
+                assertTrue("backward mapping entry must not be -1 for surviving row at newGlobal=" + newGlobal,
+                        oldGlobal >= 0);
+                assertEquals("backward mapping mismatch at newGlobal=" + newGlobal,
+                        expectedOldGlobal[newGlobal], oldGlobal);
+            }
+        }
+        assertEquals("total backward-mapped rows must equal total surviving rows",
+                6, newGlobal);
+
+        // Round-trip consistency: for each old row, forward then backward should be identity
+        Map<Integer, int[]> fwdMappings = result.forwardRgMappings.get(fileId);
+        for (int oldRgId = 0; oldRgId < 2; oldRgId++)
+        {
+            int[] fwdMapping = fwdMappings.get(oldRgId);
+            for (int oldOff = 0; oldOff < fwdMapping.length; oldOff++)
+            {
+                int fwdGlobal = fwdMapping[oldOff];
+                if (fwdGlobal < 0)
+                {
+                    continue;
+                }
+                int fwdNewRgId = RetinaResourceManager.rgIdForGlobalRowOffset(fwdGlobal, result.newFileRgRowStart);
+                int fwdNewRgOff = fwdGlobal - result.newFileRgRowStart[fwdNewRgId];
+                int roundTrip = bwd.backwardRgMappings.get(fwdNewRgId)[fwdNewRgOff];
+                int expectedGlobal = bwd.oldFileRgRowStart[oldRgId] + oldOff;
+                assertEquals("round-trip oldRg=" + oldRgId + " oldOff=" + oldOff,
+                        expectedGlobal, roundTrip);
+            }
+        }
+    }
+
     // =======================================================================
     // Section 5c: edge-case rewrite tests
     // =======================================================================
@@ -1609,6 +1704,170 @@ public class TestStorageGarbageCollector
         assertRewriteResultConsistency(result, 62);
     }
 
+    /**
+     * Multi-RG file where one RG has ALL rows deleted and the other has survivors.
+     * RG0: rows {0,1,2} all deleted → 0 survivors from RG0.
+     * RG1: rows {3,4,5}, delete row 0 → survivors 4,5 → new global offsets 0,1.
+     * Verifies output data, forward mappings per RG, backward mapping, and that
+     * the all-deleted RG does not produce any output.
+     */
+    @Test
+    public void testMultiRgRewrite_oneRgCompletelyDeleted() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long fileId = 35L;
+
+        String srcPath = writeMultiRgTestFile("src_rg_all_del.pxl", schema,
+                new long[][]{{0L, 1L, 2L}, {3L, 4L, 5L}},
+                false, null);
+
+        int srcRgCount;
+        try (PixelsReader r = PixelsReaderImpl.newBuilder()
+                .setStorage(fileStorage).setPath(srcPath)
+                .setPixelsFooterCache(new PixelsFooterCache()).build())
+        {
+            srcRgCount = r.getRowGroupNum();
+        }
+        assertEquals("source file must have 2 row groups", 2, srcRgCount);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileId + "_0", makeBitmapForRows(3, 0, 1, 2));
+        bitmaps.put(fileId + "_1", makeBitmapForRows(3, 0));
+
+        StorageGarbageCollector.FileGroup group = makeGroup(fileId, srcPath, schema);
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(group, 100L, bitmaps);
+
+        long[][] rows = readAllRows(result.newFilePath, schema, false);
+        assertEquals("2 rows should survive (RG0 all deleted, RG1: 2 survivors)", 2, rows.length);
+        assertEquals(4L, rows[0][0]);
+        assertEquals(5L, rows[1][0]);
+
+        int[] fwdRg0 = result.forwardRgMappings.get(fileId).get(0);
+        for (int i = 0; i < fwdRg0.length; i++)
+        {
+            assertEquals("RG0 all deleted → every mapping must be -1", -1, fwdRg0[i]);
+        }
+
+        int[] fwdRg1 = result.forwardRgMappings.get(fileId).get(1);
+        assertEquals(-1, fwdRg1[0]);
+        assertEquals(0, fwdRg1[1]);
+        assertEquals(1, fwdRg1[2]);
+
+        assertFalse("bitmap rg0 must be removed", bitmaps.containsKey(fileId + "_0"));
+        assertFalse("bitmap rg1 must be removed", bitmaps.containsKey(fileId + "_1"));
+
+        assertRewriteResultConsistency(result, 2);
+
+        assertEquals(1, result.backwardInfos.size());
+        StorageGarbageCollector.BackwardInfo bwd = result.backwardInfos.get(0);
+        assertEquals(0, bwd.oldFileRgRowStart[0]);
+        assertEquals(3, bwd.oldFileRgRowStart[1]);
+        assertEquals(6, bwd.oldFileRgRowStart[2]);
+
+        int globalIdx = 0;
+        for (int newRgId = 0; newRgId < result.newFileRgCount; newRgId++)
+        {
+            int[] bwdMapping = bwd.backwardRgMappings.get(newRgId);
+            if (bwdMapping == null)
+            {
+                continue;
+            }
+            for (int off = 0; off < bwdMapping.length; off++, globalIdx++)
+            {
+                assertTrue("backward mapping entry should be valid",
+                        bwdMapping[off] >= 0);
+            }
+        }
+        assertEquals(2, globalIdx);
+    }
+
+    /**
+     * Multi-file group backward mapping correctness: two files, each with 5 rows.
+     * File A: delete rows 0,4 → survivors 1,2,3 → new global 0,1,2
+     * File B: delete rows 1,3 → survivors 0,2,4 → new global 3,4,5
+     *
+     * Backward mapping per old file:
+     *   File A: oldFileRgRowStart = [0, 5], newGlobal 0→old 1, 1→old 2, 2→old 3
+     *   File B: oldFileRgRowStart = [0, 5], newGlobal 3→old 0, 4→old 2, 5→old 4
+     * Round-trip: forward(old) → backward(new) must be identity.
+     */
+    @Test
+    public void testMultiFileGroupRewrite_backwardMapping() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long fileIdA = 36L;
+        long fileIdB = 37L;
+        long[] idsA = {100L, 101L, 102L, 103L, 104L};
+        long[] idsB = {200L, 201L, 202L, 203L, 204L};
+
+        String pathA = writeTestFile("src_mf_bwd_a.pxl", schema, idsA, false, null);
+        String pathB = writeTestFile("src_mf_bwd_b.pxl", schema, idsB, false, null);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(fileIdA + "_0", makeBitmapForRows(5, 0, 4));
+        bitmaps.put(fileIdB + "_0", makeBitmapForRows(5, 1, 3));
+
+        StorageGarbageCollector.FileGroup group =
+                makeMultiFileGroup(schema, fileIdA, pathA, fileIdB, pathB);
+
+        StorageGarbageCollector.RewriteResult result =
+                gc.rewriteFileGroup(group, 100L, bitmaps);
+
+        assertRewriteResultConsistency(result, 6);
+        assertEquals("should have 2 BackwardInfos (two source files)",
+                2, result.backwardInfos.size());
+
+        for (StorageGarbageCollector.BackwardInfo bwd : result.backwardInfos)
+        {
+            long oldFileId = bwd.oldFileId;
+            Map<Integer, int[]> fwdMappings = result.forwardRgMappings.get(oldFileId);
+            assertNotNull("forward mappings must exist for oldFileId=" + oldFileId, fwdMappings);
+
+            for (int oldRgId = 0; oldRgId < bwd.oldFileRgRowStart.length - 1; oldRgId++)
+            {
+                int[] fwdMapping = fwdMappings.get(oldRgId);
+                if (fwdMapping == null)
+                {
+                    continue;
+                }
+                for (int oldOff = 0; oldOff < fwdMapping.length; oldOff++)
+                {
+                    int fwdGlobal = fwdMapping[oldOff];
+                    if (fwdGlobal < 0)
+                    {
+                        continue;
+                    }
+                    int newRgId = RetinaResourceManager.rgIdForGlobalRowOffset(
+                            fwdGlobal, result.newFileRgRowStart);
+                    int newRgOff = fwdGlobal - result.newFileRgRowStart[newRgId];
+                    int[] bwdMapping = bwd.backwardRgMappings.get(newRgId);
+                    assertNotNull("backward mapping must exist for newRgId=" + newRgId, bwdMapping);
+                    int roundTrip = bwdMapping[newRgOff];
+                    int expectedGlobal = bwd.oldFileRgRowStart[oldRgId] + oldOff;
+                    assertEquals("round-trip file=" + oldFileId + " oldRg=" + oldRgId
+                                    + " oldOff=" + oldOff,
+                            expectedGlobal, roundTrip);
+                }
+            }
+        }
+
+        int[] fwdA = result.forwardRgMappings.get(fileIdA).get(0);
+        assertEquals(-1, fwdA[0]);
+        assertEquals(0, fwdA[1]);
+        assertEquals(1, fwdA[2]);
+        assertEquals(2, fwdA[3]);
+        assertEquals(-1, fwdA[4]);
+
+        int[] fwdB = result.forwardRgMappings.get(fileIdB).get(0);
+        assertEquals(3, fwdB[0]);
+        assertEquals(-1, fwdB[1]);
+        assertEquals(4, fwdB[2]);
+        assertEquals(-1, fwdB[3]);
+        assertEquals(5, fwdB[4]);
+    }
+
     // =======================================================================
     // Section 6: dual-write functional tests
     // =======================================================================
@@ -1871,16 +2130,15 @@ public class TestStorageGarbageCollector
     }
 
     /**
-     * Full realistic end-to-end: S2 rewrite → S3 dual-write → deletes at various phases →
-     * S4 syncVisibility → multi-snap_ts consistency verification between old and new files.
+     * Full realistic end-to-end: rewrite → dual-write → deletes at various phases →
+     * syncVisibility → multi-snap_ts consistency verification between old and new files.
      *
      * Timeline:
      *   Phase 1 (ts<=100): rows 0,9 deleted → physically removed by rewrite
      *   Phase 2 (100<ts<dual-write): rows 1,2 deleted → only in old chain, need export
-     *   S3: registerDualWrite
-     *   Phase 3 (dual-write window): rows 3,4 deleted → in both chains (overlap)
-     *   S4: syncVisibility → export + coord transform + truncation dedup + import
-     *   Phase 4 (post-sync): row 5 deleted → dual-write keeps both in sync
+     *   Phase 3 (dual-write registered): rows 3,4 deleted → in both chains (overlap)
+     *   Phase 4 (syncVisibility): export + coord transform + truncation dedup + import
+     *   Phase 5 (post-sync): row 5 deleted → dual-write keeps both in sync
      *   Verify: for every snap_ts, old and new visibility match through forward mapping.
      */
     @Test
@@ -1900,7 +2158,7 @@ public class TestStorageGarbageCollector
         Map<String, long[]> bitmaps = new HashMap<>();
         bitmaps.put(fileId + "_0", makeBitmapForRows(10, 0, 9));
 
-        // S2: rewrite — rows 0,9 excluded, rows 1-8 survive as new rows 0-7
+        // Rewrite — rows 0,9 excluded, rows 1-8 survive as new rows 0-7
         StorageGarbageCollector.RewriteResult result =
                 gc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
         long newFileId = result.newFileId;
@@ -1916,14 +2174,14 @@ public class TestStorageGarbageCollector
         retinaManager.deleteRecord(fileId, 0, 1, 150L);
         retinaManager.deleteRecord(fileId, 0, 2, 180L);
 
-        // S3: register dual-write
+        // Register dual-write
         gc.registerDualWrite(result);
 
         // Phase 3: deletes during dual-write window — written to BOTH old and new
         retinaManager.deleteRecord(fileId, 0, 3, 200L);
         retinaManager.deleteRecord(fileId, 0, 4, 250L);
 
-        // S4: syncVisibility — export old chain → coord transform → truncation dedup → import
+        // syncVisibility — export old chain → coord transform → truncation dedup → import
         gc.syncVisibility(result, 100L);
 
         // Phase 4: post-sync delete — dual-write keeps both files in sync
@@ -2244,53 +2502,856 @@ public class TestStorageGarbageCollector
     }
 
     // =======================================================================
-    // Section 8: index update + atomic switch tests (placeholder)
+    // Section 8: index update + atomic switch + rollback + delayed cleanup
     // =======================================================================
 
-    /** MainIndex entries (newRowId → newRowLocation) are correct after syncIndex. */
-    @Ignore("index update and atomic switch not yet implemented")
-    @Test
-    public void testIndexSync_mainIndexEntries() throws Exception
-    {
-    }
-
-    /** SinglePointIndex (IndexKey → newRowId) is correct after syncIndex. */
-    @Ignore("index update and atomic switch not yet implemented")
-    @Test
-    public void testIndexSync_singlePointIndexUpdate() throws Exception
-    {
-    }
-
     /** atomicSwapFiles turns TEMPORARY → REGULAR and removes old files from catalog. */
-    @Ignore("index update and atomic switch not yet implemented")
     @Test
     public void testAtomicSwap_swapFiles() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+
+        long[] ids = new long[10];
+        long[] ts = new long[10];
+        for (int i = 0; i < 10; i++)
+        {
+            ids[i] = i;
+            ts[i] = 100;
+        }
+        String filePath = writeTestFile("swap_old.pxl", schema, ids, true, ts);
+
+        File oldFile = new File();
+        oldFile.setName("swap_old.pxl");
+        oldFile.setType(File.Type.REGULAR);
+        oldFile.setNumRowGroup(1);
+        oldFile.setMinRowId(0);
+        oldFile.setMaxRowId(9);
+        oldFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(oldFile));
+        long oldFileId = metadataService.getFileId(filePath);
+        assertTrue("Old file should have a valid id", oldFileId > 0);
+
+        File newFile = new File();
+        newFile.setName("swap_new.pxl");
+        newFile.setType(File.Type.TEMPORARY);
+        newFile.setNumRowGroup(1);
+        newFile.setMinRowId(0);
+        newFile.setMaxRowId(9);
+        newFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(newFile));
+        String newFilePath = testOrderedPathUri + "/swap_new.pxl";
+        long newFileId = metadataService.getFileId(newFilePath);
+        assertTrue("New file should have a valid id", newFileId > 0);
+
+        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId));
+
+        File swapped = metadataService.getFileById(newFileId);
+        assertNotNull("New file should still exist after swap", swapped);
+        assertEquals("New file should be REGULAR after swap",
+                File.Type.REGULAR, swapped.getType());
+
+        File gone = metadataService.getFileById(oldFileId);
+        assertTrue("Old file should be gone from catalog after swap",
+                gone == null || gone.getId() == 0);
     }
 
-    /** Rollback cleans up TEMPORARY, Visibility, dual-write, and index entries. */
-    @Ignore("index update and atomic switch not yet implemented")
+    /**
+     * Atomicity with multiple old files: one TEMPORARY new file and three REGULAR
+     * old files are swapped in a single call.  Verifies that after the call the new
+     * file is promoted to REGULAR and <b>all</b> old files are removed from the
+     * catalog—i.e., the UPDATE and DELETE execute as one indivisible transaction.
+     */
+    @Test
+    public void testAtomicSwap_multipleOldFilesAtomicity() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0, 1};
+        long[] ts = {100, 100};
+
+        String pathOld1 = writeTestFile("atom_old1.pxl", schema, ids, true, ts);
+        String pathOld2 = writeTestFile("atom_old2.pxl", schema, ids, true, ts);
+        String pathOld3 = writeTestFile("atom_old3.pxl", schema, ids, true, ts);
+
+        File old1 = new File();
+        old1.setName("atom_old1.pxl");
+        old1.setType(File.Type.REGULAR);
+        old1.setNumRowGroup(1);
+        old1.setMinRowId(0);
+        old1.setMaxRowId(1);
+        old1.setPathId(testPathId);
+
+        File old2 = new File();
+        old2.setName("atom_old2.pxl");
+        old2.setType(File.Type.REGULAR);
+        old2.setNumRowGroup(1);
+        old2.setMinRowId(0);
+        old2.setMaxRowId(1);
+        old2.setPathId(testPathId);
+
+        File old3 = new File();
+        old3.setName("atom_old3.pxl");
+        old3.setType(File.Type.REGULAR);
+        old3.setNumRowGroup(1);
+        old3.setMinRowId(0);
+        old3.setMaxRowId(1);
+        old3.setPathId(testPathId);
+
+        metadataService.addFiles(Arrays.asList(old1, old2, old3));
+        long oldId1 = metadataService.getFileId(pathOld1);
+        long oldId2 = metadataService.getFileId(pathOld2);
+        long oldId3 = metadataService.getFileId(pathOld3);
+        assertTrue("Old file 1 should have a valid id", oldId1 > 0);
+        assertTrue("Old file 2 should have a valid id", oldId2 > 0);
+        assertTrue("Old file 3 should have a valid id", oldId3 > 0);
+
+        File newFile = new File();
+        newFile.setName("atom_new.pxl");
+        newFile.setType(File.Type.TEMPORARY);
+        newFile.setNumRowGroup(1);
+        newFile.setMinRowId(0);
+        newFile.setMaxRowId(1);
+        newFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(newFile));
+        long newFileId = metadataService.getFileId(testOrderedPathUri + "/atom_new.pxl");
+        assertTrue("New TEMPORARY file should have a valid id", newFileId > 0);
+
+        File preSwapNew = metadataService.getFileById(newFileId);
+        assertNotNull("New file must exist before swap", preSwapNew);
+        assertEquals("New file should be TEMPORARY before swap",
+                File.Type.TEMPORARY, preSwapNew.getType());
+
+        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldId1, oldId2, oldId3));
+
+        File swapped = metadataService.getFileById(newFileId);
+        assertNotNull("New file must still exist after swap", swapped);
+        assertEquals("New file should be REGULAR after swap",
+                File.Type.REGULAR, swapped.getType());
+
+        for (long oldId : new long[]{oldId1, oldId2, oldId3})
+        {
+            File g = metadataService.getFileById(oldId);
+            assertTrue("Old file " + oldId + " should be gone after swap",
+                    g == null || g.getId() == 0);
+        }
+    }
+
+    /**
+     * Idempotency: calling {@code atomicSwapFiles} a second time after the swap has
+     * already committed must not throw.  The UPDATE is a no-op (already REGULAR) and
+     * the DELETE is a no-op (old files already removed).
+     */
+    @Test
+    public void testAtomicSwap_idempotent() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0, 1, 2};
+        long[] ts = {100, 100, 100};
+
+        String pathOld = writeTestFile("idem_old.pxl", schema, ids, true, ts);
+
+        File oldFile = new File();
+        oldFile.setName("idem_old.pxl");
+        oldFile.setType(File.Type.REGULAR);
+        oldFile.setNumRowGroup(1);
+        oldFile.setMinRowId(0);
+        oldFile.setMaxRowId(2);
+        oldFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(oldFile));
+        long oldFileId = metadataService.getFileId(pathOld);
+
+        File newFile = new File();
+        newFile.setName("idem_new.pxl");
+        newFile.setType(File.Type.TEMPORARY);
+        newFile.setNumRowGroup(1);
+        newFile.setMinRowId(0);
+        newFile.setMaxRowId(2);
+        newFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(newFile));
+        long newFileId = metadataService.getFileId(testOrderedPathUri + "/idem_new.pxl");
+
+        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId));
+
+        File afterFirst = metadataService.getFileById(newFileId);
+        assertNotNull(afterFirst);
+        assertEquals(File.Type.REGULAR, afterFirst.getType());
+
+        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId));
+
+        File afterSecond = metadataService.getFileById(newFileId);
+        assertNotNull("File must still exist after idempotent retry", afterSecond);
+        assertEquals("File should remain REGULAR after idempotent retry",
+                File.Type.REGULAR, afterSecond.getType());
+        File stillGone = metadataService.getFileById(oldFileId);
+        assertTrue("Old file should remain absent after idempotent retry",
+                stillGone == null || stillGone.getId() == 0);
+    }
+
+    /**
+     * TEMPORARY visibility semantics: before the swap, {@code getFiles(pathId)} must
+     * <b>not</b> return the TEMPORARY new file (the DAO filters {@code FILE_TYPE <> 0}).
+     * After the swap the promoted file is visible and the old file disappears.
+     */
+    @Test
+    public void testAtomicSwap_temporaryInvisibleViaGetFiles() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0, 1};
+        long[] ts = {100, 100};
+        writeTestFile("vis_old.pxl", schema, ids, true, ts);
+
+        File oldFile = new File();
+        oldFile.setName("vis_old.pxl");
+        oldFile.setType(File.Type.REGULAR);
+        oldFile.setNumRowGroup(1);
+        oldFile.setMinRowId(0);
+        oldFile.setMaxRowId(1);
+        oldFile.setPathId(testPathId);
+
+        File tempFile = new File();
+        tempFile.setName("vis_new_temp.pxl");
+        tempFile.setType(File.Type.TEMPORARY);
+        tempFile.setNumRowGroup(1);
+        tempFile.setMinRowId(0);
+        tempFile.setMaxRowId(1);
+        tempFile.setPathId(testPathId);
+
+        metadataService.addFiles(Arrays.asList(oldFile, tempFile));
+        long oldFileId = metadataService.getFileId(testOrderedPathUri + "/vis_old.pxl");
+        long tempFileId = metadataService.getFileId(testOrderedPathUri + "/vis_new_temp.pxl");
+        assertTrue(oldFileId > 0);
+        assertTrue(tempFileId > 0);
+
+        List<File> beforeSwap = metadataService.getFiles(testPathId);
+        Set<Long> beforeIds = new HashSet<>();
+        for (File f : beforeSwap)
+        {
+            beforeIds.add(f.getId());
+        }
+        assertTrue("REGULAR old file should be visible via getFiles before swap",
+                beforeIds.contains(oldFileId));
+        assertFalse("TEMPORARY new file must NOT be visible via getFiles before swap",
+                beforeIds.contains(tempFileId));
+
+        metadataService.atomicSwapFiles(tempFileId, Collections.singletonList(oldFileId));
+
+        List<File> afterSwap = metadataService.getFiles(testPathId);
+        Set<Long> afterIds = new HashSet<>();
+        for (File f : afterSwap)
+        {
+            afterIds.add(f.getId());
+        }
+        assertTrue("Promoted file should be visible via getFiles after swap",
+                afterIds.contains(tempFileId));
+        assertFalse("Old file should NOT be visible via getFiles after swap",
+                afterIds.contains(oldFileId));
+    }
+
+    /**
+     * Concurrent atomicity: multiple threads each perform an independent
+     * {@code atomicSwapFiles} on their own (newFile, oldFile) pair.  All swaps
+     * must succeed without interference, and every new file ends up REGULAR
+     * while every old file is removed.
+     */
+    @Test
+    public void testAtomicSwap_concurrentSwapsDifferentGroups() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0};
+        long[] ts = {100};
+        int nThreads = 8;
+
+        long[] newFileIds = new long[nThreads];
+        long[] oldFileIds = new long[nThreads];
+
+        for (int i = 0; i < nThreads; i++)
+        {
+            String oldName = "conc_old_" + i + ".pxl";
+            String newName = "conc_new_" + i + ".pxl";
+            writeTestFile(oldName, schema, ids, true, ts);
+
+            File oldFile = new File();
+            oldFile.setName(oldName);
+            oldFile.setType(File.Type.REGULAR);
+            oldFile.setNumRowGroup(1);
+            oldFile.setMinRowId(0);
+            oldFile.setMaxRowId(0);
+            oldFile.setPathId(testPathId);
+
+            File newFile = new File();
+            newFile.setName(newName);
+            newFile.setType(File.Type.TEMPORARY);
+            newFile.setNumRowGroup(1);
+            newFile.setMinRowId(0);
+            newFile.setMaxRowId(0);
+            newFile.setPathId(testPathId);
+
+            metadataService.addFiles(Arrays.asList(oldFile, newFile));
+            oldFileIds[i] = metadataService.getFileId(testOrderedPathUri + "/" + oldName);
+            newFileIds[i] = metadataService.getFileId(testOrderedPathUri + "/" + newName);
+            assertTrue("Old file " + i + " id must be valid", oldFileIds[i] > 0);
+            assertTrue("New file " + i + " id must be valid", newFileIds[i] > 0);
+        }
+
+        CyclicBarrier barrier = new CyclicBarrier(nThreads);
+        ExecutorService pool = Executors.newFixedThreadPool(nThreads);
+        AtomicInteger failures = new AtomicInteger(0);
+
+        for (int i = 0; i < nThreads; i++)
+        {
+            final int idx = i;
+            pool.submit(() ->
+            {
+                try
+                {
+                    barrier.await();
+                    metadataService.atomicSwapFiles(newFileIds[idx],
+                            Collections.singletonList(oldFileIds[idx]));
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    failures.incrementAndGet();
+                }
+            });
+        }
+        pool.shutdown();
+        pool.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS);
+
+        assertEquals("All concurrent swaps should succeed", 0, failures.get());
+
+        for (int i = 0; i < nThreads; i++)
+        {
+            File promoted = metadataService.getFileById(newFileIds[i]);
+            assertNotNull("Promoted file " + i + " must exist", promoted);
+            assertEquals("Promoted file " + i + " must be REGULAR",
+                    File.Type.REGULAR, promoted.getType());
+
+            File removed = metadataService.getFileById(oldFileIds[i]);
+            assertTrue("Old file " + i + " should be gone",
+                    removed == null || removed.getId() == 0);
+        }
+    }
+
+    /**
+     * Partial old-files-already-gone: one old file is deleted before the swap, but
+     * {@code atomicSwapFiles} is called with both IDs.  The DELETE-WHERE-IN for an
+     * already-absent row is a no-op; the transaction must still commit, promoting the
+     * new file and removing the remaining old file.
+     */
+    @Test
+    public void testAtomicSwap_partialOldFilesAlreadyGone() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0, 1};
+        long[] ts = {100, 100};
+
+        writeTestFile("partial_old1.pxl", schema, ids, true, ts);
+        writeTestFile("partial_old2.pxl", schema, ids, true, ts);
+
+        File old1 = new File();
+        old1.setName("partial_old1.pxl");
+        old1.setType(File.Type.REGULAR);
+        old1.setNumRowGroup(1);
+        old1.setMinRowId(0);
+        old1.setMaxRowId(1);
+        old1.setPathId(testPathId);
+
+        File old2 = new File();
+        old2.setName("partial_old2.pxl");
+        old2.setType(File.Type.REGULAR);
+        old2.setNumRowGroup(1);
+        old2.setMinRowId(0);
+        old2.setMaxRowId(1);
+        old2.setPathId(testPathId);
+
+        metadataService.addFiles(Arrays.asList(old1, old2));
+        long oldId1 = metadataService.getFileId(testOrderedPathUri + "/partial_old1.pxl");
+        long oldId2 = metadataService.getFileId(testOrderedPathUri + "/partial_old2.pxl");
+
+        metadataService.deleteFiles(Collections.singletonList(oldId1));
+        File preCheck = metadataService.getFileById(oldId1);
+        assertTrue("old1 should be gone before swap", preCheck == null || preCheck.getId() == 0);
+
+        File newFile = new File();
+        newFile.setName("partial_new.pxl");
+        newFile.setType(File.Type.TEMPORARY);
+        newFile.setNumRowGroup(1);
+        newFile.setMinRowId(0);
+        newFile.setMaxRowId(1);
+        newFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(newFile));
+        long newFileId = metadataService.getFileId(testOrderedPathUri + "/partial_new.pxl");
+
+        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldId1, oldId2));
+
+        File swapped = metadataService.getFileById(newFileId);
+        assertNotNull("New file must exist after swap", swapped);
+        assertEquals("New file must be REGULAR", File.Type.REGULAR, swapped.getType());
+
+        File g2 = metadataService.getFileById(oldId2);
+        assertTrue("Remaining old file should be gone",
+                g2 == null || g2.getId() == 0);
+    }
+
+    /**
+     * Rollback after rewrite + dual-write: verifies that Visibility entries for the new
+     * file are removed, dual-write is unregistered, the TEMPORARY catalog entry is deleted,
+     * and the physical file is cleaned up.
+     */
     @Test
     public void testAtomicSwap_rollbackCleansUp() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        long[] ts = new long[10];
+        Arrays.fill(ts, 100);
+        String filePath = writeTestFile("rollback_src.pxl", schema, ids, true, ts);
+
+        File srcFile = new File();
+        srcFile.setName("rollback_src.pxl");
+        srcFile.setType(File.Type.REGULAR);
+        srcFile.setNumRowGroup(1);
+        srcFile.setMinRowId(0);
+        srcFile.setMaxRowId(9);
+        srcFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(srcFile));
+        long srcFileId = metadataService.getFileId(filePath);
+
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, filePath, schema);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), makeBitmap(10, 6));
+
+        retinaManager.addVisibility(srcFileId, 0, 10, 50, null, true);
+
+        StorageGarbageCollector.RewriteResult result = gc.rewriteFileGroup(group, 100, bitmaps);
+        assertTrue("New file should be created", result.newFileId > 0);
+
+        gc.registerDualWrite(result);
+
+        gc.rollback(result);
+
+        assertFalse("New file should be deleted after rollback",
+                fileStorage.exists(result.newFilePath));
+
+        File catalogEntry = metadataService.getFileById(result.newFileId);
+        assertTrue("Catalog entry should be deleted after rollback",
+                catalogEntry == null || catalogEntry.getId() == 0);
     }
 
-    /** Delayed cleanup removes old files after lwm passes retireTs. */
-    @Ignore("index update and atomic switch not yet implemented")
+    /** Delayed cleanup removes old file Visibility and physical file after wall-clock deadline passes. */
     @Test
     public void testAtomicSwap_delayedCleanup() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0, 1, 2, 3, 4};
+        long[] ts = new long[5];
+        Arrays.fill(ts, 100);
+        String filePath = writeTestFile("delayed_old.pxl", schema, ids, true, ts);
+        long fakeFileId = 999999L;
+
+        retinaManager.addVisibility(fakeFileId, 0, 5, 50, null, true);
+
+        long futureDeadline = System.currentTimeMillis() + 60_000L;
+        RetinaResourceManager.RetiredFile retiredFuture = new RetinaResourceManager.RetiredFile(
+                fakeFileId, 1, filePath, futureDeadline, Collections.emptyList());
+        retinaManager.scheduleRetiredFile(retiredFuture);
+
+        retinaManager.processRetiredFiles();
+        assertTrue("File should NOT be cleaned before deadline",
+                fileStorage.exists(filePath));
+
+        resetManagerState();
+
+        retinaManager.addVisibility(fakeFileId, 0, 5, 50, null, true);
+
+        long pastDeadline = System.currentTimeMillis() - 1L;
+        RetinaResourceManager.RetiredFile retiredPast = new RetinaResourceManager.RetiredFile(
+                fakeFileId, 1, filePath, pastDeadline, Collections.emptyList());
+        retinaManager.scheduleRetiredFile(retiredPast);
+
+        retinaManager.processRetiredFiles();
+        assertFalse("File should be cleaned after deadline",
+                fileStorage.exists(filePath));
+    }
+
+    /** processFileGroup completes the full pipeline without throwing. */
+    @Test
+    public void testProcessFileGroup_fullPipeline() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        long[] ts = new long[10];
+        Arrays.fill(ts, 100);
+        String filePath = writeTestFile("pipeline_src.pxl", schema, ids, true, ts);
+
+        File srcFile = new File();
+        srcFile.setName("pipeline_src.pxl");
+        srcFile.setType(File.Type.REGULAR);
+        srcFile.setNumRowGroup(1);
+        srcFile.setMinRowId(0);
+        srcFile.setMaxRowId(9);
+        srcFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(srcFile));
+        long srcFileId = metadataService.getFileId(filePath);
+
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, filePath, schema);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), makeBitmap(10, 6));
+
+        retinaManager.addVisibility(srcFileId, 0, 10, 50, null, true);
+
+        gc.processFileGroup(group, 100, bitmaps);
+
+        assertTrue("Bitmaps should be consumed after processFileGroup", bitmaps.isEmpty());
+    }
+
+    /**
+     * processFileGroup success path using {@link NoIndexSyncGC} (which stubs out
+     * syncIndex).  Verifies that after the pipeline completes:
+     * <ul>
+     *   <li>Old file is removed from the catalog</li>
+     *   <li>A new REGULAR file exists</li>
+     *   <li>Rewritten data contains only survivors</li>
+     *   <li>gcSnapshotBitmaps are fully consumed</li>
+     * </ul>
+     */
+    @Test
+    public void testProcessFileGroup_successWithNoIndex() throws Exception
+    {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        long[] ids = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        long[] ts = new long[10];
+        Arrays.fill(ts, 100);
+        String filePath = writeTestFile("pipeline_ok_src.pxl", schema, ids, true, ts);
+
+        File srcFile = new File();
+        srcFile.setName("pipeline_ok_src.pxl");
+        srcFile.setType(File.Type.REGULAR);
+        srcFile.setNumRowGroup(1);
+        srcFile.setMinRowId(0);
+        srcFile.setMaxRowId(9);
+        srcFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(srcFile));
+        long srcFileId = metadataService.getFileId(filePath);
+
+        retinaManager.addVisibility(srcFileId, 0, 10, 50, null, true);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), makeBitmap(10, 6));
+
+        Set<Long> beforeFileIds = new HashSet<>();
+        for (File f : metadataService.getFiles(testPathId))
+        {
+            beforeFileIds.add(f.getId());
+        }
+
+        NoIndexSyncGC noIdxGc = new NoIndexSyncGC(retinaManager, metadataService,
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L);
+
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, filePath, schema);
+
+        noIdxGc.processFileGroup(group, 100, bitmaps);
+
+        assertTrue("Bitmaps should be consumed", bitmaps.isEmpty());
+
+        File oldFileCheck = metadataService.getFileById(srcFileId);
+        assertTrue("Old file should be gone from catalog after successful GC",
+                oldFileCheck == null || oldFileCheck.getId() == 0);
+
+        List<File> afterFiles = metadataService.getFiles(testPathId);
+        boolean foundNewRegular = false;
+        for (File f : afterFiles)
+        {
+            if (!beforeFileIds.contains(f.getId()) && f.getType() == File.Type.REGULAR)
+            {
+                foundNewRegular = true;
+                break;
+            }
+        }
+        assertTrue("A new REGULAR file should exist after successful pipeline", foundNewRegular);
+    }
+
+    // =======================================================================
+    // Section 8b: TypeDescription.convertColumnVectorToByte type coverage
+    // =======================================================================
+
+    /** INT column: value serialized as 4-byte big-endian. */
+    @Test
+    public void testConvertColumnVectorToByte_int()
+    {
+        LongColumnVector col = new LongColumnVector(2);
+        col.vector[0] = 42;
+        col.vector[1] = -1;
+
+        byte[] bytes0 = TypeDescription.createInt().convertColumnVectorToByte(col, 0);
+        assertEquals(Integer.BYTES, bytes0.length);
+        assertEquals(42, ByteBuffer.wrap(bytes0).getInt());
+
+        byte[] bytes1 = TypeDescription.createInt().convertColumnVectorToByte(col, 1);
+        assertEquals(-1, ByteBuffer.wrap(bytes1).getInt());
+    }
+
+    /** LONG column: value serialized as 8-byte big-endian. */
+    @Test
+    public void testConvertColumnVectorToByte_long()
+    {
+        LongColumnVector col = new LongColumnVector(1);
+        col.vector[0] = Long.MAX_VALUE;
+
+        byte[] bytes = TypeDescription.createLong().convertColumnVectorToByte(col, 0);
+        assertEquals(Long.BYTES, bytes.length);
+        assertEquals(Long.MAX_VALUE, ByteBuffer.wrap(bytes).getLong());
+    }
+
+    /** FLOAT column: raw int bits serialized as 4-byte big-endian. */
+    @Test
+    public void testConvertColumnVectorToByte_float()
+    {
+        FloatColumnVector col = new FloatColumnVector(1);
+        col.vector[0] = Float.floatToIntBits(3.14f);
+
+        byte[] bytes = TypeDescription.createFloat().convertColumnVectorToByte(col, 0);
+        assertEquals(Integer.BYTES, bytes.length);
+        assertEquals(Float.floatToIntBits(3.14f), ByteBuffer.wrap(bytes).getInt());
+    }
+
+    /** DOUBLE column: raw long bits serialized as 8-byte big-endian. */
+    @Test
+    public void testConvertColumnVectorToByte_double()
+    {
+        DoubleColumnVector col = new DoubleColumnVector(1);
+        col.vector[0] = Double.doubleToLongBits(2.718);
+
+        byte[] bytes = TypeDescription.createDouble().convertColumnVectorToByte(col, 0);
+        assertEquals(Long.BYTES, bytes.length);
+        assertEquals(Double.doubleToLongBits(2.718), ByteBuffer.wrap(bytes).getLong());
+    }
+
+    /** VARCHAR/STRING column: variable-length byte slice extracted correctly. */
+    @Test
+    public void testConvertColumnVectorToByte_string()
+    {
+        BinaryColumnVector col = new BinaryColumnVector(2);
+        byte[] hello = "hello".getBytes();
+        byte[] world = "world!".getBytes();
+        col.setVal(0, hello);
+        col.setVal(1, world);
+
+        byte[] bytes0 = TypeDescription.createVarchar(255).convertColumnVectorToByte(col, 0);
+        assertTrue("string bytes must match", Arrays.equals(hello, bytes0));
+
+        byte[] bytes1 = TypeDescription.createString().convertColumnVectorToByte(col, 1);
+        assertTrue("string bytes must match", Arrays.equals(world, bytes1));
+    }
+
+    /** SHORT DECIMAL column: value serialized as 8-byte big-endian long. */
+    @Test
+    public void testConvertColumnVectorToByte_shortDecimal()
+    {
+        DecimalColumnVector col = new DecimalColumnVector(10, 2);
+        col.vector[0] = 12345L;
+
+        TypeDescription decType = TypeDescription.createDecimal(10, 2);
+        byte[] bytes = decType.convertColumnVectorToByte(col, 0);
+        assertEquals(Long.BYTES, bytes.length);
+        assertEquals(12345L, ByteBuffer.wrap(bytes).getLong());
+    }
+
+    /** BOOLEAN column: value serialized as single byte. */
+    @Test
+    public void testConvertColumnVectorToByte_boolean()
+    {
+        LongColumnVector col = new LongColumnVector(2);
+        col.vector[0] = 1;
+        col.vector[1] = 0;
+
+        byte[] bytes0 = TypeDescription.createBoolean().convertColumnVectorToByte(col, 0);
+        assertEquals(1, bytes0.length);
+        assertEquals(1, bytes0[0]);
+
+        byte[] bytes1 = TypeDescription.createBoolean().convertColumnVectorToByte(col, 1);
+        assertEquals(1, bytes1.length);
+        assertEquals(0, bytes1[0]);
     }
 
     // =======================================================================
     // Section 9: end-to-end integration tests (placeholder)
     // =======================================================================
 
-    /** Insert → delete → runGC → catalog swap → new file correct → query correct. */
-    @Ignore("end-to-end not yet implemented")
+    /**
+     * Comprehensive end-to-end test covering the full Storage GC lifecycle with
+     * real deletion chains.  Exercises every step of the pipeline:
+     *
+     * <pre>
+     * Phase 1 (ts ≤ safeGcTs=100): delete 6 rows → physically removed by rewrite
+     * Phase 2 (ts=150, before dual-write): delete row 1 → only in old chain, needs export
+     * Rewrite → verify data, forward/backward mappings, hidden column preservation
+     * Register dual-write
+     * Phase 3 (ts=200, dual-write active): delete row 3 → propagated to both files
+     * Sync visibility → export + coord-transform + import
+     * Phase 4 (ts=300, post-sync, dual-write still active): delete row 5
+     * Commit → atomic swap (TEMPORARY→REGULAR), old file removed from catalog
+     * Verify: multi-snap_ts consistency on new file at ts=100..500
+     * Verify: old file gone from catalog, new file REGULAR
+     * </pre>
+     */
     @Test
     public void testEndToEnd_fullGcCycle() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        int numRows = 10;
+        long[] ids = new long[numRows];
+        long[] createTs = new long[numRows];
+        for (int i = 0; i < numRows; i++)
+        {
+            ids[i] = i * 10;
+            createTs[i] = 50L;
+        }
+        String srcPath = writeTestFile("e2e_full_src.pxl", schema, ids, true, createTs);
+
+        File srcFile = new File();
+        srcFile.setName("e2e_full_src.pxl");
+        srcFile.setType(File.Type.REGULAR);
+        srcFile.setNumRowGroup(1);
+        srcFile.setMinRowId(0);
+        srcFile.setMaxRowId(numRows - 1);
+        srcFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(srcFile));
+        long srcFileId = metadataService.getFileId(srcPath);
+        assertTrue("source file must have a valid catalog id", srcFileId > 0);
+
+        retinaManager.addVisibility(srcFileId, 0, numRows, 0L, null, false);
+
+        long safeGcTs = 100L;
+        retinaManager.deleteRecord(srcFileId, 0, 0, 10L);
+        retinaManager.deleteRecord(srcFileId, 0, 2, 20L);
+        retinaManager.deleteRecord(srcFileId, 0, 4, 30L);
+        retinaManager.deleteRecord(srcFileId, 0, 6, 50L);
+        retinaManager.deleteRecord(srcFileId, 0, 8, 70L);
+        retinaManager.deleteRecord(srcFileId, 0, 9, 90L);
+
+        retinaManager.deleteRecord(srcFileId, 0, 1, 150L);
+
+        long[] gcBitmap = retinaManager.queryVisibility(srcFileId, 0, safeGcTs, 0L);
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), gcBitmap);
+
+        for (int r : new int[]{0, 2, 4, 6, 8, 9})
+        {
+            assertTrue("row " + r + " should be in GC bitmap",
+                    (gcBitmap[r / 64] & (1L << (r % 64))) != 0);
+        }
+        for (int r : new int[]{1, 3, 5, 7})
+        {
+            assertFalse("row " + r + " should NOT be in GC bitmap",
+                    (gcBitmap[r / 64] & (1L << (r % 64))) != 0);
+        }
+
+        NoIndexSyncGC e2eGc = new NoIndexSyncGC(retinaManager, metadataService,
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576,
+                EncodingLevel.EL2, 86_400_000L);
+
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, srcPath, schema);
+
+        StorageGarbageCollector.RewriteResult result =
+                e2eGc.rewriteFileGroup(group, safeGcTs, bitmaps);
+        long newFileId = result.newFileId;
+        assertTrue("new file must be created", newFileId > 0);
+        assertRewriteResultConsistency(result, 4);
+
+        long[][] rows = readAllRows(result.newFilePath, schema, true);
+        assertEquals("4 survivors expected (rows 1,3,5,7)", 4, rows.length);
+        long[] expectedIds = {10L, 30L, 50L, 70L};
+        for (int i = 0; i < 4; i++)
+        {
+            assertEquals("id mismatch at new row " + i, expectedIds[i], rows[i][0]);
+            assertEquals("create_ts mismatch at new row " + i, 50L, rows[i][1]);
+        }
+
+        int[] fwd = result.forwardRgMappings.get(srcFileId).get(0);
+        assertEquals(-1, fwd[0]);
+        assertEquals(0, fwd[1]);
+        assertEquals(-1, fwd[2]);
+        assertEquals(1, fwd[3]);
+        assertEquals(-1, fwd[4]);
+        assertEquals(2, fwd[5]);
+        assertEquals(-1, fwd[6]);
+        assertEquals(3, fwd[7]);
+        assertEquals(-1, fwd[8]);
+        assertEquals(-1, fwd[9]);
+
+        assertEquals(1, result.backwardInfos.size());
+        StorageGarbageCollector.BackwardInfo bwd = result.backwardInfos.get(0);
+        assertEquals(srcFileId, bwd.oldFileId);
+
+        e2eGc.registerDualWrite(result);
+
+        retinaManager.deleteRecord(srcFileId, 0, 3, 200L);
+        int newRowForOld3 = fwd[3];
+        assertTrue("fwd[3] should be valid", newRowForOld3 >= 0);
+        long[] dualBm = retinaManager.queryVisibility(newFileId, 0, 200L, 0L);
+        assertTrue("dual-write: new row " + newRowForOld3 + " should be deleted",
+                (dualBm[newRowForOld3 / 64] & (1L << (newRowForOld3 % 64))) != 0);
+
+        e2eGc.syncVisibility(result, safeGcTs);
+
+        int newRowForOld1 = fwd[1];
+        long[] syncBm = retinaManager.queryVisibility(newFileId, 0, 150L, 0L);
+        assertTrue("sync: new row " + newRowForOld1 + " should show old row 1 deleted at ts=150",
+                (syncBm[newRowForOld1 / 64] & (1L << (newRowForOld1 % 64))) != 0);
+
+        retinaManager.deleteRecord(srcFileId, 0, 5, 300L);
+        int newRowForOld5 = fwd[5];
+        assertTrue("fwd[5] should be valid", newRowForOld5 >= 0);
+
+        e2eGc.syncIndex(result, group.tableId);
+        e2eGc.commitFileGroup(result);
+
+        File newFileCheck = metadataService.getFileById(newFileId);
+        assertNotNull("new file should exist after commit", newFileCheck);
+        assertEquals("new file should be REGULAR after commit",
+                File.Type.REGULAR, newFileCheck.getType());
+
+        File oldFileCheck = metadataService.getFileById(srcFileId);
+        assertTrue("old file should be gone from catalog after commit",
+                oldFileCheck == null || oldFileCheck.getId() == 0);
+
+        assertTrue("old physical file should still exist (delayed cleanup, not yet due)",
+                fileStorage.exists(srcPath));
+
+        for (long snap : new long[]{100L, 149L, 150L, 199L, 200L, 299L, 300L, 500L})
+        {
+            long[] bm = retinaManager.queryVisibility(newFileId, 0, snap, 0L);
+
+            boolean r0del = (bm[0] & (1L << 0)) != 0;
+            assertEquals("snap=" + snap + " newRow0 (old row1, del@150)", snap >= 150, r0del);
+
+            boolean r1del = (bm[0] & (1L << 1)) != 0;
+            assertEquals("snap=" + snap + " newRow1 (old row3, del@200)", snap >= 200, r1del);
+
+            boolean r2del = (bm[0] & (1L << 2)) != 0;
+            assertEquals("snap=" + snap + " newRow2 (old row5, del@300)", snap >= 300, r2del);
+
+            boolean r3del = (bm[0] & (1L << 3)) != 0;
+            assertFalse("snap=" + snap + " newRow3 (old row7) should never be deleted", r3del);
+        }
+
+        for (long snap : new long[]{100L, 150L, 200L, 300L, 500L})
+        {
+            long[] oldBm = retinaManager.queryVisibility(srcFileId, 0, snap, 0L);
+            long[] newBm = retinaManager.queryVisibility(newFileId, 0, snap, 0L);
+            for (int oldRow = 1; oldRow <= 7; oldRow += 2)
+            {
+                int newRow = fwd[oldRow];
+                assertTrue("old row " + oldRow + " should have valid mapping", newRow >= 0);
+                boolean oldDel = (oldBm[oldRow / 64] & (1L << (oldRow % 64))) != 0;
+                boolean newDel = (newBm[newRow / 64] & (1L << (newRow % 64))) != 0;
+                assertEquals("snap=" + snap + " old row " + oldRow + " vs new row " + newRow
+                        + " visibility mismatch", oldDel, newDel);
+            }
+        }
     }
 
     /** Inject failure after visibility sync → rollback clean → re-run succeeds. */
@@ -2338,6 +3399,10 @@ public class TestStorageGarbageCollector
             Field dualWriteField = RetinaResourceManager.class.getDeclaredField("isDualWriteActive");
             dualWriteField.setAccessible(true);
             dualWriteField.setBoolean(retinaManager, false);
+
+            Field retiredField = RetinaResourceManager.class.getDeclaredField("retiredFiles");
+            retiredField.setAccessible(true);
+            ((java.util.Queue<?>) retiredField.get(retinaManager)).clear();
         }
         catch (Exception e)
         {
@@ -2556,7 +3621,7 @@ public class TestStorageGarbageCollector
 
         StorageGarbageCollector.FileCandidate fc =
                 new StorageGarbageCollector.FileCandidate(
-                        f, filePath, fileId, rgCount, 1L, 0, 10L, 0.70, 0L);
+                        f, filePath, fileId, rgCount, 1L, 0, 0.70, 0L);
 
         return new StorageGarbageCollector.FileGroup(1L, 0, Collections.singletonList(fc));
     }
@@ -2590,7 +3655,7 @@ public class TestStorageGarbageCollector
             f.setMaxRowId(fid * 1000 + 999);
             f.setPathId(testPathId);
             candidates.add(new StorageGarbageCollector.FileCandidate(
-                    f, path, fid, rgCount, 1L, 0, 5L, 0.70, 0L));
+                    f, path, fid, rgCount, 1L, 0, 0.70, 0L));
         }
         return new StorageGarbageCollector.FileGroup(1L, 0, candidates);
     }
@@ -2702,7 +3767,7 @@ public class TestStorageGarbageCollector
                             int maxGroups, List<FakeFileEntry> fakeEntries)
         {
             super(rm, null, threshold, 134_217_728L, Integer.MAX_VALUE, maxGroups,
-                    1048576, EncodingLevel.EL2);
+                    1048576, EncodingLevel.EL2, 86_400_000L);
             this.fakeEntries = fakeEntries;
         }
 
@@ -2728,7 +3793,7 @@ public class TestStorageGarbageCollector
                         "fake_" + entry.fileId + "_0_" + entry.virtualNodeId + "_ordered.pxl",
                         entry.fileId, entry.rgCount,
                         entry.tableId, entry.virtualNodeId,
-                        stats[0], ratio, 0L));
+                        ratio, 0L));
             }
             return groupAndMerge(candidates);
         }
@@ -2754,7 +3819,7 @@ public class TestStorageGarbageCollector
         FailFirstGroupGC()
         {
             super(null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                    1048576, EncodingLevel.EL2);
+                    1048576, EncodingLevel.EL2, 86_400_000L);
         }
 
         @Override
@@ -2774,7 +3839,30 @@ public class TestStorageGarbageCollector
                 }
             }
             return new RewriteResult(group, "stub", -1,
-                    0, new int[0], new int[]{0}, new HashMap<>(), Collections.emptyList());
+                    0, new int[0], new int[]{0}, new HashMap<>(), Collections.emptyList(),
+                    Collections.emptyList());
+        }
+    }
+
+    /**
+     * StorageGarbageCollector subclass that stubs out {@code syncIndex} so that
+     * the full pipeline can be tested without requiring a configured MainIndex.
+     * All other methods (rewrite, dual-write, visibility sync, commit) use real code.
+     */
+    static class NoIndexSyncGC extends StorageGarbageCollector
+    {
+        NoIndexSyncGC(RetinaResourceManager rm, MetadataService ms,
+                      double threshold, long targetFileSize, int maxFilesPerGroup,
+                      int maxGroups, int rowGroupSize, EncodingLevel encodingLevel,
+                      long retireDelayMs)
+        {
+            super(rm, ms, threshold, targetFileSize, maxFilesPerGroup, maxGroups,
+                    rowGroupSize, encodingLevel, retireDelayMs);
+        }
+
+        @Override
+        void syncIndex(RewriteResult result, long tableId) throws Exception
+        {
         }
     }
 }

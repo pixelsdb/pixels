@@ -1492,6 +1492,52 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
+    public void getFileById(MetadataProto.GetFileByIdRequest request,
+                            StreamObserver<MetadataProto.GetFileByIdResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        MetadataProto.GetFileByIdResponse.Builder responseBuilder = MetadataProto.GetFileByIdResponse.newBuilder();
+        MetadataProto.File file = this.fileDao.getById(request.getFileId());
+        if (file != null)
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+            responseBuilder.setFile(file).setHeader(headerBuilder);
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_GET_FILE_BY_ID_FAILED).setErrorMsg("get file by id failed");
+            responseBuilder.setHeader(headerBuilder);
+        }
+
+        responseObserver.onNext(responseBuilder.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void atomicSwapFiles(MetadataProto.AtomicSwapFilesRequest request,
+                                StreamObserver<MetadataProto.AtomicSwapFilesResponse> responseObserver)
+    {
+        MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+
+        if (this.fileDao.atomicSwapFiles(request.getNewFileId(), request.getOldFileIdsList()))
+        {
+            headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
+        }
+        else
+        {
+            headerBuilder.setErrorCode(METADATA_ATOMIC_SWAP_FILES_FAILED).setErrorMsg("atomic swap files failed");
+        }
+
+        MetadataProto.AtomicSwapFilesResponse response = MetadataProto.AtomicSwapFilesResponse.newBuilder()
+                .setHeader(headerBuilder).build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void createPeerPath(MetadataProto.CreatePeerPathRequest request,
                                StreamObserver<MetadataProto.CreatePeerPathResponse> responseObserver)
     {

@@ -85,6 +85,32 @@ public class RetinaResourceManager
     private final ReadWriteLock redirectionLock = new ReentrantReadWriteLock();
     private volatile boolean isDualWriteActive = false;
 
+    // Delayed cleanup queue for old files retired after atomic swap.
+    private final ConcurrentLinkedQueue<RetiredFile> retiredFiles = new ConcurrentLinkedQueue<>();
+
+    /**
+     * Metadata for an old file that has been atomically swapped out and awaits
+     * delayed physical deletion after a configurable wall-clock grace period.
+     */
+    static final class RetiredFile
+    {
+        final long fileId;
+        final int rgCount;
+        final String filePath;
+        /** Epoch millis deadline; the file is eligible for deletion after this time. */
+        final long retireTimestamp;
+        final List<Long> oldRowIds;
+
+        RetiredFile(long fileId, int rgCount, String filePath, long retireTimestamp, List<Long> oldRowIds)
+        {
+            this.fileId = fileId;
+            this.rgCount = rgCount;
+            this.filePath = filePath;
+            this.retireTimestamp = retireTimestamp;
+            this.oldRowIds = oldRowIds;
+        }
+    }
+
     private enum CheckpointType
     {
         GC,
@@ -150,9 +176,10 @@ public class RetinaResourceManager
                 int rowGroupSize = Integer.parseInt(config.getProperty("row.group.size"));
                 EncodingLevel encodingLevel = EncodingLevel.from(
                         Integer.parseInt(config.getProperty("retina.storage.gc.encoding.level")));
+                long retireDelayMs = (long) (Double.parseDouble(config.getProperty("retina.storage.gc.file.retire.delay.hours")) * 3_600_000L);
                 gc = new StorageGarbageCollector(this, this.metadataService,
                         threshold, targetFileSize, maxFilesPerGroup, maxGroups,
-                        rowGroupSize, encodingLevel);
+                        rowGroupSize, encodingLevel, retireDelayMs);
                 logger.info("Storage GC enabled (threshold={}, targetFileSize={}, maxFilesPerGroup={}, maxGroups={})",
                         threshold, targetFileSize, maxFilesPerGroup, maxGroups);
             }
@@ -491,6 +518,62 @@ public class RetinaResourceManager
         {
             rgVisibility.close();
         }
+    }
+
+    /**
+     * Enqueues an old file for delayed cleanup after a configurable wall-clock
+     * grace period has elapsed.
+     */
+    public void scheduleRetiredFile(RetiredFile retiredFile)
+    {
+        retiredFiles.add(retiredFile);
+    }
+
+    /**
+     * Processes the retired files queue: for each file whose wall-clock
+     * {@code retireTimestamp} deadline has passed, removes its Visibility
+     * entries and deletes the physical file.
+     */
+    public void processRetiredFiles()
+    {
+        long now = System.currentTimeMillis();
+        retiredFiles.removeIf(rf ->
+        {
+            if (now <= rf.retireTimestamp)
+            {
+                return false;
+            }
+            for (int rgId = 0; rgId < rf.rgCount; rgId++)
+            {
+                try
+                {
+                    reclaimVisibility(rf.fileId, rgId, 0);
+                }
+                catch (Exception e)
+                {
+                    logger.warn("processRetiredFiles: failed to reclaim Visibility for fileId={}, rgId={}",
+                            rf.fileId, rgId, e);
+                }
+            }
+            // Old MainIndex entries for retired files are purged lazily by the
+            // MainIndex implementation; no explicit cleanup is needed here.
+            if (rf.filePath != null)
+            {
+                try
+                {
+                    Storage storage = StorageFactory.Instance().getStorage(rf.filePath);
+                    if (storage.exists(rf.filePath))
+                    {
+                        storage.delete(rf.filePath, false);
+                    }
+                }
+                catch (IOException e)
+                {
+                    logger.warn("processRetiredFiles: failed to delete physical file {}", rf.filePath, e);
+                }
+            }
+            return true;
+        });
     }
 
     public String getCheckpointPath(long timestamp)
@@ -841,6 +924,8 @@ public class RetinaResourceManager
      */
     private void runGC()
     {
+        processRetiredFiles();
+
         long timestamp = 0;
         try
         {

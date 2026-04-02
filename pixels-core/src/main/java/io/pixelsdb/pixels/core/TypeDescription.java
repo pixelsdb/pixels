@@ -1820,6 +1820,55 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         }
     }
 
+    /**
+     * Serializes one cell from a {@link ColumnVector} at the given row index into
+     * the canonical byte format, using the same encoding as {@link #convertSqlStringToByte}.
+     */
+    public byte[] convertColumnVectorToByte(ColumnVector col, int row)
+    {
+        switch (getCategory())
+        {
+            case BOOLEAN:
+            case BYTE:
+                return new byte[]{(byte) ((LongColumnVector) col).vector[row]};
+            case SHORT:
+            case INT:
+            case DATE:
+            case TIME:
+                return ByteBuffer.allocate(Integer.BYTES).putInt((int) ((LongColumnVector) col).vector[row]).array();
+            case LONG:
+            case TIMESTAMP:
+                return ByteBuffer.allocate(Long.BYTES).putLong(((LongColumnVector) col).vector[row]).array();
+            case FLOAT:
+                return ByteBuffer.allocate(Integer.BYTES).putInt(((FloatColumnVector) col).vector[row]).array();
+            case DOUBLE:
+                return ByteBuffer.allocate(Long.BYTES).putLong(((DoubleColumnVector) col).vector[row]).array();
+            case DECIMAL:
+                if (getPrecision() <= MAX_SHORT_DECIMAL_PRECISION)
+                {
+                    return ByteBuffer.allocate(Long.BYTES).putLong(((DecimalColumnVector) col).vector[row]).array();
+                }
+                else
+                {
+                    LongDecimalColumnVector ldcv = (LongDecimalColumnVector) col;
+                    long high = ldcv.vector[row * 2];
+                    long low = ldcv.vector[row * 2 + 1];
+                    return ByteBuffer.allocate(16).putLong(high).putLong(low).array();
+                }
+            case CHAR:
+            case VARCHAR:
+            case STRING:
+            case BINARY:
+            case VARBINARY:
+            {
+                BinaryColumnVector bcv = (BinaryColumnVector) col;
+                return Arrays.copyOfRange(bcv.vector[row], bcv.start[row], bcv.start[row] + bcv.lens[row]);
+            }
+            default:
+                throw new UnsupportedOperationException("Unsupported column type: " + getCategory());
+        }
+    }
+
     public byte[] convertSqlStringToByte(String value)
     {
         if (value == null || value.isEmpty())
