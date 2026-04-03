@@ -7,3 +7,7 @@ While the `Workers` are deployed together with the query engine workers and stor
 
 Either `Coordinator` or `Worker` process is started as a **stateless** daemon process in the server.
 Whenever the daemon process is crashed or killed, it only needs a restart to recover.
+
+## Usage
+
+[TPC-H Evaluation](../docs/TPC-H.md) provides an example of using `pixels-daemon`.

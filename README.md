@@ -2,12 +2,6 @@ Pixels
 =======
 [![Pixels Daily Build](https://github.com/pixelsdb/pixels/actions/workflows/daily-build.yml/badge.svg)](https://github.com/pixelsdb/pixels/releases/tag/daily-latest)
 ![GitHub commits](https://img.shields.io/github/commit-activity/m/pixelsdb/pixels/master)
-![GitHub Issues](https://img.shields.io/github/issues-closed/pixelsdb/pixels)
-![GitHub Pull Requests](https://img.shields.io/github/issues-pr-closed/pixelsdb/pixels)
-[![Visitors](https://api.visitorbadge.io/api/combined?path=https%3A%2F%2Fgithub.com%2Fpixelsdb%2Fpixels&label=visitors&countColor=%23ff8a65&style=flat)](https://visitorbadge.io/status?path=https%3A%2F%2Fgithub.com%2Fpixelsdb%2Fpixels)
-![GitHub Created At](https://img.shields.io/github/created-at/pixelsdb/pixels)
-![GitHub code size](https://img.shields.io/github/languages/code-size/pixelsdb/pixels)
-![GitHub repo size](https://img.shields.io/github/repo-size/pixelsdb/pixels)
 [![GitHub License](https://img.shields.io/github/license/pixelsdb/pixels)](https://github.com/pixelsdb/pixels/blob/master/LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/pixelsdb/pixels)
 
@@ -95,15 +89,15 @@ To solve this problem, set this property to `4096` (i.e., 4MB) or larger in `Hel
 
 > To use the maven plugin, run/debug the unit tests, or run/debug the main classes of Pixels in Intellij, set the `PIXELS_HOME` environment
 > variable for `Maven`, `Junit`, or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
-> Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](docs/INSTALL.md#install-pixels) to put
+> Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](docs/install.md#install-pixels) to put
 > the `pixels.properties` into `PIXELS_HOME/etc` and create the `logs` directory where the log files will be
 > written into.
 
 
 ## Deploy and Evaluate Pixels
 
-You can follow the [Installation](docs/INSTALL.md) instructions to deploy Pixels in a cluster,
-and learn how to use Pixels and evaluate its performance following [TPC-H Evaluation](docs/TPC-H.md) or [ClickBench Evaluation](docs/CLICKBENCH.md).
+You can follow the [Installation](docs/install.md) instructions to deploy Pixels in a cluster,
+and learn how to use Pixels and evaluate its performance following [TPC-H Evaluation](docs/TPC-H.md) or [ClickBench Evaluation](docs/ClickBench.md).
 
 
 ## Contributing

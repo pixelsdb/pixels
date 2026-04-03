@@ -14,7 +14,7 @@ replay throughput, without compromising query performance or resource cost-effic
 significantly outperforming state-of-the-art lakehouses, Iceberg and Paimon, which provides minute-level data freshness
 and one order of magnitude lower data-change throughput.
 
-## Retina Components
+## Components
 
 The components related to Retina are:
 
