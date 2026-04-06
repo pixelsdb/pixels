@@ -1,6 +1,6 @@
 # TPC-H Evaluation
 
-After the installation of [Pixels + Trino](install.md), we can evaluate the performance of Pixels using TPC-H.
+After the installation of [Pixels + Trino](INSTALL.md), we can evaluate the performance of Pixels using TPC-H.
 
 ## Prepare TPC-H
 

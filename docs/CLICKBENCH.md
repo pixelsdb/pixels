@@ -1,6 +1,6 @@
 # ClickBench Evaluation
 
-After the installation of [Pixels + Trino](install.md), we can evaluate the performance of Pixels using ClickBench.
+After the installation of [Pixels + Trino](INSTALL.md), we can evaluate the performance of Pixels using ClickBench.
 
 ## Prepare ClickBench
 

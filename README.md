@@ -89,15 +89,15 @@ To solve this problem, set this property to `4096` (i.e., 4MB) or larger in `Hel
 
 > To use the maven plugin, run/debug the unit tests, or run/debug the main classes of Pixels in Intellij, set the `PIXELS_HOME` environment
 > variable for `Maven`, `Junit`, or `Application` in `Run` -> `Edit Configurations` -> `Edit Configuration Templetes`.
-> Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](docs/install.md#install-pixels) to put
+> Ensure that the `PIXELS_HOME` directory exists and follow the instructions in [Install Pixels](docs/INSTALL.md#install-pixels) to put
 > the `pixels.properties` into `PIXELS_HOME/etc` and create the `logs` directory where the log files will be
 > written into.
 
 
 ## Deploy and Evaluate Pixels
 
-You can follow the [Installation](docs/install.md) instructions to deploy Pixels in a cluster,
-and learn how to use Pixels and evaluate its performance following [TPC-H Evaluation](docs/TPC-H.md) or [ClickBench Evaluation](docs/ClickBench.md).
+You can follow the [Installation](docs/INSTALL.md) instructions to deploy Pixels in a cluster,
+and learn how to use Pixels and evaluate its performance following [TPC-H Evaluation](docs/TPC-H.md) or [ClickBench Evaluation](docs/CLICKBENCH.md).
 
 
 ## Contributing
