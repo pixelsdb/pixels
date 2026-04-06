@@ -162,6 +162,7 @@ public class TestStorageGarbageCollector
     {
         retinaManager = RetinaResourceManager.Instance();
         resetManagerState();
+        cleanupOrderedDir();
         gc = new StorageGarbageCollector(retinaManager, metadataService, 0.5, 134_217_728L, Integer.MAX_VALUE, 10,
                 1048576, EncodingLevel.EL2, 86_400_000L);
     }
@@ -202,9 +203,13 @@ public class TestStorageGarbageCollector
         }
         for (java.io.File f : files)
         {
-            if (f.isFile())
+            if (f.isFile() && !f.delete())
             {
-                f.delete();
+                try { Thread.sleep(50); } catch (InterruptedException ignored) { }
+                if (!f.delete())
+                {
+                    System.err.println("Warning: failed to delete " + f.getAbsolutePath());
+                }
             }
         }
     }
@@ -3409,11 +3414,332 @@ public class TestStorageGarbageCollector
     {
     }
 
-    /** Concurrent INSERT/DELETE/UPDATE + GC → all operations correct. */
-    @Ignore("concurrency test not yet implemented")
+    /**
+     * Concurrent INSERT/DELETE/UPDATE + GC → all operations correct.
+     *
+     * <p>Simulates a realistic CDC event stream (serial per virtualNodeId) running
+     * concurrently with a full Storage GC pipeline (S2→S6).  CDC events include
+     * DELETE, INSERT (new file + addVisibility), and UPDATE (deleteRecord + INSERT).
+     * Events are spread across the entire GC execution window with short sleep
+     * intervals to maximize interleaving with every GC phase.
+     *
+     * <pre>
+     * Phase 0: 30 rows, delete 18 (ts 5..90 &lt; safeGcTs=100), 12 survivors (rows 18-29)
+     * Phase 1: CDC thread + GC thread start concurrently via CyclicBarrier
+     *   CDC: DELETE/INSERT/UPDATE events at ts=150..550, interleaving with GC
+     *   GC:  rewrite → registerDualWrite → syncVisibility → syncIndex(stub) → commit
+     * Phase 2: post-GC CDC deletes rows 27-29 at ts=600..700 (dual-write off)
+     * Phase 3: Verification — multi-snap_ts consistency, catalog, data, no errors
+     * </pre>
+     */
     @Test
     public void testEndToEnd_concurrentCdcAndGc() throws Exception
     {
+        TypeDescription schema = TypeDescription.fromString("struct<id:long>");
+        int numRows = 30;
+        long safeGcTs = 100L;
+
+        // ── Phase 0: Setup source file ──────────────────────────────────────
+        long[] ids = new long[numRows];
+        long[] createTs = new long[numRows];
+        for (int i = 0; i < numRows; i++)
+        {
+            ids[i] = i * 10;
+            createTs[i] = 50L;
+        }
+        String srcPath = writeTestFile("conc_cdc_gc.pxl", schema, ids, true, createTs);
+
+        File srcFile = new File();
+        srcFile.setName("conc_cdc_gc.pxl");
+        srcFile.setType(File.Type.REGULAR);
+        srcFile.setNumRowGroup(1);
+        srcFile.setMinRowId(0);
+        srcFile.setMaxRowId(numRows - 1);
+        srcFile.setPathId(testPathId);
+        metadataService.addFiles(Collections.singletonList(srcFile));
+        long srcFileId = metadataService.getFileId(srcPath);
+        assertTrue("source file must have a valid catalog id", srcFileId > 0);
+
+        retinaManager.addVisibility(srcFileId, 0, numRows, 0L, null, false);
+
+        int deletedBefore = 18;
+        for (int i = 0; i < deletedBefore; i++)
+        {
+            retinaManager.deleteRecord(srcFileId, 0, i, 5L + i * 5L);
+        }
+
+        long[] gcBitmap = retinaManager.queryVisibility(srcFileId, 0, safeGcTs, 0L);
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), gcBitmap);
+
+        for (int r = 0; r < deletedBefore; r++)
+        {
+            assertTrue("row " + r + " must be in GC bitmap",
+                    (gcBitmap[r / 64] & (1L << (r % 64))) != 0);
+        }
+        int survivors = numRows - deletedBefore;
+        for (int r = deletedBefore; r < numRows; r++)
+        {
+            assertFalse("row " + r + " must NOT be in GC bitmap",
+                    (gcBitmap[r / 64] & (1L << (r % 64))) != 0);
+        }
+
+        // ── Prepare GC and concurrency primitives ───────────────────────────
+        NoIndexSyncGC concGc = new NoIndexSyncGC(retinaManager, metadataService,
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576,
+                EncodingLevel.EL2, 86_400_000L);
+
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, srcPath, schema);
+
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        java.util.concurrent.CountDownLatch dualWriteActive = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch cdcPhaseBDone = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch gcDone = new java.util.concurrent.CountDownLatch(1);
+        AtomicInteger errors = new AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicReference<StorageGarbageCollector.RewriteResult> resultRef =
+                new java.util.concurrent.atomic.AtomicReference<>(null);
+        java.util.concurrent.atomic.AtomicReference<Throwable> gcError =
+                new java.util.concurrent.atomic.AtomicReference<>(null);
+        java.util.concurrent.atomic.AtomicReference<Throwable> cdcError =
+                new java.util.concurrent.atomic.AtomicReference<>(null);
+
+        List<Long> insertedFileIds = Collections.synchronizedList(new ArrayList<>());
+
+        // ── Phase 1: Launch CDC + GC threads concurrently ───────────────────
+
+        // CDC thread: serial events on the same (table, virtualNodeId).
+        // Phase A runs during S2 rewrite (pre-dual-write) → captured by export.
+        // Phase B runs during dual-write window (S3-S6) → forwarded by dual-write.
+        // Phase C runs after GC commit → only reaches old file.
+        Thread cdcThread = new Thread(() ->
+        {
+            try
+            {
+                barrier.await();
+
+                // Phase A + B wrapped in try-finally so that cdcPhaseBDone
+                // is always signalled, even if an exception occurs.
+                try
+                {
+                    // ── Phase A: pre-dual-write deletes (during S2 rewrite) ─
+                    // These go only to the old file's chain; syncVisibility
+                    // export will capture them (ts > safeGcTs).
+                    retinaManager.deleteRecord(srcFileId, 0, 18, 150L);
+                    Thread.sleep(2);
+                    retinaManager.deleteRecord(srcFileId, 0, 19, 200L);
+                    Thread.sleep(2);
+                    retinaManager.deleteRecord(srcFileId, 0, 20, 250L);
+
+                    // Wait until GC has registered dual-write
+                    dualWriteActive.await();
+
+                    // ── Phase B: dual-write window (S3→S6) ──────────────────
+                    // Deletes are forwarded to both old and new file.
+                    // INSERT/UPDATE interleaved to test concurrent addVisibility.
+                    retinaManager.deleteRecord(srcFileId, 0, 21, 300L);
+                    Thread.sleep(5);
+
+                    // INSERT: new file cdc_ins_1.pxl (2 rows)
+                    long[] insIds1 = {1000L, 1001L};
+                    long[] insTs1 = {300L, 300L};
+                    writeTestFile("cdc_ins_1.pxl", schema, insIds1, true, insTs1);
+                    long insFileId1 = 9001L;
+                    retinaManager.addVisibility(insFileId1, 0, 2, 0L, null, false);
+                    insertedFileIds.add(insFileId1);
+
+                    retinaManager.deleteRecord(srcFileId, 0, 22, 350L);
+                    Thread.sleep(5);
+
+                    // UPDATE row 23 @ ts=400: delete old + insert new
+                    retinaManager.deleteRecord(srcFileId, 0, 23, 400L);
+                    long[] updIds1 = {2000L};
+                    long[] updTs1 = {400L};
+                    writeTestFile("cdc_upd_1.pxl", schema, updIds1, true, updTs1);
+                    long updFileId1 = 9002L;
+                    retinaManager.addVisibility(updFileId1, 0, 1, 0L, null, false);
+                    insertedFileIds.add(updFileId1);
+
+                    retinaManager.deleteRecord(srcFileId, 0, 24, 450L);
+                    Thread.sleep(5);
+
+                    retinaManager.deleteRecord(srcFileId, 0, 25, 500L);
+                    Thread.sleep(5);
+
+                    // INSERT: new file cdc_ins_2.pxl (2 rows)
+                    long[] insIds2 = {1002L, 1003L};
+                    long[] insTs2 = {500L, 500L};
+                    writeTestFile("cdc_ins_2.pxl", schema, insIds2, true, insTs2);
+                    long insFileId2 = 9003L;
+                    retinaManager.addVisibility(insFileId2, 0, 2, 0L, null, false);
+                    insertedFileIds.add(insFileId2);
+
+                    retinaManager.deleteRecord(srcFileId, 0, 26, 550L);
+                }
+                finally
+                {
+                    cdcPhaseBDone.countDown();
+                }
+
+                // ── Phase C: Wait for GC commit, then post-GC deletes ───────
+                gcDone.await();
+
+                // Dual-write is now off; these only go to old file
+                retinaManager.deleteRecord(srcFileId, 0, 27, 600L);
+                Thread.sleep(5);
+                retinaManager.deleteRecord(srcFileId, 0, 28, 650L);
+                Thread.sleep(5);
+                retinaManager.deleteRecord(srcFileId, 0, 29, 700L);
+            }
+            catch (Throwable t)
+            {
+                cdcError.set(t);
+                errors.incrementAndGet();
+            }
+        });
+
+        // GC thread: full pipeline
+        Thread gcThread = new Thread(() ->
+        {
+            try
+            {
+                barrier.await();
+
+                StorageGarbageCollector.RewriteResult result =
+                        concGc.rewriteFileGroup(group, safeGcTs, bitmaps);
+                assertTrue("new file must be created", result.newFileId > 0);
+
+                concGc.registerDualWrite(result);
+                dualWriteActive.countDown();
+
+                concGc.syncVisibility(result, safeGcTs);
+                concGc.syncIndex(result, group.tableId);
+
+                cdcPhaseBDone.await();
+                concGc.commitFileGroup(result);
+
+                resultRef.set(result);
+            }
+            catch (Throwable t)
+            {
+                gcError.set(t);
+                errors.incrementAndGet();
+            }
+            finally
+            {
+                gcDone.countDown();
+            }
+        });
+
+        cdcThread.start();
+        gcThread.start();
+
+        cdcThread.join(30_000);
+        gcThread.join(30_000);
+
+        assertFalse("CDC thread should have finished", cdcThread.isAlive());
+        assertFalse("GC thread should have finished", gcThread.isAlive());
+
+        if (gcError.get() != null)
+        {
+            throw new AssertionError("GC thread failed", gcError.get());
+        }
+        if (cdcError.get() != null)
+        {
+            throw new AssertionError("CDC thread failed", cdcError.get());
+        }
+        assertEquals("no errors during concurrent execution", 0, errors.get());
+
+        // ── Phase 3: Verification ───────────────────────────────────────────
+        StorageGarbageCollector.RewriteResult result = resultRef.get();
+        assertNotNull("RewriteResult must be available", result);
+        long newFileId = result.newFileId;
+        assertTrue("new file must have a valid id", newFileId > 0);
+
+        // 3a. Verify new file data: 12 survivors (rows 18-29)
+        assertRewriteResultConsistency(result, survivors);
+        long[][] rows = readAllRows(result.newFilePath, schema, true);
+        assertEquals("12 survivors expected", survivors, rows.length);
+        for (int i = 0; i < survivors; i++)
+        {
+            long expectedId = (deletedBefore + i) * 10L;
+            assertEquals("id mismatch at new row " + i, expectedId, rows[i][0]);
+            assertEquals("create_ts mismatch at new row " + i, 50L, rows[i][1]);
+        }
+
+        // 3b. Verify catalog state
+        File newFileCheck = metadataService.getFileById(newFileId);
+        assertNotNull("new file should exist after commit", newFileCheck);
+        assertEquals("new file should be REGULAR", File.Type.REGULAR, newFileCheck.getType());
+
+        File oldFileCheck = metadataService.getFileById(srcFileId);
+        assertTrue("old file should be gone from catalog",
+                oldFileCheck == null || oldFileCheck.getId() == 0);
+
+        // 3c. Forward mapping
+        int[] fwd = result.forwardRgMappings.get(srcFileId).get(0);
+        for (int r = 0; r < deletedBefore; r++)
+        {
+            assertEquals("deleted row " + r + " should map to -1", -1, fwd[r]);
+        }
+        for (int r = deletedBefore; r < numRows; r++)
+        {
+            assertTrue("surviving row " + r + " should have valid mapping",
+                    fwd[r] >= 0);
+        }
+
+        // 3d. Multi-snap_ts visibility consistency for rows in dual-write window.
+        // During dual-write, deletes on old file are forwarded to new file,
+        // and export+import syncs pre-dual-write deletes. So for any snap_ts,
+        // old and new visibility must agree for rows that were deleted BEFORE
+        // dual-write was unregistered (i.e., before commit).
+        // CDC deletes on rows 18-26 have ts=150..550, all happen before/during GC.
+        for (long snapTs : new long[]{100L, 150L, 200L, 250L, 300L, 350L, 400L,
+                450L, 500L, 550L, 800L, 1000L})
+        {
+            long[] oldBm = retinaManager.queryVisibility(srcFileId, 0, snapTs, 0L);
+            for (int oldRow = deletedBefore; oldRow < numRows; oldRow++)
+            {
+                int newGlobal = fwd[oldRow];
+                assertTrue("old row " + oldRow + " must have valid fwd mapping",
+                        newGlobal >= 0);
+                int newRgId = RetinaResourceManager.rgIdForGlobalRowOffset(
+                        newGlobal, result.newFileRgRowStart);
+                int newRgOff = newGlobal - result.newFileRgRowStart[newRgId];
+                long[] newBm = retinaManager.queryVisibility(newFileId, newRgId, snapTs, 0L);
+
+                boolean oldDel = (oldBm[oldRow / 64] & (1L << (oldRow % 64))) != 0;
+                boolean newDel = (newBm[newRgOff / 64] & (1L << (newRgOff % 64))) != 0;
+
+                if (oldRow <= 26)
+                {
+                    // Rows 18-26: deleted during dual-write window → must be consistent
+                    assertEquals("snap_ts=" + snapTs + " oldRow=" + oldRow
+                            + " newRgOff=" + newRgOff + ": visibility mismatch",
+                            oldDel, newDel);
+                }
+                else
+                {
+                    // Rows 27-29: deleted after GC commit (dual-write off).
+                    // Old file shows them as deleted for snap_ts >= their delete_ts;
+                    // new file should NOT reflect these post-GC deletes.
+                    assertFalse("snap_ts=" + snapTs + " newRow for oldRow=" + oldRow
+                            + " should NOT be deleted (post-GC delete)",
+                            newDel);
+                }
+            }
+        }
+
+        // 3e. Verify INSERT files are unaffected by GC
+        for (long insFileId : insertedFileIds)
+        {
+            long[] insBm = retinaManager.queryVisibility(insFileId, 0, 1000L, 0L);
+            assertNotNull("INSERT file " + insFileId + " visibility should exist", insBm);
+            for (int w = 0; w < insBm.length; w++)
+            {
+                assertEquals("INSERT file " + insFileId + " should have no deletes",
+                        0L, insBm[w]);
+            }
+        }
     }
 
     // =======================================================================
