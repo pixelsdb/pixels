@@ -22,35 +22,23 @@
 #include <cstring>
 #include <thread>
 
+// Validates before allocation: any throw leaves tileVisibilities as nullptr,
+// so the incomplete constructor does not invoke the destructor (no memory leak).
 template<size_t CAPACITY>
-RGVisibility<CAPACITY>::RGVisibility(uint64_t rgRecordNum)
-    : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
-    size_t allocSize = tileCount * sizeof(TileVisibility<CAPACITY>);
-    void* rawMemory = operator new[](allocSize);
-    tileVisibilities = static_cast<TileVisibility<CAPACITY>*>(rawMemory);
-    for (uint64_t i = 0; i < tileCount; ++i) {
-        new (&tileVisibilities[i]) TileVisibility<CAPACITY>();
-    }
-}
+RGVisibility<CAPACITY>::RGVisibility(uint64_t rgRecordNum, uint64_t timestamp,
+                                      const std::vector<uint64_t>* initialBitmap)
+    : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY),
+      tileVisibilities(nullptr) {
+    if (initialBitmap && initialBitmap->size() < tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY)
+        throw std::invalid_argument("Initial bitmap size is too small for the given record number.");
 
-template<size_t CAPACITY>
-RGVisibility<CAPACITY>::RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap)
-    : tileCount((rgRecordNum + VISIBILITY_RECORD_CAPACITY - 1) / VISIBILITY_RECORD_CAPACITY) {
-    size_t allocSize = tileCount * sizeof(TileVisibility<CAPACITY>);
-    void* rawMemory = operator new[](allocSize);
+    tileVisibilities = static_cast<TileVisibility<CAPACITY>*>(
+        operator new[](tileCount * sizeof(TileVisibility<CAPACITY>)));
 
-    if (initialBitmap.size() < tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY) {
-        operator delete[](rawMemory);
-        throw std::runtime_error("Initial bitmap size is too small for the given record number.");
-    }
-
-    tileVisibilities = static_cast<TileVisibility<CAPACITY>*>(rawMemory);
-    for (uint64_t i = 0; i < tileCount; ++i) {
-        // Each tile takes 4 uint64_t
-        const uint64_t* tileBitmap = &initialBitmap[i * BITMAP_SIZE_PER_TILE_VISIBILITY];
-        // We use timestamp 0 for restored checkpoints to serve as the base state
-        new (&tileVisibilities[i]) TileVisibility<CAPACITY>(timestamp, tileBitmap);
-    }
+    for (uint64_t i = 0; i < tileCount; ++i)
+        new (&tileVisibilities[i]) TileVisibility<CAPACITY>(
+            timestamp,
+            initialBitmap ? initialBitmap->data() + i * BITMAP_SIZE_PER_TILE_VISIBILITY : nullptr);
 }
 
 template<size_t CAPACITY>
@@ -62,11 +50,14 @@ RGVisibility<CAPACITY>::~RGVisibility() {
 }
 
 template<size_t CAPACITY>
-void RGVisibility<CAPACITY>::collectRGGarbage(uint64_t timestamp) {
-// TileVisibility::collectTileGarbage uses COW + Epoch, so it's safe to call concurrently
-    for (uint64_t i = 0; i < tileCount; i++) {
-        tileVisibilities[i].collectTileGarbage(timestamp);
+std::vector<uint64_t> RGVisibility<CAPACITY>::collectRGGarbage(uint64_t timestamp) {
+    size_t totalWords = tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
+    std::vector<uint64_t> rgSnapshot(totalWords, 0);
+    for (uint32_t t = 0; t < tileCount; t++) {
+        tileVisibilities[t].collectTileGarbage(timestamp,
+            rgSnapshot.data() + t * BITMAP_SIZE_PER_TILE_VISIBILITY);
     }
+    return rgSnapshot;
 }
 
 template<size_t CAPACITY>
@@ -102,6 +93,33 @@ uint64_t* RGVisibility<CAPACITY>::getRGVisibilityBitmap(uint64_t timestamp) {
 template<size_t CAPACITY>
 uint64_t RGVisibility<CAPACITY>::getBitmapSize() const {
     return tileCount * BITMAP_SIZE_PER_TILE_VISIBILITY;
+}
+
+template<size_t CAPACITY>
+std::vector<uint64_t> RGVisibility<CAPACITY>::exportChainItemsAfter(uint64_t safeGcTs) const {
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    for (uint32_t t = 0; t < tileCount; t++)
+        tileVisibilities[t].exportChainItemsAfter(t, safeGcTs, items);
+    std::vector<uint64_t> result;
+    result.reserve(items.size() * 2);
+    for (auto& [off, ts] : items) { result.push_back(off); result.push_back(ts); }
+    return result;
+}
+
+template<size_t CAPACITY>
+void RGVisibility<CAPACITY>::importDeletionChain(const uint64_t* items, size_t pairCount) {
+    std::vector<std::vector<uint64_t>> tileBuckets(tileCount);
+    for (size_t i = 0; i < pairCount; i++) {
+        uint32_t rgRowOffset = static_cast<uint32_t>(items[2 * i]);
+        uint64_t ts = items[2 * i + 1];
+        uint32_t tileId = rgRowOffset / CAPACITY;
+        uint16_t localRowId = static_cast<uint16_t>(rgRowOffset % CAPACITY);
+        tileBuckets[tileId].push_back(makeDeleteIndex(localRowId, ts));
+    }
+    for (uint32_t t = 0; t < tileCount; t++) {
+        if (tileBuckets[t].empty()) continue;
+        tileVisibilities[t].importDeletionItems(tileBuckets[t]);
+    }
 }
 
 // Explicit Instantiations for JNI use

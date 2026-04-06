@@ -46,6 +46,12 @@ public class VectorizedRowBatch implements AutoCloseable
     public int projectionSize;
     public int maxSize;           // capacity, i.e., the maximum number of rows can be stored in this row batch.
 
+    /**
+     * Optional hidden commit-timestamp column vector, populated only when the reader
+     * is configured with {@code exposeHiddenColumn(true)}.  Null otherwise.
+     */
+    public LongColumnVector hiddenColumnVector;
+
     private long memoryUsage = 0L;
 
     // If this is true, then there is no data in the batch -- we have hit the end of input.
@@ -82,6 +88,7 @@ public class VectorizedRowBatch implements AutoCloseable
         this.size = 0;
         this.maxSize = size;
         this.cols = new ColumnVector[numCols];
+        this.hiddenColumnVector = null;
 
         memoryUsage += (long) Integer.BYTES * (size + numCols) +
         Integer.BYTES * 6 + Long.BYTES + 2;
@@ -216,6 +223,10 @@ public class VectorizedRowBatch implements AutoCloseable
         {
             columnVector.applyFilter(filter, this.size);
         }
+        if (hiddenColumnVector != null)
+        {
+            hiddenColumnVector.applyFilter(filter, this.size);
+        }
         this.size = cardinality;
 
         return this;
@@ -268,6 +279,19 @@ public class VectorizedRowBatch implements AutoCloseable
                 // vc.init();
             }
         }
+        if (hiddenColumnVector != null)
+        {
+            hiddenColumnVector.reset();
+        }
+    }
+
+    /**
+     * Return the hidden commit-timestamp column vector, or {@code null} if the
+     * reader was not configured to include hidden columns.
+     */
+    public LongColumnVector getHiddenColumnVector()
+    {
+        return hiddenColumnVector;
     }
 
     /**
@@ -281,6 +305,10 @@ public class VectorizedRowBatch implements AutoCloseable
             {
                 cols[i].ensureSize(rows, preserveData);
             }
+        }
+        if (hiddenColumnVector != null)
+        {
+            hiddenColumnVector.ensureSize(rows, preserveData);
         }
         if (!preserveData)
         {
@@ -326,6 +354,11 @@ public class VectorizedRowBatch implements AutoCloseable
                 }
             }
             this.cols = null;
+        }
+        if (hiddenColumnVector != null)
+        {
+            hiddenColumnVector.close();
+            hiddenColumnVector = null;
         }
     }
 

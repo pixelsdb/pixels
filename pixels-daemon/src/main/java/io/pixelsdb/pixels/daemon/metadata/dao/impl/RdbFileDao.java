@@ -28,6 +28,7 @@ import org.apache.logging.log4j.Logger;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author hank
@@ -265,6 +266,54 @@ public class RdbFileDao extends FileDao
         } catch (SQLException e)
         {
             log.error("deleteById in RdbFileDao", e);
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean atomicSwapFiles(long newFileId, List<Long> oldFileIds)
+    {
+        Connection conn = db.getConnection();
+        try
+        {
+            conn.setAutoCommit(false);
+            try (PreparedStatement pst = conn.prepareStatement(
+                    "UPDATE FILES SET FILE_TYPE=? WHERE FILE_ID=?"))
+            {
+                pst.setInt(1, MetadataProto.File.Type.REGULAR.getNumber());
+                pst.setLong(2, newFileId);
+                pst.executeUpdate();
+            }
+            String inClause = oldFileIds.stream().map(id -> "?").collect(Collectors.joining(","));
+            try (PreparedStatement pst = conn.prepareStatement(
+                    "DELETE FROM FILES WHERE FILE_ID IN (" + inClause + ")"))
+            {
+                for (int i = 0; i < oldFileIds.size(); i++)
+                {
+                    pst.setLong(i + 1, oldFileIds.get(i));
+                }
+                pst.executeUpdate();
+            }
+            conn.commit();
+            return true;
+        } catch (SQLException e)
+        {
+            try
+            {
+                conn.rollback();
+            } catch (SQLException ignored)
+            {
+            }
+            log.error("atomicSwapFiles in RdbFileDao", e);
+        } finally
+        {
+            try
+            {
+                conn.setAutoCommit(true);
+            } catch (SQLException ignored)
+            {
+            }
         }
 
         return false;

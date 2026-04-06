@@ -76,7 +76,7 @@ public class FileWriterManager
         this.virtualNodeId = virtualNodeId;
 
         // Create pixels writer.
-        String targetFileName = PixelsFileNameUtils.buildRetinaFileName(hostName, virtualNodeId);
+        String targetFileName = PixelsFileNameUtils.buildOrderedFileName(hostName, virtualNodeId);
         String targetFilePath = targetOrderedDirPath.getUri() + "/" + targetFileName;
         try
         {
@@ -97,7 +97,7 @@ public class FileWriterManager
 
         // Add the corresponding visibility for the file.
         RetinaResourceManager retinaResourceManager = RetinaResourceManager.Instance();
-        retinaResourceManager.addVisibility(this.file.getId(), 0, recordNum);
+        retinaResourceManager.addVisibility(this.file.getId(), 0, recordNum, 0L, null, false);
 
         try
         {

@@ -236,3 +236,438 @@ TEST_F(RGVisibilityTest, MultiThread) {
     delete[] finalBitmap;
     delete[] expectedFinalBitmap;
 }
+
+// =====================================================================
+// gcSnapshotBitmap correctness tests
+//
+// Core verification: the bitmap returned by collectRGGarbage (gcSnapshotBitmap)
+// must be bitwise identical to getRGVisibilityBitmap called BEFORE GC.
+//
+// Why pre-GC reference matters:
+//   getRGVisibilityBitmap traverses the full, unmodified deletion chain — it is
+//   a completely independent computation from the GC code path.  Comparing
+//   gcSnapshotBitmap with a post-GC getRGVisibilityBitmap is weaker because
+//   both read from state that GC just modified; a bug that corrupts the compact
+//   AND the snapshot identically would go undetected.
+//
+// Each test also verifies that post-GC queries still return correct results
+// (regression check on the compact logic itself).
+//
+// Covers all three code paths in collectTileGarbage:
+//   A — ts <= baseTimestamp (early return, no compaction)
+//   B — chain exists but no full block compactable
+//   C — one or more blocks compacted (with/without boundary block)
+// =====================================================================
+
+static void compareBitmaps(
+    const uint64_t* actual, const uint64_t* expected, uint64_t size, uint64_t ts,
+    const char* actualLabel, const char* expectedLabel)
+{
+    for (size_t i = 0; i < size; i++) {
+        EXPECT_EQ(actual[i], expected[i])
+            << "Word " << i << " (rows " << (i * 64) << "-" << (i * 64 + 63)
+            << ") at ts=" << ts
+            << "\n  " << actualLabel << ": " << std::bitset<64>(actual[i])
+            << "\n  " << expectedLabel << ": " << std::bitset<64>(expected[i]);
+    }
+}
+
+static void verifyGcSnapshot(
+    RGVisibilityInstance* rgv, uint64_t ts,
+    const uint64_t* preGcRef, const std::vector<uint64_t>& snapshot)
+{
+    uint64_t bitmapSize = rgv->getBitmapSize();
+    ASSERT_EQ(snapshot.size(), bitmapSize);
+
+    // Primary check: gcSnapshotBitmap must match the pre-GC ground truth
+    compareBitmaps(snapshot.data(), preGcRef, bitmapSize, ts,
+                   "gcSnapshot", "preGcRef");
+
+    // Secondary check: post-GC query must also agree (compact regression)
+    uint64_t* postGcRef = rgv->getRGVisibilityBitmap(ts);
+    compareBitmaps(snapshot.data(), postGcRef, bitmapSize, ts,
+                   "gcSnapshot", "postGcQuery");
+    delete[] postGcRef;
+}
+
+// Path A: empty chain → all-zero snapshot; then repeat GC at same ts → early return A
+TEST_F(RGVisibilityTest, GcSnapshot_EarlyReturnA) {
+    // Empty chain: baseTimestamp=0, ts=100 > 0 → enters path B with null head
+    uint64_t* preRef0 = rgVisibility->getRGVisibilityBitmap(100);
+    std::vector<uint64_t> snap0 = rgVisibility->collectRGGarbage(100);
+    verifyGcSnapshot(rgVisibility, 100, preRef0, snap0);
+    delete[] preRef0;
+    for (auto w : snap0) {
+        EXPECT_EQ(w, 0ULL);
+    }
+
+    // Add deletes and compact to advance baseTimestamp
+    rgVisibility->deleteRGRecord(5, 100);
+    rgVisibility->deleteRGRecord(10, 100);
+    rgVisibility->deleteRGRecord(15, 200);
+
+    // First GC at ts=200 → compact all 3 items → baseTimestamp becomes 200
+    uint64_t* preRef1 = rgVisibility->getRGVisibilityBitmap(200);
+    std::vector<uint64_t> snap1 = rgVisibility->collectRGGarbage(200);
+    verifyGcSnapshot(rgVisibility, 200, preRef1, snap1);
+    delete[] preRef1;
+
+    // Second GC at ts=200 → ts == baseTimestamp → true early return A
+    uint64_t* preRef2 = rgVisibility->getRGVisibilityBitmap(200);
+    std::vector<uint64_t> snap2 = rgVisibility->collectRGGarbage(200);
+    verifyGcSnapshot(rgVisibility, 200, preRef2, snap2);
+    delete[] preRef2;
+
+    ASSERT_EQ(snap1.size(), snap2.size());
+    for (size_t i = 0; i < snap1.size(); i++) {
+        EXPECT_EQ(snap1[i], snap2[i]);
+    }
+}
+
+// Path B: chain exists, head block straddles safeGcTs → no compactable block
+TEST_F(RGVisibilityTest, GcSnapshot_EarlyReturnB) {
+    // 5 items in one block: ts 1,2,3,8,10.  Block last ts=10 > safeGcTs=5
+    rgVisibility->deleteRGRecord(0, 1);
+    rgVisibility->deleteRGRecord(1, 2);
+    rgVisibility->deleteRGRecord(2, 3);
+    rgVisibility->deleteRGRecord(3, 8);
+    rgVisibility->deleteRGRecord(4, 10);
+
+    uint64_t* preRef = rgVisibility->getRGVisibilityBitmap(5);
+    std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(5);
+    verifyGcSnapshot(rgVisibility, 5, preRef, snapshot);
+    delete[] preRef;
+
+    // Rows 0,1,2 marked (ts ≤ 5); rows 3,4 not (ts 8,10 > 5)
+    EXPECT_EQ(snapshot[0], 0b111ULL);
+}
+
+// Path B variant: all items in head block have ts > safeGcTs
+TEST_F(RGVisibilityTest, GcSnapshot_EarlyReturnB_NoneMatch) {
+    rgVisibility->deleteRGRecord(0, 10);
+    rgVisibility->deleteRGRecord(1, 20);
+
+    uint64_t* preRef = rgVisibility->getRGVisibilityBitmap(5);
+    std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(5);
+    verifyGcSnapshot(rgVisibility, 5, preRef, snapshot);
+    delete[] preRef;
+
+    EXPECT_EQ(snapshot[0], 0ULL);
+}
+
+// Path C: one full block compacted + boundary block with mixed items
+TEST_F(RGVisibilityTest, GcSnapshot_CompactWithBoundary) {
+    // 10 items: rows 0-9, ts 1-10
+    // Block 1 (8 items, ts 1-8): last ts=8 ≤ 9 → compactable
+    // Block 2 (2 items, ts 9-10): boundary block
+    for (uint32_t i = 0; i < 10; i++) {
+        rgVisibility->deleteRGRecord(i, i + 1);
+    }
+
+    uint64_t* preRef = rgVisibility->getRGVisibilityBitmap(9);
+    std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(9);
+    verifyGcSnapshot(rgVisibility, 9, preRef, snapshot);
+    delete[] preRef;
+
+    // Rows 0-8 marked (ts 1-9 ≤ 9), row 9 not (ts 10 > 9)
+    EXPECT_EQ(snapshot[0], 0x1FFULL); // bits 0-8
+}
+
+// Path C: all blocks fully compacted, no remaining chain
+TEST_F(RGVisibilityTest, GcSnapshot_CompactAllBlocks) {
+    // Exactly 8 items fill one block: rows 0-7, ts 1-8
+    for (uint32_t i = 0; i < 8; i++) {
+        rgVisibility->deleteRGRecord(i, i + 1);
+    }
+
+    // safeGcTs=10 > all item ts → entire block compacted, newHead=null
+    uint64_t* preRef = rgVisibility->getRGVisibilityBitmap(10);
+    std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(10);
+    verifyGcSnapshot(rgVisibility, 10, preRef, snapshot);
+    delete[] preRef;
+
+    EXPECT_EQ(snapshot[0], 0xFFULL); // bits 0-7
+}
+
+// Path C: multiple blocks compacted before a boundary block
+TEST_F(RGVisibilityTest, GcSnapshot_CompactMultiBlock) {
+    // 20 items: rows 0-19, ts 1-20
+    // Block 1 (ts 1-8), Block 2 (ts 9-16), Block 3 tail (ts 17-20)
+    // safeGcTs=18: blocks 1,2 compacted, block 3 is boundary
+    for (uint32_t i = 0; i < 20; i++) {
+        rgVisibility->deleteRGRecord(i, i + 1);
+    }
+
+    uint64_t* preRef = rgVisibility->getRGVisibilityBitmap(18);
+    std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(18);
+    verifyGcSnapshot(rgVisibility, 18, preRef, snapshot);
+    delete[] preRef;
+
+    // Rows 0-17 marked (ts 1-18 ≤ 18), rows 18-19 not
+    EXPECT_EQ(snapshot[0], (1ULL << 18) - 1);
+}
+
+// Multiple deletes sharing the same timestamp (batch deletes)
+TEST_F(RGVisibilityTest, GcSnapshot_SameTimestamp) {
+    rgVisibility->deleteRGRecord(0, 5);
+    rgVisibility->deleteRGRecord(1, 5);
+    rgVisibility->deleteRGRecord(2, 5);
+    rgVisibility->deleteRGRecord(3, 10);
+    rgVisibility->deleteRGRecord(4, 10);
+
+    uint64_t* preRef = rgVisibility->getRGVisibilityBitmap(5);
+    std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(5);
+    verifyGcSnapshot(rgVisibility, 5, preRef, snapshot);
+    delete[] preRef;
+
+    EXPECT_EQ(snapshot[0], 0b111ULL);
+}
+
+// Deletes spanning multiple tiles (RETINA_CAPACITY=256 rows per tile)
+TEST_F(RGVisibilityTest, GcSnapshot_CrossTile) {
+    // Tile 0: rows 0-255          Tile 1: rows 256-511
+    // Tile 2: rows 512-767
+    rgVisibility->deleteRGRecord(5, 1);     // tile 0
+    rgVisibility->deleteRGRecord(10, 2);    // tile 0
+    rgVisibility->deleteRGRecord(260, 3);   // tile 1, localRow 4
+    rgVisibility->deleteRGRecord(600, 4);   // tile 2, localRow 88
+    rgVisibility->deleteRGRecord(100, 5);   // tile 0
+    rgVisibility->deleteRGRecord(300, 6);   // tile 1, localRow 44
+
+    uint64_t* preRef1 = rgVisibility->getRGVisibilityBitmap(4);
+    std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(4);
+    verifyGcSnapshot(rgVisibility, 4, preRef1, snapshot);
+    delete[] preRef1;
+
+    // After GC at ts=4, also verify a higher ts sees more deletes
+    uint64_t* preRef2 = rgVisibility->getRGVisibilityBitmap(6);
+    std::vector<uint64_t> snap2 = rgVisibility->collectRGGarbage(6);
+    verifyGcSnapshot(rgVisibility, 6, preRef2, snap2);
+    delete[] preRef2;
+}
+
+// Progressive GC rounds with interleaved inserts
+TEST_F(RGVisibilityTest, GcSnapshot_ProgressiveRounds) {
+    // Phase 1: 20 deletes at ts 1-20
+    for (uint32_t i = 0; i < 20; i++) {
+        rgVisibility->deleteRGRecord(i, i + 1);
+    }
+
+    uint64_t* preRef1 = rgVisibility->getRGVisibilityBitmap(5);
+    std::vector<uint64_t> snap1 = rgVisibility->collectRGGarbage(5);
+    verifyGcSnapshot(rgVisibility, 5, preRef1, snap1);
+    delete[] preRef1;
+
+    uint64_t* preRef2 = rgVisibility->getRGVisibilityBitmap(12);
+    std::vector<uint64_t> snap2 = rgVisibility->collectRGGarbage(12);
+    verifyGcSnapshot(rgVisibility, 12, preRef2, snap2);
+    delete[] preRef2;
+
+    // Phase 2: 10 more deletes at ts 21-30
+    for (uint32_t i = 20; i < 30; i++) {
+        rgVisibility->deleteRGRecord(i, i + 1);
+    }
+
+    uint64_t* preRef3 = rgVisibility->getRGVisibilityBitmap(25);
+    std::vector<uint64_t> snap3 = rgVisibility->collectRGGarbage(25);
+    verifyGcSnapshot(rgVisibility, 25, preRef3, snap3);
+    delete[] preRef3;
+
+    // Final GC beyond all timestamps
+    uint64_t* preRef4 = rgVisibility->getRGVisibilityBitmap(100);
+    std::vector<uint64_t> snap4 = rgVisibility->collectRGGarbage(100);
+    verifyGcSnapshot(rgVisibility, 100, preRef4, snap4);
+    delete[] preRef4;
+
+    // All 30 rows should be marked
+    EXPECT_EQ(snap4[0], (1ULL << 30) - 1);
+}
+
+// Randomized: random deletes across all tiles, verify at each GC round
+TEST_F(RGVisibilityTest, GcSnapshot_Randomized) {
+    std::mt19937 gen(42);
+    std::uniform_int_distribution<uint32_t> rowDist(0, ROW_COUNT - 1);
+    std::vector<bool> deleted(ROW_COUNT, false);
+    uint64_t ts = 1;
+    uint64_t lastGcTs = 0;
+
+    for (int round = 0; round < 10; round++) {
+        for (int d = 0; d < 100; d++) {
+            uint32_t rowId;
+            do { rowId = rowDist(gen); } while (deleted[rowId]);
+            deleted[rowId] = true;
+            rgVisibility->deleteRGRecord(rowId, ts);
+            ts++;
+        }
+
+        uint64_t gcTs = lastGcTs + 51;
+        if (gcTs >= ts) gcTs = ts - 1;
+
+        uint64_t* preRef = rgVisibility->getRGVisibilityBitmap(gcTs);
+        std::vector<uint64_t> snapshot = rgVisibility->collectRGGarbage(gcTs);
+        verifyGcSnapshot(rgVisibility, gcTs, preRef, snapshot);
+        delete[] preRef;
+        lastGcTs = gcTs;
+    }
+
+    // Final GC beyond all timestamps
+    uint64_t* preRefFinal = rgVisibility->getRGVisibilityBitmap(ts + 100);
+    std::vector<uint64_t> finalSnap = rgVisibility->collectRGGarbage(ts + 100);
+    verifyGcSnapshot(rgVisibility, ts + 100, preRefFinal, finalSnap);
+    delete[] preRefFinal;
+}
+
+// =====================================================================
+// exportChainItemsAfter tests
+// =====================================================================
+
+TEST_F(RGVisibilityTest, ExportChainItemsAfter_Basic) {
+    rgVisibility->deleteRGRecord(5, 50);
+    rgVisibility->deleteRGRecord(10, 100);
+    rgVisibility->deleteRGRecord(300, 150);
+    rgVisibility->deleteRGRecord(500, 200);
+
+    std::vector<uint64_t> items = rgVisibility->exportChainItemsAfter(100);
+
+    ASSERT_EQ(items.size(), 4u);
+    EXPECT_EQ(items[0], 300u);
+    EXPECT_EQ(items[1], 150u);
+    EXPECT_EQ(items[2], 500u);
+    EXPECT_EQ(items[3], 200u);
+}
+
+TEST_F(RGVisibilityTest, ExportChainItemsAfter_Empty) {
+    std::vector<uint64_t> items = rgVisibility->exportChainItemsAfter(100);
+    EXPECT_EQ(items.size(), 0u);
+}
+
+// =====================================================================
+// importDeletionChain tests
+// =====================================================================
+
+TEST_F(RGVisibilityTest, ImportDeletionChain_Basic) {
+    uint64_t items[] = {5, 100, 10, 200, 300, 300};
+    rgVisibility->importDeletionChain(items, 3);
+
+    uint64_t* bitmap = rgVisibility->getRGVisibilityBitmap(400);
+    EXPECT_NE(bitmap[5 / 64] & (1ULL << (5 % 64)), 0u);
+    EXPECT_NE(bitmap[10 / 64] & (1ULL << (10 % 64)), 0u);
+    EXPECT_NE(bitmap[300 / 64] & (1ULL << (300 % 64)), 0u);
+    delete[] bitmap;
+}
+
+TEST_F(RGVisibilityTest, ImportDeletionChain_CrossTile) {
+    uint64_t items[] = {
+        0, 100,
+        RETINA_CAPACITY - 1, 200,
+        RETINA_CAPACITY, 300,
+        RETINA_CAPACITY * 2 + 5, 400
+    };
+    rgVisibility->importDeletionChain(items, 4);
+
+    uint64_t* bitmap = rgVisibility->getRGVisibilityBitmap(500);
+    EXPECT_NE(bitmap[0 / 64] & (1ULL << (0 % 64)), 0u);
+    uint32_t r1 = RETINA_CAPACITY - 1;
+    EXPECT_NE(bitmap[r1 / 64] & (1ULL << (r1 % 64)), 0u);
+    uint32_t r2 = RETINA_CAPACITY;
+    EXPECT_NE(bitmap[r2 / 64] & (1ULL << (r2 % 64)), 0u);
+    uint32_t r3 = RETINA_CAPACITY * 2 + 5;
+    EXPECT_NE(bitmap[r3 / 64] & (1ULL << (r3 % 64)), 0u);
+    delete[] bitmap;
+}
+
+// =====================================================================
+// Export → Import end-to-end with coordinate mapping
+// =====================================================================
+
+TEST_F(RGVisibilityTest, ExportImportEndToEnd) {
+    uint64_t safeGcTs = 100;
+
+    rgVisibility->deleteRGRecord(5, 50);
+    rgVisibility->deleteRGRecord(10, 80);
+    rgVisibility->deleteRGRecord(15, 150);
+    rgVisibility->deleteRGRecord(20, 200);
+    rgVisibility->deleteRGRecord(300, 250);
+
+    std::vector<uint64_t> exported = rgVisibility->exportChainItemsAfter(safeGcTs);
+    ASSERT_EQ(exported.size(), 6u);
+
+    RGVisibilityInstance newRgVis(ROW_COUNT, safeGcTs, nullptr);
+
+    newRgVis.importDeletionChain(exported.data(), exported.size() / 2);
+
+    for (uint64_t snapTs : {150ULL, 200ULL, 250ULL, 500ULL}) {
+        uint64_t* oldBitmap = rgVisibility->getRGVisibilityBitmap(snapTs);
+        uint64_t* newBitmap = newRgVis.getRGVisibilityBitmap(snapTs);
+
+        for (uint32_t row : {15u, 20u, 300u}) {
+            bool oldSet = (oldBitmap[row / 64] & (1ULL << (row % 64))) != 0;
+            bool newSet = (newBitmap[row / 64] & (1ULL << (row % 64))) != 0;
+            EXPECT_EQ(oldSet, newSet)
+                << "Mismatch at row=" << row << " snapTs=" << snapTs;
+        }
+
+        for (uint32_t row : {5u, 10u}) {
+            uint64_t* newCheck = newRgVis.getRGVisibilityBitmap(snapTs);
+            bool newSet = (newCheck[row / 64] & (1ULL << (row % 64))) != 0;
+            EXPECT_FALSE(newSet)
+                << "Row " << row << " (ts<=safeGcTs) should NOT be in new chain at snapTs=" << snapTs;
+            delete[] newCheck;
+        }
+
+        delete[] oldBitmap;
+        delete[] newBitmap;
+    }
+}
+
+// =====================================================================
+// Concurrent dual-write + importDeletionChain
+// =====================================================================
+
+TEST_F(RGVisibilityTest, ImportDeletionChain_ConcurrentDualWrite) {
+    constexpr int IMPORT_ITEMS = 50;
+    constexpr int DUAL_WRITE_ITEMS = 200;
+    uint64_t safeGcTs = 100;
+
+    RGVisibilityInstance newRgVis(ROW_COUNT, safeGcTs, nullptr);
+
+    std::vector<uint64_t> importItems;
+    importItems.reserve(IMPORT_ITEMS * 2);
+    for (int i = 0; i < IMPORT_ITEMS; i++) {
+        uint32_t row = 1000 + i;
+        uint64_t ts = safeGcTs + 1 + i;
+        importItems.push_back(row);
+        importItems.push_back(ts);
+    }
+
+    std::atomic<bool> importDone{false};
+
+    std::thread dualWriteThread([&]() {
+        for (int i = 0; i < DUAL_WRITE_ITEMS; i++) {
+            uint32_t row = 2000 + i;
+            uint64_t ts = safeGcTs + 500 + i;
+            newRgVis.deleteRGRecord(row, ts);
+        }
+    });
+
+    newRgVis.importDeletionChain(importItems.data(), IMPORT_ITEMS);
+    importDone.store(true, std::memory_order_release);
+
+    dualWriteThread.join();
+
+    uint64_t queryTs = safeGcTs + 500 + DUAL_WRITE_ITEMS + 100;
+    uint64_t* bitmap = newRgVis.getRGVisibilityBitmap(queryTs);
+
+    for (int i = 0; i < IMPORT_ITEMS; i++) {
+        uint32_t row = 1000 + i;
+        EXPECT_NE(bitmap[row / 64] & (1ULL << (row % 64)), 0u)
+            << "Imported row " << row << " missing from bitmap";
+    }
+    for (int i = 0; i < DUAL_WRITE_ITEMS; i++) {
+        uint32_t row = 2000 + i;
+        EXPECT_NE(bitmap[row / 64] & (1ULL << (row % 64)), 0u)
+            << "Dual-write row " << row << " missing from bitmap";
+    }
+
+    delete[] bitmap;
+}

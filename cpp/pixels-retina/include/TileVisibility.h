@@ -32,6 +32,7 @@
 #include <cstring>
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 // rowId supports up to 65535, timestamp uses 48 bits
@@ -65,13 +66,13 @@ struct VersionedData : public pixels::RetinaBase<VersionedData<CAPACITY>> {
     uint64_t baseTimestamp;
     DeleteIndexBlock* head; // Delete chain head, part of the version
 
-    VersionedData() : baseTimestamp(0), head(nullptr) {
-        std::memset(baseBitmap, 0, sizeof(baseBitmap));
-    }
-
-    VersionedData(uint64_t ts, const uint64_t* bitmap, DeleteIndexBlock* h)
+    // timestamp defaults to 0; bitmap defaults to all-zeros.
+    explicit VersionedData(uint64_t ts = 0, const uint64_t* bitmap = nullptr, DeleteIndexBlock* h = nullptr)
         : baseTimestamp(ts), head(h) {
-        std::memcpy(baseBitmap, bitmap, NUM_WORDS * sizeof(uint64_t));
+        if (bitmap)
+            std::memcpy(baseBitmap, bitmap, NUM_WORDS * sizeof(uint64_t));
+        else
+            std::memset(baseBitmap, 0, sizeof(baseBitmap));
     }
 };
 
@@ -92,12 +93,15 @@ template<size_t CAPACITY>
 class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     static constexpr size_t NUM_WORDS = BITMAP_WORDS(CAPACITY);
  public:
-    TileVisibility();
-    TileVisibility(uint64_t ts, const uint64_t* bitmap);
+    // timestamp defaults to 0; bitmap defaults to all-zeros.
+    explicit TileVisibility(uint64_t timestamp = 0, const uint64_t* bitmap = nullptr);
     ~TileVisibility() override;
     void deleteTileRecord(uint16_t rowId, uint64_t ts);
     void getTileVisibilityBitmap(uint64_t ts, uint64_t* outBitmap) const;
-    void collectTileGarbage(uint64_t ts);
+    void collectTileGarbage(uint64_t ts, uint64_t* gcSnapshotBitmap);
+    void exportChainItemsAfter(uint32_t tileId, uint64_t safeGcTs,
+        std::vector<std::pair<uint32_t, uint64_t>>& gcChainItems) const;
+    void importDeletionItems(std::vector<uint64_t>& bucket);
 
   private:
     TileVisibility(const TileVisibility &) = delete;
@@ -108,7 +112,22 @@ class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     std::atomic<VersionedData<CAPACITY>*> currentVersion;
     std::atomic<DeleteIndexBlock *> tail;
     std::atomic<size_t> tailUsed;
-    std::vector<RetiredVersion<CAPACITY>> retired;  // Protected by GC (single writer)
+    
+    // Retired versions awaiting epoch-based reclamation.  Only the GC thread
+    // (collectTileGarbage / reclaimRetiredVersions) reads and writes this vector,
+    // so no locking is needed.
+    std::vector<RetiredVersion<CAPACITY>> retired;
+
+    // Lock-free staging slot between deleteTileRecord (CDC threads) and GC.
+    // deleteTileRecord's empty-chain path replaces currentVersion but cannot
+    // write `retired` directly — that would race with the GC thread.  Instead
+    // it atomically stores oldVer here.  The GC thread drains this slot at the
+    // start of collectTileGarbage, moving it into `retired` with a proper epoch.
+    // Flow:  deleteTileRecord → pendingRetire.store → collectTileGarbage →
+    //        pendingRetire.exchange(nullptr) → retired.emplace_back → reclaimRetiredVersions
+    // At most one version is pending per GC cycle (the empty-chain path fires
+    // at most once between consecutive GC compactions).
+    std::atomic<VersionedData<CAPACITY>*> pendingRetire{nullptr};
 };
 
 #endif // PIXELS_RETINA_TILE_VISIBILITY_H

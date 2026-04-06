@@ -65,22 +65,14 @@ public class RGVisibility implements AutoCloseable
     private final AtomicLong nativeHandle = new AtomicLong();
     private final long recordNum;
 
-    public RGVisibility(long rgRecordNum)
-    {
-        this.recordNum = rgRecordNum;
-        this.nativeHandle.set(createNativeObject(rgRecordNum));
-    }
-
     public RGVisibility(long rgRecordNum, long timestamp, long[] initialBitmap)
     {
-        this.recordNum = rgRecordNum;
-        if (initialBitmap == null)
+        if (timestamp < 0)
         {
-            this.nativeHandle.set(createNativeObject(rgRecordNum));
-        } else
-        {
-            this.nativeHandle.set(createNativeObjectInitialized(rgRecordNum, timestamp, initialBitmap));
+            throw new IllegalArgumentException("timestamp must not be negative");
         }
+        this.recordNum = rgRecordNum;
+        this.nativeHandle.set(createNativeObject(rgRecordNum, timestamp, initialBitmap));
     }
 
     public long getRecordNum()
@@ -99,12 +91,13 @@ public class RGVisibility implements AutoCloseable
     }
 
     // native methods
-    private native long createNativeObject(long rgRecordNum);
-    private native long createNativeObjectInitialized(long rgRecordNum, long timestamp, long[] bitmap);
+    private native long createNativeObject(long rgRecordNum, long timestamp, long[] bitmap);
     private native void destroyNativeObject(long nativeHandle);
     private native void deleteRecord(int rgRowOffset, long timestamp, long nativeHandle);
     private native long[] getVisibilityBitmap(long timestamp, long nativeHandle);
-    private native void garbageCollect(long timestamp, long nativeHandle);
+    private native long[] garbageCollect(long timestamp, long nativeHandle);
+    private native long[] exportChainItemsAfter(long safeGcTs, long nativeHandle);
+    private native void importDeletionChain(long[] items, long nativeHandle);
     private static native long getNativeMemoryUsage();
     private static native long getRetinaTrackedMemoryUsage();
     private static native long getRetinaObjectCount();
@@ -132,7 +125,7 @@ public class RGVisibility implements AutoCloseable
         return bitmap;
     }
 
-    public void garbageCollect(long timestamp)
+    public long[] garbageCollect(long timestamp)
     {
         long handle = this.nativeHandle.get();
         if (handle == 0)
@@ -140,7 +133,27 @@ public class RGVisibility implements AutoCloseable
             throw new IllegalStateException("RGVisibility instance has been closed.");
         }
 
-        garbageCollect(timestamp, handle);
+        return garbageCollect(timestamp, handle);
+    }
+
+    public long[] exportChainItemsAfter(long safeGcTs)
+    {
+        long handle = this.nativeHandle.get();
+        if (handle == 0)
+        {
+            throw new IllegalStateException("RGVisibility instance has been closed.");
+        }
+        return exportChainItemsAfter(safeGcTs, handle);
+    }
+
+    public void importDeletionChain(long[] items)
+    {
+        long handle = this.nativeHandle.get();
+        if (handle == 0)
+        {
+            throw new IllegalStateException("RGVisibility instance has been closed.");
+        }
+        importDeletionChain(items, handle);
     }
 
     /**

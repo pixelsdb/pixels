@@ -21,19 +21,23 @@
 #define RG_VISIBILITY_H
 #include "RetinaBase.h"
 #include "TileVisibility.h"
+#include <utility>
 #include <vector>
 
 template<size_t CAPACITY>
 class RGVisibility : public pixels::RetinaBase<RGVisibility<CAPACITY>> {
 public:
-    explicit RGVisibility(uint64_t rgRecordNum);
-    explicit RGVisibility(uint64_t rgRecordNum, uint64_t timestamp, const std::vector<uint64_t>& initialBitmap);
+    explicit RGVisibility(uint64_t rgRecordNum, uint64_t timestamp = 0,
+                          const std::vector<uint64_t>* initialBitmap = nullptr);
     ~RGVisibility() override;
 
     void deleteRGRecord(uint32_t rowId, uint64_t timestamp);
     uint64_t* getRGVisibilityBitmap(uint64_t timestamp);
 
-    void collectRGGarbage(uint64_t timestamp);
+    std::vector<uint64_t> collectRGGarbage(uint64_t timestamp);
+
+    std::vector<uint64_t> exportChainItemsAfter(uint64_t safeGcTs) const;
+    void importDeletionChain(const uint64_t* items, size_t pairCount);
 
     uint64_t getBitmapSize() const;
 

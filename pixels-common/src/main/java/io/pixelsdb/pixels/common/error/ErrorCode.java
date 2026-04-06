@@ -83,6 +83,8 @@ public class ErrorCode
     public static final int METADATA_UPDATE_SINGLE_POINT_INDEX_FAILED = (ERROR_BASE_METADATA + 51);
     public static final int METADATA_DELETE_SINGLE_POINT_INDEX_FAILED = (ERROR_BASE_METADATA + 52);
     public static final int METADATA_ADD_RETINA_BUFFER_FAILED = (ERROR_BASE_METADATA + 53);
+    public static final int METADATA_GET_FILE_BY_ID_FAILED = (ERROR_BASE_METADATA + 54);
+    public static final int METADATA_ATOMIC_SWAP_FILES_FAILED = (ERROR_BASE_METADATA + 55);
     // end error code for metadata rpc
 
     // begin error code for shared memory message queue

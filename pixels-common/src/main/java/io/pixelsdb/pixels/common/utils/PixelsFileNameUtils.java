@@ -43,8 +43,8 @@ import java.util.regex.Pattern;
  * <h3>File types</h3>
  * <table border="1">
  *   <tr><th>Type</th><th>Writer</th><th>GC eligible</th></tr>
- *   <tr><td>retina</td><td>{@code FileWriterManager} (CDC real-time path)</td><td>yes</td></tr>
- *   <tr><td>ordered</td><td>{@code IndexedPixelsConsumer} (indexed batch load)</td><td>yes</td></tr>
+ *   <tr><td>ordered</td><td>{@code FileWriterManager} (CDC real-time path) /
+ *       {@code IndexedPixelsConsumer} (indexed batch load)</td><td>yes</td></tr>
  *   <tr><td>compact</td><td>{@code CompactExecutor}</td><td>yes</td></tr>
  *   <tr><td>single</td><td>{@code SimplePixelsConsumer} (non-indexed batch load)</td><td>no</td></tr>
  *   <tr><td>copy</td><td>{@code CopyExecutor} (test/benchmark data amplification)</td><td>no</td></tr>
@@ -80,7 +80,6 @@ public final class PixelsFileNameUtils
      */
     public enum PxlFileType
     {
-        RETINA("retina"),
         ORDERED("ordered"),
         COMPACT("compact"),
         SINGLE("single"),
@@ -131,11 +130,11 @@ public final class PixelsFileNameUtils
      *   <li>timestamp — exactly 14 digits (yyyyMMddHHmmss)</li>
      *   <li>atomicCount</li>
      *   <li>virtualNodeId — non-negative integer, or {@code -1} for single files</li>
-     *   <li>type label — one of {@code retina|ordered|compact|single|copy}</li>
+     *   <li>type label — one of {@code ordered|compact|single|copy}</li>
      * </ol>
      */
     private static final Pattern PXL_PATTERN = Pattern.compile(
-            "(?:.*/)?(.+)_(\\d{14})_(\\d+)_(-?\\d+)_(retina|ordered|compact|single|copy)\\.pxl$");
+            "(?:.*/)?(.+)_(\\d{14})_(\\d+)_(-?\\d+)_(ordered|compact|single|copy)\\.pxl$");
 
     private PixelsFileNameUtils() {}
 
@@ -161,16 +160,7 @@ public final class PixelsFileNameUtils
     // -------------------------------------------------------------------------
 
     /**
-     * Builds a <b>Retina</b> file name (CDC real-time write path).
-     * <p>Format: {@code <hostName>_<yyyyMMddHHmmss>_<count>_<virtualNodeId>_retina.pxl}
-     */
-    public static String buildRetinaFileName(String hostName, int virtualNodeId)
-    {
-        return buildPxlFileName(hostName, virtualNodeId, PxlFileType.RETINA);
-    }
-
-    /**
-     * Builds an <b>Ordered</b> file name (indexed batch load).
+     * Builds an <b>Ordered</b> file name (CDC real-time write path and indexed batch load).
      * <p>Format: {@code <hostName>_<yyyyMMddHHmmss>_<count>_<virtualNodeId>_ordered.pxl}
      */
     public static String buildOrderedFileName(String hostName, int virtualNodeId)
@@ -281,8 +271,7 @@ public final class PixelsFileNameUtils
 
     /**
      * Returns {@code true} if the file at {@code path} is eligible for Storage GC,
-     * i.e. its type is one of {@link PxlFileType#RETINA}, {@link PxlFileType#ORDERED},
-     * or {@link PxlFileType#COMPACT}.
+     * i.e. its type is one of {@link PxlFileType#ORDERED} or {@link PxlFileType#COMPACT}.
      *
      * <p>{@link PxlFileType#SINGLE} and {@link PxlFileType#COPY} files, as well as
      * unrecognised paths, return {@code false}.
@@ -290,7 +279,7 @@ public final class PixelsFileNameUtils
     public static boolean isGcEligible(String path)
     {
         PxlFileType type = extractFileType(path);
-        return type == PxlFileType.RETINA || type == PxlFileType.ORDERED || type == PxlFileType.COMPACT;
+        return type == PxlFileType.ORDERED || type == PxlFileType.COMPACT;
     }
 
     // -------------------------------------------------------------------------

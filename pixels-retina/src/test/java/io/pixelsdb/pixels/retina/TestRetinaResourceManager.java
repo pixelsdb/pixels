@@ -53,7 +53,7 @@ public class TestRetinaResourceManager
             long fileId = 999;
             int rgId = 666;
             int recordNum = 100;
-            retinaResourceManager.addVisibility(fileId, rgId, recordNum);
+            retinaResourceManager.addVisibility(fileId, rgId, recordNum, 0L, null, false);
             long [] visibility = retinaResourceManager.queryVisibility(fileId, rgId, 0);
             printVisibility(visibility);
 
