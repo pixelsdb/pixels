@@ -21,7 +21,7 @@ The other integrations are opensourced in separate repositories:
 
 Pixels also has its own query engine [Pixels-Turbo](pixels-turbo).
 It prioritizes processing queries in an autoscaling MPP cluster (currently based on Trino) and exploits serverless functions 
-(e.g, [AWS Lambda](https://aws.amazon.com/lambda/) or [vHive / Knative](https://github.com/vhive-serverless/vHive)) 
+(e.g, [AWS Lambda](https://aws.amazon.com/lambda/), [vHive / Knative](https://github.com/vhive-serverless/vHive), and [Spike](https://github.com/pixelsdb/pixels-spike)) 
 to accelerate the processing of workload spikes. With `Pixels-Turbo`, we can achieve better performance and cost-efficiency 
 for continuous workloads while not compromising elasticity for workload spikes.
 
@@ -30,6 +30,11 @@ that provides users with a complete experience of serverless query processing, n
 service levels in query urgency. It allows users to select whether to execute the query immediately, within a grace period, or eventually.
 Pixels-Turbo can apply different resource scheduling and query execution policies for Different levels of query urgency, which
 will result in different monetary costs on resources.
+
+Furthermore, Pixels has a real-time data synchronization framework namely [Pixels-Retina](pixels-retina).
+It replays data-change operations from log-based CDC sources as mirror transactions on the columnar table data,
+using a lightweight MVCC mechanism to support concurrent analytical queries with 10-ms-level data freshness, significantly
+outperforming the batch-granular merge-on-read approach used by existing lakehouses such as Apache Iceberg and Paimon.
 
 ## Build Pixels
 
