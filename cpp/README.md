@@ -202,7 +202,7 @@ localfs.enable.async.io=true
 
 ## Common issues
 
-### 1. How to fetch the lastest pixels reader and duckdb?
+### 1. How to fetch the latest pixels reader and duckdb?
 
 `pixels reader` and `duckdb` will be updated frequently in the next few months, so please keep the two submodules updated. 
 

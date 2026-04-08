@@ -12,6 +12,7 @@ Here, we only install and configure the essential components for query processin
 To use the following optional components, follow the instructions in the corresponding README.md after the basic installation:
 * [Pixels Cache](../pixels-cache/README.md): The distributed columnar cache to accelerate query processing.
 * [Pixels Turbo](../pixels-turbo/README.md): The hybrid query engine that invokes serverless resources to help process unpredictable workload spikes.
+* [Pixels Retina](../pixels-retina/README.md): The transactional data synchronization framework that replays the data changes from the CDC (Change-Data-Capture) stream.
 * [Pixels Amphi](../pixels-amphi/README.md): The adaptive query scheduler that enables cost-efficient query processing in both on-perm and in-cloud environments.
 
 In AWS EC2, create an Ubuntu 22.04 instance with x86 arch and at least 4GB memory and 20GB root volume. 
