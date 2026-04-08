@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.Constants;
-import io.pixelsdb.pixels.common.utils.DateUtil;
+import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.apache.hadoop.io.IOUtils;
 
@@ -82,8 +82,7 @@ public class CopyExecutor implements CommandExecutor
                     continue;
                 }
                 String destPath = destination_ +
-                        sourceName.substring(0, sourceName.indexOf(postfix)) +
-                        "_copy_" + DateUtil.getCurTime() + postfix;
+                        PixelsFileNameUtils.buildCopyFileName(sourceName);
                 copyExecutor.execute(() -> {
                     try
                     {

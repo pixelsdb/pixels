@@ -10,17 +10,9 @@ extern "C" {
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    createNativeObject
- * Signature: (J)J
- */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNativeObject
-  (JNIEnv *, jobject, jlong);
-
-/*
- * Class:     io_pixelsdb_pixels_retina_RGVisibility
- * Method:    createNativeObjectInitialized
  * Signature: (JJ[J)J
  */
-JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNativeObjectInitialized
+JNIEXPORT jlong JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_createNativeObject
   (JNIEnv *, jobject, jlong, jlong, jlongArray);
 
 /*
@@ -50,10 +42,26 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_getVisi
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    garbageCollect
- * Signature: (JJ)V
+ * Signature: (JJ)[J
  */
-JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollect
+JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_garbageCollect
   (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    exportChainItemsAfter
+ * Signature: (JJ)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_exportChainItemsAfter
+  (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     io_pixelsdb_pixels_retina_RGVisibility
+ * Method:    importDeletionChain
+ * Signature: ([JJ)V
+ */
+JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_importDeletionChain
+  (JNIEnv *, jobject, jlongArray, jlong);
 
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility

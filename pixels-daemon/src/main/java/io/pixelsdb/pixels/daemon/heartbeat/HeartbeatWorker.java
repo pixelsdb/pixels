@@ -24,12 +24,11 @@ import io.etcd.jetcd.Lease;
 import io.pixelsdb.pixels.common.server.Server;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
+import io.pixelsdb.pixels.common.utils.NetUtils;
 import io.pixelsdb.pixels.daemon.NodeProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -55,20 +54,7 @@ public class HeartbeatWorker implements Server
     public HeartbeatWorker(NodeProto.NodeRole role)
     {
         this.role = role;
-        this.hostName = System.getenv("HOSTNAME");
-        logger.debug("HostName from system env: {}", hostName);
-        if (hostName == null)
-        {
-            try
-            {
-                this.hostName = InetAddress.getLocalHost().getHostName();
-                logger.debug("HostName from InetAddress: {}", hostName);
-            } catch (UnknownHostException e)
-            {
-                logger.debug("Hostname is null. Exit");
-                return;
-            }
-        }
+        this.hostName = NetUtils.getLocalHostName();
         logger.debug("HostName: {}", hostName);
         initialize();
     }

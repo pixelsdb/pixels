@@ -27,7 +27,7 @@ import io.pixelsdb.pixels.common.node.VnodeIdentifier;
 import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.daemon.NodeProto;
 
- public class RetinaUtils
+public class RetinaUtils
 {
     public static final String CHECKPOINT_PREFIX_GC = "vis_gc_";
     public static final String CHECKPOINT_PREFIX_OFFLOAD = "vis_offload_";
@@ -107,10 +107,14 @@ import io.pixelsdb.pixels.daemon.NodeProto;
         return RetinaService.CreateInstance(retinaHost, getInstance().defaultRetinaPort);
     }
 
-     public static RetinaService getRetinaServiceFromPath(String path)
+    public static RetinaService getRetinaServiceFromPath(String path)
     {
-        String retinaHost = extractRetinaHostNameFromPath(path);
-        if(retinaHost == null || retinaHost.equals(Constants.LOAD_DEFAULT_RETINA_PREFIX))
+        if (!PixelsFileNameUtils.isGcEligible(path))
+        {
+            return RetinaService.Instance();
+        }
+        String retinaHost = PixelsFileNameUtils.extractHostName(path);
+        if (retinaHost == null)
         {
             return RetinaService.Instance();
         }
@@ -127,18 +131,53 @@ import io.pixelsdb.pixels.daemon.NodeProto;
         return typePrefix + hostname + "_";
     }
 
-    private static String extractRetinaHostNameFromPath(String path)
+    /**
+     * Builds the checkpoint file path from a directory, prefix, hostname and timestamp.
+     *
+     * @param checkpointDir directory where checkpoint files reside (may or may not end with '/')
+     * @param prefix        {@link #CHECKPOINT_PREFIX_GC} or {@link #CHECKPOINT_PREFIX_OFFLOAD}
+     * @param hostname      the retina host name
+     * @param timestamp     the GC or offload timestamp
+     */
+    public static String buildCheckpointPath(String checkpointDir, String prefix, String hostname, long timestamp)
     {
-        if (path == null || path.isEmpty()) {
-            return null;
-        }
-        int lastSlashIndex = path.lastIndexOf('/');
-        String baseName = (lastSlashIndex == -1) ? path : path.substring(lastSlashIndex + 1);
-        int firstUnderscoreIndex = baseName.indexOf('_');
-        if (firstUnderscoreIndex > 0) {
-            // The substring from the start of baseName up to (but not including) the first underscore is the hostname.
-            return baseName.substring(0, firstUnderscoreIndex);
-        }
-        return null;
+        String fileName = getCheckpointFileName(prefix, hostname, timestamp);
+        return checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
+    }
+
+    // ── writeBufferKey utilities ────────────────────────────────────
+
+    /**
+     * Builds the canonical key for {@code pixelsWriteBufferMap} from schema and table name.
+     */
+    public static String buildWriteBufferKey(String schemaName, String tableName)
+    {
+        return schemaName + "." + tableName;
+    }
+
+    // ── rgKey utilities ──────────────────────────────────────────────
+
+    /**
+     * Builds the canonical {@code rgVisibilityMap} key for a row group.
+     */
+    public static String buildRgKey(long fileId, int rgId)
+    {
+        return fileId + "_" + rgId;
+    }
+
+    /**
+     * Extracts the file ID from an rgKey ({@code "<fileId>_<rgId>"}).
+     */
+    public static long parseFileIdFromRgKey(String rgKey)
+    {
+        return Long.parseLong(rgKey.substring(0, rgKey.indexOf('_')));
+    }
+
+    /**
+     * Extracts the row group ID from an rgKey ({@code "<fileId>_<rgId>"}).
+     */
+    public static int parseRgIdFromRgKey(String rgKey)
+    {
+        return Integer.parseInt(rgKey.substring(rgKey.indexOf('_') + 1));
     }
 }

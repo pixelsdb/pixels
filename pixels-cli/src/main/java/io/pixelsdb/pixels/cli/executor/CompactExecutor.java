@@ -32,7 +32,8 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.retina.RetinaService;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.DateUtil;
+import io.pixelsdb.pixels.common.utils.NetUtils;
+import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.core.compactor.CompactLayout;
 import io.pixelsdb.pixels.core.compactor.PixelsCompactor;
 import net.sourceforge.argparse4j.inf.Namespace;
@@ -40,7 +41,9 @@ import net.sourceforge.argparse4j.inf.Namespace;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -114,16 +117,52 @@ public class CompactExecutor implements CommandExecutor
             }
         }
 
+        // Issue #1305: obtain local hostname for the unified compact file naming.
+        String hostName = NetUtils.getLocalHostName();
+
+        /**
+         * Issue #1305:
+         * Group files by virtualNodeId before compaction.
+         * GC-eligible files (retina/ordered/compact) carry a real virtualNodeId and must
+         * not be mixed across groups to preserve create_ts/delete_ts monotonicity.
+         * single-type files fall into the VNODE_ID_NONE (-1) bucket and are compacted freely.
+         * copy-type files and unrecognised-format files are skipped.
+         */
+        Map<Integer, List<Status>> groupedStatuses = new LinkedHashMap<>();
+        for (Status status : statuses)
+        {
+            String path = status.getPath();
+            PixelsFileNameUtils.PxlFileType fileType = PixelsFileNameUtils.extractFileType(path);
+            if (fileType == null)
+            {
+                System.err.println("Skipping file with unrecognized naming format: " + path);
+                continue;
+            }
+            if (fileType == PixelsFileNameUtils.PxlFileType.COPY)
+            {
+                System.err.println("Skipping copy file (test/benchmark data, not for compaction): " + path);
+                continue;
+            }
+            int vNodeId = PixelsFileNameUtils.extractVirtualNodeId(path);
+            groupedStatuses.computeIfAbsent(vNodeId, k -> new ArrayList<>()).add(status);
+        }
+
         List<Path> targetPaths = layout.getCompactPaths();
         ConcurrentLinkedQueue<File> compactFiles = new ConcurrentLinkedQueue<>();
         ConcurrentLinkedQueue<Path> compactPaths = new ConcurrentLinkedQueue<>();
         int targetPathId = 0;
 
-        // compact
+        // Issue #1305: iterate over each virtualNodeId group independently to preserve
+        // the monotonicity invariants required by Storage GC.
         long startTime = System.currentTimeMillis();
-        for (int i = 0, thdId = 0; i < statuses.size(); i += numRowGroupInBlock, ++thdId)
+        int thdId = 0;
+        for (Map.Entry<Integer, List<Status>> entry : groupedStatuses.entrySet())
         {
-            if (i + numRowGroupInBlock > statuses.size())
+            int vNodeId = entry.getKey();
+            List<Status> groupStatuses = entry.getValue();
+            int groupSize = groupStatuses.size();
+
+            for (int i = 0; i < groupSize; ++thdId)
             {
                 /**
                  * Issue #160:
@@ -136,34 +175,38 @@ public class CompactExecutor implements CommandExecutor
                  * and rebuild a pure compactLayout for the tail files as the
                  * compactLayout in metadata does not work for the tail files.
                  */
-                numRowGroupInBlock = statuses.size() - i;
-                compactLayout = CompactLayout.buildPure(numRowGroupInBlock, numColumn);
-            }
+                // Issue #1305: use local batchSize/batchLayout instead of mutating
+                // numRowGroupInBlock/compactLayout, so they stay unchanged across batches and groups.
+                int batchSize = Math.min(numRowGroupInBlock, groupSize - i);
+                CompactLayout batchLayout = (batchSize < numRowGroupInBlock)
+                        ? CompactLayout.buildPure(batchSize, numColumn)
+                        : compactLayout;
 
-            List<String> sourcePaths = new ArrayList<>();
-            for (int j = 0; j < numRowGroupInBlock; ++j)
-            {
-                if (!statuses.get(i+j).getPath().endsWith("/"))
+                List<String> sourcePaths = new ArrayList<>();
+                for (int j = 0; j < batchSize; ++j)
                 {
-                    sourcePaths.add(statuses.get(i + j).getPath());
+                    if (!groupStatuses.get(i + j).getPath().endsWith("/"))
+                    {
+                        sourcePaths.add(groupStatuses.get(i + j).getPath());
+                    }
                 }
-            }
 
-            Path targetPath = targetPaths.get(targetPathId++);
-            String targetDirPath = targetPath.getUri();
-            targetPathId %= targetPaths.size();
-            if (!targetDirPath.endsWith("/"))
-            {
-                targetDirPath += "/";
-            }
-            String targetFileName = DateUtil.getCurTime() + "_compact.pxl";
-            String targetFilePath = targetDirPath + targetFileName;
+                Path targetPath = targetPaths.get(targetPathId++);
+                String targetDirPath = targetPath.getUri();
+                targetPathId %= targetPaths.size();
+                if (!targetDirPath.endsWith("/"))
+                {
+                    targetDirPath += "/";
+                }
+                // Issue #1305: use unified naming format (hostName + vNodeId) instead of DateUtil timestamp only.
+                String targetFileName = PixelsFileNameUtils.buildCompactFileName(hostName, vNodeId);
+                String targetFilePath = targetDirPath + targetFileName;
 
-            System.out.println("(" + thdId + ") " + sourcePaths.size() +
-                    " ordered files to be compacted into '" + targetFilePath + "'.");
+                System.out.println("(" + thdId + ") vNodeId=" + vNodeId + ", " + sourcePaths.size() +
+                        " ordered files to be compacted into '" + targetFilePath + "'.");
 
-            PixelsCompactor.Builder compactorBuilder = PixelsCompactor.newBuilder()
-                    .setSourcePaths(sourcePaths)
+                PixelsCompactor.Builder compactorBuilder = PixelsCompactor.newBuilder()
+                        .setSourcePaths(sourcePaths)
                     /**
                      * Issue #192:
                      * No need to deep copy compactLayout as it is never modified in-place
@@ -173,40 +216,46 @@ public class CompactExecutor implements CommandExecutor
                      *
                      * Deep copy it if it is in-place modified in the future.
                      */
-                    .setCompactLayout(compactLayout)
-                    .setInputStorage(orderStorage)
-                    .setOutputStorage(compactStorage)
-                    .setPath(targetFilePath)
-                    .setBlockSize(blockSize)
-                    .setReplication(replication)
-                    .setBlockPadding(false)
-                    .setHasHiddenColumn(true);
+                        .setCompactLayout(batchLayout)
+                        .setInputStorage(orderStorage)
+                        .setOutputStorage(compactStorage)
+                        .setPath(targetFilePath)
+                        .setBlockSize(blockSize)
+                        .setReplication(replication)
+                        .setBlockPadding(false)
+                        .setHasHiddenColumn(true);
 
-            long threadStart = System.currentTimeMillis();
-            compactExecutor.execute(() -> {
-                // Issue #192: run compaction in threads.
-                try
-                {
-                    // build() spends some time to read file footers and should be called inside sub-thread.
-                    PixelsCompactor pixelsCompactor = compactorBuilder.build();
-                    pixelsCompactor.compact();
-                    pixelsCompactor.close();
-                    File compactFile = new File();
-                    compactFile.setName(targetFileName);
-                    compactFile.setType(File.Type.REGULAR);
-                    compactFile.setNumRowGroup(pixelsCompactor.getNumRowGroup());
-                    compactFile.setPathId(targetPath.getId());
-                    compactFiles.offer(compactFile);
-                    compactPaths.offer(targetPath);
-                } catch (IOException e)
-                {
-                    System.err.println("write compact file '" + targetFilePath + "' failed");
-                    e.printStackTrace();
-                    return;
-                }
-                System.out.println("Compact file '" + targetFilePath + "' is built in " +
-                        ((System.currentTimeMillis() - threadStart) / 1000.0) + "s");
-            });
+                final String finalTargetFileName = targetFileName;
+                final String finalTargetFilePath = targetFilePath;
+                final Path finalTargetPath = targetPath;
+                long threadStart = System.currentTimeMillis();
+
+                compactExecutor.execute(() -> {
+                    // Issue #192: run compaction in threads.
+                    try
+                    {
+                        PixelsCompactor pixelsCompactor = compactorBuilder.build();
+                        pixelsCompactor.compact();
+                        pixelsCompactor.close();
+                        File compactFile = new File();
+                        compactFile.setName(finalTargetFileName);
+                        compactFile.setType(File.Type.REGULAR);
+                        compactFile.setNumRowGroup(pixelsCompactor.getNumRowGroup());
+                        compactFile.setPathId(finalTargetPath.getId());
+                        compactFiles.offer(compactFile);
+                        compactPaths.offer(finalTargetPath);
+                    } catch (IOException e)
+                    {
+                        System.err.println("write compact file '" + finalTargetFilePath + "' failed");
+                        e.printStackTrace();
+                        return;
+                    }
+                    System.out.println("Compact file '" + finalTargetFilePath + "' is built in " +
+                            ((System.currentTimeMillis() - threadStart) / 1000.0) + "s");
+                });
+
+                i += batchSize;
+            }
         }
 
         // Issue #192: wait for the compaction to complete.

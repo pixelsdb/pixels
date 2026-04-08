@@ -26,9 +26,9 @@
  import io.pixelsdb.pixels.common.metadata.domain.Path;
  import io.pixelsdb.pixels.common.physical.Storage;
  import io.pixelsdb.pixels.common.physical.StorageFactory;
- import io.pixelsdb.pixels.common.utils.Constants;
- import io.pixelsdb.pixels.common.utils.DateUtil;
- import io.pixelsdb.pixels.core.PixelsWriter;
+import io.pixelsdb.pixels.common.utils.NetUtils;
+import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
+import io.pixelsdb.pixels.core.PixelsWriter;
  import io.pixelsdb.pixels.core.PixelsWriterImpl;
  import io.pixelsdb.pixels.core.TypeDescription;
  import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -126,7 +126,7 @@
          {
              targetDirPath += "/";
          }
-         String targetFileName = Constants.LOAD_DEFAULT_RETINA_PREFIX + "_" + DateUtil.getCurTime() + ".pxl";
+         String targetFileName = PixelsFileNameUtils.buildSingleFileName(NetUtils.getLocalHostName());
          String targetFilePath = targetDirPath + targetFileName;
 
          pixelsWriter = PixelsWriterImpl.newBuilder()

@@ -25,7 +25,7 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Storage;
-import io.pixelsdb.pixels.common.utils.DateUtil;
+import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -76,7 +76,7 @@ public class FileWriterManager
         this.virtualNodeId = virtualNodeId;
 
         // Create pixels writer.
-        String targetFileName = hostName + "_" + DateUtil.getCurTime() + ".pxl";
+        String targetFileName = PixelsFileNameUtils.buildOrderedFileName(hostName, virtualNodeId);
         String targetFilePath = targetOrderedDirPath.getUri() + "/" + targetFileName;
         try
         {
@@ -97,7 +97,7 @@ public class FileWriterManager
 
         // Add the corresponding visibility for the file.
         RetinaResourceManager retinaResourceManager = RetinaResourceManager.Instance();
-        retinaResourceManager.addVisibility(this.file.getId(), 0, recordNum);
+        retinaResourceManager.addVisibility(this.file.getId(), 0, recordNum, 0L, null, false);
 
         try
         {

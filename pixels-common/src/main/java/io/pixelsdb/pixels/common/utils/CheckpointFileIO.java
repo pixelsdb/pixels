@@ -31,10 +31,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Unified checkpoint file read/write utility class.
@@ -73,7 +75,8 @@ public class CheckpointFileIO
             this.fileId = fileId;
             this.rgId = rgId;
             this.recordNum = recordNum;
-            this.bitmap = bitmap;
+            this.bitmap = Objects.requireNonNull(bitmap,
+                    "bitmap must not be null for fileId=" + fileId + ", rgId=" + rgId);
         }
     }
 
@@ -99,7 +102,7 @@ public class CheckpointFileIO
      * @param path      the file path
      * @param totalRgs  total number of entries to write
      * @param queue     blocking queue containing CheckpointEntry objects
-     * @throws Exception if writing fails
+     * @throws Exception if writing fails or a producer does not deliver an entry within the timeout
      */
     public static void writeCheckpoint(String path, int totalRgs, BlockingQueue<CheckpointEntry> queue) throws Exception
     {
@@ -109,7 +112,12 @@ public class CheckpointFileIO
             out.writeInt(totalRgs);
             for (int i = 0; i < totalRgs; i++)
             {
-                CheckpointEntry entry = queue.take();
+                CheckpointEntry entry = queue.poll(60, TimeUnit.SECONDS);
+                if (entry == null)
+                {
+                    throw new IOException("Checkpoint producer timed out: received " + i +
+                            " of " + totalRgs + " entries after 60 seconds");
+                }
                 out.writeLong(entry.fileId);
                 out.writeInt(entry.rgId);
                 out.writeInt(entry.recordNum);

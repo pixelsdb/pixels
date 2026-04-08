@@ -1505,6 +1505,68 @@ public class MetadataService
         return false;
     }
 
+    /**
+     * Get a file by its id.
+     * @param fileId the file id
+     * @return the file, or null if not found
+     * @throws MetadataException if the request fails
+     */
+    public File getFileById(long fileId) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.GetFileByIdRequest request = MetadataProto.GetFileByIdRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setFileId(fileId).build();
+        try
+        {
+            MetadataProto.GetFileByIdResponse response = this.stub.getFileById(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                return null;
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+            return new File(response.getFile());
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to get file by id", e);
+        }
+    }
+
+    /**
+     * Atomically promote a TEMPORARY file to REGULAR and delete the old files.
+     * @param newFileId the id of the new TEMPORARY file to promote
+     * @param oldFileIds the ids of old files to delete
+     * @throws MetadataException if the request fails
+     */
+    public void atomicSwapFiles(long newFileId, List<Long> oldFileIds) throws MetadataException
+    {
+        String token = UUID.randomUUID().toString();
+        MetadataProto.AtomicSwapFilesRequest request = MetadataProto.AtomicSwapFilesRequest.newBuilder()
+                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
+                .setNewFileId(newFileId).addAllOldFileIds(oldFileIds).build();
+        try
+        {
+            MetadataProto.AtomicSwapFilesResponse response = this.stub.atomicSwapFiles(request);
+            if (response.getHeader().getErrorCode() != 0)
+            {
+                throw new MetadataException("error code=" + response.getHeader().getErrorCode()
+                        + ", error message=" + response.getHeader().getErrorMsg());
+            }
+            if (!response.getHeader().getToken().equals(token))
+            {
+                throw new MetadataException("response token does not match.");
+            }
+        }
+        catch (Exception e)
+        {
+            throw new MetadataException("failed to atomic swap files", e);
+        }
+    }
+
     public boolean createPeerPath(String uri, List<Column> columns, Path path, Peer peer) throws MetadataException
     {
         String token = UUID.randomUUID().toString();

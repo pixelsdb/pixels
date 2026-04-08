@@ -68,6 +68,11 @@ protected:
         return true;
     }
 
+    void collectGarbage(uint64_t ts) {
+        uint64_t buf[BITMAP_SIZE] = {0};
+        v->collectTileGarbage(ts, buf);
+    }
+
     TileVisibility<RETINA_CAPACITY>* v;
 };
 
@@ -89,7 +94,7 @@ TEST_F(TileVisibilityTest, BaseFunction) {
     SET_BITMAP_BIT(expectedBitmap, 2);
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 
-    v->collectTileGarbage(101);
+    collectGarbage(101);
     v->getTileVisibilityBitmap(101, actualBitmap);
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
@@ -111,7 +116,7 @@ TEST_F(TileVisibilityTest, GarbageCollect) {
     for (int i = 0; i < count; i++) {
         v->deleteTileRecord(i, i + 100);
     }
-    v->collectTileGarbage(150);
+    collectGarbage(150);
     uint64_t actualBitmap[BITMAP_SIZE] = {0};
     uint64_t expectedBitmap[BITMAP_SIZE] = {0};
 
@@ -123,7 +128,7 @@ TEST_F(TileVisibilityTest, GarbageCollect) {
     for (int i = 51; i < count; i++) {
         SET_BITMAP_BIT(expectedBitmap, i);
     }
-    v->collectTileGarbage(100 + count);
+    collectGarbage(100 + count);
     v->getTileVisibilityBitmap(100 + count, actualBitmap);
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
@@ -267,4 +272,426 @@ TEST_F(TileVisibilityTest, MultiThread) {
     std::memset(expectedFinalBitmap, 0xFF, sizeof(expectedFinalBitmap));
 
     EXPECT_TRUE(checkBitmap(finalBitmap, expectedFinalBitmap));
+}
+
+/**
+ * ZeroSentinelInGarbageCollect — deterministic regression for Scenario 2 guard.
+ *
+ * The fix for the full-block race (Scenario 2) relies on treating item=0 as a
+ * sentinel that marks uninitialised tail slots. makeDeleteIndex(rowId=0, ts=0)=0,
+ * which is identical to the zero-initialised memory of a freshly-allocated block.
+ *
+ * Precondition enforced by TransService: all valid transaction timestamps are > 0,
+ * so ts=0 can never represent a real deletion and is safe to use as a sentinel.
+ *
+ * This test simulates the exact item value produced by the race without requiring
+ * concurrent execution:
+ *   1. Fill BLOCK_CAPACITY-1 slots with valid (rowId, ts) pairs.
+ *   2. Insert makeDeleteIndex(0,0)=0 into the last slot — the same value a
+ *      zero-initialised slot in a new block would have during the race window.
+ *   3. Run GC: without the fix, extractTimestamp(0)=0 ≤ ts would SET_BITMAP_BIT(0).
+ *              with the fix, `if (item == 0) break` stops before touching bit 0.
+ *
+ * Failure mode WITHOUT fix: bits 0..BLOCK_CAPACITY-2 set (bit 0 is spurious).
+ * Pass condition WITH fix:  bits 1..BLOCK_CAPACITY-2 set, bit 0 NOT set.
+ */
+TEST_F(TileVisibilityTest, ZeroSentinelInGarbageCollect) {
+    // Fill slots 0..BLOCK_CAPACITY-2 with valid items (rows 1..7, ts 1..7)
+    for (uint16_t i = 1; i < DeleteIndexBlock::BLOCK_CAPACITY; i++) {
+        v->deleteTileRecord(i, static_cast<uint64_t>(i));
+    }
+    // Insert the sentinel value (row=0, ts=0 → item=0) into the final slot.
+    // This replicates the zero-initialised items[1..7] that GC would encounter
+    // during the Scenario-2 race if tailUsed were stale at BLOCK_CAPACITY.
+    v->deleteTileRecord(0, 0);
+
+    collectGarbage(100);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(100, actualBitmap);
+
+    // Rows 1..(BLOCK_CAPACITY-1) should be deleted; row 0 must NOT be set.
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    for (uint16_t i = 1; i < DeleteIndexBlock::BLOCK_CAPACITY; i++) {
+        SET_BITMAP_BIT(expectedBitmap, i);
+    }
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap))
+        << "Row 0 must not be set: item==0 sentinel guard must stop GC "
+           "before processing zero-initialised (or ts=0) slots";
+}
+
+/**
+ * ConcurrentGCAndFirstInsert — targets Scenario 1 (empty-list path race).
+ *
+ * Race condition:
+ *   deleteTileRecord (empty list) does:
+ *     1. tail.CAS(nullptr → newBlk)
+ *     2. currentVersion.CAS(oldVer → newVer with head=newBlk)   ← head now visible
+ *     3. tailUsed.store(1)                                       ← window: 2 done, 3 not yet
+ *
+ *   If collectTileGarbage runs between steps 2 and 3:
+ *     - blk = newVer->head = newBlk  (reachable)
+ *     - count = tailUsed = 0         (not yet updated)
+ *     - BEFORE FIX: items[count-1] = items[size_t(-1)] → size_t underflow → UB / crash
+ *     - AFTER FIX:  count==0 guard breaks out safely; no crash.
+ *
+ * NOTE on test reliability: the race window is between two adjacent atomic operations
+ * (currentVersion.CAS at line ~99 and tailUsed.store at line ~102 in deleteTileRecord).
+ * This is too narrow to trigger reliably with OS-level scheduling alone; the test is
+ * therefore a probabilistic stress test rather than a deterministic reproducer.  For
+ * guaranteed detection, compile with AddressSanitizer + ThreadSanitizer or add a
+ * -DENABLE_TEST_HOOKS build flag that injects a sleep between the two operations.
+ *
+ * The primary value of this test is as a no-crash regression guard: if the count==0
+ * guard is removed, a crash (size_t underflow → OOB array access) will eventually
+ * surface under sustained concurrent load even if it is not triggered every run.
+ */
+TEST_F(TileVisibilityTest, ConcurrentGCAndFirstInsert) {
+    constexpr int TRIALS = 200;
+
+    for (int trial = 0; trial < TRIALS; trial++) {
+        delete v;
+        v = new TileVisibility<RETINA_CAPACITY>();
+
+        std::atomic<bool> deleteStarted{false};
+        std::atomic<bool> gcDone{false};
+
+        // GC thread: spin-waits until the delete thread has signalled it started,
+        // then immediately fires GC to maximise the chance of hitting the race window.
+        auto gcThread = std::thread([&]() {
+            while (!deleteStarted.load(std::memory_order_acquire)) {}
+            collectGarbage(1000);
+            gcDone.store(true, std::memory_order_release);
+        });
+
+        // Delete thread: signals start, then inserts the very first item (row=5, ts=100).
+        // Row 0 is intentionally never deleted so we can use bit 0 as a spurious-set
+        // canary in the companion scenario-2 test.
+        deleteStarted.store(true, std::memory_order_release);
+        v->deleteTileRecord(5, 100);
+
+        gcThread.join();
+
+        // After both operations complete, GC with a ts that covers the inserted item
+        // and verify the bitmap is exactly {row 5 deleted}.
+        collectGarbage(1000);
+        uint64_t actualBitmap[BITMAP_SIZE] = {0};
+        v->getTileVisibilityBitmap(1000, actualBitmap);
+
+        uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+        SET_BITMAP_BIT(expectedBitmap, 5);
+
+        EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap))
+            << "Trial " << trial << ": bitmap incorrect after concurrent first-insert + GC";
+    }
+}
+
+/**
+ * ConcurrentGCAndBlockTransition — targets Scenario 2 (full-block path race).
+ *
+ * Race condition:
+ *   deleteTileRecord (old tail block is full) does:
+ *     1. curTail->next.CAS(nullptr → newBlk)
+ *     2. tail.CAS(curTail → newBlk)    ← tail now points to new block
+ *     3. tailUsed.store(1)             ← window: 2 done, 3 not yet
+ *
+ *   If collectTileGarbage runs between steps 2 and 3:
+ *     - blk == tail (newBlk), count = tailUsed = BLOCK_CAPACITY (stale old value, 8)
+ *     - items[0] is the real insertion; items[1..BLOCK_CAPACITY-1] are zero-initialised
+ *     - BEFORE FIX: extractTimestamp(0)=0 ≤ ts → SET_BITMAP_BIT(extractRowId(0)=0)
+ *                   → bit 0 spuriously set in baseBitmap (persistent data corruption)
+ *     - AFTER FIX:  item==0 guard breaks the inner loop; no spurious bit 0.
+ *
+ * Strategy: pre-fill exactly BLOCK_CAPACITY items (one full block) with ts values
+ * that GC will compact, then concurrently fire GC and the (BLOCK_CAPACITY+1)-th
+ * insert that triggers new-block creation.  Row 0 is never deleted; if the bug fires,
+ * getTileVisibilityBitmap will report bit 0 set even though row 0 was never deleted.
+ *
+ * NOTE on test reliability: identical narrow-window caveat as ConcurrentGCAndFirstInsert.
+ * The ZeroSentinelInGarbageCollect test above is the deterministic companion that
+ * verifies the item==0 guard logic directly without requiring concurrent execution.
+ */
+TEST_F(TileVisibilityTest, ConcurrentGCAndBlockTransition) {
+    constexpr uint64_t GC_TS = 1000;
+    // Number of concurrent trials; more iterations → higher probability of hitting the race.
+    constexpr int TRIALS = 500;
+
+    std::atomic<bool> spuriousRow0{false};
+
+    for (int trial = 0; trial < TRIALS && !spuriousRow0.load(); trial++) {
+        delete v;
+        v = new TileVisibility<RETINA_CAPACITY>();
+
+        // Pre-fill exactly BLOCK_CAPACITY (8) items so the next insert triggers
+        // the full-block → new-block code path.  Use rows 1..8 (never row 0).
+        for (size_t i = 0; i < DeleteIndexBlock::BLOCK_CAPACITY; i++) {
+            v->deleteTileRecord(static_cast<uint16_t>(i + 1), i + 1);
+        }
+
+        std::atomic<bool> insertReady{false};
+
+        // GC thread: waits for the insert thread to be about to create the new block,
+        // then fires GC immediately to race with tail/tailUsed update.
+        auto gcThread = std::thread([&]() {
+            while (!insertReady.load(std::memory_order_acquire)) {}
+            collectGarbage(GC_TS);
+        });
+
+        // Insert thread: signal then insert the (BLOCK_CAPACITY+1)-th item to force
+        // new-block creation.  Row 0 is the canary — never intentionally deleted.
+        insertReady.store(true, std::memory_order_release);
+        v->deleteTileRecord(10, DeleteIndexBlock::BLOCK_CAPACITY + 1);
+
+        gcThread.join();
+
+        // Run one more clean GC to ensure everything that should be compacted is.
+        collectGarbage(GC_TS);
+
+        // Check the canary: bit 0 must be 0 because row 0 was never deleted.
+        uint64_t bitmap[BITMAP_SIZE] = {0};
+        v->getTileVisibilityBitmap(GC_TS, bitmap);
+
+        if (GET_BITMAP_BIT(bitmap, 0)) {
+            spuriousRow0.store(true);
+            ADD_FAILURE() << "Trial " << trial
+                          << ": bit 0 spuriously set in bitmap — "
+                          << "stale tailUsed race bug triggered (Scenario 2)";
+        }
+    }
+
+    EXPECT_FALSE(spuriousRow0.load())
+        << "Row 0 was spuriously marked deleted by GC processing "
+           "zero-initialised slots of a newly created tail block.";
+}
+
+// =========================================================================
+// exportChainItemsAfter tests
+// =========================================================================
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_Basic) {
+    v->deleteTileRecord(1, 50);
+    v->deleteTileRecord(2, 100);
+    v->deleteTileRecord(3, 150);
+    v->deleteTileRecord(4, 200);
+    v->deleteTileRecord(5, 250);
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+
+    ASSERT_EQ(items.size(), 3u);
+    EXPECT_EQ(items[0].second, 150u);
+    EXPECT_EQ(items[1].second, 200u);
+    EXPECT_EQ(items[2].second, 250u);
+    EXPECT_EQ(items[0].first, 0u * RETINA_CAPACITY + 3u);
+    EXPECT_EQ(items[1].first, 0u * RETINA_CAPACITY + 4u);
+    EXPECT_EQ(items[2].first, 0u * RETINA_CAPACITY + 5u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_AllAbove) {
+    v->deleteTileRecord(1, 200);
+    v->deleteTileRecord(2, 300);
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+
+    ASSERT_EQ(items.size(), 2u);
+    EXPECT_EQ(items[0].second, 200u);
+    EXPECT_EQ(items[1].second, 300u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_AllBelow) {
+    v->deleteTileRecord(1, 50);
+    v->deleteTileRecord(2, 80);
+    v->deleteTileRecord(3, 100);
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+    EXPECT_EQ(items.size(), 0u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_EmptyChain) {
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+    EXPECT_EQ(items.size(), 0u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_AfterGC) {
+    v->deleteTileRecord(1, 50);
+    v->deleteTileRecord(2, 100);
+    v->deleteTileRecord(3, 150);
+    v->deleteTileRecord(4, 200);
+
+    collectGarbage(100);
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+
+    ASSERT_EQ(items.size(), 2u);
+    EXPECT_EQ(items[0].second, 150u);
+    EXPECT_EQ(items[1].second, 200u);
+}
+
+TEST_F(TileVisibilityTest, ExportChainItemsAfter_MultiBlock) {
+    for (uint16_t i = 0; i < 20; i++) {
+        v->deleteTileRecord(i + 10, (i + 1) * 10);
+    }
+
+    std::vector<std::pair<uint32_t, uint64_t>> items;
+    v->exportChainItemsAfter(0, 100, items);
+
+    ASSERT_EQ(items.size(), 10u);
+    for (size_t i = 0; i < 10; i++) {
+        EXPECT_EQ(items[i].second, (i + 11) * 10);
+        EXPECT_EQ(items[i].first, 0u * RETINA_CAPACITY + (i + 20));
+    }
+}
+
+// =========================================================================
+// importDeletionItems tests
+// =========================================================================
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_Basic) {
+    std::vector<uint64_t> bucket;
+    bucket.push_back(makeDeleteIndex(1, 100));
+    bucket.push_back(makeDeleteIndex(2, 200));
+    bucket.push_back(makeDeleteIndex(5, 300));
+    bucket.push_back(makeDeleteIndex(10, 400));
+
+    v->importDeletionItems(bucket);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(500, actualBitmap);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    SET_BITMAP_BIT(expectedBitmap, 2);
+    SET_BITMAP_BIT(expectedBitmap, 5);
+    SET_BITMAP_BIT(expectedBitmap, 10);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_EmptyBucket) {
+    v->deleteTileRecord(1, 100);
+
+    std::vector<uint64_t> empty;
+    v->importDeletionItems(empty);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(200, actualBitmap);
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_MultiBlock) {
+    std::vector<uint64_t> bucket;
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    for (uint16_t i = 0; i < 20; i++) {
+        bucket.push_back(makeDeleteIndex(i + 10, (i + 1) * 10));
+        SET_BITMAP_BIT(expectedBitmap, i + 10);
+    }
+
+    v->importDeletionItems(bucket);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(300, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_Padding) {
+    std::vector<uint64_t> bucket;
+    for (uint16_t i = 0; i < 5; i++) {
+        bucket.push_back(makeDeleteIndex(i + 1, (i + 1) * 100));
+    }
+
+    v->importDeletionItems(bucket);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    for (uint16_t i = 0; i < 5; i++) SET_BITMAP_BIT(expectedBitmap, i + 1);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(600, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+
+    uint64_t partialBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(250, partialBitmap);
+    uint64_t partialExpected[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(partialExpected, 1);
+    SET_BITMAP_BIT(partialExpected, 2);
+    EXPECT_TRUE(checkBitmap(partialBitmap, partialExpected));
+}
+
+// =========================================================================
+// importDeletionItems — truncation dedup
+// =========================================================================
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_TruncationDedup) {
+    v->deleteTileRecord(20, 300);
+    v->deleteTileRecord(21, 400);
+
+    std::vector<uint64_t> bucket;
+    bucket.push_back(makeDeleteIndex(1, 100));
+    bucket.push_back(makeDeleteIndex(2, 200));
+    bucket.push_back(makeDeleteIndex(3, 300));
+    bucket.push_back(makeDeleteIndex(4, 400));
+    bucket.push_back(makeDeleteIndex(5, 500));
+
+    v->importDeletionItems(bucket);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    SET_BITMAP_BIT(expectedBitmap, 2);
+    SET_BITMAP_BIT(expectedBitmap, 3);
+    SET_BITMAP_BIT(expectedBitmap, 20);
+    SET_BITMAP_BIT(expectedBitmap, 21);
+    SET_BITMAP_BIT(expectedBitmap, 4);
+    SET_BITMAP_BIT(expectedBitmap, 5);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(600, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_FullOverlap) {
+    v->deleteTileRecord(20, 100);
+    v->deleteTileRecord(21, 200);
+
+    std::vector<uint64_t> bucket;
+    bucket.push_back(makeDeleteIndex(1, 200));
+    bucket.push_back(makeDeleteIndex(2, 300));
+
+    v->importDeletionItems(bucket);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 20);
+    SET_BITMAP_BIT(expectedBitmap, 21);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(500, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
+}
+
+// =========================================================================
+// importDeletionItems — empty chain tail claim + subsequent deletes
+// =========================================================================
+
+TEST_F(TileVisibilityTest, ImportDeletionItems_EmptyChainTailClaim) {
+    std::vector<uint64_t> bucket;
+    bucket.push_back(makeDeleteIndex(1, 100));
+    bucket.push_back(makeDeleteIndex(2, 200));
+
+    v->importDeletionItems(bucket);
+
+    v->deleteTileRecord(5, 300);
+    v->deleteTileRecord(6, 400);
+
+    uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    SET_BITMAP_BIT(expectedBitmap, 2);
+    SET_BITMAP_BIT(expectedBitmap, 5);
+    SET_BITMAP_BIT(expectedBitmap, 6);
+
+    uint64_t actualBitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(500, actualBitmap);
+    EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }

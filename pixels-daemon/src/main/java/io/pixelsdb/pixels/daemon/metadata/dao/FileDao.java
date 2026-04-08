@@ -73,4 +73,12 @@ public abstract class FileDao implements Dao<MetadataProto.File>
     abstract public boolean update (MetadataProto.File file);
 
     abstract public boolean deleteByIds (List<Long> ids);
+
+    /**
+     * Atomically promote a TEMPORARY file to REGULAR and delete the old files in a single transaction.
+     * @param newFileId the id of the new TEMPORARY file to promote
+     * @param oldFileIds the ids of old files to delete
+     * @return true if the transaction committed successfully
+     */
+    abstract public boolean atomicSwapFiles(long newFileId, List<Long> oldFileIds);
 }
