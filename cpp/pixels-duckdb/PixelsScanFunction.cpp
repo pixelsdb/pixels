@@ -430,20 +430,11 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
       case TypeDescription::STRING://不知道怎么跑起来的，能动就不要改，别的是直接reference了，这里采用的应该是拷贝
       {
           auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
-          auto &out_vec = output.data.at(col_id);
-          out_vec.SetVectorType(VectorType::FLAT_VECTOR);
-          auto result_data = FlatVector::GetData<string_t>(out_vec);
-          for (idx_t i = 0; i < thisOutputChunkRows; i++)
-          {
-              if (binaryCol->isNullAt(i))
-              {
-                  FlatVector::SetNull(out_vec, i, true);
-                  continue;
-              }
-              const std::string &str = binaryCol->getValue(i);
-              result_data[i] = StringVector::AddString(out_vec, str);
-          }
-
+          Vector vector(LogicalType::VARCHAR,
+                        (data_ptr_t) (binaryCol->current()), col->currentValid(),col->getCapacity());
+          output.data.at(col_id).Reference(vector);
+  //			    auto result_ptr = FlatVector::GetData<duckdb::string_t>(output.data.at(col_id));
+  //                memcpy(result_ptr, binaryCol->vector + row_offset, thisOutputChunkRows * sizeof(string_t));
           break;
       }
         //        case TypeDescription::STRUCT:
@@ -586,6 +577,9 @@ pixels::ConstantFilter ConvertConstantFilter(const ConstantFilter &filter) {
             break;
         case ExpressionType::COMPARE_GREATERTHANOREQUALTO:
             op = pixels::ComparisonOperator::GREATER_THAN_OR_EQUAL;
+            break;
+        case ExpressionType::COMPARE_NOTEQUAL:
+            op = pixels::ComparisonOperator::NOT_EQUAL;
             break;
         default:
             throw std::runtime_error("Unsupported DuckDB comparison type");

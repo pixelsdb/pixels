@@ -23,125 +23,102 @@
  * @create 2023-03-17
  */
 #include "vector/BinaryColumnVector.h"
-#include <cstdlib> // 用于 posix_memalign 和 free
-#include <cstring> // 用于 memcpy
+#include <cstdint>
+#include <cstring>
 
-BinaryColumnVector::BinaryColumnVector(uint64_t len, bool encoding)
-    : ColumnVector(len, encoding)
+BinaryColumnVector::BinaryColumnVector(uint64_t len, bool encoding) : ColumnVector(len, encoding)
 {
-    str_vec.resize(len);
-    memoryUsage += sizeof(std::string) * len;
+  posix_memalign(reinterpret_cast<void **>(&vector), 32,len * sizeof(pixels::string_t));
+  str_vec.resize(len);
+  memoryUsage += (long) sizeof(uint8_t) * len;
 }
 
 void BinaryColumnVector::close()
 {
-    if (!closed)
-    {
-        ColumnVector::close();
-        str_vec.clear();
-        str_vec.shrink_to_fit();
-        closed = true;
-    }
+  if (!closed)
+  {
+    ColumnVector::close();
+    free(vector);
+    vector = nullptr;
+  }
 }
 
-void BinaryColumnVector::setRef(int elementNum,
-                                uint8_t *const &sourceBuf,
-                                int start,
-                                int length)
+void BinaryColumnVector::setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length)
 {
-    if (elementNum >= (int)this->length)
-    {
-        ensureSize(elementNum + 1, true);
-    }
+  if (elementNum >= writeIndex)
+  {
+    writeIndex = elementNum + 1;
+  }
+  this->vector[elementNum]= pixels::string_t((char *) (sourceBuf + start), length);
+//    std::cout<< this->vector[elementNum].GetString()<<std::endl;
+  // TODO: isNull should implemented, but not now.
 
-    if (elementNum >= writeIndex)
-    {
-        writeIndex = elementNum + 1;
-    }
-
-    str_vec[elementNum] = std::string(
-        reinterpret_cast<char *>(sourceBuf + start),
-        length);
-
-    isNull[elementNum] = false;
 }
 
-void BinaryColumnVector::setVal(int elementNum,
-                                uint8_t *sourceBuf,
-                                int start,
-                                int length)
+void BinaryColumnVector::print(int rowCount)
 {
-    str_vec[elementNum] = std::string(
-        reinterpret_cast<char *>(sourceBuf + start),
-        length);
-
-    isNull[elementNum] = false;
+  throw InvalidArgumentException("not support print binarycolumnvector.");
 }
-
-void BinaryColumnVector::ensureSize(uint64_t size, bool preserveData)
-{
-    if (length >= size)
-        return;
-
-    if (preserveData)
-    {
-        str_vec.resize(size);
-    }
-    else
-    {
-        std::vector<std::string> new_vec(size);
-        str_vec.swap(new_vec);
-    }
-
-    memoryUsage += sizeof(std::string) * (size - length);
-
-    resize(size);  // 更新基类 length
-}
-
 
 BinaryColumnVector::~BinaryColumnVector()
 {
-    if (!closed)
-    {
-        BinaryColumnVector::close();
-    }
+  if (!closed)
+  {
+    BinaryColumnVector::close();
+  }
 }
 
 void *BinaryColumnVector::current()
 {
-    if (readIndex >= str_vec.size())
-        return nullptr;
-
-    return (void *)&str_vec[readIndex];
+  if (vector == nullptr)
+  {
+    return nullptr;
+  } else
+  {
+    return vector + readIndex;
+  }
 }
 
 void BinaryColumnVector::add(std::string &value)
 {
-    if (writeIndex >= (int)length)
-    {
-        ensureSize(writeIndex == 0 ? 1 : writeIndex * 2, true);
-    }
-
-    str_vec[writeIndex++] = value;
+  size_t len = value.size();
+  uint8_t *buffer = new uint8_t[len];
+  std::memcpy(buffer, value.data(), len);
+  add(buffer, len);
+  delete[] buffer;
 }
 
 void BinaryColumnVector::add(uint8_t *v, int len)
 {
-    if (writeIndex >= (int)length)
+  if (writeIndex >= length)
+  {
+    ensureSize(writeIndex * 2, true);
+  }
+  setVal(writeIndex++, v, 0, len);
+}
+
+void BinaryColumnVector::setVal(int elementNum, uint8_t *sourceBuf, int start, int length)
+{
+  vector[elementNum] = pixels::string_t(reinterpret_cast<char *>(sourceBuf + start), length);
+  isNull[elementNum] = false;
+  str_vec[elementNum] = std::string(reinterpret_cast<char *>(sourceBuf + start), length);
+  //std::cout<<"add str "<<str_vec[elementNum]<<std::endl;
+}
+
+void BinaryColumnVector::ensureSize(uint64_t size, bool preserveData)
+{
+  ColumnVector::ensureSize(size, preserveData);
+  if (length < size)
+  {
+    pixels::string_t *oldVector = vector;
+    posix_memalign(reinterpret_cast<void **>(&vector), 32, size * sizeof(pixels::string_t));
+    str_vec.resize(size);
+    if (preserveData)
     {
-        ensureSize(writeIndex == 0 ? 1 : writeIndex * 2, true);
+      std::copy(oldVector, oldVector + length, vector);
     }
-
-    str_vec[writeIndex++] =
-        std::string(reinterpret_cast<char *>(v), len);
-}
-
-const std::string &BinaryColumnVector::getValue(idx_t i) const
-{
-    return str_vec[i];
-}
-
-bool  BinaryColumnVector::isNullAt(idx_t i) const
-{
-    return isNull[i];
+    delete[] oldVector;
+    memoryUsage += (long) sizeof(pixels::string_t) * (size - length);
+    resize(size);
+  }
 }

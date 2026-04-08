@@ -182,13 +182,18 @@ void PixelsFilter::DecimalFilterOperation(std::shared_ptr <ColumnVector> vector,
 }
 
 template<class OP>
-void PixelsFilter::StringFilterOperation(std::shared_ptr <ColumnVector> vector,//string目前只能并行比较，原项目也是这样，沿用，后续再想办法
+void PixelsFilter::StringFilterOperation(std::shared_ptr <ColumnVector> vector,//string目前只能串行比较，原项目也是这样，沿用，后续再想办法
                                     const pixels::Scalar &constant, PixelsBitMask &filter_mask){
     std::string constant_value=constant.get_string();
+    //std::cout<<"constant val is "<<constant_value<<std::endl;
     auto binaryColumnVector = std::static_pointer_cast<BinaryColumnVector>(vector);
     for (int i = 0; i < vector->length; i++)
     {
-        filter_mask.set(i, OP::Operation((std::string) binaryColumnVector->str_vec[i],(std::string) constant_value));
+        if(!vector->checkValid(i)){//NULL直接过滤
+            filter_mask.set(i,0);
+        }
+        if(filter_mask.get(i))//string存在跳读，如果前面这一行的其他列被filter out了那么这个后面的string列不会读取，会导致脏数据
+            filter_mask.set(i, OP::Operation(binaryColumnVector->vector[i].ToString(),constant_value));
     }
 }       
 

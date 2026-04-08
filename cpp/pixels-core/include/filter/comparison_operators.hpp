@@ -11,7 +11,7 @@ struct Equals {
 struct NotEquals {
 	template <class T>
 	static inline bool Operation(const T &left, const T &right) {
-		return !Equals::Operation(left, right);
+		return left!=right;
 	}
 };
 

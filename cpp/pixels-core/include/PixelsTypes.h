@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cassert>
 #include <string>
+#include <cstring>
 using idx_t = uint64_t;
 namespace pixels {
 
@@ -148,6 +149,60 @@ public:
     }
 };
 
+struct string_t {
+public:
+    static constexpr uint32_t INLINE_LENGTH = 12;
+    string_t() {
+        value.inlined.length = 0;
+    }
+    string_t(const char *data, uint32_t len) {
+        value.inlined.length = len;
+        if (IsInlined()) {
+            // 小字符串：直接拷贝
+            memset(value.inlined.inlined, 0, INLINE_LENGTH);
+            if (len > 0) {
+                memcpy(value.inlined.inlined, data, len);
+            }
+        } else {
+            // 大字符串：存指针 + prefix
+            memcpy(value.pointer.prefix, data, 4);
+            value.pointer.ptr = const_cast<char *>(data);
+        }
+    }
+
+    string_t(const std::string &str)
+        : string_t(str.data(), (uint32_t)str.size()) {}
+
+    inline bool IsInlined() const {
+        return GetSize() <= INLINE_LENGTH;
+    }
+
+    inline const char *GetData() const {
+        return IsInlined() ? value.inlined.inlined : value.pointer.ptr;
+    }
+
+    inline uint32_t GetSize() const {
+        return value.inlined.length;
+    }
+
+    inline std::string ToString() const {
+        return std::string(GetData(), GetSize());
+    }
+
+private:
+    union {
+        struct {
+            uint32_t length;
+            char prefix[4];
+            char *ptr;
+        } pointer;
+
+        struct {
+            uint32_t length;
+            char inlined[INLINE_LENGTH];
+        } inlined;
+    } value;
+};
 
 
 } // namespace pixels

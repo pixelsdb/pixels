@@ -40,21 +40,20 @@
 
 class BinaryColumnVector : public ColumnVector
 {
-public:
-    BinaryColumnVector(uint64_t len, bool encoding);
-    ~BinaryColumnVector();
-
-    void close() override;
-
-    void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
-    void setVal(int elementNum, uint8_t *sourceBuf, int start, int length);
-    void ensureSize(uint64_t size, bool preserveData) override;
-    void add(std::string &value);
-    void add(uint8_t *v, int len);
-    void *current() override;
-    const std::string &getValue(idx_t i) const;
-    bool isNullAt(idx_t i) const;
-    std::vector<std::string> str_vec;   // 唯一字符串存储
+ public:
+  pixels::string_t *vector;
+  std::vector<std::string> str_vec;
+  explicit BinaryColumnVector(uint64_t len = VectorizedRowBatch::DEFAULT_SIZE, bool encoding = false);
+  ~BinaryColumnVector();
+  void setRef(int elementNum, uint8_t *const &sourceBuf, int start, int length);
+  void *current() override;
+  void close() override;
+  void print(int rowCount) override;
+  void add(std::string &value) override;
+  void add(uint8_t *v, int length);
+  //void setVal(int elemnetNum,uint8_t* sourceBuf);
+  void setVal(int elementNum, uint8_t *sourceBuf, int start, int length);
+  void ensureSize(uint64_t size, bool preserveData) override;
 };
 
 #endif //PIXELS_BINARYCOLUMNVECTOR_H
