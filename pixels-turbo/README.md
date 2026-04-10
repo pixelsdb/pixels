@@ -7,6 +7,7 @@ and automatically invokes cloud functions to process unpredictable workload spik
 enough resources.
 
 ## Components
+
 Currently, `Pixels-Turbo` uses Trino as the query entry-point and the query processor in the MPP cluster, 
 and implements the serverless query accelerator from scratch.
 `Pixels-Turbo` is composed of the following components:
