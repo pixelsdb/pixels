@@ -67,7 +67,7 @@ public:
     explicit PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> reader,
                                     const pixels::proto::PostScript &pixelsPostScript,
                                     const pixels::proto::Footer &pixelsFooter,
-                                    PixelsReaderOption &opt,//option不能是只读的，因为要把tablefilterset拿过来
+                                    PixelsReaderOption &opt,
                                     std::shared_ptr <PixelsFooterCache> pixelsFooterCache
     );
 

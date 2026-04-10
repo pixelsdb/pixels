@@ -27,7 +27,7 @@
 
 #include "vector/ColumnVector.h"
 #include "vector/VectorizedRowBatch.h"
-#include "PixelsTypes.h"  //引入中立类型
+#include "PixelsTypes.h" 
 
 #pragma once
 #include <cstdint>
@@ -55,7 +55,7 @@ public:
     pixels::PhysicalType getPhysicalType() const { return physical_type_; }
     size_t ElementSize() const;
     void ensureSize(uint64_t size, bool preserveData);
-    void* vector;//这里改为void，之后根据大小调整
+    void* vector;
     int precision_;
     int scale_;
 

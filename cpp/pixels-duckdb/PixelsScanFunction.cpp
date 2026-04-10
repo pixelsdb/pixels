@@ -111,7 +111,7 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
       }
     if (data.vectorizedRowBatch == nullptr)
       {
-      data.vectorizedRowBatch = currPixelsRecordReader->readBatch(false);//readbatch里完成filter过滤
+      data.vectorizedRowBatch = currPixelsRecordReader->readBatch(false);
       }
     uint64_t currentLoc = data.vectorizedRowBatch->position();
     std::shared_ptr<TypeDescription> resultSchema = data.currPixelsRecordReader->getResultSchema();
@@ -427,7 +427,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
         //            break;
       case TypeDescription::VARCHAR:
       case TypeDescription::CHAR:
-      case TypeDescription::STRING://不知道怎么跑起来的，能动就不要改，别的是直接reference了，这里采用的应该是拷贝
+      case TypeDescription::STRING:
       {
           auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
           Vector vector(LogicalType::VARCHAR,
@@ -537,10 +537,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsR
           ->setStorage(storage)
           ->setPixelsFooterCache(footerCache)
           ->build();
-
-    // 1. 使用 auto 配合 std::move（或者直接在下一步 move）
     PixelsReaderOption option = GetPixelsReaderOption(scan_data, parallel_state);
-    // 2. 传给 read 时必须显式 move
     scan_data.nextPixelsRecordReader = scan_data.nextReader->read(std::move(option));
     auto nextPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(
         scan_data.nextPixelsRecordReader);
@@ -561,7 +558,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsR
 
 pixels::ConstantFilter ConvertConstantFilter(const ConstantFilter &filter) {
     pixels::ComparisonOperator op;
-    // 转换比较操作符
+    // convert DuckDB's ExpressionType to pixels's ComparisonOperator
     switch (filter.comparison_type) {
         case ExpressionType::COMPARE_EQUAL:
             op = pixels::ComparisonOperator::EQUAL;
@@ -600,11 +597,11 @@ pixels::ConstantFilter ConvertConstantFilter(const ConstantFilter &filter) {
         }   
         case LogicalTypeId::DATE: {
             auto d = filter.constant.GetValue<date_t>();
-            val.set(d.days);   // 转成 int
+            val.set(d.days);   //convert to int
             break;
         }
         case duckdb::LogicalTypeId::DECIMAL: {
-            double decimal_value = filter.constant.GetValue<double>(); // 整数表示
+            double decimal_value = filter.constant.GetValue<double>(); 
             int32_t scale = DecimalType::GetScale(filter.constant.type());
             for(int i=0;i<scale;i++){
               decimal_value*=10;
@@ -643,7 +640,7 @@ ConvertConjunctionFilter(const ConjunctionFilter &duck_filter) {
         case TableFilterType::CONJUNCTION_AND:
         case TableFilterType::CONJUNCTION_OR: {
             const auto &child_conj =static_cast<const ConjunctionFilter &>(child_ref);
-            result->child_filters.push_back(ConvertConjunctionFilter(child_conj)); // 递归直接接收
+            result->child_filters.push_back(ConvertConjunctionFilter(child_conj)); 
             break;
         }
         case TableFilterType::IS_NULL:
@@ -678,17 +675,17 @@ pixels::TableFilterSet PixelsScanFunction::ConvertDuckDBFilter(TableFilterSet* f
                 break;
             }
             
-            case TableFilterType::IS_NULL://以下的要么连filter层也没有实现要么就是duckdb不会下推，转换也没有必要
+            case TableFilterType::IS_NULL://nothing to do
                 break;
-            case TableFilterType::IS_NOT_NULL:
+            case TableFilterType::IS_NOT_NULL://nothing to do
                 break;
-            case TableFilterType::STRUCT_EXTRACT:
+            case TableFilterType::STRUCT_EXTRACT://we don't support struct type now, so we can ignore this type of filter
                 break;
-            case TableFilterType::OPTIONAL_FILTER:
+            case TableFilterType::OPTIONAL_FILTER://we don't support optional filter now, so we can ignore this type of filter
                 break;
-            case TableFilterType::IN_FILTER:
+            case TableFilterType::IN_FILTER://we don't support in filter now, so we can ignore this type of filter
                 break;
-            case TableFilterType::DYNAMIC_FILTER:
+            case TableFilterType::DYNAMIC_FILTER://we don't support dynamic filter now, so we can ignore this type of filter
                 break;
             default:
                 break;
@@ -704,7 +701,6 @@ PixelsReaderOption PixelsScanFunction::GetPixelsReaderOption(PixelsReadLocalStat
     option.setTolerantSchemaEvolution(true);
     option.setEnableEncodedColumnVector(true);
     option.setEnabledFilterPushDown(enable_filter_pushdown);
-    //option.setFilter(global_state.filters);完成从duckdb的filter到pixelstablefilter的转换,做一个adapter来转接
     if (global_state.filters && enable_filter_pushdown) {
         auto pixels_filter = ConvertDuckDBFilter(global_state.filters);
         option.setFilter(std::move(pixels_filter));

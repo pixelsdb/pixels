@@ -1,5 +1,26 @@
+/*
+ * Copyright 2024 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+
 #pragma once
-//放一些枚举类
+//some common types used in pixels extension
 
 #ifndef PIXELS_TYPES_H
 #define PIXELS_TYPES_H
@@ -11,14 +32,14 @@
 using idx_t = uint64_t;
 namespace pixels {
 
-enum class PhysicalType : uint8_t {//decimal的物理存储类型
+enum class PhysicalType : uint8_t {//physical type of decimal, used for decimal column statistics
     INT16,
     INT32,
     INT64,
     INT128,
 };
 
-struct DecimalConfig {//decimal不同物理存储类型的最大宽度
+struct DecimalConfig {//decimal config, used for decimal column statistics
         static constexpr int MAX_WIDTH_INT16 = 4;
         static constexpr int MAX_WIDTH_INT32 = 9;
         static constexpr int MAX_WIDTH_INT64 = 18;
@@ -38,16 +59,16 @@ enum class ComparisonOperator : uint8_t {
 
 enum class TableFilterType : uint8_t {
 	CONSTANT_COMPARISON = 0, // constant comparison (e.g. =C, >C, >=C, <C, <=C)
-	IS_NULL = 1,             // C IS NULL 不支持
-	IS_NOT_NULL = 2,         // C IS NOT NULL 不支持
+	IS_NULL = 1,             // C IS NULL 
+	IS_NOT_NULL = 2,         // C IS NOT NULL
 	CONJUNCTION_OR = 3,      // OR of different filters
 	CONJUNCTION_AND = 4,     // AND of different filters
-	STRUCT_EXTRACT = 5,      // filter applies to child-column of struct 不支持
-	OPTIONAL_FILTER = 6,     // executing filter is not required for query correctness 不支持
-	IN_FILTER = 7,           // col IN (C1, C2, C3, ...)    不支持
-	DYNAMIC_FILTER = 8,      // dynamic filters can be updated at run-time  不支持
-	EXPRESSION_FILTER = 9,   // an arbitrary expression     不支持
-    DEFAULT=10               //未定义
+	STRUCT_EXTRACT = 5,      // filter applies to child-column of struct 
+	OPTIONAL_FILTER = 6,     // executing filter is not required for query correctness
+	IN_FILTER = 7,           // col IN (C1, C2, C3, ...)    
+	DYNAMIC_FILTER = 8,      // dynamic filters can be updated at run-time 
+	EXPRESSION_FILTER = 9,   // an arbitrary expression     
+    DEFAULT=10               //
 };
 
 struct Scalar {
@@ -70,7 +91,6 @@ private:
     std::string str_;
 
 public:
-    // ---------- 构造 ----------
     Scalar() : type_(Type::INVALID) {}
 
     Scalar(int32_t v) : type_(Type::INT32), i32_(v) {}
@@ -80,7 +100,6 @@ public:
     Scalar(const std::string &v) : type_(Type::STRING), str_(v) {}
     Scalar(std::string &&v) : type_(Type::STRING), str_(std::move(v)) {}
 
-    // ---------- 类型访问 ----------
     Type type() const {
         return type_;
     }
@@ -91,7 +110,6 @@ public:
     bool is_double() const { return type_ == Type::DOUBLE; }
     bool is_string() const { return type_ == Type::STRING; }
 
-    // ---------- 读取接口 ----------
     int32_t get_int32() const {
         assert(type_ == Type::INT32);
         return i32_;
@@ -117,7 +135,6 @@ public:
         return str_;
     }
 
-    // ---------- 写入接口 ----------
     void set(int32_t v) {
         type_ = Type::INT32;
         i32_ = v;
@@ -158,13 +175,13 @@ public:
     string_t(const char *data, uint32_t len) {
         value.inlined.length = len;
         if (IsInlined()) {
-            // 小字符串：直接拷贝
+            // small string: store inlined, prefix is not used
             memset(value.inlined.inlined, 0, INLINE_LENGTH);
             if (len > 0) {
                 memcpy(value.inlined.inlined, data, len);
             }
         } else {
-            // 大字符串：存指针 + prefix
+            // large string: store pointer, prefix is the first 4 bytes of data
             memcpy(value.pointer.prefix, data, 4);
             value.pointer.ptr = const_cast<char *>(data);
         }

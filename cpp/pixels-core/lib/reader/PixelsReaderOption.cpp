@@ -1,3 +1,28 @@
+/*
+ * Copyright 2023 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/*
+ * @author liyu
+ * @create 2023-07-06
+ */
+
 #include "reader/PixelsReaderOption.h"
 
 PixelsReaderOption::PixelsReaderOption()
@@ -10,7 +35,7 @@ PixelsReaderOption::PixelsReaderOption()
     batchSize = 0;
     rgStart = 0;
     rgLen = -1;  // -1 means reading to the end of the file
-    ringIndex = 0; // 显式初始化
+    ringIndex = 0; // default ring index is 0, which means not using ring buffer
 }
 
 void PixelsReaderOption::setIncludeCols(const std::vector <std::string> &columnNames)

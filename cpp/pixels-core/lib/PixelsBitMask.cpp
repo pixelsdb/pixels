@@ -97,7 +97,7 @@ void PixelsBitMask::set(long index, uint8_t value)
     {
         byteMask &= ~shiftMask;
     }
-    // value==1 什么都不做
+    // value==1 do nothing 
 }
 
 

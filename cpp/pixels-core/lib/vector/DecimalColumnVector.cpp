@@ -121,7 +121,7 @@ void DecimalColumnVector::add(const std::string& input)
     for (int i = 0; i < scale_diff; i++)
         integerValue *= 10;
 
-    add((long)integerValue);  // 自动走分支
+    add((long)integerValue);
 }
 
 void DecimalColumnVector::add(long value)

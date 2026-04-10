@@ -85,7 +85,6 @@ class PixelsReaderOption
   std::vector<std::string> includedCols;
   // TODO: pixelsPredicate
   pixels::TableFilterSet filter;
-  //修改：不再依赖 duckdb 类型，不过看来原项目的主人是想要设计一套自己的谓词系统的
   bool skipCorruptRecords;
   bool tolerantSchemaEvolution;     // this may lead to column missing due to schema evolution
   bool enableEncodedColumnVector;   // whether read encoded column vectors directly when possible

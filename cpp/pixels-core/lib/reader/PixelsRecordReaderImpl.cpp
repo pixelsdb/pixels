@@ -47,10 +47,8 @@ PixelsRecordReaderImpl::PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> 
     // assert(batchSize >= STANDARD_VECTOR_SIZE);
     enabledFilterPushDown = option.isEnabledFilterPushDown();
     if (enabledFilterPushDown) {
-        // 从 option 中把含有 unique_ptr 的 map 彻底移动到当前类的成员 filter 中
         this->filter = option.extractFilter(); 
     } else {
-        // 如果 TableFilterSet 内部是 map，清除即可
         this->filter.filters.clear(); 
     }
     filterMask = nullptr;
@@ -230,14 +228,10 @@ std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reus
     }
 
     std::vector<int> filterColumnIndex;
-    //std::cout << "filter size: " << filter.filters.size() << std::endl;
-    if (!filter.filters.empty())//reader的filter没有了duckdb的tablefilterset，改成自己的tablefilterset
+    if (!filter.filters.empty())
     {
         for (auto const& [col_idx, filter_ptr] : filter.filters) 
         {
-            // col_idx 是 idx_t 类型
-            // filter_ptr 是 std::unique_ptr<TableFilter>& 类型
-            //printf("filter column index: %d\n", col_idx);
             int index = curChunkBufferIndex.at(col_idx);
             auto &encoding = curEncoding.at(col_idx);
             auto &chunkIndex = curChunkIndex.at(col_idx);
@@ -245,10 +239,9 @@ std::shared_ptr <VectorizedRowBatch> PixelsRecordReaderImpl::readBatch(bool reus
                                 postScript.pixelstride(), resultRowBatch->rowCount,columnVectors.at(col_idx), *chunkIndex, filterMask);
             filterColumnIndex.emplace_back(index);
 
-            // 注意：传给 ApplyFilter 时，需要解引用指针以获取对象引用
             PixelsFilter::ApplyFilter(
                 columnVectors.at(col_idx), 
-                *filter_ptr,  // 这里解引用 unique_ptr 得到 TableFilter&
+                *filter_ptr,  
                 *filterMask, 
                 resultSchema->getChildren().at(col_idx)
             );

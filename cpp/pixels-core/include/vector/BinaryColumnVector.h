@@ -31,11 +31,7 @@
 #include <string>
 #include <vector>
 
-/**
- * BinaryColumnVector 
- * 作用：存储字符串或二进制数据的引用。原本项目同时保存duckdb的string和std的string，有点和稀泥，这里先改为仅保存std的string
- * 后续要实现一个类似duckdb的string_t结构体，包含指针和长度，来避免std::string的内存分配和复制开销。
- */
+
 // BinaryColumnVector.h
 
 class BinaryColumnVector : public ColumnVector
