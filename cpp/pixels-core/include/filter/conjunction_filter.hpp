@@ -1,0 +1,61 @@
+/*
+ * Copyright 2026 PixelsDB.
+ *
+ * This file is part of Pixels.
+ *
+ * Pixels is free software: you can redistribute it and/or modify
+ * it under the terms of the Affero GNU General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Pixels is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * Affero GNU General Public License for more details.
+ *
+ * You should have received a copy of the Affero GNU General Public
+ * License along with Pixels.  If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+#include "table_filter.hpp"
+
+
+namespace pixels {
+
+class ConjunctionFilter : public TableFilter {
+public:
+	explicit ConjunctionFilter(TableFilterType filter_type_p) : TableFilter(filter_type_p) {
+	}
+
+	~ConjunctionFilter() override {
+	}
+
+	//! The filters of this conjunction
+	std::vector<std::unique_ptr<TableFilter>> child_filters;
+
+public:
+	bool Equals(const TableFilter &other) const override {
+		return TableFilter::Equals(other);
+	}
+};
+
+class ConjunctionOrFilter : public ConjunctionFilter {
+public:
+    static constexpr const TableFilterType TYPE = TableFilterType::CONJUNCTION_OR;
+
+    ConjunctionOrFilter()
+        : ConjunctionFilter(TYPE) {}
+};
+
+class ConjunctionAndFilter : public ConjunctionFilter {
+public:
+    static constexpr const TableFilterType TYPE = TableFilterType::CONJUNCTION_AND;
+
+    ConjunctionAndFilter()
+        : ConjunctionFilter(TYPE) {}
+};
+
+}

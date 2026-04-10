@@ -20,21 +20,22 @@
 
 /*
  * @author liyu
- * @create 2023-03-15
+ * @create 2023-07-06
  */
+
 #include "reader/PixelsReaderOption.h"
 
 PixelsReaderOption::PixelsReaderOption()
 {
-    // TODO: pixelsPredicate
     skipCorruptRecords = false;
     tolerantSchemaEvolution = true;
     enableEncodedColumnVector = true;
-    enableFilterPushDown = false;
+    enableFilterPushDown = false; 
     queryId = -1L;
     batchSize = 0;
     rgStart = 0;
     rgLen = -1;  // -1 means reading to the end of the file
+    ringIndex = 0; // default ring index is 0, which means not using ring buffer
 }
 
 void PixelsReaderOption::setIncludeCols(const std::vector <std::string> &columnNames)
@@ -121,14 +122,18 @@ bool PixelsReaderOption::isEnabledFilterPushDown()
     return this->enableFilterPushDown;
 }
 
-void PixelsReaderOption::setFilter(duckdb::TableFilterSet *filter)
-{
-    this->filter = filter;
+
+void PixelsReaderOption::setFilter(pixels::TableFilterSet f) {
+    //std::cout<<"at set filter"<<f.filters.size()<<std::endl;
+    filter = std::move(f);
 }
 
-duckdb::TableFilterSet *PixelsReaderOption::getFilter()
-{
-    return this->filter;
+pixels::TableFilterSet PixelsReaderOption::extractFilter() {
+    return std::move(filter);
+}
+
+int PixelsReaderOption::getfiltersize(){
+    return filter.filters.size();
 }
 
 void PixelsReaderOption::setBatchSize(int batchSize)
@@ -140,13 +145,3 @@ int PixelsReaderOption::getBatchSize() const
 {
     return batchSize;
 }
-
-
-
-
-
-
-
-
-
-

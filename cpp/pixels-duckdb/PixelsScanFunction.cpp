@@ -26,6 +26,7 @@
 #include "physical/StorageArrayScheduler.h"
 #include "profiler/CountProfiler.h"
 
+/// @brief 
 namespace duckdb
 {
 
@@ -82,11 +83,11 @@ void PixelsScanFunction::PixelsScanImplementation(ClientContext &context,
     {
     return;
     }
-
+  
   auto &data = (PixelsReadLocalState &) *data_p.local_state;
   auto &gstate = (PixelsReadGlobalState &) *data_p.global_state;
   auto &bind_data = (PixelsReadBindData &) *data_p.bind_data;
-
+  //std::cout << "filters ptr: " << gstate.filters << std::endl;
   do
     {
     if (data.currPixelsRecordReader == nullptr ||
@@ -356,8 +357,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
       case TypeDescription::INT:
         {
         auto intCol = std::static_pointer_cast<IntColumnVector>(col);
-        Vector vector(LogicalType::INTEGER,
-                      (data_ptr_t) (intCol->current()), col->currentValid(),col->getCapacity());
+        Vector vector(LogicalType::INTEGER,(data_ptr_t) (intCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<int>(output.data.at(col_id));
 //			    memcpy(result_ptr, intCol->intVector + row_offset, thisOutputChunkRows * sizeof(int));
@@ -370,8 +370,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
       case TypeDescription::LONG:
         {
         auto longCol = std::static_pointer_cast<LongColumnVector>(col);
-        Vector vector(LogicalType::BIGINT,
-                      (data_ptr_t) (longCol->current()), col->currentValid(),col->getCapacity());
+        Vector vector(LogicalType::BIGINT,(data_ptr_t) (longCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<long>(output.data.at(col_id));
 //			    memcpy(result_ptr, longCol->longVector + row_offset, thisOutputChunkRows * sizeof(long));
@@ -387,8 +386,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
       case TypeDescription::DECIMAL:
         {
         auto decimalCol = std::static_pointer_cast<DecimalColumnVector>(col);
-        Vector vector(LogicalType::DECIMAL(colSchema->getPrecision(), colSchema->getScale()),
-                      (data_ptr_t) (decimalCol->current()), col->currentValid(),col->getCapacity());
+        Vector vector(LogicalType::DECIMAL(colSchema->getPrecision(), colSchema->getScale()),(data_ptr_t) (decimalCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<long>(output.data.at(col_id));
 //			    memcpy(result_ptr, decimalCol->vector + row_offset, thisOutputChunkRows * sizeof(long));
@@ -403,8 +401,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
       case TypeDescription::DATE:
         {
         auto dateCol = std::static_pointer_cast<DateColumnVector>(col);
-        Vector vector(LogicalType::DATE,
-                      (data_ptr_t) (dateCol->current()), col->currentValid(),col->getCapacity());
+        Vector vector(LogicalType::DATE,(data_ptr_t) (dateCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
 //			    auto result_ptr = FlatVector::GetData<int>(output.data.at(col_id));
 //			    memcpy(result_ptr, dateCol->dates + row_offset, thisOutputChunkRows * sizeof(int));
@@ -419,8 +416,7 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
       case TypeDescription::TIMESTAMP:
         {
         auto tsCol = std::static_pointer_cast<TimestampColumnVector>(col);
-        Vector vector(LogicalType::TIMESTAMP,
-                      (data_ptr_t) (tsCol->current()), col->currentValid(),col->getCapacity());
+        Vector vector(LogicalType::TIMESTAMP,(data_ptr_t) (tsCol->current()), col->currentValid(),col->getCapacity());
         output.data.at(col_id).Reference(vector);
         break;
         }
@@ -432,15 +428,15 @@ void PixelsScanFunction::TransformDuckdbChunk(PixelsReadLocalState &data,
       case TypeDescription::VARCHAR:
       case TypeDescription::CHAR:
       case TypeDescription::STRING:
-        {
-        auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
-        Vector vector(LogicalType::VARCHAR,
-                      (data_ptr_t) (binaryCol->current()), col->currentValid(),col->getCapacity());
-        output.data.at(col_id).Reference(vector);
-//			    auto result_ptr = FlatVector::GetData<duckdb::string_t>(output.data.at(col_id));
-//                memcpy(result_ptr, binaryCol->vector + row_offset, thisOutputChunkRows * sizeof(string_t));
-        break;
-        }
+      {
+          auto binaryCol = std::static_pointer_cast<BinaryColumnVector>(col);
+          Vector vector(LogicalType::VARCHAR,
+                        (data_ptr_t) (binaryCol->current()), col->currentValid(),col->getCapacity());
+          output.data.at(col_id).Reference(vector);
+  //			    auto result_ptr = FlatVector::GetData<duckdb::string_t>(output.data.at(col_id));
+  //                memcpy(result_ptr, binaryCol->vector + row_offset, thisOutputChunkRows * sizeof(string_t));
+          break;
+      }
         //        case TypeDescription::STRUCT:
         //            break;
 //			default:
@@ -541,9 +537,8 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsR
           ->setStorage(storage)
           ->setPixelsFooterCache(footerCache)
           ->build();
-
     PixelsReaderOption option = GetPixelsReaderOption(scan_data, parallel_state);
-    scan_data.nextPixelsRecordReader = scan_data.nextReader->read(option);
+    scan_data.nextPixelsRecordReader = scan_data.nextReader->read(std::move(option));
     auto nextPixelsRecordReader = std::static_pointer_cast<PixelsRecordReaderImpl>(
         scan_data.nextPixelsRecordReader);
 
@@ -552,8 +547,8 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsR
       //double buffer
       nextPixelsRecordReader->read();
     }
-
-    } else
+    }
+  else
     {
     scan_data.nextReader = nullptr;
     scan_data.nextPixelsRecordReader = nullptr;
@@ -561,21 +556,163 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsR
   return true;
 }
 
-PixelsReaderOption
-PixelsScanFunction::GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state)
-{
-  PixelsReaderOption option;
-  option.setSkipCorruptRecords(true);
-  option.setTolerantSchemaEvolution(true);
-  option.setEnableEncodedColumnVector(true);
-  option.setFilter(global_state.filters);
-  option.setEnabledFilterPushDown(enable_filter_pushdown);
-  // includeCols comes from the caller of PixelsPageSource
-  option.setIncludeCols(local_state.column_names);
-  option.setRGRange(0, local_state.nextReader->getRowGroupNum());
-  option.setQueryId(1);
-  int stride = std::stoi(ConfigFactory::Instance().getProperty("pixel.stride"));
-  option.setBatchSize(stride);
-  return option;
+pixels::ConstantFilter ConvertConstantFilter(const ConstantFilter &filter) {
+    pixels::ComparisonOperator op;
+    // convert DuckDB's ExpressionType to pixels's ComparisonOperator
+    switch (filter.comparison_type) {
+        case ExpressionType::COMPARE_EQUAL:
+            op = pixels::ComparisonOperator::EQUAL;
+            break;
+        case ExpressionType::COMPARE_LESSTHAN:
+            op = pixels::ComparisonOperator::LESS_THAN;
+            break;
+        case ExpressionType::COMPARE_LESSTHANOREQUALTO:
+            op = pixels::ComparisonOperator::LESS_THAN_OR_EQUAL;
+            break;
+        case ExpressionType::COMPARE_GREATERTHAN:
+            op = pixels::ComparisonOperator::GREATER_THAN;
+            break;
+        case ExpressionType::COMPARE_GREATERTHANOREQUALTO:
+            op = pixels::ComparisonOperator::GREATER_THAN_OR_EQUAL;
+            break;
+        case ExpressionType::COMPARE_NOTEQUAL:
+            op = pixels::ComparisonOperator::NOT_EQUAL;
+            break;
+        default:
+            throw std::runtime_error("Unsupported DuckDB comparison type");
+    }
+    pixels::Scalar val;
+    switch (filter.constant.type().id()) {
+        case LogicalTypeId::INTEGER:{
+            val.set(filter.constant.GetValue<int32_t>());
+            break;
+        }  
+        case LogicalTypeId::BIGINT:{
+            val.set(filter.constant.GetValue<int64_t>());
+            break;
+        }
+        case LogicalTypeId::VARCHAR:{
+            val.set(filter.constant.GetValue<std::string>());
+            break;
+        }   
+        case LogicalTypeId::DATE: {
+            auto d = filter.constant.GetValue<date_t>();
+            val.set(d.days);   //convert to int
+            break;
+        }
+        case duckdb::LogicalTypeId::DECIMAL: {
+            double decimal_value = filter.constant.GetValue<double>(); 
+            int32_t scale = DecimalType::GetScale(filter.constant.type());
+            for(int i=0;i<scale;i++){
+              decimal_value*=10;
+            }
+            val.set((int64_t)decimal_value);
+            break;
+        }
+        case duckdb::LogicalTypeId::TIMESTAMP:{
+            val.set(filter.constant.GetValue<int64_t>());
+            break;
+        }
+        default:
+            throw std::runtime_error("Unsupported DuckDB constant type");
+    }
+
+    return pixels::ConstantFilter(op, std::move(val));
 }
+
+static std::unique_ptr<pixels::TableFilter>
+ConvertConjunctionFilter(const ConjunctionFilter &duck_filter) {
+    std::unique_ptr<pixels::ConjunctionFilter> result;
+    
+    if (duck_filter.filter_type == TableFilterType::CONJUNCTION_AND) {
+        result = std::make_unique<pixels::ConjunctionAndFilter>();
+    } else {
+        result = std::make_unique<pixels::ConjunctionOrFilter>();
+    }
+    for (const auto &child : duck_filter.child_filters) {
+        const TableFilter &child_ref = *child;
+        switch (child_ref.filter_type) {
+        case TableFilterType::CONSTANT_COMPARISON: {
+            const auto &cf = static_cast<const ConstantFilter &>(child_ref);
+            result->child_filters.push_back(std::make_unique<pixels::ConstantFilter>(ConvertConstantFilter(cf)));   
+            break;
+        }
+        case TableFilterType::CONJUNCTION_AND:
+        case TableFilterType::CONJUNCTION_OR: {
+            const auto &child_conj =static_cast<const ConjunctionFilter &>(child_ref);
+            result->child_filters.push_back(ConvertConjunctionFilter(child_conj)); 
+            break;
+        }
+        case TableFilterType::IS_NULL:
+          break;
+        case TableFilterType::IS_NOT_NULL:
+          break;
+        case TableFilterType::IN_FILTER:
+          break;
+        default:
+            break;
+        }
+    }
+    return result;
+}
+
+pixels::TableFilterSet PixelsScanFunction::ConvertDuckDBFilter(TableFilterSet* filters){
+    pixels::TableFilterSet pixel_filters;
+    for (auto &entry : filters->filters) {
+        idx_t col_idx = entry.first;
+        const TableFilter &filter_ref = *entry.second;
+        switch (filter_ref.filter_type) {
+            case TableFilterType::CONSTANT_COMPARISON: {
+                const auto &cf = static_cast<const ConstantFilter&>(filter_ref);
+                pixel_filters.filters[col_idx] = std::make_unique<pixels::ConstantFilter>(std::move(ConvertConstantFilter(cf)));
+                break;
+            }
+
+            case TableFilterType::CONJUNCTION_AND:
+            case TableFilterType::CONJUNCTION_OR: {
+                const auto &conj =static_cast<const ConjunctionFilter &>(filter_ref);
+                pixel_filters.filters[col_idx] =ConvertConjunctionFilter(conj);
+                break;
+            }
+            
+            case TableFilterType::IS_NULL://nothing to do
+                break;
+            case TableFilterType::IS_NOT_NULL://nothing to do
+                break;
+            case TableFilterType::STRUCT_EXTRACT://we don't support struct type now, so we can ignore this type of filter
+                break;
+            case TableFilterType::OPTIONAL_FILTER://we don't support optional filter now, so we can ignore this type of filter
+                break;
+            case TableFilterType::IN_FILTER://we don't support in filter now, so we can ignore this type of filter
+                break;
+            case TableFilterType::DYNAMIC_FILTER://we don't support dynamic filter now, so we can ignore this type of filter
+                break;
+            default:
+                break;
+        }
+    }
+    return pixel_filters; 
+
+}
+
+PixelsReaderOption PixelsScanFunction::GetPixelsReaderOption(PixelsReadLocalState &local_state, PixelsReadGlobalState &global_state) {
+    PixelsReaderOption option;
+    option.setSkipCorruptRecords(true);
+    option.setTolerantSchemaEvolution(true);
+    option.setEnableEncodedColumnVector(true);
+    option.setEnabledFilterPushDown(enable_filter_pushdown);
+    if (global_state.filters && enable_filter_pushdown) {
+        auto pixels_filter = ConvertDuckDBFilter(global_state.filters);
+        option.setFilter(std::move(pixels_filter));
+    }
+    option.setIncludeCols(local_state.column_names);
+    option.setRGRange(0, local_state.nextReader->getRowGroupNum());
+    option.setQueryId(1);
+    
+    int stride = std::stoi(ConfigFactory::Instance().getProperty("pixel.stride"));
+    option.setBatchSize(stride);
+
+    return option;
+}
+
 }

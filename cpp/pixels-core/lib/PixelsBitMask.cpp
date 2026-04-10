@@ -89,16 +89,15 @@ void PixelsBitMask::set()
 void PixelsBitMask::set(long index, uint8_t value)
 {
     assert(index < maskLength);
+
     uint8_t &byteMask = mask[index / 8];
     uint8_t shiftMask = 1 << (index % 8);
+
     if (value == 0)
     {
-        byteMask = byteMask & ~(shiftMask);
+        byteMask &= ~shiftMask;
     }
-    else
-    {
-        byteMask = byteMask | shiftMask;
-    }
+    // value==1 do nothing 
 }
 
 
@@ -133,7 +132,6 @@ void PixelsBitMask::And(long index, uint8_t value)
 
 void PixelsBitMask::setByteAligned(long index, uint8_t value)
 {
-    mask[index / 8] = value;
+    mask[index / 8] &= value;  
 }
-
 
