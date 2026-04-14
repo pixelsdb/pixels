@@ -105,7 +105,7 @@
         async-http-client-2.12.4, and jetcd-0.7.7.
         This version also fixes the problem in Pixels#935 caused by Netty#14479 -->
         <dep.netty.version>4.1.118.Final</dep.netty.version>
-        <dep.asynchttpclient.version>2.12.4</dep.asynchttpclient.version>
+        <dep.asynchttpclient.version>3.0.9</dep.asynchttpclient.version>
         <dep.fastjson.version>1.2.83</dep.fastjson.version>
         <dep.commons-cli.version>1.5.0</dep.commons-cli.version>
         <dep.commons-io.version>2.16.1</dep.commons-io.version>
