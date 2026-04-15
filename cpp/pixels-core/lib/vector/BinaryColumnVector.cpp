@@ -23,11 +23,12 @@
  * @create 2023-03-17
  */
 #include "vector/BinaryColumnVector.h"
+#include <cstdint>
+#include <cstring>
 
 BinaryColumnVector::BinaryColumnVector(uint64_t len, bool encoding) : ColumnVector(len, encoding)
 {
-  posix_memalign(reinterpret_cast<void **>(&vector), 32,
-                 len * sizeof(duckdb::string_t));
+  posix_memalign(reinterpret_cast<void **>(&vector), 32,len * sizeof(pixels::string_t));
   str_vec.resize(len);
   memoryUsage += (long) sizeof(uint8_t) * len;
 }
@@ -48,8 +49,7 @@ void BinaryColumnVector::setRef(int elementNum, uint8_t *const &sourceBuf, int s
   {
     writeIndex = elementNum + 1;
   }
-  this->vector[elementNum]
-      = duckdb::string_t((char *) (sourceBuf + start), length);
+  this->vector[elementNum]= pixels::string_t((char *) (sourceBuf + start), length);
 //    std::cout<< this->vector[elementNum].GetString()<<std::endl;
   // TODO: isNull should implemented, but not now.
 
@@ -99,9 +99,10 @@ void BinaryColumnVector::add(uint8_t *v, int len)
 
 void BinaryColumnVector::setVal(int elementNum, uint8_t *sourceBuf, int start, int length)
 {
-  vector[elementNum] = duckdb::string_t(reinterpret_cast<char *>(sourceBuf + start), length);
+  vector[elementNum] = pixels::string_t(reinterpret_cast<char *>(sourceBuf + start), length);
   isNull[elementNum] = false;
   str_vec[elementNum] = std::string(reinterpret_cast<char *>(sourceBuf + start), length);
+  //std::cout<<"add str "<<str_vec[elementNum]<<std::endl;
 }
 
 void BinaryColumnVector::ensureSize(uint64_t size, bool preserveData)
@@ -109,15 +110,15 @@ void BinaryColumnVector::ensureSize(uint64_t size, bool preserveData)
   ColumnVector::ensureSize(size, preserveData);
   if (length < size)
   {
-    duckdb::string_t *oldVector = vector;
-    posix_memalign(reinterpret_cast<void **>(&vector), 32, size * sizeof(duckdb::string_t));
+    pixels::string_t *oldVector = vector;
+    posix_memalign(reinterpret_cast<void **>(&vector), 32, size * sizeof(pixels::string_t));
     str_vec.resize(size);
     if (preserveData)
     {
       std::copy(oldVector, oldVector + length, vector);
     }
     delete[] oldVector;
-    memoryUsage += (long) sizeof(duckdb::string_t) * (size - length);
+    memoryUsage += (long) sizeof(pixels::string_t) * (size - length);
     resize(size);
   }
 }

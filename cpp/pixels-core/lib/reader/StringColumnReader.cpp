@@ -84,7 +84,7 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
                 int pixelId = elementIndex / pixelStride;
                 // TODO: should write the remaining code
             }
-            if (vector->checkValid(i) && (filterMask == nullptr || filterMask->get(i)))
+            if (valid && (filterMask == nullptr || filterMask->get(i)))
             {
                 int originId = cascadeRLE ? (int) contentDecoder->next() : contentBuf->getInt();
                 int tmpLen = dictStarts[originId + 1] - dictStarts[originId];

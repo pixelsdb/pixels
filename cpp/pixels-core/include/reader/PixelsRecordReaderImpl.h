@@ -67,7 +67,7 @@ public:
     explicit PixelsRecordReaderImpl(std::shared_ptr <PhysicalReader> reader,
                                     const pixels::proto::PostScript &pixelsPostScript,
                                     const pixels::proto::Footer &pixelsFooter,
-                                    const PixelsReaderOption &opt,
+                                    PixelsReaderOption &opt,
                                     std::shared_ptr <PixelsFooterCache> pixelsFooterCache
     );
 
@@ -104,7 +104,8 @@ private:
     pixels::proto::PostScript postScript;
     std::shared_ptr <PixelsFooterCache> footerCache;
     PixelsReaderOption option;
-    duckdb::TableFilterSet *filter;
+    //pixels::predicate filter
+    pixels::TableFilterSet filter;
     long queryId;
     int ringIndex;
     int RGStart;

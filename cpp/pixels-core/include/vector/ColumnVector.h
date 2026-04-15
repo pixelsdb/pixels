@@ -38,8 +38,6 @@
  * structure that is used in the inner loop of query execution.
  */
 
-#include "duckdb.h"
-
 #include "exception/InvalidArgumentException.h"
 #include <iostream>
 #include <memory>
@@ -56,7 +54,7 @@
  * The fields are public by design since this is a performance-critical
  * structure that is used in the inner loop of query execution.
  */
-
+using idx_t = uint64_t;
 class ColumnVector
 {
 public:

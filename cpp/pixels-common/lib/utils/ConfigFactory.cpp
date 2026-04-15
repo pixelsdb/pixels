@@ -53,8 +53,8 @@ ConfigFactory::ConfigFactory()
     {
         pixelsHome += "/";
     }
-    std::ifstream infile(pixelsHome + "etc/pixels-cpp.properties");
-    std::cout << "pixels properties file is " << pixelsHome + "etc/pixels-cpp.properties" << std::endl;
+    std::ifstream infile(pixelsHome + "cpp/etc/pixels-cpp.properties");
+    std::cout << "pixels properties file is " << pixelsHome + "cpp/etc/pixels-cpp.properties" << std::endl;
     std::string line;
     while (std::getline(infile, line))
     {
