@@ -99,6 +99,19 @@ public class RetinaResourceManager
         final String filePath;
         /** Epoch millis deadline; the file is eligible for deletion after this time. */
         final long retireTimestamp;
+        /**
+         * Old rowIds replaced during Storage GC index sync, forwarded verbatim from
+         * {@code StorageGarbageCollector.RewriteResult#oldRowIds}.
+         * <br/>
+         * <b>Semantics:</b> the list length equals the corresponding
+         * {@code pendingIndexEntries.size()} at syncIndex time, and may contain
+         * {@code -1L} placeholders in slots where {@code updatePrimaryEntry} returned
+         * a negative value (i.e. no prior entry existed to replace). Any consumer that
+         * treats this list as "real rowIds to reclaim" MUST filter out negative values
+         * first; e.g. a future MainIndex {@code deleteRowIdRange} based reclamation
+         * must skip {@code -1L} entries.
+         * <br/>
+         */
         final List<Long> oldRowIds;
 
         RetiredFile(long fileId, int rgCount, String filePath, long retireTimestamp, List<Long> oldRowIds)
