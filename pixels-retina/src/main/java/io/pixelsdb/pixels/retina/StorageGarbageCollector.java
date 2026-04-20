@@ -208,7 +208,15 @@ public class StorageGarbageCollector
 
         /** Set by {@link #syncIndex} after allocating new rowIds. */
         long newRowIdStart = -1;
-        /** Set by {@link #syncIndex} after updating SinglePointIndex; old rowIds that were replaced. */
+        /**
+         * Set by {@link #syncIndex} after updating SinglePointIndex; old rowIds that were replaced.
+         * <br/>
+         * <b>Alignment invariant:</b> {@code oldRowIds.size() == pendingIndexEntries.size()}; each
+         * slot corresponds 1:1 to the same-position entry in {@link #pendingIndexEntries}. Slots
+         * where {@link io.pixelsdb.pixels.common.index.SinglePointIndex#updatePrimaryEntry} returned
+         * a negative value (i.e. no prior entry to replace) are stored as {@code -1L} placeholders,
+         * so that rollback can pair each {@code PendingIndexEntry} with its own old rowId.
+         */
         List<Long> oldRowIds;
 
         RewriteResult(FileGroup group, String newFilePath, long newFileId,
@@ -1132,7 +1140,11 @@ public class StorageGarbageCollector
                 SinglePointIndexFactory.Instance().getSinglePointIndex(
                         tableId, primaryIndex.getId(), indexOption);
 
-        List<Long> oldRowIds = new ArrayList<>();
+        // Keep oldRowIds aligned 1:1 with pendingIndexEntries: slots where
+        // updatePrimaryEntry returned a negative value are stored as -1L placeholders.
+        // rollbackSinglePointIndex relies on this alignment to pair each PendingIndexEntry
+        // with its own old rowId.
+        List<Long> oldRowIds = new ArrayList<>(result.pendingIndexEntries.size());
         for (PendingIndexEntry pe : result.pendingIndexEntries)
         {
             long newRowId = newRowIdStart + pe.newGlobalRowOffset;
@@ -1140,11 +1152,8 @@ public class StorageGarbageCollector
                     .setTableId(tableId).setIndexId(primaryIndex.getId())
                     .setKey(pe.pkBytes).setTimestamp(pe.createTs).build();
             long oldRowId = spIndex.updatePrimaryEntry(key, newRowId);
-            if (oldRowId >= 0)
-            {
-                oldRowIds.add(oldRowId);
-            }
-            else
+            oldRowIds.add(oldRowId);
+            if (oldRowId < 0)
             {
                 logger.warn("StorageGC syncIndex: updatePrimaryEntry returned {} for tableId={}, " +
                         "newGlobalRowOffset={} — index may be inconsistent", oldRowId, tableId, pe.newGlobalRowOffset);
@@ -1294,17 +1303,30 @@ public class StorageGarbageCollector
             io.pixelsdb.pixels.common.index.SinglePointIndex spIndex =
                     SinglePointIndexFactory.Instance().getSinglePointIndex(
                             result.group.tableId, primaryIndex.getId(), indexOption);
-            int idx = 0;
-            for (PendingIndexEntry pe : result.pendingIndexEntries)
+
+            // Alignment invariant: oldRowIds.size() == pendingIndexEntries.size()
+            // (established in updateSinglePointIndex). Walk them in lockstep by
+            // position and skip -1 placeholders — those slots had no prior entry
+            // to redirect, so there is nothing to revert.
+            int n = Math.min(result.pendingIndexEntries.size(), result.oldRowIds.size());
+            if (n < result.pendingIndexEntries.size() || n < result.oldRowIds.size())
             {
-                if (idx >= result.oldRowIds.size())
+                logger.warn("Rollback: pendingIndexEntries.size={} != oldRowIds.size={}; " +
+                                "rolling back the common prefix only — index may remain inconsistent",
+                        result.pendingIndexEntries.size(), result.oldRowIds.size());
+            }
+            for (int i = 0; i < n; i++)
+            {
+                long oldRowId = result.oldRowIds.get(i);
+                if (oldRowId < 0)
                 {
-                    break;
+                    continue;
                 }
+                PendingIndexEntry pe = result.pendingIndexEntries.get(i);
                 IndexProto.IndexKey key = IndexProto.IndexKey.newBuilder()
                         .setTableId(result.group.tableId).setIndexId(primaryIndex.getId())
                         .setKey(pe.pkBytes).setTimestamp(pe.createTs).build();
-                spIndex.updatePrimaryEntry(key, result.oldRowIds.get(idx++));
+                spIndex.updatePrimaryEntry(key, oldRowId);
             }
         }
         catch (Exception e)
