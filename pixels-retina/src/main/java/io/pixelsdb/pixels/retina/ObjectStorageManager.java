@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.retina;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.physical.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,6 +33,7 @@ import java.nio.ByteBuffer;
  */
 public class ObjectStorageManager
 {
+    private static final Logger logger = LogManager.getLogger(ObjectStorageManager.class);
     private static volatile ObjectStorageManager instance;
     private final Storage storage;
     private final String path;
@@ -49,17 +52,12 @@ public class ObjectStorageManager
         String storageScheme = config.getProperty("retina.buffer.object.storage.scheme");
         try
         {
-            switch(storageScheme)
+            if (!"s3".equals(storageScheme) && !"minio".equals(storageScheme))
             {
-                case "s3":
-                    this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.s3);
-                    break;
-                case "minio":
-                    this.storage = StorageFactory.Instance().getStorage(Storage.Scheme.minio);
-                    break;
-                default:
-                    throw new RetinaException("Unsupported storage scheme: " + storageScheme);
+                logger.warn("ObjectStorageManager is configured with non-standard storage scheme '{}'; " +
+                        "expected production schemes are 's3' or 'minio'", storageScheme);
             }
+            this.storage = StorageFactory.Instance().getStorage(storageScheme);
         } catch (IOException e)
         {
             throw new RetinaException("Failed to get storage", e);
