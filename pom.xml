@@ -143,6 +143,8 @@
         <!-- slf4j-1.7.36 is compatible with 1.7.x that is widely used in third-party libraries -->
         <dep.slf4j.version>1.7.36</dep.slf4j.version>
 
+        <dep.rocksdb.version>10.2.1</dep.rocksdb.version>
+
         <!-- testing -->
         <dep.junit4.version>4.13.2</dep.junit4.version>
         <dep.junit.platform.version>1.8.2</dep.junit.platform.version>

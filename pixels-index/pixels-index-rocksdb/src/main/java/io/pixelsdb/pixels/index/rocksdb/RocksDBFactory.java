@@ -189,7 +189,9 @@ public class RocksDBFactory
         int fixedLengthPrefix = Integer.parseInt(config.getProperty("index.rocksdb.prefix.length"));
         if (keyLen != null)
         {
-            fixedLengthPrefix = keyLen + Long.BYTES; // key buffer + index id
+            // Prefix must only cover the logical lookup key.
+            // It must not include the encoded timestamp suffix.
+            fixedLengthPrefix = keyLen + (multiCF ? 0 : Long.BYTES);
         }
         CompactionStyle compactionStyle = CompactionStyle.valueOf(config.getProperty("index.rocksdb.compaction.style"));
 

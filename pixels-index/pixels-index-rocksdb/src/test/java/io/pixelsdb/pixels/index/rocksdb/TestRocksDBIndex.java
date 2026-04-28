@@ -25,14 +25,18 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.IndexUtils;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -43,6 +47,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class TestRocksDBIndex
 {
+    private static final boolean MULTI_CF =
+            Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rocksdb.multicf"));
     private RocksDB rocksDB;
     private static final long TABLE_ID = 100L;
     private static final long INDEX_ID = 100L;
@@ -170,6 +176,48 @@ public class TestRocksDBIndex
 
         long result = uniqueIndex.getUniqueRowId(key2);
         assertEquals(rowId2, result, "getUniqueRowId should return the rowId of the latest timestamp entry");
+    }
+
+    @Test
+    public void testSeekFindsNextVersionWithSameLogicalPrefix() throws Exception
+    {
+        byte[] key = "testSeekSameLogicalPrefix".getBytes();
+        long newerTimestamp = 1000L;
+        long olderTimestamp = newerTimestamp + 1000L;
+
+        IndexProto.IndexKey newerKey = IndexProto.IndexKey.newBuilder()
+                .setIndexId(INDEX_ID)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(newerTimestamp)
+                .build();
+        IndexProto.IndexKey olderKey = IndexProto.IndexKey.newBuilder()
+                .setIndexId(INDEX_ID)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(olderTimestamp)
+                .build();
+
+        uniqueIndex.putEntry(olderKey, 1L);
+
+        ByteBuffer seekKey = toKeyBuffer(newerKey);
+        ByteBuffer expectedKey = toKeyBuffer(olderKey);
+
+        ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
+        readOptions.setPrefixSameAsStart(true)
+                .setTotalOrderSeek(false)
+                .setVerifyChecksums(false);
+
+        String cfName = IndexUtils.getCFName(TABLE_ID, INDEX_ID, 0, MULTI_CF);
+        ColumnFamilyHandle columnFamilyHandle = RocksDBFactory.getAllCfHandles().get(cfName);
+        assertNotNull(columnFamilyHandle, "column family handle should exist");
+
+        try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
+        {
+            iterator.seek(seekKey);
+            assertTrue(iterator.isValid(), "seek should land on the next key with the same logical prefix");
+            byte[] expectedBytes = new byte[expectedKey.remaining()];
+            expectedKey.get(expectedBytes);
+            assertArrayEquals(expectedBytes, iterator.key());
+        }
     }
 
     @Test
