@@ -94,18 +94,52 @@ if [ $CP_ETC -eq 1 ]; then
 fi
 
 # find and copy pixels.properties
-if [ -z "$(find $PIXELS_HOME/etc -name "pixels.properties")" ]; then
+if [ ! -f "$PIXELS_HOME/etc/pixels.properties" ]; then
   cp -v ./pixels-common/src/main/resources/pixels.properties $PIXELS_HOME/etc
   echo "$(
     tput setaf 1
     tput setab 7
   )Make sure to modify '$PIXELS_HOME/etc/pixels.properties'!$(tput sgr 0)"
 else
-  read -p "'$PIXELS_HOME/etc/pixels.properties' exists, override?[y/n]" -n 1 -r
-  echo # move to a new line
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cp -v ./pixels-common/src/main/resources/pixels.properties $PIXELS_HOME/etc
+  TEMPLATE_KEYS=$(mktemp)
+  TARGET_KEYS=$(mktemp)
+  NEW_KEYS=$(mktemp)
+  DEPRECATED_KEYS=$(mktemp)
+  NEW_OPTIONS=$(mktemp)
+  DEPRECATED_OPTIONS=$(mktemp)
+
+  sed -n '/^[[:space:]]*#/d; /^[[:space:]]*$/d; /=/ { s/[[:space:]]*=.*$//; s/^[[:space:]]*//; p; }' ./pixels-common/src/main/resources/pixels.properties | sort -u > $TEMPLATE_KEYS
+  sed -n '/^[[:space:]]*#/d; /^[[:space:]]*$/d; /=/ { s/[[:space:]]*=.*$//; s/^[[:space:]]*//; p; }' $PIXELS_HOME/etc/pixels.properties | sort -u > $TARGET_KEYS
+
+  comm -13 $TARGET_KEYS $TEMPLATE_KEYS > $NEW_KEYS
+  comm -23 $TARGET_KEYS $TEMPLATE_KEYS > $DEPRECATED_KEYS
+
+  if [ -s $NEW_KEYS ]; then
+    awk -F= 'FNR==NR { keys[$1]=1; next } /^[[:space:]]*#/ || /^[[:space:]]*$/ || index($0, "=") == 0 { next } { key=$1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", key); if (key in keys) print $0 }' $NEW_KEYS ./pixels-common/src/main/resources/pixels.properties > $NEW_OPTIONS
+    echo "new config option:"
+    sed 's/^/  /' $NEW_OPTIONS
+    read -p "add new config options to '$PIXELS_HOME/etc/pixels.properties'?[Y/n]" -n 1 -r
+    echo # move to a new line
+    if [[ -z $REPLY || $REPLY =~ ^[Yy]$ ]]; then
+      echo >> $PIXELS_HOME/etc/pixels.properties
+      cat $NEW_OPTIONS >> $PIXELS_HOME/etc/pixels.properties
+    fi
   fi
+
+  if [ -s $DEPRECATED_KEYS ]; then
+    awk -F= 'FNR==NR { keys[$1]=1; next } /^[[:space:]]*#/ || /^[[:space:]]*$/ || index($0, "=") == 0 { next } { key=$1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", key); if (key in keys) print $0 }' $DEPRECATED_KEYS $PIXELS_HOME/etc/pixels.properties > $DEPRECATED_OPTIONS
+    echo "deprecated config option:"
+    sed 's/^/  /' $DEPRECATED_OPTIONS
+    read -p "remove deprecated config options from '$PIXELS_HOME/etc/pixels.properties'?[y/N]" -n 1 -r
+    echo # move to a new line
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      TMP_PIXELS_PROPERTIES=$(mktemp)
+      awk -F= 'FNR==NR { keys[$1]=1; next } { line=$0; key=$1; if (line ~ /^[[:space:]]*#/ || line ~ /^[[:space:]]*$/ || index(line, "=") == 0) { print line; next } gsub(/^[[:space:]]+|[[:space:]]+$/, "", key); if (!(key in keys)) print line }' $DEPRECATED_KEYS $PIXELS_HOME/etc/pixels.properties > $TMP_PIXELS_PROPERTIES
+      mv $TMP_PIXELS_PROPERTIES $PIXELS_HOME/etc/pixels.properties
+    fi
+  fi
+
+  rm -f $TEMPLATE_KEYS $TARGET_KEYS $NEW_KEYS $DEPRECATED_KEYS $NEW_OPTIONS $DEPRECATED_OPTIONS
 fi
 
 # find and copy pixels-cpp.properties
