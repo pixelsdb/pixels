@@ -52,7 +52,7 @@ public class ObjectStorageManager
         String storageScheme = config.getProperty("retina.buffer.object.storage.scheme");
         try
         {
-            if (!"s3".equals(storageScheme) && !"minio".equals(storageScheme))
+            if (!Storage.Scheme.minio.equals(storageScheme) && !Storage.Scheme.s3.equals(storageScheme))
             {
                 logger.warn("ObjectStorageManager is configured with non-standard storage scheme '{}'; " +
                         "expected production schemes are 's3' or 'minio'", storageScheme);
