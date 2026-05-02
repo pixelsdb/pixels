@@ -9,7 +9,7 @@ jobs:
   remove:
     uses: ./.github/workflows/remove-daily-latest.yml
     secrets:
-      gh_token: ${{ secrets.PIXELS_DEVELOP }}
+      PIXELS_DEVELOP: ${{ secrets.PIXELS_DEVELOP }}
 
   build:
     uses: ./.github/workflows/build-pixels.yml
