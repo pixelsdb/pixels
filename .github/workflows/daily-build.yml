@@ -36,10 +36,8 @@ jobs:
 
       - name: Update daily-latest tag to latest commit
         run: |
-          git tag -d daily-latest || true
-          git push origin --delete daily-latest || true
-          git tag daily-latest
-          git push origin daily-latest
+          git tag -f daily-latest
+          git push origin refs/tags/daily-latest --force
         env:
           GH_TOKEN: ${{ secrets.PIXELS_DEVELOP }}
 
