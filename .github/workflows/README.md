@@ -7,7 +7,7 @@ This directory contains the GitHub Actions workflows used to build Pixels and pu
 - `build-pixels.yml`: reusable workflow that builds the project and optionally packages the output.
 - `pr-build-check.yml`: runs the reusable build workflow for pull requests targeting `master`.
 - `remove-daily-latest.yml`: reusable workflow that removes existing assets from the `daily-latest` release before a new daily build is published.
-- `daily-build.yml`: scheduled and manual workflow that calls `remove-daily-latest.yml`, calls `build-pixels.yml`, updates the `daily-latest` tag, publishes the release, and removes old artifacts.
+- `daily-build.yml`: scheduled and manual workflow that calls `remove-daily-latest.yml`, calls `build-pixels.yml`, updates the `daily-latest` tag, publishes the release with `gh release`, and removes old artifacts.
 
 ## Required secret
 
