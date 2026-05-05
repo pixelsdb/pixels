@@ -5,11 +5,15 @@ on:
     - cron: '30 1 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
   remove:
     uses: ./.github/workflows/remove-daily-latest.yml
     secrets:
-      gh_token: ${{ secrets.PIXELS_DEVELOP }}
+      PIXELS_DEVELOP: ${{ secrets.PIXELS_DEVELOP }}
 
   build:
     uses: ./.github/workflows/build-pixels.yml
@@ -32,28 +36,35 @@ jobs:
 
       - name: Update daily-latest tag to latest commit
         run: |
-          git tag -d daily-latest || true
-          git push origin --delete daily-latest || true
-          git tag daily-latest
-          git push origin daily-latest
+          git tag -f daily-latest
+          git push origin refs/tags/daily-latest --force
         env:
           GH_TOKEN: ${{ secrets.PIXELS_DEVELOP }}
 
       - name: Create or Update Daily Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: daily-latest
-          name: "Pixels Daily Build ${{ needs.build.outputs.build_date }}"
-          body: |
-            Automated daily build created at ${{ needs.build.outputs.build_date }}.
-            Environment:
-            - Commit: ${{ needs.build.outputs.commit_hash }}
-            - Java: ${{ needs.build.outputs.java_version }}
-            - CMake: ${{ needs.build.outputs.cmake_version }}
-            - C++: ${{ needs.build.outputs.cxx_version }}
-          files: ./downloaded_package/pixels-*.tar.gz
-          prerelease: true
-          draft: false
+        run: |
+          cat > release-notes.md <<EOF
+          Automated daily build created at ${{ needs.build.outputs.build_date }}.
+          Environment:
+          - Commit: ${{ needs.build.outputs.commit_hash }}
+          - Java: ${{ needs.build.outputs.java_version }}
+          - CMake: ${{ needs.build.outputs.cmake_version }}
+          - C++: ${{ needs.build.outputs.cxx_version }}
+          EOF
+
+          if gh release view daily-latest >/dev/null 2>&1; then
+            gh release edit daily-latest \
+              --title "Pixels Daily Build ${{ needs.build.outputs.build_date }}" \
+              --notes-file release-notes.md \
+              --prerelease
+          else
+            gh release create daily-latest \
+              --title "Pixels Daily Build ${{ needs.build.outputs.build_date }}" \
+              --notes-file release-notes.md \
+              --prerelease
+          fi
+
+          gh release upload daily-latest ./downloaded_package/pixels-*.tar.gz --clobber
         env:
           GH_TOKEN: ${{ secrets.PIXELS_DEVELOP }}
 

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   workflow_call:
     secrets:
-      gh_token:
+      PIXELS_DEVELOP:
         required: true
 
 jobs:
@@ -24,4 +24,4 @@ jobs:
             gh release delete-asset daily-latest "$a" -y
           done
         env:
-          GH_TOKEN: ${{ secrets.gh_token }}
+          GH_TOKEN: ${{ secrets.PIXELS_DEVELOP }}
