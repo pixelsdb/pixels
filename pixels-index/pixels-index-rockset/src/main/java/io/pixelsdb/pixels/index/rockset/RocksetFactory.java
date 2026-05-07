@@ -203,9 +203,11 @@ public class RocksetFactory
         int targetFileSizeMultiplier = Integer.parseInt(config.getProperty("index.rockset.target.file.size.multiplier"));
         RocksetCompactionStyle compactionStyle = RocksetCompactionStyle.valueOf(config.getProperty("index.rockset.compaction.style"));
         int fixedLengthPrefix = Integer.parseInt(config.getProperty("index.rockset.prefix.length"));
-        if(keyLen != null)
+        if (keyLen != null)
         {
-            fixedLengthPrefix = keyLen + Long.BYTES; // key buffer + index id
+            // Prefix must only cover the logical lookup key.
+            // It must not include the encoded timestamp suffix.
+            fixedLengthPrefix = keyLen + (multiCF ? 0 : Long.BYTES);
         }
 
         // Compression Options
@@ -377,4 +379,3 @@ public class RocksetFactory
         }, 0, logInterval, TimeUnit.SECONDS);
     }
 }
-

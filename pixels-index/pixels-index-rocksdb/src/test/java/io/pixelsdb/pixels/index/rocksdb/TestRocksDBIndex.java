@@ -25,39 +25,52 @@ import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.IndexUtils;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.rocksdb.RocksIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.index.rocksdb.RocksDBIndex.toBuffer;
 import static io.pixelsdb.pixels.index.rocksdb.RocksDBIndex.toKeyBuffer;
+import static io.pixelsdb.pixels.index.rocksdb.RocksDBIndex.startsWith;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TestRocksDBIndex
 {
+    private static final boolean MULTI_CF =
+            Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rocksdb.multicf"));
+    private static final Logger log = LoggerFactory.getLogger(TestRocksDBIndex.class);
     private RocksDB rocksDB;
     private static final long TABLE_ID = 100L;
     private static final long INDEX_ID = 100L;
+    private static final int VNODE_ID = 0;
     private SinglePointIndex uniqueIndex;
     private SinglePointIndex nonUniqueIndex;
-
+    private ColumnFamilyHandle columnFamilyHandle;
     @BeforeEach
     public void setUp() throws RocksDBException,SinglePointIndexException
     {
         IndexOption option = IndexOption.builder()
-                .vNodeId(0)
+                .vNodeId(VNODE_ID)
                 .build();
         uniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID, true, option);
         nonUniqueIndex = new RocksDBIndex(TABLE_ID, INDEX_ID + 1, false, option);
         rocksDB = RocksDBFactory.getRocksDB();
+        columnFamilyHandle = RocksDBFactory.getOrCreateColumnFamily(TABLE_ID, INDEX_ID, VNODE_ID);
     }
 
     @AfterEach
@@ -77,7 +90,7 @@ public class TestRocksDBIndex
     public void testPutEntry() throws RocksDBException, SinglePointIndexException
     {
         // Create Entry
-        byte[] key = "testPutEntry".getBytes();
+        byte[] key = ByteBuffer.allocate(4).putInt(1).array();
         long timestamp = 1000L;
         long rowId = 100L;
 
@@ -91,7 +104,7 @@ public class TestRocksDBIndex
         ByteBuffer valueBuffer = RocksDBThreadResources.getValueBuffer();
         ReadOptions readOptions = new ReadOptions();
         // Assert index has been written to rocksDB
-        int ret = rocksDB.get(readOptions, keyBuffer, valueBuffer);
+        int ret = rocksDB.get(columnFamilyHandle, readOptions, keyBuffer, valueBuffer);
         assertTrue(ret != RocksDB.NOT_FOUND);
 
         long storedRowId = valueBuffer.getLong();
@@ -173,6 +186,50 @@ public class TestRocksDBIndex
     }
 
     @Test
+    public void testSeekFindsNextVersionWithSameLogicalPrefix() throws Exception
+    {
+        // Use Default Prefix Len = 4
+        byte[] key = ByteBuffer.allocate(4).putInt(7).array();
+        long[] storedTimestamps = {1L, 3L, 5L, 7L, 9L};
+        long[] seekTimestamps = {1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L};
+        long[] expectedTimestamps = {1L, 1L, 3L, 3L, 5L, 5L, 7L, 7L, 9L, 9L};
+
+        for (long timestamp : storedTimestamps)
+        {
+            IndexProto.IndexKey storedKey = IndexProto.IndexKey.newBuilder()
+                    .setIndexId(INDEX_ID)
+                    .setKey(ByteString.copyFrom(key))
+                    .setTimestamp(timestamp)
+                    .build();
+            uniqueIndex.putEntry(storedKey, timestamp);
+        }
+
+        ReadOptions readOptions = RocksDBThreadResources.getReadOptions();
+        readOptions.setPrefixSameAsStart(true)
+                .setTotalOrderSeek(false)
+                .setVerifyChecksums(false);
+
+        for (int i = 0; i < seekTimestamps.length; i++)
+        {
+            long seekTimestamp = seekTimestamps[i];
+            long expectedTimestamp = expectedTimestamps[i];
+            ByteBuffer seekKey = toKeyBuffer(indexKey(key, seekTimestamp));
+
+            try (RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle, readOptions))
+            {
+                iterator.seek(seekKey);
+                assertTrue(iterator.isValid(), "seek should find a version for timestamp " + seekTimestamp);
+                assertTrue(startsWith(ByteBuffer.wrap(iterator.key()), seekKey),
+                        "seek should remain within the same logical prefix for timestamp " + seekTimestamp);
+                long getTs = extractTimestampFromUniqueKey(iterator.key());
+                System.out.println("Timestamp: " + getTs);
+                assertEquals(expectedTimestamp, getTs,
+                        "seek should land on the closest stored version for timestamp " + seekTimestamp);
+            }
+        }
+    }
+
+    @Test
     public void testGetRowIds() throws SinglePointIndexException
     {
         byte[] key = "testGetRowIds".getBytes();
@@ -205,6 +262,21 @@ public class TestRocksDBIndex
         System.out.println(result.size());
         System.out.println(result.toString());
         assertTrue(rowIds.containsAll(result) && result.containsAll(rowIds), "getRowIds should return the rowId of all entries");
+    }
+
+    private static IndexProto.IndexKey indexKey(byte[] key, long timestamp)
+    {
+        return IndexProto.IndexKey.newBuilder()
+                .setIndexId(INDEX_ID)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp)
+                .build();
+    }
+
+    private static long extractTimestampFromUniqueKey(byte[] encodedKey)
+    {
+        ByteBuffer keyBuffer = ByteBuffer.wrap(encodedKey);
+        return Long.MAX_VALUE - keyBuffer.getLong(encodedKey.length - Long.BYTES);
     }
 
     @Test
