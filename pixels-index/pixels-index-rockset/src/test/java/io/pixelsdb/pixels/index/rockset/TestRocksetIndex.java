@@ -21,42 +21,48 @@ package io.pixelsdb.pixels.index.rockset;
 
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
-import io.pixelsdb.pixels.common.index.SinglePointIndex;
-import io.pixelsdb.pixels.common.index.SinglePointIndexFactory;
 import io.pixelsdb.pixels.common.exception.MainIndexException;
 import io.pixelsdb.pixels.common.exception.SinglePointIndexException;
 import io.pixelsdb.pixels.common.index.SinglePointIndex;
 import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.index.IndexProto;
+import io.pixelsdb.pixels.index.rockset.jni.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import io.pixelsdb.pixels.index.rockset.jni.*;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.pixelsdb.pixels.index.rockset.RocksetIndex.startsWith;
 import static io.pixelsdb.pixels.index.rockset.RocksetIndex.toKeyBuffer;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TestRocksetIndex
 {
+    private static final boolean MULTI_CF =
+            Boolean.parseBoolean(ConfigFactory.Instance().getProperty("index.rockset.multicf"));
     private RocksetDB rocksetDB;
     private static final long TABLE_ID = 100L;
     private static final long INDEX_ID = 100L;
+    private static final int VNODE_ID = 0;
     private SinglePointIndex uniqueIndex;
     private SinglePointIndex nonUniqueIndex;
+    private RocksetColumnFamilyHandle columnFamilyHandle;
 
     @BeforeEach
     public void setUp() throws Exception
     {
         IndexOption option = IndexOption.builder()
-            .vNodeId(0)
+            .vNodeId(VNODE_ID)
             .build();
         uniqueIndex = new RocksetIndex(TABLE_ID, INDEX_ID, true, option);
         nonUniqueIndex = new RocksetIndex(TABLE_ID, INDEX_ID + 1, false, option);
+        rocksetDB = RocksetFactory.getRocksetDB();
+        columnFamilyHandle = RocksetFactory.getOrCreateColumnFamily(TABLE_ID, INDEX_ID, VNODE_ID);
     }
 
     @AfterEach
@@ -76,7 +82,7 @@ public class TestRocksetIndex
     public void testPutEntry() throws SinglePointIndexException
     {
         // Create Entry
-        byte[] key = "testPutEntry".getBytes();
+        byte[] key = ByteBuffer.allocate(4).putInt(3622).array();
         long timestamp = 1000L;
         long rowId = 100L;
 
@@ -144,7 +150,7 @@ public class TestRocksetIndex
     @Test
     public void testGetUniqueRowId() throws  SinglePointIndexException
     {
-        byte[] key = "testGetUniqueRowId".getBytes();
+        byte[] key = ByteBuffer.allocate(4).putInt(2).array();
         long timestamp1 = 1000L;
         long timestamp2 = timestamp1 + 1000; // newer
 
@@ -169,6 +175,42 @@ public class TestRocksetIndex
 
         long result = uniqueIndex.getUniqueRowId(key2);
         assertEquals(rowId2, result, "getUniqueRowId should return the rowId of the latest timestamp entry");
+    }
+
+    @Test
+    public void testSeekFindsNextVersionWithSameLogicalPrefix() throws Exception
+    {
+        assertTrue(MULTI_CF, "This test assumes multi-CF layout for logical-key prefix matching");
+
+        byte[] key = ByteBuffer.allocate(4).putInt(7).array();
+        long[] storedTimestamps = {1L, 3L, 5L, 7L, 9L};
+        long[] seekTimestamps = {1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L};
+        long[] expectedTimestamps = {1L, 1L, 3L, 3L, 5L, 5L, 7L, 7L, 9L, 9L};
+
+        for (long timestamp : storedTimestamps)
+        {
+            uniqueIndex.putEntry(indexKey(key, timestamp), timestamp);
+        }
+
+        RocksetReadOptions readOptions = RocksetThreadResources.getReadOptions();
+        readOptions.setPrefixSameAsStart(true);
+
+        for (int i = 0; i < seekTimestamps.length; i++)
+        {
+            long seekTimestamp = seekTimestamps[i];
+            long expectedTimestamp = expectedTimestamps[i];
+            ByteBuffer seekKey = toKeyBuffer(indexKey(key, seekTimestamp));
+
+            try (RocksetIterator iterator = rocksetDB.newIterator(columnFamilyHandle, readOptions))
+            {
+                iterator.seek(seekKey);
+                assertTrue(iterator.isValid(), "seek should find a version for timestamp " + seekTimestamp);
+                assertTrue(startsWith(ByteBuffer.wrap(iterator.key()), seekKey),
+                        "seek should remain within the same logical prefix for timestamp " + seekTimestamp);
+                assertEquals(expectedTimestamp, extractTimestampFromUniqueKey(iterator.key()),
+                        "seek should land on the closest stored version for timestamp " + seekTimestamp);
+            }
+        }
     }
 
     @Test
@@ -204,6 +246,21 @@ public class TestRocksetIndex
         System.out.println(result.size());
         System.out.println(result.toString());
         assertTrue(rowIds.containsAll(result) && result.containsAll(rowIds), "getRowIds should return the rowId of all entries");
+    }
+
+    private static IndexProto.IndexKey indexKey(byte[] key, long timestamp)
+    {
+        return IndexProto.IndexKey.newBuilder()
+                .setIndexId(INDEX_ID)
+                .setKey(ByteString.copyFrom(key))
+                .setTimestamp(timestamp)
+                .build();
+    }
+
+    private static long extractTimestampFromUniqueKey(byte[] encodedKey)
+    {
+        ByteBuffer keyBuffer = ByteBuffer.wrap(encodedKey);
+        return Long.MAX_VALUE - keyBuffer.getLong(encodedKey.length - Long.BYTES);
     }
 
     @Test
@@ -396,4 +453,3 @@ public class TestRocksetIndex
         System.out.printf("Deleted %,d entries in %.2f ms (%.2f ops/sec)%n", count, durationMs, count * 1000.0 / durationMs);
     }
 }
-
