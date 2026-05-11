@@ -44,7 +44,7 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetReadOptions_disposeInternalJni(
  */
 JNIEXPORT void JNICALL
 Java_io_pixelsdb_pixels_index_rockset_jni_RocksetReadOptions_setPrefixSameAsStart(
-    JNIEnv*, jclass, jlong handle, jboolean flag) 
+    JNIEnv*, jobject, jlong handle, jboolean flag) 
 {
   reinterpret_cast<ReadOptions*>(handle)->prefix_same_as_start =
       static_cast<bool>(flag);

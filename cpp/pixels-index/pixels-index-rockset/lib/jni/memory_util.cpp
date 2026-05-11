@@ -7,7 +7,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "include/org_rocksdb_MemoryUtil.h"
 #include "portal.h"
 
 jobject Java_io_pixelsdb_pixels_index_rockset_jni_MemoryUtil_getApproximateMemoryUsageByType(

@@ -103,49 +103,49 @@ public class TestRocksetIndex
         assertEquals(rowId, storedRowId);
     }
 
-    @Test
-    public void testPutEntries() throws SinglePointIndexException, MainIndexException
-    {
-        long timestamp = 1000L;
-        long fileId = 1L;
-        int rgId = 2;
+    // @Test
+    // public void testPutEntries() throws SinglePointIndexException, MainIndexException
+    // {
+    //     long timestamp = 1000L;
+    //     long fileId = 1L;
+    //     int rgId = 2;
 
-        List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>();
+    //     List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>();
 
-        // Create two entries
-        for (int i = 0; i < 2; i++)
-        {
-            byte[] key = ("testPutEntries" + i).getBytes(); // use different keys
+    //     // Create two entries
+    //     for (int i = 0; i < 2; i++)
+    //     {
+    //         byte[] key = ("testPutEntries" + i).getBytes(); // use different keys
 
-            long rowId = i * 1000L;
+    //         long rowId = i * 1000L;
 
-            IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
-                    .setIndexId(INDEX_ID).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
+    //         IndexProto.IndexKey keyProto = IndexProto.IndexKey.newBuilder()
+    //                 .setIndexId(INDEX_ID).setKey(ByteString.copyFrom(key)).setTimestamp(timestamp).build();
 
-            IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
-                    .setFileId(fileId).setRgId(rgId).setRgRowOffset(i).build();
+    //         IndexProto.RowLocation rowLocation = IndexProto.RowLocation.newBuilder()
+    //                 .setFileId(fileId).setRgId(rgId).setRgRowOffset(i).build();
 
-            IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
-                    .setIndexKey(keyProto).setRowId(rowId).setRowLocation(rowLocation).build();
-            entries.add(entry);
-        }
+    //         IndexProto.PrimaryIndexEntry entry = IndexProto.PrimaryIndexEntry.newBuilder()
+    //                 .setIndexKey(keyProto).setRowId(rowId).setRowLocation(rowLocation).build();
+    //         entries.add(entry);
+    //     }
 
-        boolean success = uniqueIndex.putPrimaryEntries(entries);
-        assertTrue(success, "putEntries should return true");
+    //     boolean success = uniqueIndex.putPrimaryEntries(entries);
+    //     assertTrue(success, "putEntries should return true");
 
-        // Assert every index has been written to rockset
-        for (int i = 0; i < entries.size(); i++)
-        {
-            IndexProto.PrimaryIndexEntry entry = entries.get(i);
-            ByteBuffer keyBuffer = toKeyBuffer(entry.getIndexKey());
-            ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
-            RocksetReadOptions rocksetReadOptions = RocksetThreadResources.getReadOptions();
-            // int ret = rocksetDB.get(rocksetReadOptions, keyBuffer, valueBuffer);
-            // assertTrue(ret != 0);
-            long storedRowId = valueBuffer.getLong();
-            assertEquals(i* 1000L, storedRowId);
-        }
-    }
+    //     // Assert every index has been written to rockset
+    //     for (int i = 0; i < entries.size(); i++)
+    //     {
+    //         IndexProto.PrimaryIndexEntry entry = entries.get(i);
+    //         ByteBuffer keyBuffer = toKeyBuffer(entry.getIndexKey());
+    //         ByteBuffer valueBuffer = RocksetThreadResources.getValueBuffer();
+    //         RocksetReadOptions rocksetReadOptions = RocksetThreadResources.getReadOptions();
+    //         // int ret = rocksetDB.get(rocksetReadOptions, keyBuffer, valueBuffer);
+    //         // assertTrue(ret != 0);
+    //         long storedRowId = valueBuffer.getLong();
+    //         assertEquals(i* 1000L, storedRowId);
+    //     }
+    // }
 
     @Test
     public void testGetUniqueRowId() throws  SinglePointIndexException

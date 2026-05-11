@@ -1,6 +1,7 @@
 #include "io_pixelsdb_pixels_index_rockset_jni_RocksetColumnFamilyOptions.h"
 #include <rocksdb/options.h>
 #include <rocksdb/table.h>
+#include <limits>
 
 using ROCKSDB_NAMESPACE::ColumnFamilyOptions;
 using ROCKSDB_NAMESPACE::CompressionType;
@@ -26,7 +27,9 @@ JNIEXPORT void JNICALL
 Java_io_pixelsdb_pixels_index_rockset_jni_RocksetColumnFamilyOptions_nativeSetWriteBufferSize(
     JNIEnv* env, jclass, jlong jhandle, jlong jwrite_buffer_size) 
 {
-    if (jwrite_buffer_size < 0 || jwrite_buffer_size > static_cast<jlong>(SIZE_MAX)) {
+    if (jwrite_buffer_size < 0 ||
+        static_cast<uint64_t>(jwrite_buffer_size) >
+            static_cast<uint64_t>(std::numeric_limits<size_t>::max())) {
         jclass exc = env->FindClass("java/lang/IllegalArgumentException");
         env->ThrowNew(exc, "write_buffer_size out of range");
         return;
@@ -139,6 +142,5 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetColumnFamilyOptions_disposeInte
   assert(cfo != nullptr);
   delete cfo;
 }
-
 
 

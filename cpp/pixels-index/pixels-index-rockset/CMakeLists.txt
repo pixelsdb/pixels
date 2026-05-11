@@ -25,23 +25,26 @@ else()
 endif()
 
 # 3. Configure rocksdb-cloud as external project
-set(ROCKSDB_CLOUD_GIT_REPOSITORY https://github.com/rockset/rocksdb-cloud.git)
-set(ROCKSDB_CLOUD_GIT_TAG master)
+set(ROCKSDB_CLOUD_GIT_REPOSITORY git@github.com:rockset/rocksdb-cloud.git)
+set(ROCKSDB_CLOUD_GIT_TAG v6.7.3)
 set(ROCKSDB_CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_C_COMPILER=/usr/bin/gcc-10
+    -DCMAKE_CXX_COMPILER=/usr/bin/g++-10
     -DWITH_GFLAGS=OFF
     -DWITH_TESTS=OFF
     -DWITH_BENCHMARK_TOOLS=OFF
     -DWITH_CORE_TOOLS=OFF
+    -DWITH_TOOLS=OFF
     -DFAIL_ON_WARNINGS=OFF
     -DUSE_RTTI=1
-    -DCMAKE_CXX_FLAGS=-frtti
+    -DCMAKE_CXX_FLAGS=-frtti\ -DUSE_AWS
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/deps/rocksdb_cloud-install
     -DWITH_JNI=OFF
     -DWITH_SNAPPY=OFF
     -DWITH_ZLIB=ON
     -DWITH_BZ2=OFF
-    -DWITH_LZ4=OFF
+    -DWITH_LZ4=ON
     -DWITH_ZSTD=OFF
     -DWITH_LIBURING=ON
     -DWITH_AWS=ON
@@ -54,6 +57,9 @@ ExternalProject_Add(rocksdb_cloud
     GIT_TAG ${ROCKSDB_CLOUD_GIT_TAG}
     GIT_SHALLOW true
     UPDATE_COMMAND ""
+    PATCH_COMMAND ${CMAKE_COMMAND}
+        -DROCKSDB_CLOUD_SOURCE_DIR=<SOURCE_DIR>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/PatchRocksDBCloud.cmake
     CMAKE_ARGS ${ROCKSDB_CMAKE_ARGS}
     BUILD_BYPRODUCTS
         ${CMAKE_CURRENT_BINARY_DIR}/deps/rocksdb_cloud-install/lib/librocksdb${CMAKE_SHARED_LIBRARY_SUFFIX}
@@ -97,10 +103,15 @@ add_library(pixels-index-rockset SHARED
 
 add_dependencies(pixels-index-rockset rocksdb_cloud)
 
+target_compile_definitions(pixels-index-rockset
+    PRIVATE ROCKSDB_NAMESPACE=rocksdb
+)
+
 # 10. ink RocksDB and its dependencies
 target_link_libraries(pixels-index-rockset
     RocksDB::rocksdb
     z
+    lz4
     curl
     pthread
     dl

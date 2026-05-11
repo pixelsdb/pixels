@@ -26,10 +26,10 @@ JNIEXPORT jlongArray JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB
 /*
  * Class:     io_pixelsdb_pixels_index_rockset_jni_RocksetDB
  * Method:    listColumnFamilies0
- * Signature: (Ljava/lang/String;)Ljava/util/List;
+ * Signature: (JLjava/lang/String;)Ljava/util/List;
  */
 JNIEXPORT jobject JNICALL Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_listColumnFamilies0
-  (JNIEnv *, jclass, jstring);
+  (JNIEnv *, jclass, jlong, jstring);
 
 /*
  * Class:     io_pixelsdb_pixels_index_rockset_jni_RocksetDB
