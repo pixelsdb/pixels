@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.cli.executor;
 
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -67,7 +68,10 @@ public class ImportExecutor implements CommandExecutor
         try
         {
             List<File> importFiles = getImportFiles(ordered, writableLayout);
-            metadataService.addFiles(importFiles);
+            if (!metadataService.addFiles(importFiles))
+            {
+                throw new MetadataException("failed to import pixels files into metadata");
+            }
             System.out.println(command + " is successful");
         }
         catch (Exception e)

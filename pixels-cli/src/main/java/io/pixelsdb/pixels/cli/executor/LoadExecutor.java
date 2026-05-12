@@ -93,7 +93,10 @@ public class LoadExecutor implements CommandExecutor
             {
                 File file = loadedInfo.loadedFile;
                 Path path = loadedInfo.loadedPath;
-                metadataService.updateFile(file);
+                if (!metadataService.updateFile(file))
+                {
+                    throw new MetadataException("failed to publish loaded file " + file.getName());
+                }
                 try
                 {
 

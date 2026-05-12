@@ -896,7 +896,10 @@ public class StorageGarbageCollector
             newFile.setMinRowId(minRowId);
             newFile.setMaxRowId(maxRowId);
             newFile.setPathId(group.files.get(0).file.getPathId());
-            metadataService.addFiles(Collections.singletonList(newFile));
+            if (!metadataService.addFiles(Collections.singletonList(newFile)))
+            {
+                throw new MetadataException("failed to add metadata for GC rewrite file " + newFilePath);
+            }
             newFileId = metadataService.getFileId(newFilePath);
 
             for (int rgId = 0; rgId < newFileRgCount; rgId++)
@@ -939,7 +942,10 @@ public class StorageGarbageCollector
             }
             try
             {
-                metadataService.deleteFiles(Collections.singletonList(newFileId));
+                if (!metadataService.deleteFiles(Collections.singletonList(newFileId)))
+                {
+                    throw new MetadataException("failed to delete temporary GC catalog entry for fileId=" + newFileId);
+                }
             }
             catch (Exception ex)
             {
@@ -1263,7 +1269,10 @@ public class StorageGarbageCollector
 
             try
             {
-                metadataService.deleteFiles(Collections.singletonList(result.newFileId));
+                if (!metadataService.deleteFiles(Collections.singletonList(result.newFileId)))
+                {
+                    throw new MetadataException("failed to rollback GC catalog entry for fileId=" + result.newFileId);
+                }
             }
             catch (Exception ex)
             {

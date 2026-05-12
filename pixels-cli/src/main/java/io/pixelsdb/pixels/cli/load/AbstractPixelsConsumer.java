@@ -167,7 +167,10 @@ public abstract class AbstractPixelsConsumer extends Consumer
             {
                 try
                 {
-                    metadataService.deleteFiles(Collections.singletonList((tmpFile.getId())));
+                    if (!metadataService.deleteFiles(Collections.singletonList((tmpFile.getId()))))
+                    {
+                        throw new MetadataException("failed to delete temporary load file " + tmpFile.getId());
+                    }
                 } catch (MetadataException e)
                 {
                     e.printStackTrace();
@@ -211,7 +214,10 @@ public abstract class AbstractPixelsConsumer extends Consumer
         file.setNumRowGroup(1);
         file.setPathId(filePath.getId());
         String tmpFilePath = filePath.getUri() + "/" + fileName;
-        this.metadataService.addFiles(Collections.singletonList(file));
+        if (!this.metadataService.addFiles(Collections.singletonList(file)))
+        {
+            throw new MetadataException("failed to add temporary load file " + tmpFilePath);
+        }
         file.setId(metadataService.getFileId(tmpFilePath));
         return file;
     }

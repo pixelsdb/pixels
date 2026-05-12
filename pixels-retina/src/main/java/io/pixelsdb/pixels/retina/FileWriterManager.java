@@ -87,7 +87,10 @@ public class FileWriterManager
             this.file.setType(File.Type.TEMPORARY);
             this.file.setNumRowGroup(1);
             this.file.setPathId(targetOrderedDirPath.getId());
-            metadataService.addFiles(Collections.singletonList(file));
+            if (!metadataService.addFiles(Collections.singletonList(file)))
+            {
+                throw new MetadataException("failed to add metadata for ingest file " + targetFilePath);
+            }
             this.file.setId(metadataService.getFileId(targetFilePath));
         } catch (MetadataException e)
         {
@@ -177,7 +180,10 @@ public class FileWriterManager
                 // Update the file's type.
                 this.file.setType(File.Type.REGULAR);
                 MetadataService metadataService = MetadataService.Instance();
-                metadataService.updateFile(this.file);
+                if (!metadataService.updateFile(this.file))
+                {
+                    throw new MetadataException("failed to publish ingest file " + this.file.getId() + " as REGULAR");
+                }
 
                 future.complete(null);
             } catch (Exception e)
