@@ -30,3 +30,14 @@ resources/*.xml
 *.o
 .vscode
 cpp/pixels-retina/third_party/
+
+# AI tools
+.codex
+.claude/
+.cursor/
+.continue/
+.aider*
+.ai/
+.notes/
+CLAUDE.local.md
+AGENTS.md.local
