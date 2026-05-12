@@ -36,7 +36,10 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.*;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -65,6 +68,13 @@ public class SqliteMainIndex implements MainIndex
             "rg_row_offset_start INT NOT NULL, rg_row_offset_end INT NOT NULL, PRIMARY KEY (row_id_start, row_id_end))";
 
     /**
+     * The SQL statement to create the per-file flush marker table.
+     */
+    private static final String createFlushMarkerTableSql = "CREATE TABLE IF NOT EXISTS row_id_range_flush_markers " +
+            "(file_id BIGINT NOT NULL PRIMARY KEY, entry_count BIGINT NOT NULL, range_count BIGINT NOT NULL, " +
+            "range_hash BLOB NOT NULL, committed_at_ms BIGINT NOT NULL)";
+
+    /**
      * The SQL statement to query the row id range that covers the given row id (the two ? are of the same value).
      */
     private static final String queryRangeSql = "SELECT * FROM row_id_ranges WHERE row_id_start <= ? AND ? < row_id_end";
@@ -84,6 +94,42 @@ public class SqliteMainIndex implements MainIndex
      * The SQL statement to insert a new row id range.
      */
     private static final String insertRangeSql = "INSERT INTO row_id_ranges VALUES(?, ?, ?, ?, ?, ?)";
+
+    /**
+     * The SQL statement to query a per-file flush marker.
+     */
+    private static final String queryFlushMarkerSql =
+            "SELECT entry_count, range_count, range_hash FROM row_id_range_flush_markers WHERE file_id = ?";
+
+    /**
+     * The SQL statement to insert a per-file flush marker.
+     */
+    private static final String insertFlushMarkerSql =
+            "INSERT INTO row_id_range_flush_markers VALUES(?, ?, ?, ?, ?)";
+
+    private static final class FlushMarker
+    {
+        private final long fileId;
+        private final long entryCount;
+        private final long rangeCount;
+        private final byte[] rangeHash;
+
+        private FlushMarker(long fileId, long entryCount, long rangeCount, byte[] rangeHash)
+        {
+            this.fileId = fileId;
+            this.entryCount = entryCount;
+            this.rangeCount = rangeCount;
+            this.rangeHash = rangeHash;
+        }
+
+        private boolean matches(MainIndexBuffer.FlushSnapshot snapshot, byte[] snapshotHash)
+        {
+            return this.fileId == snapshot.getFileId()
+                    && this.entryCount == snapshot.getEntryCount()
+                    && this.rangeCount == snapshot.getRowIdRanges().size()
+                    && Arrays.equals(this.rangeHash, snapshotHash);
+        }
+    }
 
     private final long tableId;
     private final String sqlitePath;
@@ -116,6 +162,7 @@ public class SqliteMainIndex implements MainIndex
             try (Statement statement = connection.createStatement())
             {
                 statement.execute(createTableSql);
+                statement.execute(createFlushMarkerTableSql);
             }
         }
         catch (SQLException e)
@@ -312,31 +359,68 @@ public class SqliteMainIndex implements MainIndex
     @Override
     public boolean deleteRowIdRange(RowIdRange rowIdRange) throws MainIndexException
     {
-        this.dbRwLock.writeLock().lock();
-        try (PreparedStatement pst = connection.prepareStatement(deleteRangesSql))
+        long rowIdStart = rowIdRange.getRowIdStart();
+        long rowIdEnd = rowIdRange.getRowIdEnd();
+        if (rowIdEnd <= rowIdStart)
         {
-            long rowIdStart = rowIdRange.getRowIdStart();
-            long rowIdEnd = rowIdRange.getRowIdEnd();
-            pst.setLong(1, rowIdStart);
-            pst.setLong(2, rowIdEnd);
-            RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdStart);
-            RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdEnd - 1);
-            boolean res = true;
-            if (leftBorderRange != null)
+            throw new MainIndexException("Invalid row id range to delete: [" + rowIdStart + ", " + rowIdEnd + ")");
+        }
+
+        this.dbRwLock.writeLock().lock();
+        try
+        {
+            boolean originalAutoCommit = this.connection.getAutoCommit();
+            try
             {
-                int width = (int) (rowIdStart - leftBorderRange.getRowIdStart());
-                RowIdRange newLeftBorderRange = leftBorderRange.toBuilder()
-                        .setRowIdEnd(rowIdStart).setRgRowOffsetEnd(leftBorderRange.getRgRowOffsetStart() + width).build();
-                res &= updateRowIdRangeWidth(leftBorderRange, newLeftBorderRange);
+                this.connection.setAutoCommit(false);
+                RowIdRange leftBorderRange = getRowIdRangeFromSqlite(rowIdStart);
+                RowIdRange rightBorderRange = getRowIdRangeFromSqlite(rowIdEnd - 1);
+                boolean res = true;
+                try (PreparedStatement pst = connection.prepareStatement(deleteRangesSql))
+                {
+                    pst.setLong(1, rowIdStart);
+                    pst.setLong(2, rowIdEnd);
+                    pst.executeUpdate();
+                }
+                if (leftBorderRange != null && rightBorderRange != null &&
+                        leftBorderRange.getRowIdStart() == rightBorderRange.getRowIdStart() &&
+                        leftBorderRange.getRowIdEnd() == rightBorderRange.getRowIdEnd())
+                {
+                    res &= trimSingleOverlappingRange(leftBorderRange, rowIdStart, rowIdEnd);
+                }
+                else
+                {
+                    if (leftBorderRange != null && leftBorderRange.getRowIdStart() < rowIdStart &&
+                            rowIdStart < leftBorderRange.getRowIdEnd())
+                    {
+                        int width = (int) (rowIdStart - leftBorderRange.getRowIdStart());
+                        RowIdRange newLeftBorderRange = leftBorderRange.toBuilder()
+                                .setRowIdEnd(rowIdStart)
+                                .setRgRowOffsetEnd(leftBorderRange.getRgRowOffsetStart() + width).build();
+                        res &= updateRowIdRangeWidth(leftBorderRange, newLeftBorderRange);
+                    }
+                    if (rightBorderRange != null && rightBorderRange.getRowIdStart() < rowIdEnd &&
+                            rowIdEnd < rightBorderRange.getRowIdEnd())
+                    {
+                        int width = (int) (rightBorderRange.getRowIdEnd() - rowIdEnd);
+                        RowIdRange newRightBorderRange = rightBorderRange.toBuilder()
+                                .setRowIdStart(rowIdEnd)
+                                .setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd() - width).build();
+                        res &= updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
+                    }
+                }
+                this.connection.commit();
+                return res;
             }
-            if (rightBorderRange != null)
+            catch (SQLException | RowIdException e)
             {
-                int width = (int) (rightBorderRange.getRowIdEnd() - rowIdEnd);
-                RowIdRange newRightBorderRange = rightBorderRange.toBuilder()
-                        .setRowIdStart(rowIdEnd).setRgRowOffsetStart(rightBorderRange.getRgRowOffsetEnd() - width).build();
-                res &= updateRowIdRangeWidth(rightBorderRange, newRightBorderRange);
+                rollbackQuietly(e);
+                throw e;
             }
-            return res;
+            finally
+            {
+                this.connection.setAutoCommit(originalAutoCommit);
+            }
         }
         catch (SQLException | RowIdException e)
         {
@@ -348,6 +432,46 @@ public class SqliteMainIndex implements MainIndex
             this.indexCache.evictRange(rowIdRange);
             this.dbRwLock.writeLock().unlock();
         }
+    }
+
+    private boolean trimSingleOverlappingRange(RowIdRange range, long rowIdStart, long rowIdEnd)
+            throws RowIdException, SQLException
+    {
+        if (range.getRowIdStart() < rowIdStart && rowIdEnd < range.getRowIdEnd())
+        {
+            int leftWidth = (int) (rowIdStart - range.getRowIdStart());
+            RowIdRange newLeftRange = range.toBuilder()
+                    .setRowIdEnd(rowIdStart)
+                    .setRgRowOffsetEnd(range.getRgRowOffsetStart() + leftWidth).build();
+            int rightWidth = (int) (range.getRowIdEnd() - rowIdEnd);
+            RowIdRange newRightRange = range.toBuilder()
+                    .setRowIdStart(rowIdEnd)
+                    .setRgRowOffsetStart(range.getRgRowOffsetEnd() - rightWidth).build();
+            boolean res = updateRowIdRangeWidth(range, newLeftRange);
+            try (PreparedStatement pst = this.connection.prepareStatement(insertRangeSql))
+            {
+                bindRangeInsertStatement(pst, newRightRange);
+                res &= pst.executeUpdate() > 0;
+            }
+            return res;
+        }
+        if (range.getRowIdStart() < rowIdStart && rowIdStart < range.getRowIdEnd())
+        {
+            int width = (int) (rowIdStart - range.getRowIdStart());
+            RowIdRange newLeftRange = range.toBuilder()
+                    .setRowIdEnd(rowIdStart)
+                    .setRgRowOffsetEnd(range.getRgRowOffsetStart() + width).build();
+            return updateRowIdRangeWidth(range, newLeftRange);
+        }
+        if (range.getRowIdStart() < rowIdEnd && rowIdEnd < range.getRowIdEnd())
+        {
+            int width = (int) (range.getRowIdEnd() - rowIdEnd);
+            RowIdRange newRightRange = range.toBuilder()
+                    .setRowIdStart(rowIdEnd)
+                    .setRgRowOffsetStart(range.getRgRowOffsetEnd() - width).build();
+            return updateRowIdRangeWidth(range, newRightRange);
+        }
+        return true;
     }
 
     /**
@@ -392,6 +516,16 @@ public class SqliteMainIndex implements MainIndex
         }
     }
 
+    private static void bindRangeInsertStatement(PreparedStatement pst, RowIdRange range) throws SQLException
+    {
+        pst.setLong(1, range.getRowIdStart());
+        pst.setLong(2, range.getRowIdEnd());
+        pst.setLong(3, range.getFileId());
+        pst.setInt(4, range.getRgId());
+        pst.setInt(5, range.getRgRowOffsetStart());
+        pst.setInt(6, range.getRgRowOffsetEnd());
+    }
+
     /**
      * Update the width of an existing row id range.
      * @param oldRange the old row id range
@@ -424,22 +558,52 @@ public class SqliteMainIndex implements MainIndex
         this.dbRwLock.writeLock().lock();
         try
         {
-            List<RowIdRange> rowIdRanges = this.indexBuffer.flush(fileId);
-            try (PreparedStatement pst = this.connection.prepareStatement(insertRangeSql))
+            MainIndexBuffer.FlushSnapshot snapshot = this.indexBuffer.snapshotForFlush(fileId);
+            if (snapshot.isEmpty())
             {
-                for (RowIdRange range : rowIdRanges)
-                {
-                    pst.setLong(1, range.getRowIdStart());
-                    pst.setLong(2, range.getRowIdEnd());
-                    pst.setLong(3, range.getFileId());
-                    pst.setInt(4, range.getRgId());
-                    pst.setInt(5, range.getRgRowOffsetStart());
-                    pst.setInt(6, range.getRgRowOffsetEnd());
-                    pst.addBatch();
-                }
-                pst.executeBatch();
                 return true;
             }
+
+            byte[] snapshotHash = buildRangeHash(snapshot.getRowIdRanges());
+            FlushMarker marker = readFlushMarker(snapshot.getFileId());
+            if (marker != null)
+            {
+                if (!marker.matches(snapshot, snapshotHash))
+                {
+                    throw new MainIndexException("Conflicting flush marker already exists for fileId=" + fileId);
+                }
+                this.indexBuffer.discardFlushed(snapshot);
+                return true;
+            }
+
+            boolean originalAutoCommit = this.connection.getAutoCommit();
+            try
+            {
+                this.connection.setAutoCommit(false);
+                try (PreparedStatement pst = this.connection.prepareStatement(insertRangeSql))
+                {
+                    for (RowIdRange range : snapshot.getRowIdRanges())
+                    {
+                        bindRangeInsertStatement(pst, range);
+                        pst.addBatch();
+                    }
+                    pst.executeBatch();
+                }
+                insertFlushMarker(snapshot, snapshotHash);
+                this.connection.commit();
+            }
+            catch (SQLException e)
+            {
+                rollbackQuietly(e);
+                throw e;
+            }
+            finally
+            {
+                this.connection.setAutoCommit(originalAutoCommit);
+            }
+
+            this.indexBuffer.discardFlushed(snapshot);
+            return true;
         }
         catch (MainIndexException | SQLException e)
         {
@@ -449,6 +613,86 @@ public class SqliteMainIndex implements MainIndex
         {
             this.cacheRwLock.writeLock().unlock();
             this.dbRwLock.writeLock().unlock();
+        }
+    }
+
+    private FlushMarker readFlushMarker(long fileId) throws SQLException
+    {
+        try (PreparedStatement pst = this.connection.prepareStatement(queryFlushMarkerSql))
+        {
+            pst.setLong(1, fileId);
+            try (ResultSet rs = pst.executeQuery())
+            {
+                if (!rs.next())
+                {
+                    return null;
+                }
+                return new FlushMarker(fileId, rs.getLong("entry_count"),
+                        rs.getLong("range_count"), rs.getBytes("range_hash"));
+            }
+        }
+    }
+
+    private void insertFlushMarker(MainIndexBuffer.FlushSnapshot snapshot, byte[] rangeHash) throws SQLException
+    {
+        try (PreparedStatement pst = this.connection.prepareStatement(insertFlushMarkerSql))
+        {
+            pst.setLong(1, snapshot.getFileId());
+            pst.setLong(2, snapshot.getEntryCount());
+            pst.setLong(3, snapshot.getRowIdRanges().size());
+            pst.setBytes(4, rangeHash);
+            pst.setLong(5, System.currentTimeMillis());
+            pst.executeUpdate();
+        }
+    }
+
+    private byte[] buildRangeHash(List<RowIdRange> rowIdRanges) throws MainIndexException
+    {
+        try
+        {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (RowIdRange range : rowIdRanges)
+            {
+                updateLong(digest, range.getRowIdStart());
+                updateLong(digest, range.getRowIdEnd());
+                updateLong(digest, range.getFileId());
+                updateInt(digest, range.getRgId());
+                updateInt(digest, range.getRgRowOffsetStart());
+                updateInt(digest, range.getRgRowOffsetEnd());
+            }
+            return digest.digest();
+        }
+        catch (NoSuchAlgorithmException e)
+        {
+            throw new MainIndexException("Failed to build range hash for main index flush", e);
+        }
+    }
+
+    private static void updateLong(MessageDigest digest, long value)
+    {
+        for (int shift = 56; shift >= 0; shift -= 8)
+        {
+            digest.update((byte) (value >>> shift));
+        }
+    }
+
+    private static void updateInt(MessageDigest digest, int value)
+    {
+        for (int shift = 24; shift >= 0; shift -= 8)
+        {
+            digest.update((byte) (value >>> shift));
+        }
+    }
+
+    private void rollbackQuietly(Exception failure)
+    {
+        try
+        {
+            this.connection.rollback();
+        }
+        catch (SQLException rollbackException)
+        {
+            failure.addSuppressed(rollbackException);
         }
     }
 
