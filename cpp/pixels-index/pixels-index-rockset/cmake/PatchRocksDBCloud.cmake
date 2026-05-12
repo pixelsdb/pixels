@@ -59,3 +59,18 @@ string(REPLACE
     "${ROCKSDB_AWS_S3_CONTENT}")
 
 file(WRITE "${ROCKSDB_CLOUD_AWS_S3}" "${ROCKSDB_AWS_S3_CONTENT}")
+
+set(ROCKSDB_CLOUD_DATA_BLOCK_HASH_INDEX_H
+    "${ROCKSDB_CLOUD_SOURCE_DIR}/table/block_based/data_block_hash_index.h")
+file(READ "${ROCKSDB_CLOUD_DATA_BLOCK_HASH_INDEX_H}" ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT)
+
+if(NOT ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT MATCHES "#include <cstdint>")
+    string(REPLACE
+        "#include <string>\n#include <vector>"
+        "#include <cstdint>\n#include <string>\n#include <vector>"
+        ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT
+        "${ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT}")
+    message(STATUS "Patched rocksdb-cloud data_block_hash_index.h to include <cstdint>")
+endif()
+
+file(WRITE "${ROCKSDB_CLOUD_DATA_BLOCK_HASH_INDEX_H}" "${ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT}")

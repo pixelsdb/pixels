@@ -4,6 +4,10 @@ project(pixels_rockset_jni)
 include(ExternalProject)
 include(ProcessorCount)
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 # 0. Get core count
 ProcessorCount(CORES)
 if(CORES EQUAL 0)
@@ -25,12 +29,15 @@ else()
 endif()
 
 # 3. Configure rocksdb-cloud as external project
-set(ROCKSDB_CLOUD_GIT_REPOSITORY git@github.com:rockset/rocksdb-cloud.git)
+set(ROCKSDB_CLOUD_GIT_REPOSITORY https://github.com/rockset/rocksdb-cloud.git)
 set(ROCKSDB_CLOUD_GIT_TAG v6.7.3)
+set(ROCKSDB_CLOUD_COMPAT_HEADER
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/RocksDBCloudCompat.h)
 set(ROCKSDB_CMAKE_ARGS
     -DCMAKE_BUILD_TYPE=Release
-    -DCMAKE_C_COMPILER=/usr/bin/gcc-10
-    -DCMAKE_CXX_COMPILER=/usr/bin/g++-10
+    -DCMAKE_CXX_STANDARD=11
+    -DCMAKE_CXX_STANDARD_REQUIRED=ON
+    -DCMAKE_CXX_EXTENSIONS=OFF
     -DWITH_GFLAGS=OFF
     -DWITH_TESTS=OFF
     -DWITH_BENCHMARK_TOOLS=OFF
@@ -38,7 +45,7 @@ set(ROCKSDB_CMAKE_ARGS
     -DWITH_TOOLS=OFF
     -DFAIL_ON_WARNINGS=OFF
     -DUSE_RTTI=1
-    -DCMAKE_CXX_FLAGS=-frtti\ -DUSE_AWS
+    -DCMAKE_CXX_FLAGS=-frtti\ -DUSE_AWS\ -include\ ${ROCKSDB_CLOUD_COMPAT_HEADER}
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/deps/rocksdb_cloud-install
     -DWITH_JNI=OFF
     -DWITH_SNAPPY=OFF
@@ -49,6 +56,14 @@ set(ROCKSDB_CMAKE_ARGS
     -DWITH_LIBURING=ON
     -DWITH_AWS=ON
 )
+
+if(CMAKE_C_COMPILER)
+    list(APPEND ROCKSDB_CMAKE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER})
+endif()
+
+if(CMAKE_CXX_COMPILER)
+    list(APPEND ROCKSDB_CMAKE_ARGS -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER})
+endif()
 
 # 4. Download and build rocksdb-cloud
 ExternalProject_Add(rocksdb_cloud
@@ -71,6 +86,7 @@ ExternalProject_Add(rocksdb_cloud
 ExternalProject_Get_Property(rocksdb_cloud INSTALL_DIR)
 set(ROCKSDB_CLOUD_INCLUDE_DIR ${INSTALL_DIR}/include)
 set(ROCKSDB_CLOUD_LIBRARY ${INSTALL_DIR}/lib/librocksdb${CMAKE_SHARED_LIBRARY_SUFFIX})
+set(ROCKSDB_CLOUD_LIBRARY_GLOB ${INSTALL_DIR}/lib/librocksdb${CMAKE_SHARED_LIBRARY_SUFFIX}*)
 file(MAKE_DIRECTORY ${ROCKSDB_CLOUD_INCLUDE_DIR})
 
 # 6. Create imported target for rocksdb
@@ -103,6 +119,11 @@ add_library(pixels-index-rockset SHARED
 
 add_dependencies(pixels-index-rockset rocksdb_cloud)
 
+set_target_properties(pixels-index-rockset PROPERTIES
+    BUILD_RPATH "${INSTALL_DIR}/lib"
+    INSTALL_RPATH "\$ORIGIN"
+)
+
 target_compile_definitions(pixels-index-rockset
     PRIVATE ROCKSDB_NAMESPACE=rocksdb
 )
@@ -120,3 +141,14 @@ target_link_libraries(pixels-index-rockset
 # 11. Install pixels-index-rockset to ${PIXELS_HOME}/lib
 install(TARGETS pixels-index-rockset
         LIBRARY DESTINATION ${PIXELS_HOME}/lib)
+install(FILES ${ROCKSDB_CLOUD_LIBRARY}
+        DESTINATION ${PIXELS_HOME}/lib)
+install(CODE "
+  file(GLOB ROCKSDB_RUNTIME_LIBS \"${ROCKSDB_CLOUD_LIBRARY_GLOB}\")
+  foreach(RUNTIME_LIB IN LISTS ROCKSDB_RUNTIME_LIBS)
+    get_filename_component(RUNTIME_LIB_NAME \"\${RUNTIME_LIB}\" NAME)
+    if(NOT RUNTIME_LIB_NAME STREQUAL \"librocksdb${CMAKE_SHARED_LIBRARY_SUFFIX}\")
+      file(INSTALL DESTINATION \"${PIXELS_HOME}/lib\" TYPE FILE FILES \"\${RUNTIME_LIB}\")
+    endif()
+  endforeach()
+")
