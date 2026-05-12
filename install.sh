@@ -32,10 +32,11 @@ mkdir -p $PIXELS_HOME/var
 echo "Installing pixels-index-rockset JNI library..."
 ROCKSET_JNI_LIB=./cpp/pixels-index/pixels-index-rockset/build/libpixels-index-rockset.so
 if [ ! -f "$ROCKSET_JNI_LIB" ]; then
-  echo "ERROR: '$ROCKSET_JNI_LIB' not found. Build it before running install.sh."
-  exit 1
+  echo "WARN: '$ROCKSET_JNI_LIB' not found. Skip installing pixels-index-rockset JNI library."
+  echo "WARN: Build it manually if you need Rockset index support. See cpp/pixels-index/pixels-index-rockset/README.md."
+else
+  cp -v "$ROCKSET_JNI_LIB" $PIXELS_HOME/lib
 fi
-cp -v "$ROCKSET_JNI_LIB" $PIXELS_HOME/lib
 
 echo "Installing scripts..."
 
@@ -174,4 +175,3 @@ echo "$(
   tput setaf 1
   tput setab 7
 )See the README of pixels-presto/trino/hive to install a query engine.$(tput sgr 0)"
-
