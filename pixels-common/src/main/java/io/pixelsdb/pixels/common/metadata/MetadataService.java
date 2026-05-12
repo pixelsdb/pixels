@@ -1361,7 +1361,7 @@ public class MetadataService
         {
             throw new MetadataException("failed to add file", e);
         }
-        return false;
+        return true;
     }
 
     /**
@@ -1476,7 +1476,7 @@ public class MetadataService
         {
             throw new MetadataException("failed to update file", e);
         }
-        return false;
+        return true;
     }
 
     public boolean deleteFiles(List<Long> fileIds) throws MetadataException
@@ -1502,7 +1502,7 @@ public class MetadataService
         {
             throw new MetadataException("failed to delete files", e);
         }
-        return false;
+        return true;
     }
 
     /**

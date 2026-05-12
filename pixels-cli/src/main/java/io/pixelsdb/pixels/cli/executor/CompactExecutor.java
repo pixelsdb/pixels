@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.cli.executor;
 
 import com.google.common.base.Joiner;
 import io.pixelsdb.pixels.cli.Main;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Compact;
@@ -261,7 +262,10 @@ public class CompactExecutor implements CommandExecutor
         // Issue #192: wait for the compaction to complete.
         compactExecutor.shutdown();
         while (!compactExecutor.awaitTermination(100, TimeUnit.SECONDS));
-        metadataService.addFiles(compactFiles);
+        if (!metadataService.addFiles(compactFiles))
+        {
+            throw new MetadataException("failed to add compact files to metadata");
+        }
 
         if (retinaService.isEnabled())
         {
