@@ -1428,6 +1428,9 @@ public class MetadataService
         }
     }
 
+    /**
+     * Return query-visible REGULAR files under the path.
+     */
     public List<File> getFiles(long pathId) throws MetadataException
     {
         String token = UUID.randomUUID().toString();

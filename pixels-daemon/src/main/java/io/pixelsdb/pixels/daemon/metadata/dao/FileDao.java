@@ -38,6 +38,9 @@ public abstract class FileDao implements Dao<MetadataProto.File>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
+    /**
+     * Return query-visible REGULAR files under a path.
+     */
     public abstract List<MetadataProto.File> getAllByPathId(long pathId);
 
     public abstract MetadataProto.File getByPathIdAndFileName(long pathId, String fileName);

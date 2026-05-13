@@ -680,6 +680,7 @@ message AddFilesResponse {
 }
 
 message GetFilesRequest {
+    // Query-visible REGULAR file enumeration.
     RequestHeader header = 1;
     uint64 pathId = 2;
 }
