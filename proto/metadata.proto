@@ -174,8 +174,10 @@ message Path {
 
 message File {
     enum Type {
-        TEMPORARY = 0;
+        TEMPORARY_INGEST = 0;
         REGULAR = 1;
+        TEMPORARY_GC = 2;
+        RETIRED = 3;
     }
     uint64 id = 1;
     string name = 2;
@@ -184,6 +186,7 @@ message File {
     uint64 minRowId = 5;
     uint64 maxRowId = 6;
     uint64 pathId = 7;
+    optional uint64 cleanupAt = 8;
 }
 
 message SchemaVersion {
@@ -707,7 +710,7 @@ message GetFileTypeRequest {
 
 message GetFileTypeResponse {
     ResponseHeader header = 1;
-    File.Type fileType = 2; // the type of the file, e.g., REGULAR or EMPTY
+    File.Type fileType = 2; // the type of the file, e.g., REGULAR or RETIRED
 }
 
 message UpdateFileRequest {

@@ -62,8 +62,8 @@ public class TestIngestFilePublisher
 
         assertSame(firstFinish, secondFinish);
         assertEquals(1, writer.closeCount.get());
-        assertEquals(File.Type.TEMPORARY, file.getType());
-        assertEquals(File.Type.TEMPORARY, fileWriterManager.getFileSnapshot().getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, fileWriterManager.getFileSnapshot().getType());
         assertTrue(firstFinish.isDone());
         assertFalse(firstFinish.isCompletedExceptionally());
     }
@@ -90,8 +90,8 @@ public class TestIngestFilePublisher
         assertSame(firstFinish, secondFinish);
         assertTrue(secondFinish.isCompletedExceptionally());
         assertEquals(1, writer.closeCount.get());
-        assertEquals(File.Type.TEMPORARY, file.getType());
-        assertEquals(File.Type.TEMPORARY, fileWriterManager.getFileSnapshot().getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, fileWriterManager.getFileSnapshot().getType());
     }
 
     @Test
@@ -129,7 +129,7 @@ public class TestIngestFilePublisher
 
         File freshSnapshot = fileWriterManager.getFileSnapshot();
         assertEquals("ingest_203.pxl", file.getName());
-        assertEquals(File.Type.TEMPORARY, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
         assertEquals(1, file.getNumRowGroup());
         assertEquals(0, file.getMinRowId());
         assertEquals(63, file.getMaxRowId());
@@ -150,7 +150,7 @@ public class TestIngestFilePublisher
         FileWriterManager fileWriterManager = testFileWriterManager(writer, file);
 
         File before = fileWriterManager.getFileSnapshot();
-        assertEquals(File.Type.TEMPORARY, before.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, before.getType());
         assertEquals(63L, before.getMaxRowId());
 
         // Mutations on the underlying file (e.g. visibility/row id updates) must be observed
@@ -206,7 +206,7 @@ public class TestIngestFilePublisher
 
         assertEquals(3, writer.addRowBatchCount.get());
         assertEquals(0, writer.closeCount.get());
-        assertEquals(File.Type.TEMPORARY, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
     }
 
     @Test
@@ -227,10 +227,10 @@ public class TestIngestFilePublisher
         }
 
         // After a failed addRowBatch, finish() must still close the underlying writer exactly once
-        // and keep the file in TEMPORARY state (publication is the buffer's responsibility).
+        // and keep the file in TEMPORARY_INGEST state (publication is the buffer's responsibility).
         fileWriterManager.finish().get(5, TimeUnit.SECONDS);
         assertEquals(1, writer.closeCount.get());
-        assertEquals(File.Type.TEMPORARY, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
     }
 
     @SuppressWarnings("unchecked")
@@ -280,7 +280,7 @@ public class TestIngestFilePublisher
         firstFinish.get(5, TimeUnit.SECONDS);
         assertEquals("writer.close() must run at most once even under concurrent finish() calls",
                 1, writer.closeCount.get());
-        assertEquals(File.Type.TEMPORARY, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
     }
 
     @Test
@@ -328,7 +328,7 @@ public class TestIngestFilePublisher
         assertSame(firstFinish, secondFinish);
         assertTrue(secondFinish.isCompletedExceptionally());
         assertEquals(1, writer.closeCount.get());
-        assertEquals(File.Type.TEMPORARY, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
     }
 
     @Test(timeout = 10_000L)
@@ -400,7 +400,7 @@ public class TestIngestFilePublisher
 
         assertEquals(callerCount * callsPerCaller, writer.addRowBatchCount.get());
         assertEquals(0, writer.closeCount.get());
-        assertEquals(File.Type.TEMPORARY, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
     }
 
     @Test
@@ -429,7 +429,7 @@ public class TestIngestFilePublisher
         File snapshot = fileWriterManager.getFileSnapshot();
         assertEquals(255L, snapshot.getMaxRowId());
         assertEquals(3, snapshot.getNumRowGroup());
-        assertEquals(File.Type.TEMPORARY, snapshot.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, snapshot.getType());
         assertEquals(1, writer.closeCount.get());
     }
 
@@ -469,7 +469,7 @@ public class TestIngestFilePublisher
         // After a runtime failure inside the writer, finish() must still be able to close it.
         fileWriterManager.finish().get(5, TimeUnit.SECONDS);
         assertEquals(1, writer.closeCount.get());
-        assertEquals(File.Type.TEMPORARY, file.getType());
+        assertEquals(File.Type.TEMPORARY_INGEST, file.getType());
     }
 
     private static File temporaryFile(long id)
@@ -477,7 +477,7 @@ public class TestIngestFilePublisher
         File file = new File();
         file.setId(id);
         file.setName("ingest_" + id + ".pxl");
-        file.setType(File.Type.TEMPORARY);
+        file.setType(File.Type.TEMPORARY_INGEST);
         file.setNumRowGroup(1);
         file.setMinRowId(0);
         file.setMaxRowId(63);

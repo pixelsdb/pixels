@@ -1882,7 +1882,7 @@ public class TestStorageGarbageCollector
     // =======================================================================
 
     /**
-     * Atomicity with multiple old files: one TEMPORARY new file and three REGULAR
+     * Atomicity with multiple old files: one TEMPORARY_GC new file and three REGULAR
      * old files are swapped in a single call.  Verifies that after the call the new
      * file is promoted to REGULAR and <b>all</b> old files are removed from the
      * catalog—i.e., the UPDATE and DELETE execute as one indivisible transaction.
@@ -1901,12 +1901,12 @@ public class TestStorageGarbageCollector
                 new String[]{"atom_old1.pxl", "atom_old2.pxl", "atom_old3.pxl"},
                 new File.Type[]{File.Type.REGULAR, File.Type.REGULAR, File.Type.REGULAR},
                 new int[]{1, 1, 1}, new long[]{0, 0, 0}, new long[]{1, 1, 1});
-        long newFileId = registerTestFile("atom_new.pxl", File.Type.TEMPORARY, 1, 0, 1);
+        long newFileId = registerTestFile("atom_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 1);
 
         File preSwapNew = metadataService.getFileById(newFileId);
         assertNotNull("New file must exist before swap", preSwapNew);
-        assertEquals("New file should be TEMPORARY before swap",
-                File.Type.TEMPORARY, preSwapNew.getType());
+        assertEquals("New file should be TEMPORARY_GC before swap",
+                File.Type.TEMPORARY_GC, preSwapNew.getType());
 
         metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1], oldIds[2]));
 
@@ -1927,7 +1927,7 @@ public class TestStorageGarbageCollector
     {
         writeTestFile("idem_old.pxl", LONG_ID_SCHEMA, new long[]{0, 1, 2}, true, new long[]{100, 100, 100});
         long oldFileId = registerTestFile("idem_old.pxl", File.Type.REGULAR, 1, 0, 2);
-        long newFileId = registerTestFile("idem_new.pxl", File.Type.TEMPORARY, 1, 0, 2);
+        long newFileId = registerTestFile("idem_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 2);
 
         metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId));
         assertFileRegular(newFileId, "File should be REGULAR after first swap");
@@ -1939,8 +1939,8 @@ public class TestStorageGarbageCollector
     }
 
     /**
-     * TEMPORARY visibility semantics: before the swap, {@code getFiles(pathId)} must
-     * <b>not</b> return the TEMPORARY new file (the DAO filters {@code FILE_TYPE = REGULAR}).
+     * TEMPORARY_GC visibility semantics: before the swap, {@code getFiles(pathId)} must
+     * <b>not</b> return the TEMPORARY_GC new file (the DAO filters {@code FILE_TYPE = REGULAR}).
      * After the swap the promoted file is visible and the old file disappears.
      */
     @Test
@@ -1949,7 +1949,7 @@ public class TestStorageGarbageCollector
         writeTestFile("vis_old.pxl", LONG_ID_SCHEMA, new long[]{0, 1}, true, new long[]{100, 100});
         long[] fileIds = registerTestFiles(
                 new String[]{"vis_old.pxl", "vis_new_temp.pxl"},
-                new File.Type[]{File.Type.REGULAR, File.Type.TEMPORARY},
+                new File.Type[]{File.Type.REGULAR, File.Type.TEMPORARY_GC},
                 new int[]{1, 1}, new long[]{0, 0}, new long[]{1, 1});
         long oldFileId = fileIds[0];
         long tempFileId = fileIds[1];
@@ -1962,7 +1962,7 @@ public class TestStorageGarbageCollector
         }
         assertTrue("REGULAR old file should be visible via getFiles before swap",
                 beforeIds.contains(oldFileId));
-        assertFalse("TEMPORARY new file must NOT be visible via getFiles before swap",
+        assertFalse("TEMPORARY_GC new file must NOT be visible via getFiles before swap",
                 beforeIds.contains(tempFileId));
 
         metadataService.atomicSwapFiles(tempFileId, Collections.singletonList(oldFileId));
@@ -2000,9 +2000,9 @@ public class TestStorageGarbageCollector
             regularId = registerTestFile("mix_regular_" + suffix + ".pxl",
                     File.Type.REGULAR, 1, 0L, 1L);
             tempId = registerTestFile("mix_temp_" + suffix + ".pxl",
-                    File.Type.TEMPORARY, 1, 0L, 1L);
+                    File.Type.TEMPORARY_INGEST, 1, 0L, 1L);
             nonRegularPositiveId = insertRawFileWithType("mix_non_regular_" + suffix + ".pxl",
-                    File.Type.REGULAR.ordinal() + 1, 1, 0L, 1L);
+                    File.Type.TEMPORARY_GC.getNumber(), 1, 0L, 1L);
             negativeId = insertRawFileWithType("mix_negative_" + suffix + ".pxl",
                     -2, 1, 0L, 1L);
             extremeId = insertRawFileWithType("mix_extreme_max_" + suffix + ".pxl",
@@ -2018,7 +2018,7 @@ public class TestStorageGarbageCollector
             }
             assertTrue("REGULAR member of the mix must be visible",
                     visible.contains(regularId));
-            assertFalse("TEMPORARY (FILE_TYPE=0) must be hidden",
+            assertFalse("TEMPORARY_INGEST (FILE_TYPE=0) must be hidden",
                     visible.contains(tempId));
             assertFalse("non-REGULAR positive FILE_TYPE must be hidden",
                     visible.contains(nonRegularPositiveId));
@@ -2035,6 +2035,135 @@ public class TestStorageGarbageCollector
             if (nonRegularPositiveId > 0) cleanup.add(nonRegularPositiveId);
             if (negativeId > 0) cleanup.add(negativeId);
             if (extremeId > 0) cleanup.add(extremeId);
+            if (!cleanup.isEmpty()) metadataService.deleteFiles(cleanup);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // c01.1 regression — RETIRED is a new File.Type and must be invisible to
+    // query-time enumeration just like the two TEMPORARY_* states.  These tests
+    // pin down the contract that the DAO filters FILE_TYPE = REGULAR and nothing
+    // else, so future refactors cannot accidentally widen the visible set.
+    // -------------------------------------------------------------------------
+
+
+
+    /**
+     * Exhaustive coverage: for every defined non-REGULAR {@link File.Type}, getFiles must
+     * exclude that file.  Using {@link File.Type#values()} guards against future enum
+     * additions silently leaking into query results.
+     */
+    @Test
+    public void testGetFiles_allNonRegularTypes_allHidden() throws Exception
+    {
+        List<Long> registeredIds = new ArrayList<>();
+        long regularId = -1L;
+        try
+        {
+            String suffix = Long.toString(System.nanoTime());
+            regularId = registerTestFile("all_types_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 1L);
+
+            // Register one file per non-REGULAR type, including RETIRED.
+            Set<Long> nonRegularIds = new HashSet<>();
+            for (File.Type t : File.Type.values())
+            {
+                if (t == File.Type.REGULAR) continue;
+                long id = insertRawFileWithType(
+                        "all_types_" + t + "_" + suffix + ".pxl",
+                        t.getNumber(), 1, 0L, 1L);
+                registeredIds.add(id);
+                nonRegularIds.add(id);
+            }
+            registeredIds.add(regularId);
+
+            List<File> visible = metadataService.getFiles(testPathId);
+            Set<Long> visibleIds = new HashSet<>();
+            for (File f : visible)
+            {
+                assertEquals("every visible file must carry FILE_TYPE = REGULAR",
+                        File.Type.REGULAR, f.getType());
+                visibleIds.add(f.getId());
+            }
+            assertTrue("the seed REGULAR file must be visible",
+                    visibleIds.contains(regularId));
+            for (long id : nonRegularIds)
+            {
+                assertFalse("non-REGULAR file (id=" + id + ") leaked into getFiles",
+                        visibleIds.contains(id));
+            }
+        }
+        finally
+        {
+            if (!registeredIds.isEmpty()) metadataService.deleteFiles(registeredIds);
+        }
+    }
+
+    /**
+     * After the swap of a TEMPORARY_GC -> REGULAR, a RETIRED tombstone for the *old* file
+     * (i.e. the same file ids that were just deleted) cannot pollute the new visible set
+     * even if the catalog still carries unrelated RETIRED entries on the same path.
+     */
+    @Test
+    public void testGetFiles_retiredCoexistsWithFreshlyPromoted() throws Exception
+    {
+        long oldRegularId = -1L;
+        long tempGcId = -1L;
+        long retiredCoexistingId = -1L;
+        try
+        {
+            String suffix = Long.toString(System.nanoTime());
+
+            // Pre-existing RETIRED file on the same path.  This must remain hidden
+            // throughout the entire scenario.
+            retiredCoexistingId = insertRawFileWithType(
+                    "coexist_retired_" + suffix + ".pxl",
+                    File.Type.RETIRED.getNumber(), 1, 0L, 1L);
+
+            // The classic swap pair.
+            oldRegularId = registerTestFile("coexist_old_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 1L);
+            tempGcId = registerTestFile("coexist_new_temp_gc_" + suffix + ".pxl",
+                    File.Type.TEMPORARY_GC, 1, 0L, 1L);
+
+            // Before swap: only oldRegular visible; RETIRED + TEMPORARY_GC hidden.
+            Set<Long> beforeIds = new HashSet<>();
+            for (File f : metadataService.getFiles(testPathId)) beforeIds.add(f.getId());
+            assertTrue("old REGULAR must be visible before swap",
+                    beforeIds.contains(oldRegularId));
+            assertFalse("RETIRED tombstone must be hidden before swap",
+                    beforeIds.contains(retiredCoexistingId));
+            assertFalse("TEMPORARY_GC must be hidden before swap",
+                    beforeIds.contains(tempGcId));
+
+            metadataService.atomicSwapFiles(tempGcId, Collections.singletonList(oldRegularId));
+
+            // After swap: tempGcId is now REGULAR (visible); old REGULAR is gone; the
+            // coexisting RETIRED file must STILL be hidden (the swap did not promote it).
+            Set<Long> afterIds = new HashSet<>();
+            for (File f : metadataService.getFiles(testPathId))
+            {
+                assertEquals("getFiles must only emit REGULAR after swap",
+                        File.Type.REGULAR, f.getType());
+                afterIds.add(f.getId());
+            }
+            assertTrue("freshly-promoted file must be visible after swap",
+                    afterIds.contains(tempGcId));
+            assertFalse("the deleted old REGULAR must be gone after swap",
+                    afterIds.contains(oldRegularId));
+            assertFalse("the unrelated RETIRED tombstone must remain hidden after swap",
+                    afterIds.contains(retiredCoexistingId));
+
+            // After the promote, the old file ids are deleted — clear the local handle so
+            // the cleanup block below does not double-delete a non-existent row.
+            oldRegularId = -1L;
+        }
+        finally
+        {
+            List<Long> cleanup = new ArrayList<>();
+            if (oldRegularId > 0) cleanup.add(oldRegularId);
+            if (tempGcId > 0) cleanup.add(tempGcId);
+            if (retiredCoexistingId > 0) cleanup.add(retiredCoexistingId);
             if (!cleanup.isEmpty()) metadataService.deleteFiles(cleanup);
         }
     }
@@ -2117,9 +2246,9 @@ public class TestStorageGarbageCollector
             regularId = registerTestFile("conc_regular_" + suffix + ".pxl",
                     File.Type.REGULAR, 1, 0L, 1L);
             tempId = registerTestFile("conc_temp_" + suffix + ".pxl",
-                    File.Type.TEMPORARY, 1, 0L, 1L);
+                    File.Type.TEMPORARY_INGEST, 1, 0L, 1L);
             nonRegularPositiveId = insertRawFileWithType("conc_non_regular_" + suffix + ".pxl",
-                    File.Type.REGULAR.ordinal() + 1, 1, 0L, 1L);
+                    File.Type.TEMPORARY_GC.getNumber(), 1, 0L, 1L);
 
             final int threads = 8;
             final int iterations = 16;
@@ -2166,7 +2295,7 @@ public class TestStorageGarbageCollector
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                     .get(30, java.util.concurrent.TimeUnit.SECONDS);
 
-            assertEquals("no concurrent reader may observe a TEMPORARY file",
+            assertEquals("no concurrent reader may observe a TEMPORARY_INGEST file",
                     0, leakedTemporary.get());
             assertEquals("no concurrent reader may observe a non-REGULAR file",
                     0, leakedNonRegular.get());
@@ -2222,7 +2351,7 @@ public class TestStorageGarbageCollector
 
             long[] pair = registerTestFiles(
                     new String[]{oldName, newName},
-                    new File.Type[]{File.Type.REGULAR, File.Type.TEMPORARY},
+                    new File.Type[]{File.Type.REGULAR, File.Type.TEMPORARY_GC},
                     new int[]{1, 1}, new long[]{0, 0}, new long[]{0, 0});
             oldFileIds[i] = pair[0];
             newFileIds[i] = pair[1];
@@ -2261,7 +2390,7 @@ public class TestStorageGarbageCollector
         metadataService.deleteFiles(Collections.singletonList(oldIds[0]));
         assertFileGone(oldIds[0], "old1 should be gone before swap");
 
-        long newFileId = registerTestFile("partial_new.pxl", File.Type.TEMPORARY, 1, 0, 1);
+        long newFileId = registerTestFile("partial_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 1);
         metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1]));
 
         assertFileRegular(newFileId, "New file must be REGULAR");
@@ -2270,7 +2399,7 @@ public class TestStorageGarbageCollector
 
     /**
      * Rollback after rewrite + dual-write: verifies that Visibility entries for the new
-     * file are removed, dual-write is unregistered, the TEMPORARY catalog entry is deleted,
+     * file are removed, dual-write is unregistered, the TEMPORARY_GC catalog entry is deleted,
      * and the physical file is cleaned up.
      */
     @Test
@@ -2354,7 +2483,7 @@ public class TestStorageGarbageCollector
      * Phase 3 (ts=200, dual-write active): delete row 3 → propagated to both files
      * Sync visibility → export + coord-transform + import
      * Phase 4 (ts=300, post-sync, dual-write still active): delete row 5
-     * Commit → atomic swap (TEMPORARY→REGULAR), old file removed from catalog
+     * Commit -> atomic swap (TEMPORARY_GC -> REGULAR), old file removed from catalog
      * Verify: multi-snap_ts consistency on new file at ts=100..500
      * Verify: old file gone from catalog, new file REGULAR
      * </pre>

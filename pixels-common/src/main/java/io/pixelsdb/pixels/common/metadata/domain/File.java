@@ -33,22 +33,37 @@ import static java.util.Objects.requireNonNull;
  */
 public class File extends Base
 {
-    /**
-     * Files such as loaded and compacted are marked as REGULAR, while file
-     * created by pixelsWriterImpl during build are marked as TEMPORARY.
-     */
     public enum Type
     {
-        TEMPORARY, REGULAR;
+        TEMPORARY_INGEST(0),
+        REGULAR(1),
+        TEMPORARY_GC(2),
+        RETIRED(3);
+
+        private final int number;
+
+        Type(int number)
+        {
+            this.number = number;
+        }
+
+        public int getNumber()
+        {
+            return number;
+        }
 
         public static Type valueOf(int number)
         {
             switch (number)
             {
                 case 0:
-                    return TEMPORARY;
+                    return TEMPORARY_INGEST;
                 case 1:
                     return REGULAR;
+                case 2:
+                    return TEMPORARY_GC;
+                case 3:
+                    return RETIRED;
                 default:
                     throw new InvalidArgumentException("invalid number for File.Type");
             }
@@ -61,6 +76,7 @@ public class File extends Base
     private long minRowId;
     private long maxRowId;
     private long pathId;
+    private Long cleanupAt;
 
     public File()
     {
@@ -70,11 +86,12 @@ public class File extends Base
     {
         this.setId(file.getId());
         this.name = file.getName();
-        this.type = Type.valueOf(file.getType().getNumber());
+        this.type = Type.valueOf(file.getTypeValue());
         this.numRowGroup = file.getNumRowGroup();
         this.minRowId = file.getMinRowId();
         this.maxRowId = file.getMaxRowId();
         this.pathId = file.getPathId();
+        this.cleanupAt = file.hasCleanupAt() ? file.getCleanupAt() : null;
     }
 
     public String getName()
@@ -137,6 +154,16 @@ public class File extends Base
         this.pathId = pathId;
     }
 
+    public Long getCleanupAt()
+    {
+        return cleanupAt;
+    }
+
+    public void setCleanupAt(Long cleanupAt)
+    {
+        this.cleanupAt = cleanupAt;
+    }
+
     public static List<File> convertFiles(List<MetadataProto.File> protoFiles)
     {
         requireNonNull(protoFiles, "protoFiles is null");
@@ -182,8 +209,14 @@ public class File extends Base
     @Override
     public MetadataProto.File toProto()
     {
-        return MetadataProto.File.newBuilder().setId(this.getId()).setName(this.name)
-                .setTypeValue(this.type.ordinal()).setNumRowGroup(this.numRowGroup)
-                .setMinRowId(this.minRowId).setMaxRowId(this.maxRowId).setPathId(this.pathId).build();
+        MetadataProto.File.Builder builder = MetadataProto.File.newBuilder()
+                .setId(this.getId()).setName(this.name)
+                .setTypeValue(this.type.getNumber()).setNumRowGroup(this.numRowGroup)
+                .setMinRowId(this.minRowId).setMaxRowId(this.maxRowId).setPathId(this.pathId);
+        if (this.cleanupAt != null)
+        {
+            builder.setCleanupAt(this.cleanupAt);
+        }
+        return builder.build();
     }
 }

@@ -607,7 +607,7 @@ public class StorageGarbageCollector
      * Rewrites all files in one {@link FileGroup} into a single new file, filtering out
      * rows marked as deleted in {@code gcSnapshotBitmaps}.
      *
-     * <p>The new file is registered as {@code TEMPORARY} in the catalog and its
+     * <p>The new file is registered as {@code TEMPORARY_GC} in the catalog and its
      * {@link RGVisibility} objects are initialised with {@code baseTimestamp = safeGcTs}.
      *
      * <p>After rewriting completes the {@code gcSnapshotBitmaps} entries for this group
@@ -877,7 +877,7 @@ public class StorageGarbageCollector
             backwardInfos.add(new BackwardInfo(fc.fileId, bwdMappings, oldFileRgRowStart));
         }
 
-        // Register the new file as TEMPORARY in the catalog and initialise Visibility.
+        // Register the new file as TEMPORARY_GC in the catalog and initialise Visibility.
         // Track registration progress so that partial state can be cleaned up on failure.
         long newFileId = -1;
         int registeredRgCount = 0;
@@ -891,7 +891,7 @@ public class StorageGarbageCollector
             }
             File newFile = new File();
             newFile.setName(newFileName);
-            newFile.setType(File.Type.TEMPORARY);
+            newFile.setType(File.Type.TEMPORARY_GC);
             newFile.setNumRowGroup(newFileRgCount);
             newFile.setMinRowId(minRowId);
             newFile.setMaxRowId(maxRowId);
@@ -920,7 +920,7 @@ public class StorageGarbageCollector
     }
 
     /**
-     * Best-effort cleanup of a partially-created TEMPORARY file.  Removes the
+     * Best-effort cleanup of a partially-created TEMPORARY_GC file.  Removes the
      * catalog record, the physical file, and any RGVisibility keys that were
      * registered before the failure.
      */
@@ -1173,7 +1173,7 @@ public class StorageGarbageCollector
     // -------------------------------------------------------------------------
 
     /**
-     * Atomically promotes the new TEMPORARY file to REGULAR, deletes old files from
+     * Atomically promotes the new TEMPORARY_GC file to REGULAR, deletes old files from
      * the catalog, unregisters dual-write, and enqueues the old files for delayed cleanup.
      */
     void commitFileGroup(RewriteResult result) throws Exception

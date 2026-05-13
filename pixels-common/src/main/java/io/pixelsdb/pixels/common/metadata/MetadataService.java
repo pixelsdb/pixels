@@ -1420,7 +1420,7 @@ public class MetadataService
             {
                 throw new MetadataException("response token does not match.");
             }
-            return File.Type.valueOf(response.getFileType().getNumber());
+            return File.Type.valueOf(response.getFileTypeValue());
         }
         catch (Exception e)
         {
@@ -1540,8 +1540,8 @@ public class MetadataService
     }
 
     /**
-     * Atomically promote a TEMPORARY file to REGULAR and delete the old files.
-     * @param newFileId the id of the new TEMPORARY file to promote
+     * Atomically promote a temporary file to REGULAR and delete the old files.
+     * @param newFileId the id of the new temporary file to promote
      * @param oldFileIds the ids of old files to delete
      * @throws MetadataException if the request fails
      */
