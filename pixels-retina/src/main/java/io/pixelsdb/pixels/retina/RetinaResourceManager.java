@@ -48,6 +48,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -66,7 +67,7 @@ public class RetinaResourceManager
 
     // GC related fields
     private final ScheduledExecutorService gcExecutor;
-    private final boolean storageGcEnabled;
+    private final AtomicBoolean gcScheduled;
     private final StorageGarbageCollector storageGarbageCollector;
 
     // Checkpoint related fields
@@ -150,37 +151,20 @@ public class RetinaResourceManager
             return t;
         });
 
-        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
+        this.gcExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "retina-gc-thread");
             t.setDaemon(true);
             return t;
         });
-        try
-        {
-            long interval = Long.parseLong(config.getProperty("retina.gc.interval"));
-            if (interval > 0)
-            {
-                executor.scheduleAtFixedRate(
-                        this::runGC,
-                        interval,
-                        interval,
-                        TimeUnit.SECONDS
-                );
-            }
-        } catch (Exception e)
-        {
-            logger.error("Failed to start retina background gc", e);
-        }
-        this.gcExecutor = executor;
+        this.gcScheduled = new AtomicBoolean(false);
         totalVirtualNodeNum = Integer.parseInt(ConfigFactory.Instance().getProperty("node.virtual.num"));
         this.retinaHostName = NetUtils.getLocalHostName();
 
-        boolean gcEnabled = false;
         StorageGarbageCollector gc = null;
         try
         {
-            gcEnabled = Boolean.parseBoolean(config.getProperty("retina.storage.gc.enabled"));
-            if (gcEnabled)
+            boolean storageGcEnabled = Boolean.parseBoolean(config.getProperty("retina.storage.gc.enabled"));
+            if (storageGcEnabled)
             {
                 double threshold = Double.parseDouble(config.getProperty("retina.storage.gc.threshold"));
                 long targetFileSize = Long.parseLong(config.getProperty("retina.storage.gc.target.file.size"));
@@ -200,10 +184,8 @@ public class RetinaResourceManager
         catch (Exception e)
         {
             logger.error("Failed to initialise StorageGarbageCollector, Storage GC will be disabled", e);
-            gcEnabled = false;
             gc = null;
         }
-        this.storageGcEnabled = gcEnabled;
         this.storageGarbageCollector = gc;
     }
 
@@ -215,6 +197,62 @@ public class RetinaResourceManager
     public static RetinaResourceManager Instance()
     {
         return InstanceHolder.instance;
+    }
+
+    /**
+     * Starts the periodic Retina GC scheduler after the service has reached the
+     * lifecycle point where background cleanup is safe to run.
+     *
+     * <p>The constructor intentionally does not schedule GC: recovery-capable
+     * startup must stay fail-closed until initialization succeeds. This method is
+     * idempotent so future lifecycle READY hooks can call it safely.</p>
+     *
+     * @throws RetinaException if GC configuration is invalid or the scheduler cannot be started.
+     */
+    public void startBackgroundGc() throws RetinaException
+    {
+        long interval;
+        try
+        {
+            interval = Long.parseLong(ConfigFactory.Instance().getProperty("retina.gc.interval"));
+        }
+        catch (Exception e)
+        {
+            throw new RetinaException("Invalid retina GC interval configuration", e);
+        }
+
+        if (interval <= 0)
+        {
+            logger.info("Retina background GC is disabled");
+            return;
+        }
+
+        if (!this.gcScheduled.compareAndSet(false, true))
+        {
+            logger.debug("Retina background GC scheduler has already been started");
+            return;
+        }
+
+        try
+        {
+            this.gcExecutor.scheduleAtFixedRate(
+                    this::runGC,
+                    interval,
+                    interval,
+                    TimeUnit.SECONDS
+            );
+            logger.info("Retina background GC scheduler started with interval {} seconds", interval);
+        }
+        catch (RuntimeException e)
+        {
+            this.gcScheduled.set(false);
+            throw new RetinaException("Failed to start retina background GC", e);
+        }
+    }
+
+    public boolean isBackgroundGcStarted()
+    {
+        return this.gcScheduled.get();
     }
 
     public void addVisibility(long fileId, int rgId, int recordNum, long timestamp,
@@ -1000,7 +1038,7 @@ public class RetinaResourceManager
 
             // Step 3: Storage GC — pass file-level stats so that candidate selection
             // uses O(1) lookups instead of per-RG aggregation loops.
-            if (storageGcEnabled && storageGarbageCollector != null)
+            if (storageGarbageCollector != null)
             {
                 try
                 {

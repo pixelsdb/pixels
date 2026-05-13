@@ -72,6 +72,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Tests for {@link StorageGarbageCollector}, covering scan/grouping, data rewrite,
@@ -95,6 +96,7 @@ import static org.junit.Assert.assertTrue;
  * </ul>
  * Legacy test names (pre-convention) are preserved for CI stability.
  */
+@Ignore("Integration suite requires a running metadata server and external metadata DB state.")
 public class TestStorageGarbageCollector
 {
     // -----------------------------------------------------------------------
@@ -704,96 +706,166 @@ public class TestStorageGarbageCollector
     // =======================================================================
 
     /**
-     * After {@code runStorageGC}, the {@code gcSnapshotBitmaps} map must have had
-     * non-candidate entries removed.  Candidate bitmaps must be retained for the rewrite phase.
+     * When no file crosses the strict deletion-ratio threshold,
+     * {@code runStorageGC} must return before metadata scan and keep the bitmap
+     * snapshot intact for the already-written GC checkpoint.
      */
     @Test
-    public void testRunStorageGC_trimsBitmapMapToCandidate()
+    public void testRunStorageGC_noCandidateDoesNotScanOrTrim()
     {
-        long candidateFileId = 66001L;
-        long otherFileId     = 66002L;
+        long belowThresholdFileId = 66101L;
+        long exactlyThresholdFileId = 66102L;
+
+        Map<Long, long[]> fileStats = new HashMap<>();
+        fileStats.put(belowThresholdFileId, makeRgStats(100, 40));
+        fileStats.put(exactlyThresholdFileId, makeRgStats(100, 50));
 
         Map<String, long[]> bitmaps = new HashMap<>();
-        bitmaps.put(candidateFileId + "_0", makeBitmap(100, 60));
-        bitmaps.put(otherFileId + "_0", makeBitmap(100, 20));
+        bitmaps.put(RetinaUtils.buildRgKey(belowThresholdFileId, 0), makeBitmap(100, 40));
+        bitmaps.put(RetinaUtils.buildRgKey(exactlyThresholdFileId, 0), makeBitmap(100, 50));
 
-        // File-level stats: candidateFileId has 60% deletion, otherFileId has 20%
+        TrackingRunStorageGC trackingGc = new TrackingRunStorageGC(Collections.emptyList());
+
+        trackingGc.runStorageGC(301L, fileStats, bitmaps);
+
+        assertFalse("no candidate means metadata scan must not run", trackingGc.scanCalled);
+        assertFalse("no candidate means process phase must not run", trackingGc.processCalled);
+        assertTrue("below-threshold bitmap must remain for checkpoint recovery",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(belowThresholdFileId, 0)));
+        assertTrue("exact-threshold bitmap must remain because threshold is strict >",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(exactlyThresholdFileId, 0)));
+        assertEquals("bitmap snapshot must remain unchanged", 2, bitmaps.size());
+    }
+
+    /**
+     * Candidate selection must be driven by file-level stats only.  Files at the
+     * threshold, with zero rows, or below threshold must not be passed to scan;
+     * their bitmap entries are released before rewrite processing starts.
+     */
+    @Test
+    public void testRunStorageGC_passesOnlyStrictFileLevelCandidatesToScan()
+    {
+        long candidateA = 66201L;
+        long candidateB = 66202L;
+        long exactlyThreshold = 66203L;
+        long zeroRows = 66204L;
+        long belowThreshold = 66205L;
+
         Map<Long, long[]> fileStats = new HashMap<>();
-        fileStats.put(candidateFileId, makeRgStats(100, 60));
+        fileStats.put(candidateA, makeRgStats(100, 51));
+        fileStats.put(candidateB, makeRgStats(200, 120));
+        fileStats.put(exactlyThreshold, makeRgStats(100, 50));
+        fileStats.put(zeroRows, new long[]{0, 10});
+        fileStats.put(belowThreshold, makeRgStats(100, 49));
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        for (long fileId : Arrays.asList(candidateA, candidateB, exactlyThreshold, zeroRows, belowThreshold))
+        {
+            bitmaps.put(RetinaUtils.buildRgKey(fileId, 0), makeBitmap(100, 1));
+        }
+        bitmaps.put(RetinaUtils.buildRgKey(candidateB, 1), makeBitmap(100, 1));
+
+        TrackingRunStorageGC trackingGc = new TrackingRunStorageGC(Collections.emptyList());
+
+        trackingGc.runStorageGC(302L, fileStats, bitmaps);
+
+        assertTrue("candidate scan must run when at least one file qualifies", trackingGc.scanCalled);
+        assertEquals(new HashSet<>(Arrays.asList(candidateA, candidateB)), trackingGc.capturedCandidateFileIds);
+        assertEquals("only candidate RG bitmaps should remain", 3, bitmaps.size());
+        assertTrue(bitmaps.containsKey(RetinaUtils.buildRgKey(candidateA, 0)));
+        assertTrue(bitmaps.containsKey(RetinaUtils.buildRgKey(candidateB, 0)));
+        assertTrue(bitmaps.containsKey(RetinaUtils.buildRgKey(candidateB, 1)));
+        assertFalse(bitmaps.containsKey(RetinaUtils.buildRgKey(exactlyThreshold, 0)));
+        assertFalse(bitmaps.containsKey(RetinaUtils.buildRgKey(zeroRows, 0)));
+        assertFalse(bitmaps.containsKey(RetinaUtils.buildRgKey(belowThreshold, 0)));
+        assertFalse("empty scan result must skip process phase", trackingGc.processCalled);
+    }
+
+    /**
+     * The process phase must see the safe GC timestamp, the groups returned from
+     * scan, and a bitmap map already trimmed to candidate files.  This protects
+     * the Storage GC rewrite path from accidentally consuming non-candidate RGs.
+     */
+    @Test
+    public void testRunStorageGC_processSeesTrimmedCandidateBitmapsAndSafeTs()
+    {
+        long candidateFileId = 66301L;
+        long otherFileId = 66302L;
+        long safeGcTs = 303L;
+
+        StorageGarbageCollector.FileGroup group = new StorageGarbageCollector.FileGroup(
+                7L, 4, Collections.singletonList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(candidateFileId, 2), "fake_candidate", candidateFileId, 2, 7L, 4, 0.75, 0L)));
+        TrackingRunStorageGC trackingGc = new TrackingRunStorageGC(Collections.singletonList(group));
+
+        Map<Long, long[]> fileStats = new HashMap<>();
+        fileStats.put(candidateFileId, makeRgStats(100, 75));
+        fileStats.put(otherFileId, makeRgStats(100, 10));
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(candidateFileId, 0), makeBitmap(100, 75));
+        bitmaps.put(RetinaUtils.buildRgKey(candidateFileId, 1), makeBitmap(100, 60));
+        bitmaps.put(RetinaUtils.buildRgKey(otherFileId, 0), makeBitmap(100, 10));
+
+        trackingGc.runStorageGC(safeGcTs, fileStats, bitmaps);
+
+        assertTrue("process phase must run for non-empty groups", trackingGc.processCalled);
+        assertEquals("safeGcTs must be forwarded to process phase", safeGcTs, trackingGc.capturedSafeGcTs);
+        assertEquals("scan groups must be forwarded unchanged", 1, trackingGc.capturedFileGroups.size());
+        assertEquals(candidateFileId, trackingGc.capturedFileGroups.get(0).files.get(0).fileId);
+        assertEquals(new HashSet<>(Arrays.asList(
+                RetinaUtils.buildRgKey(candidateFileId, 0),
+                RetinaUtils.buildRgKey(candidateFileId, 1))), trackingGc.bitmapKeysSeenByProcess);
+        assertFalse("non-candidate bitmap must be trimmed before process",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(otherFileId, 0)));
+    }
+
+    /**
+     * If the downstream process phase fails, {@code runStorageGC} must already
+     * have released non-candidate bitmaps.  This mirrors the real GC ordering:
+     * checkpoint is complete, then candidate-only rewrite state is retained.
+     */
+    @Test
+    public void testRunStorageGC_processFailureKeepsOnlyCandidateBitmaps()
+    {
+        long candidateFileId = 66401L;
+        long otherFileId = 66402L;
+
+        StorageGarbageCollector.FileGroup group = new StorageGarbageCollector.FileGroup(
+                8L, 0, Collections.singletonList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(candidateFileId, 1), "fake_candidate", candidateFileId, 1, 8L, 0, 0.80, 0L)));
+        TrackingRunStorageGC trackingGc = new TrackingRunStorageGC(Collections.singletonList(group));
+        trackingGc.processFailure = new RuntimeException("simulated process failure");
+
+        Map<Long, long[]> fileStats = new HashMap<>();
+        fileStats.put(candidateFileId, makeRgStats(100, 80));
         fileStats.put(otherFileId, makeRgStats(100, 20));
 
-        List<FakeFileEntry> fakeFiles = Arrays.asList(
-                new FakeFileEntry(candidateFileId, 1, 1L, 0),
-                new FakeFileEntry(otherFileId, 1, 1L, 0));
-
-        DirectScanStorageGC gc = new DirectScanStorageGC(
-                retinaManager, 0.5, 10, fakeFiles);
-
-        gc.runStorageGC(300L, fileStats, bitmaps);
-
-        assertTrue("candidate RG key must be retained",
-                bitmaps.containsKey(candidateFileId + "_0"));
-        assertFalse("non-candidate RG key must be removed",
-                bitmaps.containsKey(otherFileId + "_0"));
-    }
-
-    // =======================================================================
-    // Section 4: runStorageGC end-to-end scan → process
-    // =======================================================================
-
-    /**
-     * A file whose invalidRatio is exactly equal to the threshold (0.5) must NOT
-     * be selected as a candidate.  The design uses strict {@code >}, not {@code >=}.
-     */
-    @Test
-    public void testRunStorageGC_thresholdExactlyEqual()
-    {
-        long fileId = 57001L;
-
-        Map<Long, long[]> fileStats = new HashMap<>();
-        fileStats.put(fileId, makeRgStats(100, 50));  // exactly 50% = threshold
-
         Map<String, long[]> bitmaps = new HashMap<>();
-        bitmaps.put(fileId + "_0", makeBitmap(100, 50));
+        bitmaps.put(RetinaUtils.buildRgKey(candidateFileId, 0), makeBitmap(100, 80));
+        bitmaps.put(RetinaUtils.buildRgKey(otherFileId, 0), makeBitmap(100, 20));
 
-        DirectScanStorageGC gc = new DirectScanStorageGC(
-                retinaManager, 0.5, 10,
-                Collections.singletonList(new FakeFileEntry(fileId, 1, 1L, 0)));
+        try
+        {
+            trackingGc.runStorageGC(304L, fileStats, bitmaps);
+            fail("process failure should propagate to the caller");
+        }
+        catch (RuntimeException e)
+        {
+            assertEquals("simulated process failure", e.getMessage());
+        }
 
-        gc.runStorageGC(400L, fileStats, bitmaps);
-
-        assertTrue("file at exactly threshold must NOT be trimmed (no candidates)",
-                bitmaps.containsKey(fileId + "_0"));
-        assertEquals(1, bitmaps.size());
-    }
-
-    /**
-     * A file whose {@code fileStats} entry has {@code totalRows=0} must not
-     * produce a candidate even if invalidCount is also 0 (division by zero guard).
-     */
-    @Test
-    public void testRunStorageGC_skipsTotalRowsZero()
-    {
-        long fileId = 58001L;
-
-        Map<Long, long[]> fileStats = new HashMap<>();
-        fileStats.put(fileId, new long[]{0, 0});  // totalRows=0
-
-        Map<String, long[]> bitmaps = new HashMap<>();
-        bitmaps.put(fileId + "_0", new long[]{0L});
-
-        DirectScanStorageGC gc = new DirectScanStorageGC(
-                retinaManager, 0.5, 10,
-                Collections.singletonList(new FakeFileEntry(fileId, 1, 1L, 0)));
-
-        gc.runStorageGC(500L, fileStats, bitmaps);
-
-        assertTrue("totalRows=0 file must remain untouched (no candidates)",
-                bitmaps.containsKey(fileId + "_0"));
+        assertTrue("process phase should have been entered", trackingGc.processCalled);
+        assertTrue("candidate bitmap remains available for failure handling",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(candidateFileId, 0)));
+        assertFalse("non-candidate bitmap must remain released after failure",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(otherFileId, 0)));
     }
 
     // =======================================================================
-    // Section 4b: processFileGroups error handling
+    // Section 4: processFileGroups error handling
     // =======================================================================
 
     /**
@@ -3956,6 +4028,53 @@ public class TestStorageGarbageCollector
         void processFileGroups(List<FileGroup> fileGroups, long safeGcTs,
                                Map<String, long[]> gcSnapshotBitmaps)
         {
+        }
+    }
+
+    /**
+     * StorageGarbageCollector subclass that records the boundaries between
+     * {@code runStorageGC}'s candidate calculation, scan, bitmap trimming, and
+     * process phases without touching real metadata or Pixels files.
+     */
+    static class TrackingRunStorageGC extends StorageGarbageCollector
+    {
+        private final List<FileGroup> groupsToReturn;
+        boolean scanCalled;
+        boolean processCalled;
+        RuntimeException processFailure;
+        Set<Long> capturedCandidateFileIds = Collections.emptySet();
+        List<FileGroup> capturedFileGroups = Collections.emptyList();
+        long capturedSafeGcTs = Long.MIN_VALUE;
+        Set<String> bitmapKeysSeenByProcess = Collections.emptySet();
+
+        TrackingRunStorageGC(List<FileGroup> groupsToReturn)
+        {
+            super(null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                    1048576, EncodingLevel.EL2, 86_400_000L);
+            this.groupsToReturn = groupsToReturn;
+        }
+
+        @Override
+        List<FileGroup> scanAndGroupFiles(Set<Long> candidateFileIds,
+                                          Map<Long, long[]> fileStats)
+        {
+            this.scanCalled = true;
+            this.capturedCandidateFileIds = new HashSet<>(candidateFileIds);
+            return groupsToReturn;
+        }
+
+        @Override
+        void processFileGroups(List<FileGroup> fileGroups, long safeGcTs,
+                               Map<String, long[]> gcSnapshotBitmaps)
+        {
+            this.processCalled = true;
+            this.capturedFileGroups = new ArrayList<>(fileGroups);
+            this.capturedSafeGcTs = safeGcTs;
+            this.bitmapKeysSeenByProcess = new HashSet<>(gcSnapshotBitmaps.keySet());
+            if (processFailure != null)
+            {
+                throw processFailure;
+            }
         }
     }
 
