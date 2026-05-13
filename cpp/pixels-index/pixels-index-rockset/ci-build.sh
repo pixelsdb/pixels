@@ -7,6 +7,7 @@ BUILD_DIR="${SCRIPT_DIR}/build"
 AWS_SDK_VERSION="${AWS_SDK_VERSION:-1.11.578}"
 AWS_INSTALL_PREFIX="${AWS_INSTALL_PREFIX:-/usr/local}"
 WORK_DIR="${SCRIPT_DIR}/.deps"
+CACHE_DIR="${SCRIPT_DIR}/.cache"
 AWS_WORK_DIR="${WORK_DIR}/aws-sdk-cpp"
 GFLAGS_WORK_DIR="${WORK_DIR}/gflags"
 ZSTD_WORK_DIR="${WORK_DIR}/zstd"
@@ -306,12 +307,13 @@ ensure_zstd_rhel() {
 }
 
 ensure_aws_sdk() {
+  mkdir -p "$WORK_DIR" "$CACHE_DIR" "$AWS_INSTALL_PREFIX"
+
   if [[ -f "${AWS_INSTALL_PREFIX}/include/aws/core/Aws.h" ]] && \
      [[ -f "${AWS_INSTALL_PREFIX}/lib/libaws-cpp-sdk-core.so" || -f "${AWS_INSTALL_PREFIX}/lib64/libaws-cpp-sdk-core.so" ]]; then
     return 0
   fi
 
-  mkdir -p "$WORK_DIR"
   if [[ ! -d "$AWS_WORK_DIR/.git" ]]; then
     run git clone https://github.com/aws/aws-sdk-cpp "$AWS_WORK_DIR"
   fi
@@ -392,10 +394,13 @@ main() {
   note "Using JAVA_HOME=$JAVA_HOME"
   note "Using CC=$cc_bin"
   note "Using CXX=$cxx_bin"
+  note "Using AWS_INSTALL_PREFIX=$AWS_INSTALL_PREFIX"
   note "Configuring build directory: $BUILD_DIR"
 
   (
     cd "$BUILD_DIR"
+    export CMAKE_PREFIX_PATH="${AWS_INSTALL_PREFIX}:${CMAKE_PREFIX_PATH:-}"
+    export LD_LIBRARY_PATH="${AWS_INSTALL_PREFIX}/lib:${AWS_INSTALL_PREFIX}/lib64:${LD_LIBRARY_PATH:-}"
     CC="$cc_bin" CXX="$cxx_bin" run cmake ..
     run make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
     run cmake --install .

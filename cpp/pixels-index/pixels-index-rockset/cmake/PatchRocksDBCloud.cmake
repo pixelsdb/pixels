@@ -1,76 +1,35 @@
-set(ROCKSDB_CLOUD_CMAKE "${ROCKSDB_CLOUD_SOURCE_DIR}/CMakeLists.txt")
-set(ROCKSDB_CLOUD_SOURCES
-    "cloud/aws/aws_env.cc"
-    "cloud/aws/aws_kafka.cc"
-    "cloud/aws/aws_kinesis.cc"
-    "cloud/aws/aws_retry.cc"
-    "cloud/aws/aws_s3.cc"
-    "cloud/db_cloud_impl.cc"
-    "cloud/cloud_env.cc"
-    "cloud/cloud_env_impl.cc"
-    "cloud/cloud_env_options.cc"
-    "cloud/cloud_log_controller.cc"
-    "cloud/manifest_reader.cc"
-    "cloud/purge.cc"
-    "cloud/cloud_manifest.cc"
-    "cloud/cloud_storage_provider.cc"
-    "db/db_impl/db_impl_remote_compaction.cc")
+set(ROCKSDB_CLOUD_PATCH_DIR "${CMAKE_CURRENT_LIST_DIR}/patches")
+set(ROCKSDB_CLOUD_PATCH_STAMP
+    "${ROCKSDB_CLOUD_SOURCE_DIR}/.pixels-rocksdb-cloud-patched")
 
-file(READ "${ROCKSDB_CLOUD_CMAKE}" ROCKSDB_CMAKE_CONTENT)
+if(EXISTS "${ROCKSDB_CLOUD_PATCH_STAMP}")
+    message(STATUS "rocksdb-cloud patches already applied")
+    return()
+endif()
 
-foreach(ROCKSDB_CLOUD_SOURCE IN LISTS ROCKSDB_CLOUD_SOURCES)
-    if(NOT ROCKSDB_CMAKE_CONTENT MATCHES "${ROCKSDB_CLOUD_SOURCE}")
-        string(APPEND ROCKSDB_CLOUD_SOURCE_LINES "\n        ${ROCKSDB_CLOUD_SOURCE}")
+set(ROCKSDB_CLOUD_PATCH_FILES
+    "${ROCKSDB_CLOUD_PATCH_DIR}/0001-add-cloud-sources-and-aws-libs.patch"
+    "${ROCKSDB_CLOUD_PATCH_DIR}/0002-enable-path-style-s3-client.patch"
+    "${ROCKSDB_CLOUD_PATCH_DIR}/0003-include-cstdint-in-data-block-hash-index.patch")
+
+foreach(ROCKSDB_CLOUD_PATCH_FILE IN LISTS ROCKSDB_CLOUD_PATCH_FILES)
+    if(NOT EXISTS "${ROCKSDB_CLOUD_PATCH_FILE}")
+        message(FATAL_ERROR "rocksdb-cloud patch file not found: ${ROCKSDB_CLOUD_PATCH_FILE}")
+    endif()
+
+    execute_process(
+        COMMAND patch --batch -p1 --input "${ROCKSDB_CLOUD_PATCH_FILE}"
+        WORKING_DIRECTORY "${ROCKSDB_CLOUD_SOURCE_DIR}"
+        RESULT_VARIABLE ROCKSDB_CLOUD_PATCH_RESULT
+        OUTPUT_VARIABLE ROCKSDB_CLOUD_PATCH_STDOUT
+        ERROR_VARIABLE ROCKSDB_CLOUD_PATCH_STDERR)
+
+    if(NOT ROCKSDB_CLOUD_PATCH_RESULT EQUAL 0)
+        message(FATAL_ERROR
+            "Failed to apply rocksdb-cloud patch: ${ROCKSDB_CLOUD_PATCH_FILE}\n"
+            "stdout:\n${ROCKSDB_CLOUD_PATCH_STDOUT}\n"
+            "stderr:\n${ROCKSDB_CLOUD_PATCH_STDERR}")
     endif()
 endforeach()
 
-if(ROCKSDB_CLOUD_SOURCE_LINES)
-    string(REPLACE
-        "        utilities/write_batch_with_index/write_batch_with_index_internal.cc"
-        "        utilities/write_batch_with_index/write_batch_with_index_internal.cc${ROCKSDB_CLOUD_SOURCE_LINES}"
-        ROCKSDB_CMAKE_CONTENT
-        "${ROCKSDB_CMAKE_CONTENT}")
-    message(STATUS "Patched rocksdb-cloud CMake source list with cloud sources")
-endif()
-
-if(NOT ROCKSDB_CMAKE_CONTENT MATCHES "aws-cpp-sdk-core")
-    string(REPLACE
-        "if(WIN32)\n  set(SYSTEM_LIBS"
-        "list(APPEND THIRDPARTY_LIBS\n  aws-cpp-sdk-s3\n  aws-cpp-sdk-transfer\n  aws-cpp-sdk-kinesis\n  aws-cpp-sdk-core\n  curl)\n\nif(WIN32)\n  set(SYSTEM_LIBS"
-        ROCKSDB_CMAKE_CONTENT
-        "${ROCKSDB_CMAKE_CONTENT}")
-    message(STATUS "Patched rocksdb-cloud CMake link libraries with AWS SDK dependencies")
-endif()
-
-file(WRITE "${ROCKSDB_CLOUD_CMAKE}" "${ROCKSDB_CMAKE_CONTENT}")
-
-set(ROCKSDB_CLOUD_AWS_S3 "${ROCKSDB_CLOUD_SOURCE_DIR}/cloud/aws/aws_s3.cc")
-file(READ "${ROCKSDB_CLOUD_AWS_S3}" ROCKSDB_AWS_S3_CONTENT)
-
-string(REPLACE
-    "std::make_shared<Aws::S3::S3Client>(creds, config)"
-    "std::make_shared<Aws::S3::S3Client>(creds, config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::RequestDependent, true)"
-    ROCKSDB_AWS_S3_CONTENT
-    "${ROCKSDB_AWS_S3_CONTENT}")
-string(REPLACE
-    "std::make_shared<Aws::S3::S3Client>(config)"
-    "std::make_shared<Aws::S3::S3Client>(config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::RequestDependent, true)"
-    ROCKSDB_AWS_S3_CONTENT
-    "${ROCKSDB_AWS_S3_CONTENT}")
-
-file(WRITE "${ROCKSDB_CLOUD_AWS_S3}" "${ROCKSDB_AWS_S3_CONTENT}")
-
-set(ROCKSDB_CLOUD_DATA_BLOCK_HASH_INDEX_H
-    "${ROCKSDB_CLOUD_SOURCE_DIR}/table/block_based/data_block_hash_index.h")
-file(READ "${ROCKSDB_CLOUD_DATA_BLOCK_HASH_INDEX_H}" ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT)
-
-if(NOT ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT MATCHES "#include <cstdint>")
-    string(REPLACE
-        "#include <string>\n#include <vector>"
-        "#include <cstdint>\n#include <string>\n#include <vector>"
-        ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT
-        "${ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT}")
-    message(STATUS "Patched rocksdb-cloud data_block_hash_index.h to include <cstdint>")
-endif()
-
-file(WRITE "${ROCKSDB_CLOUD_DATA_BLOCK_HASH_INDEX_H}" "${ROCKSDB_DATA_BLOCK_HASH_INDEX_H_CONTENT}")
+file(WRITE "${ROCKSDB_CLOUD_PATCH_STAMP}" "patched\n")

@@ -31,6 +31,10 @@ endif()
 # 3. Configure rocksdb-cloud as external project
 set(ROCKSDB_CLOUD_GIT_REPOSITORY https://github.com/rockset/rocksdb-cloud.git)
 set(ROCKSDB_CLOUD_GIT_TAG v6.7.3)
+set(AWS_SDK_PREFIX $ENV{AWS_INSTALL_PREFIX})
+if(NOT AWS_SDK_PREFIX)
+    set(AWS_SDK_PREFIX /usr/local)
+endif()
 set(ROCKSDB_CLOUD_COMPAT_HEADER
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/RocksDBCloudCompat.h)
 set(ROCKSDB_CMAKE_ARGS
@@ -45,6 +49,7 @@ set(ROCKSDB_CMAKE_ARGS
     -DWITH_TOOLS=OFF
     -DFAIL_ON_WARNINGS=OFF
     -DUSE_RTTI=1
+    -DCMAKE_PREFIX_PATH=${AWS_SDK_PREFIX}
     -DCMAKE_CXX_FLAGS=-frtti\ -DUSE_AWS\ -include\ ${ROCKSDB_CLOUD_COMPAT_HEADER}
     -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/deps/rocksdb_cloud-install
     -DWITH_JNI=OFF

@@ -9,7 +9,14 @@ on:
 
 jobs:
   build-rockset:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    env:
+      ROCKSET_MODULE_DIR: cpp/pixels-index/pixels-index-rockset
+      AWS_SDK_VERSION: 1.11.578
+      AWS_INSTALL_PREFIX: ${{ github.workspace }}/cpp/pixels-index/pixels-index-rockset/.cache/aws-sdk-install
 
     steps:
       - name: Checkout code
@@ -27,8 +34,23 @@ jobs:
           mkdir -p "$PIXELS_HOME/lib"
           echo "PIXELS_HOME=$PIXELS_HOME" >> "$GITHUB_ENV"
 
+      - name: Cache AWS SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ROCKSET_MODULE_DIR }}/.deps/aws-sdk-cpp
+            ${{ env.ROCKSET_MODULE_DIR }}/.cache/aws-sdk-install
+          key: ${{ runner.os }}-rockset-aws-sdk-${{ env.AWS_SDK_VERSION }}-${{ hashFiles('cpp/pixels-index/pixels-index-rockset/ci-build.sh', '.github/workflows/build-rockset.yml') }}
+
+      - name: Cache rocksdb-cloud
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ROCKSET_MODULE_DIR }}/build/deps
+          key: ${{ runner.os }}-rockset-cloud-${{ hashFiles('cpp/pixels-index/pixels-index-rockset/CMakeLists.txt', 'cpp/pixels-index/pixels-index-rockset/cmake/**', 'cpp/pixels-index/pixels-index-rockset/include/jni/**', 'cpp/pixels-index/pixels-index-rockset/lib/jni/**', 'cpp/pixels-index/pixels-index-rockset/ci-build.sh') }}
+
       - name: Build pixels-index-rockset
-        working-directory: cpp/pixels-index/pixels-index-rockset
+        working-directory: ${{ env.ROCKSET_MODULE_DIR }}
         run: |
           chmod +x ./ci-build.sh
           ./ci-build.sh
