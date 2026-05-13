@@ -71,10 +71,13 @@ public class RdbFileDao extends FileDao
     public List<MetadataProto.File> getAllByPathId(long pathId)
     {
         Connection conn = db.getConnection();
-        try (Statement st = conn.createStatement())
+        String sql = "SELECT * FROM FILES WHERE FILE_TYPE = ? AND PATHS_PATH_ID = ?";
+        try (PreparedStatement st = conn.prepareStatement(sql))
         {
-            // Issue #932: Add empty file markers and ignore empty files when retrieving file lists.
-            ResultSet rs = st.executeQuery("SELECT * FROM FILES WHERE FILE_TYPE <> 0 AND PATHS_PATH_ID=" + pathId);
+            // Query-visible file enumeration is REGULAR-only.
+            st.setInt(1, MetadataProto.File.Type.REGULAR.getNumber());
+            st.setLong(2, pathId);
+            ResultSet rs = st.executeQuery();
             List<MetadataProto.File> files = new ArrayList<>();
             while (rs.next())
             {

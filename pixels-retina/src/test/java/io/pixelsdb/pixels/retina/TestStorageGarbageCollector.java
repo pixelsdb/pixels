@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
+import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -52,6 +53,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1866,7 +1868,7 @@ public class TestStorageGarbageCollector
 
     /**
      * TEMPORARY visibility semantics: before the swap, {@code getFiles(pathId)} must
-     * <b>not</b> return the TEMPORARY new file (the DAO filters {@code FILE_TYPE <> 0}).
+     * <b>not</b> return the TEMPORARY new file (the DAO filters {@code FILE_TYPE = REGULAR}).
      * After the swap the promoted file is visible and the old file disappears.
      */
     @Test
@@ -1903,6 +1905,223 @@ public class TestStorageGarbageCollector
                 afterIds.contains(tempFileId));
         assertFalse("Old file should NOT be visible via getFiles after swap",
                 afterIds.contains(oldFileId));
+    }
+
+    // -----------------------------------------------------------------------
+    // Coverage for getFiles(pathId) REGULAR-only enumeration.
+    // -----------------------------------------------------------------------
+
+    /**
+     * A path containing REGULAR and non-REGULAR FILE_TYPE values returns only REGULAR entries.
+     */
+    @Test
+    public void testGetFiles_mixedAllFileTypes_onlyRegular() throws Exception
+    {
+        long regularId = -1L;
+        long tempId = -1L;
+        long nonRegularPositiveId = -1L;
+        long negativeId = -1L;
+        long extremeId = -1L;
+        try
+        {
+            String suffix = Long.toString(System.nanoTime());
+            regularId = registerTestFile("mix_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 1L);
+            tempId = registerTestFile("mix_temp_" + suffix + ".pxl",
+                    File.Type.TEMPORARY, 1, 0L, 1L);
+            nonRegularPositiveId = insertRawFileWithType("mix_non_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR.ordinal() + 1, 1, 0L, 1L);
+            negativeId = insertRawFileWithType("mix_negative_" + suffix + ".pxl",
+                    -2, 1, 0L, 1L);
+            extremeId = insertRawFileWithType("mix_extreme_max_" + suffix + ".pxl",
+                    Integer.MAX_VALUE, 1, 0L, 1L);
+
+            List<File> files = metadataService.getFiles(testPathId);
+            Set<Long> visible = new HashSet<>();
+            for (File f : files)
+            {
+                assertEquals("getFiles must only emit REGULAR",
+                        File.Type.REGULAR, f.getType());
+                visible.add(f.getId());
+            }
+            assertTrue("REGULAR member of the mix must be visible",
+                    visible.contains(regularId));
+            assertFalse("TEMPORARY (FILE_TYPE=0) must be hidden",
+                    visible.contains(tempId));
+            assertFalse("non-REGULAR positive FILE_TYPE must be hidden",
+                    visible.contains(nonRegularPositiveId));
+            assertFalse("negative FILE_TYPE must be hidden",
+                    visible.contains(negativeId));
+            assertFalse("Integer.MAX_VALUE FILE_TYPE must be hidden",
+                    visible.contains(extremeId));
+        }
+        finally
+        {
+            List<Long> cleanup = new ArrayList<>();
+            if (regularId > 0) cleanup.add(regularId);
+            if (tempId > 0) cleanup.add(tempId);
+            if (nonRegularPositiveId > 0) cleanup.add(nonRegularPositiveId);
+            if (negativeId > 0) cleanup.add(negativeId);
+            if (extremeId > 0) cleanup.add(extremeId);
+            if (!cleanup.isEmpty()) metadataService.deleteFiles(cleanup);
+        }
+    }
+
+    /**
+     * A minimum-size REGULAR file is returned with its catalog fields intact.
+     */
+    @Test
+    public void testGetFiles_singleRegularMinimumData() throws Exception
+    {
+        long fileId = -1L;
+        try
+        {
+            fileId = registerTestFile("min_single_regular_" + System.nanoTime() + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 0L);
+            List<File> files = metadataService.getFiles(testPathId);
+            File found = null;
+            for (File f : files)
+            {
+                if (f.getId() == fileId)
+                {
+                    found = f;
+                }
+                assertEquals("every returned entry must be REGULAR",
+                        File.Type.REGULAR, f.getType());
+            }
+            assertNotNull("the single REGULAR minimum-data file must be visible", found);
+            assertEquals("type must be REGULAR", File.Type.REGULAR, found.getType());
+            assertEquals("numRowGroup of minimum file must be 1", 1, found.getNumRowGroup());
+            assertEquals("minRowId of minimum file must be 0", 0L, found.getMinRowId());
+            assertEquals("maxRowId of minimum file must be 0", 0L, found.getMaxRowId());
+        }
+        finally
+        {
+            if (fileId > 0)
+            {
+                metadataService.deleteFiles(Collections.singletonList(fileId));
+            }
+        }
+    }
+
+    /**
+     * A deleted REGULAR file is no longer returned by {@code getFiles}.
+     */
+    @Test
+    public void testGetFiles_deletedRegular_notVisible() throws Exception
+    {
+        long regularId = registerTestFile("delete_visibility_" + System.nanoTime() + ".pxl",
+                File.Type.REGULAR, 1, 0L, 1L);
+
+        List<File> beforeDelete = metadataService.getFiles(testPathId);
+        Set<Long> beforeIds = new HashSet<>();
+        for (File f : beforeDelete) beforeIds.add(f.getId());
+        assertTrue("REGULAR file must be visible before delete",
+                beforeIds.contains(regularId));
+
+        metadataService.deleteFiles(Collections.singletonList(regularId));
+
+        List<File> afterDelete = metadataService.getFiles(testPathId);
+        for (File f : afterDelete)
+        {
+            assertFalse("deleted REGULAR file must no longer be visible",
+                    f.getId() == regularId);
+        }
+    }
+
+    /**
+     * Concurrent readers observe a consistent REGULAR-only result.
+     */
+    @Test
+    public void testGetFiles_concurrentReaders_consistentRegularOnly() throws Exception
+    {
+        long regularId = -1L;
+        long tempId = -1L;
+        long nonRegularPositiveId = -1L;
+        ExecutorService pool = null;
+        try
+        {
+            String suffix = Long.toString(System.nanoTime());
+            regularId = registerTestFile("conc_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 1L);
+            tempId = registerTestFile("conc_temp_" + suffix + ".pxl",
+                    File.Type.TEMPORARY, 1, 0L, 1L);
+            nonRegularPositiveId = insertRawFileWithType("conc_non_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR.ordinal() + 1, 1, 0L, 1L);
+
+            final int threads = 8;
+            final int iterations = 16;
+            pool = Executors.newFixedThreadPool(threads);
+            CyclicBarrier startGate = new CyclicBarrier(threads);
+            AtomicInteger leakedTemporary = new AtomicInteger();
+            AtomicInteger leakedNonRegular = new AtomicInteger();
+            AtomicInteger missingRegular = new AtomicInteger();
+
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            final long pinnedRegular = regularId;
+            final long pinnedTemp = tempId;
+            final long pinnedNonRegular = nonRegularPositiveId;
+            for (int t = 0; t < threads; t++)
+            {
+                futures.add(CompletableFuture.runAsync(() ->
+                {
+                    try
+                    {
+                        startGate.await();
+                        for (int i = 0; i < iterations; i++)
+                        {
+                            List<File> snapshot = metadataService.getFiles(testPathId);
+                            boolean sawRegular = false;
+                            for (File f : snapshot)
+                            {
+                                if (f.getType() != File.Type.REGULAR)
+                                {
+                                    leakedNonRegular.incrementAndGet();
+                                }
+                                if (f.getId() == pinnedRegular) sawRegular = true;
+                                if (f.getId() == pinnedTemp) leakedTemporary.incrementAndGet();
+                                if (f.getId() == pinnedNonRegular) leakedNonRegular.incrementAndGet();
+                            }
+                            if (!sawRegular) missingRegular.incrementAndGet();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        throw new RuntimeException(e);
+                    }
+                }, pool));
+            }
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .get(30, java.util.concurrent.TimeUnit.SECONDS);
+
+            assertEquals("no concurrent reader may observe a TEMPORARY file",
+                    0, leakedTemporary.get());
+            assertEquals("no concurrent reader may observe a non-REGULAR file",
+                    0, leakedNonRegular.get());
+            assertEquals("every concurrent reader must observe the REGULAR file",
+                    0, missingRegular.get());
+
+            // A follow-up call should remain REGULAR-only after the concurrent burst.
+            List<File> followUp = metadataService.getFiles(testPathId);
+            assertNotNull("follow-up getFiles must not return null", followUp);
+            for (File f : followUp)
+            {
+                assertEquals("follow-up entries must all be REGULAR",
+                        File.Type.REGULAR, f.getType());
+            }
+        }
+        finally
+        {
+            if (pool != null)
+            {
+                pool.shutdownNow();
+            }
+            List<Long> cleanup = new ArrayList<>();
+            if (regularId > 0) cleanup.add(regularId);
+            if (tempId > 0) cleanup.add(tempId);
+            if (nonRegularPositiveId > 0) cleanup.add(nonRegularPositiveId);
+            if (!cleanup.isEmpty()) metadataService.deleteFiles(cleanup);
+        }
     }
 
     /**
@@ -2947,6 +3166,27 @@ public class TestStorageGarbageCollector
         f.setMaxRowId(maxRow);
         f.setPathId(testPathId);
         metadataService.addFiles(Collections.singletonList(f));
+        long id = metadataService.getFileId(testOrderedPathUri + "/" + name);
+        assertTrue(name + " must have valid id", id > 0);
+        return id;
+    }
+
+    private long insertRawFileWithType(String name, int fileType,
+                                       int numRg, long minRow, long maxRow)
+            throws Exception
+    {
+        String sql = "INSERT INTO FILES(FILE_NAME, FILE_TYPE, FILE_NUM_RG, FILE_MIN_ROW_ID, FILE_MAX_ROW_ID, PATHS_PATH_ID) " +
+                "VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement pst = MetaDBUtil.Instance().getConnection().prepareStatement(sql))
+        {
+            pst.setString(1, name);
+            pst.setInt(2, fileType);
+            pst.setInt(3, numRg);
+            pst.setLong(4, minRow);
+            pst.setLong(5, maxRow);
+            pst.setLong(6, testPathId);
+            assertEquals("raw test file insert should affect one row", 1, pst.executeUpdate());
+        }
         long id = metadataService.getFileId(testOrderedPathUri + "/" + name);
         assertTrue(name + " must have valid id", id > 0);
         return id;
