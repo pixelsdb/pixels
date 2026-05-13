@@ -236,7 +236,7 @@ public class PixelsWriteBuffer
         {
             throw new RetinaException("Expect rgRowOffset >= 0, get " + rgRowOffset);
         }
-        builder.setFileId(activeMemTable.getFileId())
+        builder.setFileId(currentMemTable.getFileId())
                 .setRgId(0)
                 .setRgRowOffset(rgRowOffset);
         return rowId;
