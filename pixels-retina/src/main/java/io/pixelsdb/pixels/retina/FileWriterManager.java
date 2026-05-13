@@ -50,6 +50,9 @@ public class FileWriterManager
     private final long firstBlockId;
     private long lastBlockId = -1;
     private final int virtualNodeId;
+    // Initialized by PixelsWriteBuffer's single-threaded file publisher.
+    private CompletableFuture<Void> physicalCloseFuture;
+
     /**
      * Creating pixelsWriter by passing in parameters avoids the need to read
      * the configuration file for each call.
@@ -125,6 +128,17 @@ public class FileWriterManager
         }
     }
 
+    FileWriterManager(long tableId, PixelsWriter writer, File file,
+                      long firstBlockId, long lastBlockId, int virtualNodeId)
+    {
+        this.tableId = tableId;
+        this.writer = writer;
+        this.file = file;
+        this.firstBlockId = firstBlockId;
+        this.lastBlockId = lastBlockId;
+        this.virtualNodeId = virtualNodeId;
+    }
+
     public long getFileId()
     {
         return this.file.getId();
@@ -145,6 +159,19 @@ public class FileWriterManager
         return this.lastBlockId;
     }
 
+    File getFileSnapshot()
+    {
+        File snapshot = new File();
+        snapshot.setId(this.file.getId());
+        snapshot.setName(this.file.getName());
+        snapshot.setType(this.file.getType());
+        snapshot.setNumRowGroup(this.file.getNumRowGroup());
+        snapshot.setMinRowId(this.file.getMinRowId());
+        snapshot.setMaxRowId(this.file.getMaxRowId());
+        snapshot.setPathId(this.file.getPathId());
+        return snapshot;
+    }
+
     public void addRowBatch(VectorizedRowBatch rowBatch) throws RetinaException
     {
         try
@@ -158,13 +185,22 @@ public class FileWriterManager
 
     /**
      * Create a background thread to write the block of data stored in shared storage to a file.
+     * Metadata publication is handled by {@link PixelsWriteBuffer} after the
+     * physical close and index flush barrier both complete.
      */
-    public CompletableFuture<Void> finish()
+    CompletableFuture<Void> finish()
     {
+        if (physicalCloseFuture != null)
+        {
+            return physicalCloseFuture;
+        }
+
         CompletableFuture<Void> future = new CompletableFuture<>();
+        physicalCloseFuture = future;
 
         new Thread(() -> {
-            try {
+            try
+            {
                 for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId)
                 {
                     ObjectStorageManager objectStorageManager = ObjectStorageManager.Instance();
@@ -176,21 +212,12 @@ public class FileWriterManager
                     this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
                 }
                 this.writer.close();
-
-                // Update the file's type.
-                this.file.setType(File.Type.REGULAR);
-                MetadataService metadataService = MetadataService.Instance();
-                if (!metadataService.updateFile(this.file))
-                {
-                    throw new MetadataException("failed to publish ingest file " + this.file.getId() + " as REGULAR");
-                }
-
                 future.complete(null);
             } catch (Exception e)
             {
                 future.completeExceptionally(e);
             }
-        }).start();
+        }, "pixels-retina-file-finish-" + this.file.getId()).start();
 
         return future;
     }
