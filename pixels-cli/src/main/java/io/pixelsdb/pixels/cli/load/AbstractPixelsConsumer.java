@@ -163,7 +163,7 @@ public abstract class AbstractPixelsConsumer extends Consumer
     {
         for (File tmpFile : tmpFiles)
         {
-            if (tmpFile.getType() == File.Type.TEMPORARY)
+            if (tmpFile.getType() == File.Type.TEMPORARY_INGEST)
             {
                 try
                 {
@@ -210,7 +210,7 @@ public abstract class AbstractPixelsConsumer extends Consumer
     {
         File file = new File();
         file.setName(fileName);
-        file.setType(File.Type.TEMPORARY);
+        file.setType(File.Type.TEMPORARY_INGEST);
         file.setNumRowGroup(1);
         file.setPathId(filePath.getId());
         String tmpFilePath = filePath.getUri() + "/" + fileName;
