@@ -1173,17 +1173,18 @@ public class StorageGarbageCollector
     // -------------------------------------------------------------------------
 
     /**
-     * Atomically promotes the new TEMPORARY_GC file to REGULAR, deletes old files from
+     * Atomically promotes the new TEMPORARY_GC file to REGULAR, retires old files in
      * the catalog, unregisters dual-write, and enqueues the old files for delayed cleanup.
      */
     void commitFileGroup(RewriteResult result) throws Exception
     {
         List<Long> oldFileIds = result.group.files.stream()
                 .map(fc -> fc.fileId).collect(Collectors.toList());
+        long retireDeadline = System.currentTimeMillis() + retireDelayMs;
 
         try
         {
-            metadataService.atomicSwapFiles(result.newFileId, oldFileIds);
+            metadataService.atomicSwapFiles(result.newFileId, oldFileIds, retireDeadline);
         }
         catch (Exception e)
         {
@@ -1200,7 +1201,6 @@ public class StorageGarbageCollector
 
         unregisterDualWrite(result);
 
-        long retireDeadline = System.currentTimeMillis() + retireDelayMs;
         for (FileCandidate fc : result.group.files)
         {
             resourceManager.scheduleRetiredFile(

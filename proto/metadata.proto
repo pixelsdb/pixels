@@ -746,6 +746,7 @@ message AtomicSwapFilesRequest {
     RequestHeader header = 1;
     uint64 newFileId = 2;
     repeated uint64 oldFileIds = 3;
+    optional uint64 cleanupAt = 4;
 }
 
 message AtomicSwapFilesResponse {

@@ -1884,8 +1884,8 @@ public class TestStorageGarbageCollector
     /**
      * Atomicity with multiple old files: one TEMPORARY_GC new file and three REGULAR
      * old files are swapped in a single call.  Verifies that after the call the new
-     * file is promoted to REGULAR and <b>all</b> old files are removed from the
-     * catalog—i.e., the UPDATE and DELETE execute as one indivisible transaction.
+     * file is promoted to REGULAR and <b>all</b> old files are marked RETIRED with
+     * the same cleanup deadline—i.e., both UPDATE steps execute as one transaction.
      */
     @Test
     public void testAtomicSwap_multipleOldFilesAtomicity() throws Exception
@@ -1902,25 +1902,27 @@ public class TestStorageGarbageCollector
                 new File.Type[]{File.Type.REGULAR, File.Type.REGULAR, File.Type.REGULAR},
                 new int[]{1, 1, 1}, new long[]{0, 0, 0}, new long[]{1, 1, 1});
         long newFileId = registerTestFile("atom_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 1);
+        long cleanupAt = 1_700_000_010_000L;
 
         File preSwapNew = metadataService.getFileById(newFileId);
         assertNotNull("New file must exist before swap", preSwapNew);
         assertEquals("New file should be TEMPORARY_GC before swap",
                 File.Type.TEMPORARY_GC, preSwapNew.getType());
 
-        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1], oldIds[2]));
+        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1], oldIds[2]), cleanupAt);
 
         assertFileRegular(newFileId, "New file should be REGULAR after swap");
         for (long oldId : oldIds)
         {
-            assertFileGone(oldId, "Old file " + oldId + " should be gone after swap");
+            assertFileRetired(oldId, cleanupAt,
+                    "Old file " + oldId + " should be retired after swap");
         }
     }
 
     /**
      * Idempotency: calling {@code atomicSwapFiles} a second time after the swap has
-     * already committed must not throw.  The UPDATE is a no-op (already REGULAR) and
-     * the DELETE is a no-op (old files already removed).
+     * already committed must not throw.  The new file remains REGULAR and the old file
+     * remains RETIRED with the retry's cleanup deadline.
      */
     @Test
     public void testAtomicSwap_idempotent() throws Exception
@@ -1928,55 +1930,18 @@ public class TestStorageGarbageCollector
         writeTestFile("idem_old.pxl", LONG_ID_SCHEMA, new long[]{0, 1, 2}, true, new long[]{100, 100, 100});
         long oldFileId = registerTestFile("idem_old.pxl", File.Type.REGULAR, 1, 0, 2);
         long newFileId = registerTestFile("idem_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 2);
+        long firstCleanupAt = 1_700_000_020_000L;
+        long retryCleanupAt = 1_700_000_030_000L;
 
-        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId));
+        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId), firstCleanupAt);
         assertFileRegular(newFileId, "File should be REGULAR after first swap");
+        assertFileRetired(oldFileId, firstCleanupAt, "Old file should be RETIRED after first swap");
 
-        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId));
+        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId), retryCleanupAt);
 
         assertFileRegular(newFileId, "File should remain REGULAR after idempotent retry");
-        assertFileGone(oldFileId, "Old file should remain absent after idempotent retry");
-    }
-
-    /**
-     * TEMPORARY_GC visibility semantics: before the swap, {@code getRegularFiles(pathId)} must
-     * <b>not</b> return the TEMPORARY_GC new file (the DAO filters {@code FILE_TYPE = REGULAR}).
-     * After the swap the promoted file is visible and the old file disappears.
-     */
-    @Test
-    public void testAtomicSwap_temporaryInvisibleViaGetRegularFiles() throws Exception
-    {
-        writeTestFile("vis_old.pxl", LONG_ID_SCHEMA, new long[]{0, 1}, true, new long[]{100, 100});
-        long[] fileIds = registerTestFiles(
-                new String[]{"vis_old.pxl", "vis_new_temp.pxl"},
-                new File.Type[]{File.Type.REGULAR, File.Type.TEMPORARY_GC},
-                new int[]{1, 1}, new long[]{0, 0}, new long[]{1, 1});
-        long oldFileId = fileIds[0];
-        long tempFileId = fileIds[1];
-
-        List<File> beforeSwap = metadataService.getRegularFiles(testPathId);
-        Set<Long> beforeIds = new HashSet<>();
-        for (File f : beforeSwap)
-        {
-            beforeIds.add(f.getId());
-        }
-        assertTrue("REGULAR old file should be visible via getRegularFiles before swap",
-                beforeIds.contains(oldFileId));
-        assertFalse("TEMPORARY_GC new file must NOT be visible via getRegularFiles before swap",
-                beforeIds.contains(tempFileId));
-
-        metadataService.atomicSwapFiles(tempFileId, Collections.singletonList(oldFileId));
-
-        List<File> afterSwap = metadataService.getRegularFiles(testPathId);
-        Set<Long> afterIds = new HashSet<>();
-        for (File f : afterSwap)
-        {
-            afterIds.add(f.getId());
-        }
-        assertTrue("Promoted file should be visible via getRegularFiles after swap",
-                afterIds.contains(tempFileId));
-        assertFalse("Old file should NOT be visible via getRegularFiles after swap",
-                afterIds.contains(oldFileId));
+        assertFileRetired(oldFileId, retryCleanupAt,
+                "Old file should remain RETIRED after idempotent retry");
     }
 
     // -----------------------------------------------------------------------
@@ -2136,10 +2101,11 @@ public class TestStorageGarbageCollector
             assertFalse("TEMPORARY_GC must be hidden before swap",
                     beforeIds.contains(tempGcId));
 
-            metadataService.atomicSwapFiles(tempGcId, Collections.singletonList(oldRegularId));
+            long cleanupAt = 1_700_000_050_000L;
+            metadataService.atomicSwapFiles(tempGcId, Collections.singletonList(oldRegularId), cleanupAt);
 
-            // After swap: tempGcId is now REGULAR (visible); old REGULAR is gone; the
-            // coexisting RETIRED file must STILL be hidden (the swap did not promote it).
+            // After swap: tempGcId is now REGULAR (visible); old REGULAR is now RETIRED and
+            // hidden; the coexisting RETIRED file must STILL be hidden (the swap did not promote it).
             Set<Long> afterIds = new HashSet<>();
             for (File f : metadataService.getRegularFiles(testPathId))
             {
@@ -2149,14 +2115,12 @@ public class TestStorageGarbageCollector
             }
             assertTrue("freshly-promoted file must be visible after swap",
                     afterIds.contains(tempGcId));
-            assertFalse("the deleted old REGULAR must be gone after swap",
+            assertFalse("the retired old REGULAR must be hidden after swap",
                     afterIds.contains(oldRegularId));
+            assertFileRetired(oldRegularId, cleanupAt,
+                    "the old REGULAR must become RETIRED after swap");
             assertFalse("the unrelated RETIRED tombstone must remain hidden after swap",
                     afterIds.contains(retiredCoexistingId));
-
-            // After the promote, the old file ids are deleted — clear the local handle so
-            // the cleanup block below does not double-delete a non-existent row.
-            oldRegularId = -1L;
         }
         finally
         {
@@ -2330,7 +2294,7 @@ public class TestStorageGarbageCollector
      * thread, so {@code atomicSwapFiles} is never called concurrently in production.
      * This test reflects that design: N independent (newFile, oldFile) pairs are
      * swapped one after another, and every new file ends up REGULAR while every
-     * old file is removed.
+     * old file is marked RETIRED with its cleanup deadline.
      */
     @Test
     public void testAtomicSwap_multipleSerialSwaps() throws Exception
@@ -2342,6 +2306,7 @@ public class TestStorageGarbageCollector
 
         long[] newFileIds = new long[nPairs];
         long[] oldFileIds = new long[nPairs];
+        long[] cleanupAts = new long[nPairs];
 
         for (int i = 0; i < nPairs; i++)
         {
@@ -2355,26 +2320,28 @@ public class TestStorageGarbageCollector
                     new int[]{1, 1}, new long[]{0, 0}, new long[]{0, 0});
             oldFileIds[i] = pair[0];
             newFileIds[i] = pair[1];
+            cleanupAts[i] = 1_700_000_060_000L + i;
         }
 
         for (int i = 0; i < nPairs; i++)
         {
             metadataService.atomicSwapFiles(newFileIds[i],
-                    Collections.singletonList(oldFileIds[i]));
+                    Collections.singletonList(oldFileIds[i]), cleanupAts[i]);
         }
 
         for (int i = 0; i < nPairs; i++)
         {
             assertFileRegular(newFileIds[i], "Promoted file " + i + " must be REGULAR");
-            assertFileGone(oldFileIds[i], "Old file " + i + " should be gone");
+            assertFileRetired(oldFileIds[i], cleanupAts[i],
+                    "Old file " + i + " should be RETIRED");
         }
     }
 
     /**
      * Partial old-files-already-gone: one old file is deleted before the swap, but
-     * {@code atomicSwapFiles} is called with both IDs.  The DELETE-WHERE-IN for an
-     * already-absent row is a no-op; the transaction must still commit, promoting the
-     * new file and removing the remaining old file.
+     * {@code atomicSwapFiles} is called with both IDs.  The UPDATE for an already-absent
+     * row is a no-op; the transaction must still commit, promoting the new file and
+     * retiring the remaining old file.
      */
     @Test
     public void testAtomicSwap_partialOldFilesAlreadyGone() throws Exception
@@ -2391,10 +2358,11 @@ public class TestStorageGarbageCollector
         assertFileGone(oldIds[0], "old1 should be gone before swap");
 
         long newFileId = registerTestFile("partial_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 1);
-        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1]));
+        long cleanupAt = 1_700_000_070_000L;
+        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1]), cleanupAt);
 
         assertFileRegular(newFileId, "New file must be REGULAR");
-        assertFileGone(oldIds[1], "Remaining old file should be gone");
+        assertFileRetired(oldIds[1], cleanupAt, "Remaining old file should be RETIRED");
     }
 
     /**
@@ -2588,7 +2556,8 @@ public class TestStorageGarbageCollector
         e2eGc.commitFileGroup(result);
 
         assertFileRegular(newFileId, "new file should be REGULAR after commit");
-        assertFileGone(srcFileId, "old file should be gone from catalog after commit");
+        assertFileRetiredWithCleanupAt(srcFileId,
+                "old file should be RETIRED in catalog after commit");
 
         assertTrue("old physical file should still exist (delayed cleanup, not yet due)",
                 fileStorage.exists(srcPath));
@@ -2873,7 +2842,7 @@ public class TestStorageGarbageCollector
 
         // 3b. Verify catalog state
         assertFileRegular(newFileId, "new file should be REGULAR");
-        assertFileGone(srcFileId, "old file should be gone from catalog");
+        assertFileRetiredWithCleanupAt(srcFileId, "old file should be RETIRED in catalog");
 
         // 3c. Forward mapping
         int[] fwd = result.forwardRgMappings.get(srcFileId).get(0);
@@ -3251,10 +3220,10 @@ public class TestStorageGarbageCollector
         assertNotNull("file-B must still exist (not GCed)", metadataService.getFileById(fileIdB));
         assertNotNull("file-C must still exist", metadataService.getFileById(fileIdC));
 
-        // Old generations gone from catalog
-        assertFileGone(fileIdA, "file-A should be gone from catalog");
-        assertFileGone(fileIdAprime, "file-A' should be gone from catalog");
-        assertFileGone(fileIdAdoubleprime, "file-A'' should be gone from catalog");
+        // Old generations are retired in catalog
+        assertFileRetiredWithCleanupAt(fileIdA, "file-A should be RETIRED in catalog");
+        assertFileRetiredWithCleanupAt(fileIdAprime, "file-A' should be RETIRED in catalog");
+        assertFileRetiredWithCleanupAt(fileIdAdoubleprime, "file-A'' should be RETIRED in catalog");
 
         // Physical files from generations 1 and 2 cleaned up
         assertFalse("file-A physical should not exist", fileStorage.exists(pathA));
@@ -3439,6 +3408,22 @@ public class TestStorageGarbageCollector
         File f = metadataService.getFileById(fileId);
         assertNotNull(msg, f);
         assertEquals(msg, File.Type.REGULAR, f.getType());
+    }
+
+    private void assertFileRetired(long fileId, long cleanupAt, String msg) throws Exception
+    {
+        File f = metadataService.getFileById(fileId);
+        assertNotNull(msg, f);
+        assertEquals(msg, File.Type.RETIRED, f.getType());
+        assertEquals(msg, Long.valueOf(cleanupAt), f.getCleanupAt());
+    }
+
+    private void assertFileRetiredWithCleanupAt(long fileId, String msg) throws Exception
+    {
+        File f = metadataService.getFileById(fileId);
+        assertNotNull(msg, f);
+        assertEquals(msg, File.Type.RETIRED, f.getType());
+        assertNotNull(msg, f.getCleanupAt());
     }
 
     // =======================================================================

@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * @author hank
@@ -350,7 +349,7 @@ public class RdbFileDao extends FileDao
     }
 
     @Override
-    public boolean atomicSwapFiles(long newFileId, List<Long> oldFileIds)
+    public boolean atomicSwapFiles(long newFileId, List<Long> oldFileIds, long cleanupAt)
     {
         Connection conn = db.getConnection();
         try
@@ -363,15 +362,20 @@ public class RdbFileDao extends FileDao
                 pst.setLong(2, newFileId);
                 pst.executeUpdate();
             }
-            String inClause = oldFileIds.stream().map(id -> "?").collect(Collectors.joining(","));
-            try (PreparedStatement pst = conn.prepareStatement(
-                    "DELETE FROM FILES WHERE FILE_ID IN (" + inClause + ")"))
+            if (oldFileIds != null && !oldFileIds.isEmpty())
             {
-                for (int i = 0; i < oldFileIds.size(); i++)
+                try (PreparedStatement pst = conn.prepareStatement(
+                        "UPDATE FILES SET FILE_TYPE=?, FILE_CLEANUP_AT=? WHERE FILE_ID=?"))
                 {
-                    pst.setLong(i + 1, oldFileIds.get(i));
+                    for (Long oldFileId : oldFileIds)
+                    {
+                        pst.setInt(1, MetadataProto.File.Type.RETIRED.getNumber());
+                        pst.setLong(2, cleanupAt);
+                        pst.setLong(3, oldFileId);
+                        pst.addBatch();
+                    }
+                    pst.executeBatch();
                 }
-                pst.executeUpdate();
             }
             conn.commit();
             return true;

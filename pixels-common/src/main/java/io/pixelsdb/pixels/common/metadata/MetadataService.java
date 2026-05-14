@@ -1675,17 +1675,18 @@ public class MetadataService
     }
 
     /**
-     * Atomically promote a temporary file to REGULAR and delete the old files.
-     * @param newFileId the id of the new temporary file to promote
-     * @param oldFileIds the ids of old files to delete
+     * Atomically promote a temporary GC file to REGULAR and retire the old files.
+     * @param newFileId the id of the new temporary GC file to promote
+     * @param oldFileIds the ids of old files to retire
+     * @param cleanupAt the cleanup deadline to write on retired old files
      * @throws MetadataException if the request fails
      */
-    public void atomicSwapFiles(long newFileId, List<Long> oldFileIds) throws MetadataException
+    public void atomicSwapFiles(long newFileId, List<Long> oldFileIds, long cleanupAt) throws MetadataException
     {
         String token = UUID.randomUUID().toString();
         MetadataProto.AtomicSwapFilesRequest request = MetadataProto.AtomicSwapFilesRequest.newBuilder()
                 .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token))
-                .setNewFileId(newFileId).addAllOldFileIds(oldFileIds).build();
+                .setNewFileId(newFileId).addAllOldFileIds(oldFileIds).setCleanupAt(cleanupAt).build();
         try
         {
             MetadataProto.AtomicSwapFilesResponse response = this.stub.atomicSwapFiles(request);

@@ -47,7 +47,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -249,44 +248,71 @@ public class TestRdbFileDao
     // =========================================================================
 
     /**
-     * Promoting a file clears {@code FILE_CLEANUP_AT} with the type update.
+     * Promoting a file clears {@code FILE_CLEANUP_AT}; retiring old files writes the shared deadline.
      */
     @Test
-    public void atomicSwapFiles_promoteSqlClearsCleanupAt() throws Exception
+    public void atomicSwapFiles_promotesNewFileAndRetiresOldFilesWithCleanupAt() throws Exception
     {
-        PreparedStatement updatePst = mock(PreparedStatement.class);
-        PreparedStatement deletePst = mock(PreparedStatement.class);
-        when(mockConn.prepareStatement(anyString())).thenAnswer(inv -> {
-            String sql = inv.getArgument(0);
-            if (sql.startsWith("UPDATE")) return updatePst;
-            if (sql.startsWith("DELETE")) return deletePst;
-            return mock(PreparedStatement.class);
-        });
+        PreparedStatement promotePst = mock(PreparedStatement.class);
+        PreparedStatement retirePst = mock(PreparedStatement.class);
+        when(mockConn.prepareStatement(anyString())).thenReturn(promotePst).thenReturn(retirePst);
 
-        assertTrue(dao.atomicSwapFiles(101L, Arrays.asList(11L, 12L)));
+        long cleanupAt = 1_700_000_001_234L;
+        assertTrue(dao.atomicSwapFiles(101L, Arrays.asList(11L, 12L), cleanupAt));
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mockConn, atLeastOnce()).prepareStatement(sqlCaptor.capture());
-        boolean clearsCleanupAt = false;
-        for (String sql : sqlCaptor.getAllValues())
-        {
-            if (sql.contains("FILE_TYPE=?") && sql.contains("FILE_CLEANUP_AT=NULL"))
-            {
-                clearsCleanupAt = true;
-                break;
-            }
-        }
-        assertTrue("promote SQL must clear FILE_CLEANUP_AT to NULL together with the type update",
-                clearsCleanupAt);
+        verify(mockConn, times(2)).prepareStatement(sqlCaptor.capture());
+        String promoteSql = sqlCaptor.getAllValues().get(0);
+        String retireSql = sqlCaptor.getAllValues().get(1);
+        assertTrue("promote SQL must update FILE_TYPE",
+                promoteSql.contains("FILE_TYPE=?"));
+        assertTrue("promote SQL must clear FILE_CLEANUP_AT to NULL",
+                promoteSql.contains("FILE_CLEANUP_AT=NULL"));
+        assertTrue("retire SQL must update FILE_TYPE",
+                retireSql.contains("FILE_TYPE=?"));
+        assertTrue("retire SQL must bind FILE_CLEANUP_AT",
+                retireSql.contains("FILE_CLEANUP_AT=?"));
+        assertTrue("retire SQL must address old files by FILE_ID",
+                retireSql.contains("WHERE FILE_ID=?"));
 
-        verify(updatePst).setInt(1, REGULAR_VALUE);
-        verify(updatePst).setLong(2, 101L);
-        verify(updatePst).executeUpdate();
-        verify(deletePst).setLong(1, 11L);
-        verify(deletePst).setLong(2, 12L);
-        verify(deletePst).executeUpdate();
+        verify(promotePst).setInt(1, REGULAR_VALUE);
+        verify(promotePst).setLong(2, 101L);
+        verify(promotePst).executeUpdate();
+
+        verify(retirePst, times(2)).setInt(1, RETIRED_VALUE);
+        verify(retirePst, times(2)).setLong(2, cleanupAt);
+        verify(retirePst).setLong(3, 11L);
+        verify(retirePst).setLong(3, 12L);
+        verify(retirePst, times(2)).addBatch();
+        verify(retirePst).executeBatch();
+
         verify(mockConn).setAutoCommit(false);
         verify(mockConn).commit();
+        verify(mockConn).setAutoCommit(true);
+    }
+
+    @Test
+    public void atomicSwapFiles_withNoOldFiles_onlyPromotesNewFile() throws Exception
+    {
+        PreparedStatement promotePst = mock(PreparedStatement.class);
+        when(mockConn.prepareStatement(anyString())).thenReturn(promotePst);
+
+        assertTrue(dao.atomicSwapFiles(202L, Collections.emptyList(), 1_700_000_002_000L));
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mockConn).prepareStatement(sqlCaptor.capture());
+        String promoteSql = sqlCaptor.getValue();
+        assertTrue("promote SQL must update FILE_TYPE",
+                promoteSql.contains("FILE_TYPE=?"));
+        assertTrue("promote SQL must clear FILE_CLEANUP_AT to NULL",
+                promoteSql.contains("FILE_CLEANUP_AT=NULL"));
+
+        verify(promotePst).setInt(1, REGULAR_VALUE);
+        verify(promotePst).setLong(2, 202L);
+        verify(promotePst).executeUpdate();
+        verify(mockConn).setAutoCommit(false);
+        verify(mockConn).commit();
+        verify(mockConn).setAutoCommit(true);
     }
 
     @Test
@@ -295,7 +321,7 @@ public class TestRdbFileDao
         when(mockConn.prepareStatement(anyString())).thenThrow(new SQLException("boom"));
 
         assertFalse("atomicSwapFiles must report failure when the JDBC layer throws",
-                dao.atomicSwapFiles(1L, Collections.singletonList(2L)));
+                dao.atomicSwapFiles(1L, Collections.singletonList(2L), 42L));
         verify(mockConn).setAutoCommit(false);
         verify(mockConn).rollback();
         verify(mockConn).setAutoCommit(true);

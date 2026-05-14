@@ -1526,7 +1526,9 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        if (this.fileDao.atomicSwapFiles(request.getNewFileId(), request.getOldFileIdsList()))
+        if (request.hasCleanupAt() &&
+                this.fileDao.atomicSwapFiles(request.getNewFileId(), request.getOldFileIdsList(),
+                        request.getCleanupAt()))
         {
             headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
         }
