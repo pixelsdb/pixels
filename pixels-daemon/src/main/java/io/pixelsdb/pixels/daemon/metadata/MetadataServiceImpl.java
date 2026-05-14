@@ -1351,14 +1351,18 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
     }
 
     @Override
-    public void getFiles(MetadataProto.GetFilesRequest request,
-                         StreamObserver<MetadataProto.GetFilesResponse> responseObserver)
+    public void getFilesByType(MetadataProto.GetFilesByTypeRequest request,
+                               StreamObserver<MetadataProto.GetFilesByTypeResponse> responseObserver)
     {
+        // pathId is optional; absent means scanning across paths.
         MetadataProto.ResponseHeader.Builder headerBuilder = MetadataProto.ResponseHeader.newBuilder()
                 .setToken(request.getHeader().getToken());
 
-        MetadataProto.GetFilesResponse.Builder responseBuilder = MetadataProto.GetFilesResponse.newBuilder();
-        List<MetadataProto.File> files = this.fileDao.getAllByPathId(request.getPathId());
+        MetadataProto.GetFilesByTypeResponse.Builder responseBuilder =
+                MetadataProto.GetFilesByTypeResponse.newBuilder();
+        Long pathId = request.hasPathId() ? request.getPathId() : null;
+        List<MetadataProto.File> files =
+                this.fileDao.getFilesByType(pathId, request.getFileTypesList());
         if (files != null)
         {
             headerBuilder.setErrorCode(SUCCESS).setErrorMsg("");
@@ -1366,7 +1370,7 @@ public class MetadataServiceImpl extends MetadataServiceGrpc.MetadataServiceImpl
         }
         else
         {
-            headerBuilder.setErrorCode(METADATA_GET_FILES_FAILED).setErrorMsg("get files by path id failed");
+            headerBuilder.setErrorCode(METADATA_GET_FILES_FAILED).setErrorMsg("get files by type failed");
             responseBuilder.setHeader(headerBuilder);
         }
 

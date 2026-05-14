@@ -239,9 +239,9 @@ public class TestFileDomain
     {
         for (File.Type t : File.Type.values())
         {
-            // RETIRED carries cleanupAt; the others should not.  We deliberately set cleanupAt
-            // independently of type to verify the domain object preserves whatever it is given.
-            Long cleanup = (t == File.Type.RETIRED) ? 1_700_000_000_999L : null;
+            // The domain object preserves cleanupAt exactly as provided; lifecycle-specific
+            // invariants are enforced by callers that create or update catalog rows.
+            Long cleanup = (t == File.Type.REGULAR) ? null : 1_700_000_000_999L;
             File original = makeFile(7L, "x_" + t + ".pxl", t, 1, 0L, 63L, 3L, cleanup);
 
             File restored = new File(original.toProto());

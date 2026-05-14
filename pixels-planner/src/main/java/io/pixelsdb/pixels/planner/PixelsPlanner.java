@@ -1895,7 +1895,7 @@ public class PixelsPlanner
             {
                 base += "/";
             }
-            for (File file : metadataService.getFiles(dirPath.getId()))
+            for (File file : metadataService.getRegularFiles(dirPath.getId()))
             {
                 filePaths.add(base + file.getName());
             }

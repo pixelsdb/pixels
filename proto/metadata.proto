@@ -65,7 +65,7 @@ service MetadataService {
     rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
     rpc DeletePaths (DeletePathsRequest) returns (DeletePathsResponse);
     rpc AddFiles (AddFilesRequest) returns (AddFilesResponse);
-    rpc GetFiles (GetFilesRequest) returns (GetFilesResponse);
+    rpc GetFilesByType (GetFilesByTypeRequest) returns (GetFilesByTypeResponse);
     rpc GetFileId (GetFileIdRequest) returns (GetFileIdResponse);
     rpc GetFileType (GetFileTypeRequest) returns (GetFileTypeResponse);
     rpc UpdateFile (UpdateFileRequest) returns (UpdateFileResponse);
@@ -682,13 +682,14 @@ message AddFilesResponse {
     ResponseHeader header = 1;
 }
 
-message GetFilesRequest {
-    // Query-visible REGULAR file enumeration.
+message GetFilesByTypeRequest {
+    // If set, restricts the scan to one path; otherwise scans across paths.
     RequestHeader header = 1;
-    uint64 pathId = 2;
+    optional uint64 pathId = 2;
+    repeated File.Type fileTypes = 3;
 }
 
-message GetFilesResponse {
+message GetFilesByTypeResponse {
     ResponseHeader header = 1;
     repeated File files = 2;
 }

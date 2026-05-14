@@ -1939,12 +1939,12 @@ public class TestStorageGarbageCollector
     }
 
     /**
-     * TEMPORARY_GC visibility semantics: before the swap, {@code getFiles(pathId)} must
+     * TEMPORARY_GC visibility semantics: before the swap, {@code getRegularFiles(pathId)} must
      * <b>not</b> return the TEMPORARY_GC new file (the DAO filters {@code FILE_TYPE = REGULAR}).
      * After the swap the promoted file is visible and the old file disappears.
      */
     @Test
-    public void testAtomicSwap_temporaryInvisibleViaGetFiles() throws Exception
+    public void testAtomicSwap_temporaryInvisibleViaGetRegularFiles() throws Exception
     {
         writeTestFile("vis_old.pxl", LONG_ID_SCHEMA, new long[]{0, 1}, true, new long[]{100, 100});
         long[] fileIds = registerTestFiles(
@@ -1954,33 +1954,33 @@ public class TestStorageGarbageCollector
         long oldFileId = fileIds[0];
         long tempFileId = fileIds[1];
 
-        List<File> beforeSwap = metadataService.getFiles(testPathId);
+        List<File> beforeSwap = metadataService.getRegularFiles(testPathId);
         Set<Long> beforeIds = new HashSet<>();
         for (File f : beforeSwap)
         {
             beforeIds.add(f.getId());
         }
-        assertTrue("REGULAR old file should be visible via getFiles before swap",
+        assertTrue("REGULAR old file should be visible via getRegularFiles before swap",
                 beforeIds.contains(oldFileId));
-        assertFalse("TEMPORARY_GC new file must NOT be visible via getFiles before swap",
+        assertFalse("TEMPORARY_GC new file must NOT be visible via getRegularFiles before swap",
                 beforeIds.contains(tempFileId));
 
         metadataService.atomicSwapFiles(tempFileId, Collections.singletonList(oldFileId));
 
-        List<File> afterSwap = metadataService.getFiles(testPathId);
+        List<File> afterSwap = metadataService.getRegularFiles(testPathId);
         Set<Long> afterIds = new HashSet<>();
         for (File f : afterSwap)
         {
             afterIds.add(f.getId());
         }
-        assertTrue("Promoted file should be visible via getFiles after swap",
+        assertTrue("Promoted file should be visible via getRegularFiles after swap",
                 afterIds.contains(tempFileId));
-        assertFalse("Old file should NOT be visible via getFiles after swap",
+        assertFalse("Old file should NOT be visible via getRegularFiles after swap",
                 afterIds.contains(oldFileId));
     }
 
     // -----------------------------------------------------------------------
-    // Coverage for getFiles(pathId) REGULAR-only enumeration.
+    // Coverage for getRegularFiles(pathId) REGULAR-only enumeration.
     // -----------------------------------------------------------------------
 
     /**
@@ -2008,11 +2008,11 @@ public class TestStorageGarbageCollector
             extremeId = insertRawFileWithType("mix_extreme_max_" + suffix + ".pxl",
                     Integer.MAX_VALUE, 1, 0L, 1L);
 
-            List<File> files = metadataService.getFiles(testPathId);
+            List<File> files = metadataService.getRegularFiles(testPathId);
             Set<Long> visible = new HashSet<>();
             for (File f : files)
             {
-                assertEquals("getFiles must only emit REGULAR",
+                assertEquals("getRegularFiles must only emit REGULAR",
                         File.Type.REGULAR, f.getType());
                 visible.add(f.getId());
             }
@@ -2077,7 +2077,7 @@ public class TestStorageGarbageCollector
             }
             registeredIds.add(regularId);
 
-            List<File> visible = metadataService.getFiles(testPathId);
+            List<File> visible = metadataService.getRegularFiles(testPathId);
             Set<Long> visibleIds = new HashSet<>();
             for (File f : visible)
             {
@@ -2128,7 +2128,7 @@ public class TestStorageGarbageCollector
 
             // Before swap: only oldRegular visible; RETIRED + TEMPORARY_GC hidden.
             Set<Long> beforeIds = new HashSet<>();
-            for (File f : metadataService.getFiles(testPathId)) beforeIds.add(f.getId());
+            for (File f : metadataService.getRegularFiles(testPathId)) beforeIds.add(f.getId());
             assertTrue("old REGULAR must be visible before swap",
                     beforeIds.contains(oldRegularId));
             assertFalse("RETIRED tombstone must be hidden before swap",
@@ -2141,9 +2141,9 @@ public class TestStorageGarbageCollector
             // After swap: tempGcId is now REGULAR (visible); old REGULAR is gone; the
             // coexisting RETIRED file must STILL be hidden (the swap did not promote it).
             Set<Long> afterIds = new HashSet<>();
-            for (File f : metadataService.getFiles(testPathId))
+            for (File f : metadataService.getRegularFiles(testPathId))
             {
-                assertEquals("getFiles must only emit REGULAR after swap",
+                assertEquals("getRegularFiles must only emit REGULAR after swap",
                         File.Type.REGULAR, f.getType());
                 afterIds.add(f.getId());
             }
@@ -2179,7 +2179,7 @@ public class TestStorageGarbageCollector
         {
             fileId = registerTestFile("min_single_regular_" + System.nanoTime() + ".pxl",
                     File.Type.REGULAR, 1, 0L, 0L);
-            List<File> files = metadataService.getFiles(testPathId);
+            List<File> files = metadataService.getRegularFiles(testPathId);
             File found = null;
             for (File f : files)
             {
@@ -2214,7 +2214,7 @@ public class TestStorageGarbageCollector
         long regularId = registerTestFile("delete_visibility_" + System.nanoTime() + ".pxl",
                 File.Type.REGULAR, 1, 0L, 1L);
 
-        List<File> beforeDelete = metadataService.getFiles(testPathId);
+        List<File> beforeDelete = metadataService.getRegularFiles(testPathId);
         Set<Long> beforeIds = new HashSet<>();
         for (File f : beforeDelete) beforeIds.add(f.getId());
         assertTrue("REGULAR file must be visible before delete",
@@ -2222,7 +2222,7 @@ public class TestStorageGarbageCollector
 
         metadataService.deleteFiles(Collections.singletonList(regularId));
 
-        List<File> afterDelete = metadataService.getFiles(testPathId);
+        List<File> afterDelete = metadataService.getRegularFiles(testPathId);
         for (File f : afterDelete)
         {
             assertFalse("deleted REGULAR file must no longer be visible",
@@ -2271,7 +2271,7 @@ public class TestStorageGarbageCollector
                         startGate.await();
                         for (int i = 0; i < iterations; i++)
                         {
-                            List<File> snapshot = metadataService.getFiles(testPathId);
+                            List<File> snapshot = metadataService.getRegularFiles(testPathId);
                             boolean sawRegular = false;
                             for (File f : snapshot)
                             {
@@ -2303,7 +2303,7 @@ public class TestStorageGarbageCollector
                     0, missingRegular.get());
 
             // A follow-up call should remain REGULAR-only after the concurrent burst.
-            List<File> followUp = metadataService.getFiles(testPathId);
+            List<File> followUp = metadataService.getRegularFiles(testPathId);
             assertNotNull("follow-up getFiles must not return null", followUp);
             for (File f : followUp)
             {

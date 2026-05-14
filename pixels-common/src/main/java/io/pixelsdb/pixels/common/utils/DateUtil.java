@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.common.utils;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -49,6 +50,7 @@ public class DateUtil
     public static String getCurTime()
     {
         SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmss");//set the style
+        df.setTimeZone(TimeZone.getTimeZone(ConfigFactory.Instance().getProperty("pxl.file.timestamp.zone")));
         return df.format(new Date()) + "_" + count.getAndIncrement();
     }
 }

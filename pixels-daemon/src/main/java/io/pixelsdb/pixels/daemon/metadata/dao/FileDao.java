@@ -39,9 +39,12 @@ public abstract class FileDao implements Dao<MetadataProto.File>
     }
 
     /**
-     * Return query-visible REGULAR files under a path.
+     * Return files of the requested types.
+     *
+     * @param pathId path scope, or {@code null} for all paths
+     * @param types file types to include; null or empty returns no files
      */
-    public abstract List<MetadataProto.File> getAllByPathId(long pathId);
+    public abstract List<MetadataProto.File> getFilesByType(Long pathId, List<MetadataProto.File.Type> types);
 
     public abstract MetadataProto.File getByPathIdAndFileName(long pathId, String fileName);
 

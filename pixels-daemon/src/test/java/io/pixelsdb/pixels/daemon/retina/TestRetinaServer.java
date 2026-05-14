@@ -116,8 +116,8 @@ public class TestRetinaServer
         when(metadataService.getSchemas()).thenReturn(Collections.singletonList(schema));
         when(metadataService.getTables(schema.getName())).thenReturn(Collections.singletonList(table));
         when(metadataService.getLayouts(schema.getName(), table.getName())).thenReturn(Collections.singletonList(layout));
-        when(metadataService.getFiles(orderedPath.getId())).thenReturn(Collections.singletonList(orderedFile));
-        when(metadataService.getFiles(compactPath.getId())).thenReturn(Collections.singletonList(compactFile));
+        when(metadataService.getRegularFiles(orderedPath.getId())).thenReturn(Collections.singletonList(orderedFile));
+        when(metadataService.getRegularFiles(compactPath.getId())).thenReturn(Collections.singletonList(compactFile));
         doAnswer(invocation -> {
             lifecycleEvents.add("recover");
             return null;

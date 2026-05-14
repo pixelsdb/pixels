@@ -297,7 +297,7 @@ public class CacheCoordinator implements Server
         // Issue #723: files are managed in metadata, do not get file paths from storage.
         for (Path compactPath : compactPaths)
         {
-            this.metadataService.getFiles(compactPath.getId()).forEach(
+            this.metadataService.getRegularFiles(compactPath.getId()).forEach(
                     file -> filePaths.add(File.getFilePath(compactPath, file)));
         }
         return filePaths;

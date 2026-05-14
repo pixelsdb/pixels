@@ -381,7 +381,7 @@ public class StorageGarbageCollector
                     List<File> files;
                     try
                     {
-                        files = metadataService.getFiles(path.getId());
+                        files = metadataService.getRegularFiles(path.getId());
                     }
                     catch (MetadataException e)
                     {

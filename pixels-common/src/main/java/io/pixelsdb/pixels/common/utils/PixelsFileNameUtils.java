@@ -19,6 +19,11 @@
  */
 package io.pixelsdb.pixels.common.utils;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.OptionalLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -267,6 +272,34 @@ public final class PixelsFileNameUtils
     {
         Matcher m = match(path);
         return (m != null) ? PxlFileType.fromLabel(m.group(5)) : null;
+    }
+
+    /**
+     * Extracts the embedded {@code yyyyMMddHHmmss} create time from a {@code .pxl} path.
+     * 
+     * @param path absolute or relative file path
+     * @return {@code epoch-millis} of the embedded timestamp, or
+     *         {@link OptionalLong#empty()} if {@code path} does not match the
+     *         unified format or the timestamp segment fails to parse.
+     */
+    public static OptionalLong extractCreateTimeMillis(String path)
+    {
+        Matcher m = match(path);
+        if (m == null)
+        {
+            return OptionalLong.empty();
+        }
+        try
+        {
+            return OptionalLong.of(LocalDateTime.parse(m.group(2), DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                    .atZone(ZoneId.of(ConfigFactory.Instance().getProperty("pxl.file.timestamp.zone")))
+                    .toInstant()
+                    .toEpochMilli());
+        }
+        catch (DateTimeParseException e)
+        {
+            return OptionalLong.empty();
+        }
     }
 
     /**

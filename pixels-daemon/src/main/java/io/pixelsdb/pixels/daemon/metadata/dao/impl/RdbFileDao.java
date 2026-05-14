@@ -27,6 +27,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -60,14 +62,32 @@ public class RdbFileDao extends FileDao
         return builder.build();
     }
 
+    /**
+     * Bind {@code FILE_CLEANUP_AT} for a file row.
+     *
+     * <p>{@code RETIRED} files must carry a cleanup deadline; other types must not.
+     */
     private static void setCleanupAt(PreparedStatement pst, int index, MetadataProto.File file) throws SQLException
     {
-        if (file.getTypeValue() == MetadataProto.File.Type.RETIRED.getNumber() && file.hasCleanupAt())
+        if (file.getTypeValue() == MetadataProto.File.Type.RETIRED.getNumber())
         {
+            if (!file.hasCleanupAt())
+            {
+                throw new SQLException("FILES row invariant violated: RETIRED file '"
+                        + file.getName() + "' (id=" + file.getId()
+                        + ") must carry a non-null FILE_CLEANUP_AT");
+            }
             pst.setLong(index, file.getCleanupAt());
         }
         else
         {
+            if (file.hasCleanupAt())
+            {
+                throw new SQLException("FILES row invariant violated: non-RETIRED file '"
+                        + file.getName() + "' (id=" + file.getId()
+                        + ", type=" + file.getType()
+                        + ") must NOT carry FILE_CLEANUP_AT (got " + file.getCleanupAt() + ")");
+            }
             pst.setNull(index, Types.BIGINT);
         }
     }
@@ -76,9 +96,9 @@ public class RdbFileDao extends FileDao
     public MetadataProto.File getById(long id)
     {
         Connection conn = db.getConnection();
-        try (Statement st = conn.createStatement())
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM FILES WHERE FILE_ID=" + id))
         {
-            ResultSet rs = st.executeQuery("SELECT * FROM FILES WHERE FILE_ID=" + id);
             if (rs.next())
             {
                 return buildFile(rs);
@@ -92,25 +112,59 @@ public class RdbFileDao extends FileDao
     }
 
     @Override
-    public List<MetadataProto.File> getAllByPathId(long pathId)
+    public List<MetadataProto.File> getFilesByType(Long pathId, List<MetadataProto.File.Type> types)
     {
-        Connection conn = db.getConnection();
-        String sql = "SELECT * FROM FILES WHERE FILE_TYPE = ? AND PATHS_PATH_ID = ?";
-        try (PreparedStatement st = conn.prepareStatement(sql))
+        if (types == null || types.isEmpty())
         {
-            // Query-visible file enumeration is REGULAR-only.
-            st.setInt(1, MetadataProto.File.Type.REGULAR.getNumber());
-            st.setLong(2, pathId);
-            ResultSet rs = st.executeQuery();
-            List<MetadataProto.File> files = new ArrayList<>();
-            while (rs.next())
+            return Collections.emptyList();
+        }
+        // De-duplicate while preserving insertion order so the SQL bind order is stable.
+        LinkedHashSet<Integer> typeNumbers = new LinkedHashSet<>();
+        for (MetadataProto.File.Type type : types)
+        {
+            if (type != null)
             {
-                files.add(buildFile(rs));
+                typeNumbers.add(type.getNumber());
             }
-            return files;
+        }
+        if (typeNumbers.isEmpty())
+        {
+            return Collections.emptyList();
+        }
+
+        StringBuilder sql = new StringBuilder("SELECT * FROM FILES WHERE ");
+        if (pathId != null)
+        {
+            sql.append("PATHS_PATH_ID = ? AND ");
+        }
+        sql.append("FILE_TYPE IN (")
+                .append(String.join(",", Collections.nCopies(typeNumbers.size(), "?")))
+                .append(") ORDER BY FILE_ID");
+
+        Connection conn = db.getConnection();
+        try (PreparedStatement pst = conn.prepareStatement(sql.toString()))
+        {
+            int index = 1;
+            if (pathId != null)
+            {
+                pst.setLong(index++, pathId);
+            }
+            for (Integer number : typeNumbers)
+            {
+                pst.setInt(index++, number);
+            }
+            try (ResultSet rs = pst.executeQuery())
+            {
+                List<MetadataProto.File> files = new ArrayList<>();
+                while (rs.next())
+                {
+                    files.add(buildFile(rs));
+                }
+                return files;
+            }
         } catch (SQLException e)
         {
-            log.error("getAllByPathId in RdbFileDao", e);
+            log.error("getFilesByType in RdbFileDao", e);
         }
 
         return null;
@@ -125,10 +179,12 @@ public class RdbFileDao extends FileDao
         {
             st.setLong(1, pathId);
             st.setString(2, fileName);
-            ResultSet rs = st.executeQuery();
-            if (rs.next())
+            try (ResultSet rs = st.executeQuery())
             {
-                return buildFile(rs);
+                if (rs.next())
+                {
+                    return buildFile(rs);
+                }
             }
         } catch (SQLException e)
         {
@@ -145,10 +201,12 @@ public class RdbFileDao extends FileDao
         try (Statement st = conn.createStatement())
         {
             String sql = "SELECT 1 FROM FILES WHERE FILE_ID=" + file.getId();
-            ResultSet rs = st.executeQuery(sql);
-            if (rs.next())
+            try (ResultSet rs = st.executeQuery(sql))
             {
-                return true;
+                if (rs.next())
+                {
+                    return true;
+                }
             }
         } catch (SQLException e)
         {
@@ -181,14 +239,16 @@ public class RdbFileDao extends FileDao
             setCleanupAt(pst, 7, file);
             if (pst.executeUpdate() == 1)
             {
-                ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()");
-                if (rs.next())
+                try (ResultSet rs = pst.executeQuery("SELECT LAST_INSERT_ID()"))
                 {
-                    return rs.getLong(1);
-                }
-                else
-                {
-                    return -1;
+                    if (rs.next())
+                    {
+                        return rs.getLong(1);
+                    }
+                    else
+                    {
+                        return -1;
+                    }
                 }
             }
             else

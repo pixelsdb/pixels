@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.server.HostAddress;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import io.pixelsdb.pixels.daemon.MetadataServiceGrpc;
@@ -1429,16 +1430,56 @@ public class MetadataService
     }
 
     /**
-     * Return query-visible REGULAR files under the path.
+     * Return query-visible {@link File.Type#REGULAR} files under the path.
      */
-    public List<File> getFiles(long pathId) throws MetadataException
+    public List<File> getRegularFiles(long pathId) throws MetadataException
     {
+        return getFilesByType(pathId, EnumSet.of(File.Type.REGULAR));
+    }
+
+    /**
+     * Return files of the requested types, scoped to a single path.
+     */
+    public List<File> getFilesByType(long pathId, Set<File.Type> types) throws MetadataException
+    {
+        return invokeGetFilesByType(pathId, types, "get files by type");
+    }
+
+    /**
+     * Catalog-wide cross-path enumeration of the requested types.
+     */
+    public List<File> getFilesByType(Set<File.Type> types) throws MetadataException
+    {
+        return invokeGetFilesByType(null, types, "get files by type (cross-path)");
+    }
+
+    private List<File> invokeGetFilesByType(Long pathId, Set<File.Type> types, String errorContext)
+            throws MetadataException
+    {
+        if (types == null || types.isEmpty())
+        {
+            throw new IllegalArgumentException(
+                    errorContext + ": 'types' must be non-null and non-empty");
+        }
         String token = UUID.randomUUID().toString();
-        MetadataProto.GetFilesRequest request = MetadataProto.GetFilesRequest.newBuilder()
-                .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token)).setPathId(pathId).build();
+        MetadataProto.GetFilesByTypeRequest.Builder requestBuilder =
+                MetadataProto.GetFilesByTypeRequest.newBuilder()
+                        .setHeader(MetadataProto.RequestHeader.newBuilder().setToken(token));
+        if (pathId != null)
+        {
+            requestBuilder.setPathId(pathId);
+        }
+        for (File.Type type : types)
+        {
+            if (type != null)
+            {
+                requestBuilder.addFileTypesValue(type.getNumber());
+            }
+        }
+
         try
         {
-            MetadataProto.GetFilesResponse response = this.stub.getFiles(request);
+            MetadataProto.GetFilesByTypeResponse response = this.stub.getFilesByType(requestBuilder.build());
             if (response.getHeader().getErrorCode() != 0)
             {
                 throw new MetadataException("error code=" + response.getHeader().getErrorCode()
@@ -1450,10 +1491,104 @@ public class MetadataService
             }
             return File.convertFiles(response.getFilesList());
         }
+        catch (MetadataException e)
+        {
+            throw e;
+        }
         catch (Exception e)
         {
-            throw new MetadataException("failed to get files", e);
+            throw new MetadataException("failed to " + errorContext, e);
         }
+    }
+
+    /**
+     * Return temporary files (TEMPORARY_INGEST + TEMPORARY_GC) whose filename
+     * create time plus {@code ttlMs} is not later than now.
+     *
+     * <p>The create time is decoded from the {@code yyyyMMddHHmmss} timestamp in
+     * the file name. Files with unparsable names are logged and skipped.
+     *
+     * <p>For background sweepers only; not for query-visible callers.
+     *
+     * @param ttlMs temporary-file TTL in milliseconds. Must be {@code >= 0}.
+     */
+    public List<File> listTemporaryFilesDue(long ttlMs) throws MetadataException
+    {
+        if (ttlMs < 0)
+        {
+            throw new IllegalArgumentException("listTemporaryFilesDue: ttlMs must be >= 0, got " + ttlMs);
+        }
+        long now = System.currentTimeMillis();
+        List<File> all = getFilesByType(
+                EnumSet.of(File.Type.TEMPORARY_INGEST, File.Type.TEMPORARY_GC));
+        List<File> due = new ArrayList<>(all.size());
+        int skippedParseFailure = 0;
+        for (File f : all)
+        {
+            OptionalLong createTime = PixelsFileNameUtils.extractCreateTimeMillis(f.getName());
+            if (!createTime.isPresent())
+            {
+                skippedParseFailure++;
+                logger.warn("listTemporaryFilesDue: cannot decode createTime from file name '{}' " +
+                                "(id={}, pathId={}, type={}); skipping. event=sweep.parse_failure",
+                        f.getName(), f.getId(), f.getPathId(), f.getType());
+                continue;
+            }
+            if (createTime.getAsLong() + ttlMs <= now)
+            {
+                due.add(f);
+            }
+        }
+        if (skippedParseFailure > 0)
+        {
+            logger.warn("listTemporaryFilesDue: skipped {} temporary file(s) due to filename parse failure; " +
+                    "investigate writer-side filename generation. event=sweep.parse_failure.summary",
+                    skippedParseFailure);
+        }
+        // Oldest-first ordering for reproducible sweep batches.  The createTime is already
+        // parsed once above, but the file list is small (sweep batch), so re-parsing here
+        // is acceptable and keeps the sort key self-contained.
+        due.sort(Comparator
+                .comparingLong((File f) -> PixelsFileNameUtils.extractCreateTimeMillis(f.getName())
+                        .orElse(Long.MAX_VALUE))
+                .thenComparingLong(File::getId));
+        return due;
+    }
+
+    /**
+     * Return RETIRED files whose {@code cleanupAt} deadline has arrived.
+     */
+    public List<File> listRetiredFilesDue() throws MetadataException
+    {
+        long now = System.currentTimeMillis();
+        List<File> all = getFilesByType(EnumSet.of(File.Type.RETIRED));
+        List<File> due = new ArrayList<>(all.size());
+        int skippedInvariantViolation = 0;
+        for (File f : all)
+        {
+            Long cleanupAt = f.getCleanupAt();
+            if (cleanupAt == null)
+            {
+                skippedInvariantViolation++;
+                logger.warn("listRetiredFilesDue: RETIRED file '{}' (id={}, pathId={}) carries no cleanupAt; " +
+                                "skipping. event=sweep.invariant_violation",
+                        f.getName(), f.getId(), f.getPathId());
+                continue;
+            }
+            if (cleanupAt <= now)
+            {
+                due.add(f);
+            }
+        }
+        if (skippedInvariantViolation > 0)
+        {
+            logger.warn("listRetiredFilesDue: skipped {} RETIRED file(s) missing cleanupAt; " +
+                    "investigate DAO write path. event=sweep.invariant_violation.summary",
+                    skippedInvariantViolation);
+        }
+        due.sort(Comparator.comparingLong((File f) -> f.getCleanupAt())
+                .thenComparingLong(File::getId));
+        return due;
     }
 
     public boolean updateFile(File file) throws MetadataException

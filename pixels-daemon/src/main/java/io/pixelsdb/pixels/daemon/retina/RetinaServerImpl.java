@@ -132,7 +132,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         // add visibility for ordered files
                         List<Path> orderedPaths = layout.getOrderedPaths();
                         validateOrderedOrCompactPaths(orderedPaths);
-                        List<File> orderedFiles = this.metadataService.getFiles(orderedPaths.get(0).getId());
+                        List<File> orderedFiles = this.metadataService.getRegularFiles(orderedPaths.get(0).getId());
                         files.addAll(orderedFiles.stream()
                                 .map(file -> orderedPaths.get(0).getUri() + "/" + file.getName())
                                 .collect(Collectors.toList()));
@@ -140,7 +140,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                         // add visibility for compact files
                         List<Path> compactPaths = layout.getCompactPaths();
                         validateOrderedOrCompactPaths(compactPaths);
-                        List<File> compactFiles = this.metadataService.getFiles(compactPaths.get(0).getId());
+                        List<File> compactFiles = this.metadataService.getRegularFiles(compactPaths.get(0).getId());
                         files.addAll(compactFiles.stream()
                                 .map(file -> compactPaths.get(0).getUri() + "/" + file.getName())
                                 .collect(Collectors.toList()));
