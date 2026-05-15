@@ -117,26 +117,34 @@ Pixels is an academic system aims at providing production-grade quality. It supp
 is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
-> `ICDE'25` [PixelsDB: Serverless and NL-Aided Data Analytics with Flexible Service Levels and Prices](https://arxiv.org/abs/2405.19784)\
-> Haoqiong Bian, Dongyang Geng, Haoyang Li, Yunpeng Chai, Anastasia Ailamaki
+1. [PixelsDB: Serverless and NL-Aided Data Analytics with Flexible Service Levels and Prices](https://arxiv.org/abs/2405.19784)  
+   Haoqiong Bian, Dongyang Geng, Haoyang Li, Yunpeng Chai, Anastasia Ailamaki  
+   *Proceedings of the 41st IEEE International Conference on Data Engineering* (**ICDE'25**).
 
-> `arXiv'24` [Serverless Query Processing with Flexible Performance SLAs and Prices](https://arxiv.org/abs/2409.01388)\
-> Haoqiong Bian, Dongyang Geng, Yunpeng Chai, Anastasia Ailamaki
+2. [Serverless Query Processing with Flexible Performance SLAs and Prices](https://arxiv.org/abs/2409.01388)  
+   Haoqiong Bian, Dongyang Geng, Yunpeng Chai, Anastasia Ailamaki  
+   *arXiv preprint arXiv:2409.01388* (**arXiv'24**).
 
-> `SIGMOD'23` [Using Cloud Functions as Accelerator for Elastic Data Analytics](https://doi.org/10.1145/3589306)\
-> Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki
+3. [Using Cloud Functions as Accelerator for Elastic Data Analytics](https://doi.org/10.1145/3589306)  
+   Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki  
+   *Proceedings of the 2023 ACM International Conference on Management of Data* (**SIGMOD'23**).
 
-> `EDBT'22` [Columnar Storage Optimization and Caching for Data Lakes (short)](https://doi.org/10.48786/edbt.2022.33)\
-> Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du
+4. [Columnar Storage Optimization and Caching for Data Lakes (short)](https://doi.org/10.48786/edbt.2022.33)  
+   Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du  
+   *Proceedings of the 25th International Conference on Extending Database Technology* (**EDBT'22**).
 
-> `ICDE'22` [Pixels: An Efficient Column Store for Cloud Data Lakes](https://doi.org/10.1109/ICDE53745.2022.00276)\
-> Haoqiong Bian, Anastasia Ailamaki
+5. [Pixels: An Efficient Column Store for Cloud Data Lakes](https://doi.org/10.1109/ICDE53745.2022.00276)  
+   Haoqiong Bian, Anastasia Ailamaki  
+   *Proceedings of the 38th IEEE International Conference on Data Engineering* (**ICDE'22**).
 
-> `CIDR'20` [Pixels: Multiversion Wide Table Store for Data Lakes (abstract)](https://www.cidrdb.org/cidr2020/gongshow2020/gongshow/abstracts/cidr2020_abstract74.pdf)\
-> Haoqiong Bian
+6. [Pixels: Multiversion Wide Table Store for Data Lakes (abstract)](https://www.cidrdb.org/cidr2020/gongshow2020/gongshow/abstracts/cidr2020_abstract74.pdf)  
+   Haoqiong Bian  
+   *10th Annual Conference on Innovative Data Systems Research* (**CIDR'20**).
 
-> `ICDE'18` [Rainbow: Adaptive Layout Optimization for Wide Tables (demo)](https://doi.org/10.1109/ICDE.2018.00200)\
-> Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du
+7. [Rainbow: Adaptive Layout Optimization for Wide Tables (demo)](https://doi.org/10.1109/ICDE.2018.00200)  
+   Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du  
+   *Proceedings of the 34th IEEE International Conference on Data Engineering* (**ICDE'18**).
 
-> `SIGMOD'17` [Wide Table Layout Optimization by Column Ordering and Duplication](https://doi.org/10.1145/3035918.3035930)\
-> Haoqiong Bian, Ying Yan, Wenbo Tao, Liang Jeff Chen, Yueguo Chen, Xiaoyong Du, Thomas Moscibroda
+8. [Wide Table Layout Optimization by Column Ordering and Duplication](https://doi.org/10.1145/3035918.3035930)  
+   Haoqiong Bian, Ying Yan, Wenbo Tao, Liang Jeff Chen, Yueguo Chen, Xiaoyong Du, Thomas Moscibroda  
+   *Proceedings of the 2017 ACM International Conference on Management of Data* (**SIGMOD'17**).
