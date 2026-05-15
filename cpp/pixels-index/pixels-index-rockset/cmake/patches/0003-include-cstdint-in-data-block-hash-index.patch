@@ -1,0 +1,12 @@
+diff --git a/table/block_based/data_block_hash_index.h b/table/block_based/data_block_hash_index.h
+index 0af8b257..75a797bd 100644
+--- a/table/block_based/data_block_hash_index.h
++++ b/table/block_based/data_block_hash_index.h
+@@ -5,6 +5,7 @@
+ 
+ #pragma once
+ 
++#include <cstdint>
+ #include <string>
+ #include <vector>
+ 

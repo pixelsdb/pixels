@@ -21,10 +21,9 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetBlockBasedTableConfig_newTableF
     JNIEnv*,
     jclass,
     jlong jblock_cache_handle,
-    jlong jfilter_policy_handle,
     jlong jblock_size,
-    jboolean jwhole_key_filtering,
-    jboolean jcache_index_and_filter_blocks)
+    jlong jfilter_policy_handle,
+    jboolean jwhole_key_filtering)
 {
     BlockBasedTableOptions options;
     // 1. block cache

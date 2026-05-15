@@ -77,11 +77,13 @@ public class RocksetFactory
     }
     static RocksetDB createRocksetDB(String rocksetPath) throws Exception
     {
+        RocksetEnv rocksetEnv = createRocksetEnv();
+
         // 1. Get existing column families (returns empty list for new database)
         List<byte[]> existingColumnFamilies;
         try
         {
-            existingColumnFamilies = RocksetDB.listColumnFamilies0(rocksetPath);
+            existingColumnFamilies = RocksetDB.listColumnFamilies0(rocksetEnv.nativeHandle(), rocksetPath);
         } catch (Exception e)
         {
             // For new database, return list containing only default column family
@@ -112,21 +114,7 @@ public class RocksetFactory
         List<RocksetColumnFamilyDescriptor> descriptors = new ArrayList<>();
         for(byte[] existingColumnFamily: existingColumnFamilies)
         {
-            long[] ids = IndexUtils.parseTableAndIndexId(existingColumnFamily);
-            Integer keyLen = null;
-            if(ids != null)
-            {
-                long tableId = ids[0];
-                long indexId = ids[1];
-                try
-                {
-                    keyLen = getIndexKeyLen(tableId, indexId);
-                } catch (MetadataException ignored)
-                {
-
-                }
-            }
-            descriptors.add(createCFDescriptor(existingColumnFamily, keyLen));
+            descriptors.add(createCFDescriptor(existingColumnFamily));
         }
         // 4. Open DB
         List<RocksetColumnFamilyHandle> handles = new ArrayList<>();
@@ -163,8 +151,7 @@ public class RocksetFactory
                     .setStatsDumpPeriodSec(statsInterval)
                     .setDbLogDir(statsPath);
         }
-        RocksetEnv rocksetEnv = createRocksetEnv();
-        RocksetDB db = RocksetDB.open(rocksetEnv, options, rocksetPath, descriptors, handles);
+        RocksetDB db = openWithMissingColumnFamilyRetry(rocksetEnv, options, rocksetPath, descriptors, handles);
         if(enableStats)
         {
             startRocksetLogThread(db);
@@ -177,6 +164,103 @@ public class RocksetFactory
             cfHandles.putIfAbsent(cfName, handles.get(i));
         }
         return db;
+    }
+
+    private static RocksetDB openWithMissingColumnFamilyRetry(
+            RocksetEnv rocksetEnv,
+            RocksetDBOptions options,
+            String rocksetPath,
+            List<RocksetColumnFamilyDescriptor> descriptors,
+            List<RocksetColumnFamilyHandle> handles) throws Exception
+    {
+        Set<String> descriptorNames = new HashSet<>();
+        for (RocksetColumnFamilyDescriptor descriptor : descriptors)
+        {
+            descriptorNames.add(new String(descriptor.getName(), StandardCharsets.UTF_8));
+        }
+
+        Exception lastException = null;
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            handles.clear();
+            try
+            {
+                return RocksetDB.open(rocksetEnv, options, rocksetPath, descriptors, handles);
+            } catch (Exception e)
+            {
+                lastException = e;
+                List<String> missingColumnFamilies = extractMissingColumnFamilies(e);
+                if (missingColumnFamilies.isEmpty())
+                {
+                    throw e;
+                }
+
+                boolean added = false;
+                for (String columnFamily : missingColumnFamilies)
+                {
+                    if (descriptorNames.add(columnFamily))
+                    {
+                        descriptors.add(createCFDescriptor(columnFamily.getBytes(StandardCharsets.UTF_8)));
+                        added = true;
+                    }
+                }
+                if (!added)
+                {
+                    throw e;
+                }
+            }
+        }
+        throw lastException;
+    }
+
+    private static List<String> extractMissingColumnFamilies(Throwable throwable)
+    {
+        final String marker = "Column families not opened:";
+        for (Throwable current = throwable; current != null; current = current.getCause())
+        {
+            String message = current.getMessage();
+            if (message == null)
+            {
+                continue;
+            }
+            int markerIndex = message.indexOf(marker);
+            if (markerIndex < 0)
+            {
+                continue;
+            }
+
+            String names = message.substring(markerIndex + marker.length()).trim();
+            List<String> result = new ArrayList<>();
+            for (String name : names.split(","))
+            {
+                String trimmed = name.trim();
+                if (!trimmed.isEmpty())
+                {
+                    result.add(trimmed);
+                }
+            }
+            return result;
+        }
+        return Collections.emptyList();
+    }
+
+    private static RocksetColumnFamilyDescriptor createCFDescriptor(byte[] name) throws Exception
+    {
+        long[] ids = IndexUtils.parseTableAndIndexId(name);
+        Integer keyLen = null;
+        if(ids != null)
+        {
+            long tableId = ids[0];
+            long indexId = ids[1];
+            try
+            {
+                keyLen = getIndexKeyLen(tableId, indexId);
+            } catch (MetadataException ignored)
+            {
+
+            }
+        }
+        return createCFDescriptor(name, keyLen);
     }
 
     private static RocksetColumnFamilyDescriptor createCFDescriptor(byte[] name, Integer keyLen)

@@ -1,0 +1,40 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9db02a1e..5e18ba00 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -725,6 +725,21 @@ set(SOURCES
+         utilities/ttl/db_ttl_impl.cc
+         utilities/write_batch_with_index/write_batch_with_index.cc
+         utilities/write_batch_with_index/write_batch_with_index_internal.cc
++        cloud/aws/aws_env.cc
++        cloud/aws/aws_kafka.cc
++        cloud/aws/aws_kinesis.cc
++        cloud/aws/aws_retry.cc
++        cloud/aws/aws_s3.cc
++        cloud/db_cloud_impl.cc
++        cloud/cloud_env.cc
++        cloud/cloud_env_impl.cc
++        cloud/cloud_env_options.cc
++        cloud/cloud_log_controller.cc
++        cloud/manifest_reader.cc
++        cloud/purge.cc
++        cloud/cloud_manifest.cc
++        cloud/cloud_storage_provider.cc
++        db/db_impl/db_impl_remote_compaction.cc
+         $<TARGET_OBJECTS:build_version>)
+ 
+ if(HAVE_SSE42 AND NOT MSVC)
+@@ -792,6 +807,13 @@ if(WITH_LIBRADOS)
+   list(APPEND THIRDPARTY_LIBS rados)
+ endif()
+ 
++list(APPEND THIRDPARTY_LIBS
++  aws-cpp-sdk-s3
++  aws-cpp-sdk-transfer
++  aws-cpp-sdk-kinesis
++  aws-cpp-sdk-core
++  curl)
++
+ if(WIN32)
+   set(SYSTEM_LIBS ${SYSTEM_LIBS} shlwapi.lib rpcrt4.lib)
+ else()

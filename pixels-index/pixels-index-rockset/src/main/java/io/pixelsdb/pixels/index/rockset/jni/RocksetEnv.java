@@ -21,7 +21,7 @@ public final class RocksetEnv implements AutoCloseable
         return new RocksetEnv(h);
     }
 
-    long nativeHandle() 
+    public long nativeHandle() 
     {
         return nativeHandle;
     }

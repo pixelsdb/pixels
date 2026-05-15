@@ -19,7 +19,6 @@
 #include "rocksdb/rate_limiter.h"
 #include "rocksdb/status.h"
 #include "rocksdb/table.h"
-#include "rocksdb/utilities/backup_engine.h"
 #include "rocksdb/utilities/memory_util.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/utilities/write_batch_with_index.h"
@@ -27,6 +26,31 @@
 namespace ROCKSDB_NAMESPACE {
 class JniUtil {
     public:
+    template<typename T>
+    static std::vector<T*> fromJPointers(JNIEnv* env, jlongArray handles,
+                                         jboolean* has_exception) {
+        std::vector<T*> ptrs;
+        *has_exception = JNI_FALSE;
+        if (handles == nullptr) {
+            return ptrs;
+        }
+
+        const jsize handle_count = env->GetArrayLength(handles);
+        jlong* raw_handles = env->GetLongArrayElements(handles, nullptr);
+        if (raw_handles == nullptr) {
+            *has_exception = JNI_TRUE;
+            return ptrs;
+        }
+
+        ptrs.reserve(static_cast<size_t>(handle_count));
+        for (jsize i = 0; i < handle_count; ++i) {
+            ptrs.push_back(reinterpret_cast<T*>(raw_handles[i]));
+        }
+
+        env->ReleaseLongArrayElements(handles, raw_handles, JNI_ABORT);
+        return ptrs;
+    }
+
     /**
     * Detect if jlong overflows size_t
     *
@@ -201,4 +225,82 @@ class MemoryUsageTypeJni {
         }
     }
   };
+
+class ByteJni {
+    public:
+    static jobject valueOf(JNIEnv* env, jbyte value) {
+        jclass cls = env->FindClass("java/lang/Byte");
+        if (cls == nullptr) {
+            return nullptr;
+        }
+        jmethodID mid = env->GetStaticMethodID(cls, "valueOf", "(B)Ljava/lang/Byte;");
+        if (mid == nullptr) {
+            return nullptr;
+        }
+        return env->CallStaticObjectMethod(cls, mid, value);
+    }
+};
+
+class LongJni {
+    public:
+    static jobject valueOf(JNIEnv* env, jlong value) {
+        jclass cls = env->FindClass("java/lang/Long");
+        if (cls == nullptr) {
+            return nullptr;
+        }
+        jmethodID mid = env->GetStaticMethodID(cls, "valueOf", "(J)Ljava/lang/Long;");
+        if (mid == nullptr) {
+            return nullptr;
+        }
+        return env->CallStaticObjectMethod(cls, mid, value);
+    }
+};
+
+class HashMapJni {
+    public:
+    template<typename K, typename V, typename JK, typename JV>
+    using FnMapKV =
+        std::function<std::unique_ptr<std::pair<JK, JV>>(const std::pair<K, V>&)>;
+
+    static jobject construct(JNIEnv* env, uint32_t initial_capacity) {
+        jclass cls = env->FindClass("java/util/HashMap");
+        if (cls == nullptr) {
+            return nullptr;
+        }
+        jmethodID mid = env->GetMethodID(cls, "<init>", "(I)V");
+        if (mid == nullptr) {
+            return nullptr;
+        }
+        return env->NewObject(cls, mid, static_cast<jint>(initial_capacity));
+    }
+
+    template<typename Iterator, typename Fn>
+    static bool putAll(JNIEnv* env, jobject hash_map, Iterator begin,
+                       Iterator end, Fn fn_map_kv) {
+        jclass cls = env->FindClass("java/util/HashMap");
+        if (cls == nullptr) {
+            return false;
+        }
+        jmethodID mid = env->GetMethodID(
+            cls, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        if (mid == nullptr) {
+            return false;
+        }
+
+        for (auto it = begin; it != end; ++it) {
+            auto kv = fn_map_kv(*it);
+            if (kv == nullptr) {
+                return false;
+            }
+            jobject old_value = env->CallObjectMethod(hash_map, mid, kv->first, kv->second);
+            if (env->ExceptionCheck()) {
+                return false;
+            }
+            env->DeleteLocalRef(old_value);
+            env->DeleteLocalRef(kv->first);
+            env->DeleteLocalRef(kv->second);
+        }
+        return true;
+    }
+};
 }

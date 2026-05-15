@@ -49,6 +49,7 @@ import static io.pixelsdb.pixels.index.rockset.RocksetThreadResources.EMPTY_VALU
 
 public class RocksetIndex extends CachingSinglePointIndex
 {
+    private static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
     // load pixels-index-rockset
     static
     {
@@ -69,9 +70,8 @@ public class RocksetIndex extends CachingSinglePointIndex
             throw new IllegalStateException("libpixels-index-rockset.so is not readable at " + libPath);
         }
         System.load(libPath);
-        System.out.println("JNI loaded OK");
+        LOGGER.info("RockSet Index JNI loaded OK");
     }
-    private static final Logger LOGGER = LogManager.getLogger(RocksetIndex.class);
     private static final long TOMBSTONE_ROW_ID = Long.MAX_VALUE;
     private final RocksetDB rocksetDB;
     private final String rocksDBPath;
