@@ -75,9 +75,18 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
      */
     public RetinaServerImpl()
     {
-        this.metadataService = MetadataService.Instance();
-        this.indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
-        this.retinaResourceManager = RetinaResourceManager.Instance();
+        this(MetadataService.Instance(),
+                IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local),
+                RetinaResourceManager.Instance());
+    }
+
+    RetinaServerImpl(MetadataService metadataService, IndexService indexService,
+                     RetinaResourceManager retinaResourceManager)
+    {
+        this.metadataService = requireNonNull(metadataService, "metadataService is null");
+        this.indexService = requireNonNull(indexService, "indexService is null");
+        this.retinaResourceManager = requireNonNull(retinaResourceManager, "retinaResourceManager is null");
+
         int totalBuckets = Integer.parseInt(ConfigFactory.Instance().getProperty("index.bucket.num"));
         this.indexOptionPool = new IndexOption[totalBuckets];
         for (int i = 0; i < totalBuckets; i++)
@@ -86,91 +95,95 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             this.indexOptionPool[i].setVNodeId(i);
         }
 
-        startRetinaMetricsLogThread();
         try
         {
-            logger.info("Pre-loading checkpoints...");
-            this.retinaResourceManager.recoverCheckpoints();
-
-            List<Schema> schemas = this.metadataService.getSchemas();
-            for (Schema schema : schemas)
-            {
-                List<Table> tables = this.metadataService.getTables(schema.getName());
-                for (Table table : tables)
-                {
-                    List<Layout> layouts = this.metadataService.getLayouts(schema.getName(), table.getName());
-                    List<String> files = new LinkedList<>();
-                    for (Layout layout : layouts)
-                    {
-                        if (layout.isReadable())
-                        {
-                            /*
-                             * Issue #946: always add visibility to all files
-                             */
-                            // add visibility for ordered files
-                            List<Path> orderedPaths = layout.getOrderedPaths();
-                            validateOrderedOrCompactPaths(orderedPaths);
-                            List<File> orderedFiles = this.metadataService.getFiles(orderedPaths.get(0).getId());
-                            files.addAll(orderedFiles.stream()
-                                    .map(file -> orderedPaths.get(0).getUri() + "/" + file.getName())
-                                    .collect(Collectors.toList()));
-
-                            // add visibility for compact files
-                            List<Path> compactPaths = layout.getCompactPaths();
-                            validateOrderedOrCompactPaths(compactPaths);
-                            List<File> compactFiles = this.metadataService.getFiles(compactPaths.get(0).getId());
-                            files.addAll(compactFiles.stream()
-                                    .map(file -> compactPaths.get(0).getUri() + "/" + file.getName())
-                                    .collect(Collectors.toList()));
-                        }
-                    }
-
-                    int threadNum = Integer.parseInt
-                            (ConfigFactory.Instance().getProperty("retina.service.init.threads"));
-                    ExecutorService executorService = Executors.newFixedThreadPool(threadNum);
-                    AtomicBoolean success = new AtomicBoolean(true);
-                    AtomicReference<Exception> e = new AtomicReference<>();
-                    try
-                    {
-                        for (String filePath : files)
-                        {
-                            executorService.submit(() ->
-                            {
-                                try
-                                {
-                                    this.retinaResourceManager.addVisibility(filePath);
-                                }
-                                catch (Exception ex)
-                                {
-                                    success.set(false);
-                                    e.set(ex);
-                                }
-                            });
-                        }
-                    }
-                    finally
-                    {
-                        executorService.shutdown();
-                    }
-
-                    if (success.get())
-                    {
-                        executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-                    }
-
-                    if (!success.get())
-                    {
-                        throw new RetinaException("Can't add visibility", e.get());
-                    }
-
-                    this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
-                }
-            }
+            initializeRetinaResources();
+            this.retinaResourceManager.startBackgroundGc();
+            startRetinaMetricsLogThread();
             logger.info("Retina service is ready");
         }
         catch (Exception e)
         {
             logger.error("Error while initializing RetinaServerImpl", e);
+            throw new IllegalStateException("Failed to initialize RetinaServerImpl", e);
+        }
+    }
+
+    private void initializeRetinaResources() throws Exception
+    {
+        logger.info("Pre-loading checkpoints...");
+        this.retinaResourceManager.recoverCheckpoints();
+
+        List<Schema> schemas = this.metadataService.getSchemas();
+        for (Schema schema : schemas)
+        {
+            List<Table> tables = this.metadataService.getTables(schema.getName());
+            for (Table table : tables)
+            {
+                List<Layout> layouts = this.metadataService.getLayouts(schema.getName(), table.getName());
+                List<String> files = new LinkedList<>();
+                for (Layout layout : layouts)
+                {
+                    if (layout.isReadable())
+                    {
+                        /*
+                         * Issue #946: always add visibility to all files
+                         */
+                        // add visibility for ordered files
+                        List<Path> orderedPaths = layout.getOrderedPaths();
+                        validateOrderedOrCompactPaths(orderedPaths);
+                        List<File> orderedFiles = this.metadataService.getFiles(orderedPaths.get(0).getId());
+                        files.addAll(orderedFiles.stream()
+                                .map(file -> orderedPaths.get(0).getUri() + "/" + file.getName())
+                                .collect(Collectors.toList()));
+
+                        // add visibility for compact files
+                        List<Path> compactPaths = layout.getCompactPaths();
+                        validateOrderedOrCompactPaths(compactPaths);
+                        List<File> compactFiles = this.metadataService.getFiles(compactPaths.get(0).getId());
+                        files.addAll(compactFiles.stream()
+                                .map(file -> compactPaths.get(0).getUri() + "/" + file.getName())
+                                .collect(Collectors.toList()));
+                    }
+                }
+
+                int threadNum = Integer.parseInt
+                        (ConfigFactory.Instance().getProperty("retina.service.init.threads"));
+                ExecutorService executorService = Executors.newFixedThreadPool(threadNum);
+                AtomicBoolean success = new AtomicBoolean(true);
+                AtomicReference<Exception> e = new AtomicReference<>();
+                try
+                {
+                    for (String filePath : files)
+                    {
+                        executorService.submit(() ->
+                        {
+                            try
+                            {
+                                this.retinaResourceManager.addVisibility(filePath);
+                            }
+                            catch (Exception ex)
+                            {
+                                success.set(false);
+                                e.set(ex);
+                            }
+                        });
+                    }
+                }
+                finally
+                {
+                    executorService.shutdown();
+                }
+
+                executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+
+                if (!success.get())
+                {
+                    throw new RetinaException("Can't add visibility", e.get());
+                }
+
+                this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
+            }
         }
     }
 
