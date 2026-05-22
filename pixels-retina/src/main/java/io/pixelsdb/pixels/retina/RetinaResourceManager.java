@@ -60,9 +60,11 @@ import java.util.stream.Collectors;
 public class RetinaResourceManager
 {
     private static final Logger logger = LogManager.getLogger(RetinaResourceManager.class);
+
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
     private final Map<String, Map<Integer, PixelsWriteBuffer>> pixelsWriteBufferMap;
+    private final IngestFileMetadataRegistry ingestFileMetadataRegistry;
     private String retinaHostName;
 
     // GC related fields
@@ -136,6 +138,7 @@ public class RetinaResourceManager
         this.metadataService = MetadataService.Instance();
         this.rgVisibilityMap = new ConcurrentHashMap<>();
         this.pixelsWriteBufferMap = new ConcurrentHashMap<>();
+        this.ingestFileMetadataRegistry = new IngestFileMetadataRegistry();
         this.offloadedCheckpoints = new ConcurrentHashMap<>();
         this.checkpointFutures = new ConcurrentHashMap<>();
 
@@ -200,12 +203,14 @@ public class RetinaResourceManager
     }
 
     /**
-     * Starts the periodic Retina GC scheduler after the service has reached the
-     * lifecycle point where background cleanup is safe to run.
+     * Starts the periodic Retina GC scheduler after the service has reached
+     * the lifecycle point where background cleanup is safe to run.
      *
-     * <p>The constructor intentionally does not schedule GC: recovery-capable
-     * startup must stay fail-closed until initialization succeeds. This method is
-     * idempotent so future lifecycle READY hooks can call it safely.</p>
+     * <p>The constructor intentionally does not schedule GC: startup must
+     * stay fail-closed until initialization succeeds, otherwise a background
+     * GC tick could observe partially constructed state. This method is
+     * idempotent so callers that wire it into a service-ready hook can
+     * invoke it more than once safely.</p>
      *
      * @throws RetinaException if GC configuration is invalid or the scheduler cannot be started.
      */
@@ -296,6 +301,24 @@ public class RetinaResourceManager
         {
             throw new RetinaException("Failed to add visibility for file " +  filePath, e);
         }
+    }
+
+    public void removeVisibility(long fileId)
+    {
+        String prefix = fileId + "_";
+        this.rgVisibilityMap.entrySet().removeIf(entry ->
+        {
+            if (!entry.getKey().startsWith(prefix))
+            {
+                return false;
+            }
+            RGVisibility rgVisibility = entry.getValue();
+            if (rgVisibility != null)
+            {
+                rgVisibility.close();
+            }
+            return true;
+        });
     }
 
     public long[] queryVisibility(long fileId, int rgId, long timestamp, long transId) throws RetinaException
@@ -412,6 +435,36 @@ public class RetinaResourceManager
         return createCheckpoint(timestamp, type, null);
     }
 
+    void registerIngestFileMetadata(long fileId, long tableId, int virtualNodeId,
+                                    long firstBlockId) throws RetinaException
+    {
+        this.ingestFileMetadataRegistry.register(fileId, tableId, virtualNodeId, firstBlockId);
+    }
+
+    void unregisterIngestFileMetadata(long fileId)
+    {
+        this.ingestFileMetadataRegistry.unregister(fileId);
+    }
+
+    IngestFileMetadataRegistry.Entry getIngestFileMetadata(long fileId) throws RetinaException
+    {
+        return this.ingestFileMetadataRegistry.get(fileId);
+    }
+
+    List<IngestFileMetadataRegistry.Entry> listIngestFileMetadataByStream(long tableId, int virtualNodeId)
+    {
+        return this.ingestFileMetadataRegistry.listByStream(tableId, virtualNodeId);
+    }
+
+    void validateRgVisibilityFileRegistered(long fileId) throws RetinaException
+    {
+        if (!this.ingestFileMetadataRegistry.contains(fileId))
+        {
+            throw new RetinaException("RGVisibilityIndex contains fileId=" + fileId
+                    + " but registry has no entry, indicating publisher/retire ordering bug");
+        }
+    }
+
     private CompletableFuture<Void> createCheckpoint(
             long timestamp, CheckpointType type, Map<String, long[]> precomputedBitmaps) throws RetinaException
     {
@@ -420,6 +473,11 @@ public class RetinaResourceManager
 
         // 1. Capture current entries to ensure we process a consistent set of RGs
         List<Map.Entry<String, RGVisibility>> entries = new ArrayList<>(this.rgVisibilityMap.entrySet());
+        for (Map.Entry<String, RGVisibility> entry : entries)
+        {
+            long fileId = RetinaUtils.parseFileIdFromRgKey(entry.getKey());
+            validateRgVisibilityFileRegistered(fileId);
+        }
         int totalRgs = entries.size();
         logger.info("Starting {} checkpoint for {} RGs at timestamp {}", type, totalRgs, timestamp);
 
@@ -779,7 +837,9 @@ public class RetinaResourceManager
         }
     }
 
-    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName, byte[][] colValues, long timestamp, int vNodeId) throws RetinaException
+    public IndexProto.PrimaryIndexEntry.Builder insertRecord(String schemaName, String tableName,
+                                                             byte[][] colValues, long timestamp,
+                                                             int vNodeId) throws RetinaException
     {
         IndexProto.PrimaryIndexEntry.Builder builder = IndexProto.PrimaryIndexEntry.newBuilder();
         PixelsWriteBuffer writeBuffer = checkPixelsWriteBuffer(schemaName, tableName, vNodeId);
@@ -789,17 +849,18 @@ public class RetinaResourceManager
 
     private RetinaProto.VisibilityBitmap getVisibilityBitmapSlice(long[] visibilityBitmap, long startIndex, int length) throws RetinaException
     {
-        if (startIndex % 64 != 0 || length % 64 != 0)
+        if (startIndex % 64 != 0)
         {
-            throw new RetinaException("StartIndex and length must be multiple of 64");
+            throw new RetinaException("StartIndex must be multiple of 64");
         }
-        if (length == 0)
+        if (length <= 0)
         {
             return RetinaProto.VisibilityBitmap.newBuilder().build();
         }
 
+        int alignedLength = ((length + 63) / 64) * 64;
         int startLongIndex = (int) (startIndex / 64);
-        int endLongIndex = startLongIndex + (length / 64);
+        int endLongIndex = startLongIndex + (alignedLength / 64);
 
         if (visibilityBitmap == null || endLongIndex > visibilityBitmap.length)
         {
@@ -825,10 +886,12 @@ public class RetinaResourceManager
 
         Set<Long> fileIds = new HashSet<>();
 
-        // active memTable returns directly
-        if (!activeMemtable.getRowBatch().isEmpty())
+        // Active memTable returns its full appended rows; visibility is masked
+        // downstream by the RGVisibility bitmap slice below.
+        int activeSize = activeMemtable.getSize();
+        if (activeSize > 0)
         {
-            ByteString data = ByteString.copyFrom(activeMemtable.getRowBatch().serialize());
+            ByteString data = ByteString.copyFrom(activeMemtable.serialize());
             responseBuilder.setData(data);
 
             fileIds.add(activeMemtable.getFileId());
@@ -842,8 +905,11 @@ public class RetinaResourceManager
         fileIds.add(activeMemtable.getFileId());
         for (MemTable immutableMemtable : immutableMemTables)
         {
-            fileIds.add(immutableMemtable.getFileId());
-            ids.add(immutableMemtable.getId());
+            if (!immutableMemtable.isEmpty())
+            {
+                fileIds.add(immutableMemtable.getFileId());
+                ids.add(immutableMemtable.getId());
+            }
         }
         for (ObjectEntry objectEntry : objectEntries)
         {
@@ -860,21 +926,25 @@ public class RetinaResourceManager
             fileIdToVisibility.put(fileId, visibility);
         }
 
-        // only return the corresponding part of bitmap
-        if (!activeMemtable.getRowBatch().isEmpty())
+        // only return the corresponding visible part of bitmap
+        if (activeSize > 0)
         {
             responseBuilder.addBitmaps(getVisibilityBitmapSlice(
                     fileIdToVisibility.get(activeMemtable.getFileId()),
-                    activeMemtable.getStartIndex(), activeMemtable.getLength()));
+                    activeMemtable.getStartIndex(), activeSize));
         } else
         {
             responseBuilder.addBitmaps(RetinaProto.VisibilityBitmap.newBuilder());
         }
         for (MemTable immutableMemtable : immutableMemTables)
         {
-            responseBuilder.addBitmaps(getVisibilityBitmapSlice(
-                    fileIdToVisibility.get(immutableMemtable.getFileId()),
-                    immutableMemtable.getStartIndex(), immutableMemtable.getLength()));
+            int immutableSize = immutableMemtable.getSize();
+            if (immutableSize > 0)
+            {
+                responseBuilder.addBitmaps(getVisibilityBitmapSlice(
+                        fileIdToVisibility.get(immutableMemtable.getFileId()),
+                        immutableMemtable.getStartIndex(), immutableSize));
+            }
         }
         for (ObjectEntry objectEntry : objectEntries)
         {
@@ -958,16 +1028,18 @@ public class RetinaResourceManager
      *       checkpoint bitmap serialisation significantly cheaper.</li>
      *   <li><b>Checkpoint second, unconditional and blocking</b>: written regardless of whether
      *       Storage GC finds any candidate files. The {@code .join()} ensures the checkpoint
-     *       file is fully on disk before Storage GC begins rewriting any files, so crash
-     *       recovery can always restore the post-Memory-GC visibility state independently of
-     *       any in-progress Storage GC rewrite. {@code gcExecutor} is single-threaded, so the
-     *       blocking join is also the simplest way to guarantee no two GC cycles overlap.</li>
+     *       file is fully on disk before Storage GC begins rewriting any files, so after a
+     *       crash the post-Memory-GC visibility state can be rebuilt from the checkpoint
+     *       independently of any in-progress Storage GC rewrite. {@code gcExecutor} is
+     *       single-threaded, so the blocking join is also the simplest way to guarantee no
+     *       two GC cycles overlap.</li>
      *   <li><b>Storage GC third</b>: requires an up-to-date {@code baseBitmap} (hence after
-     *       Memory GC) and its own WAL for crash recovery. Placing it after the checkpoint
-     *       keeps the two recovery paths independent: on restart, the GC checkpoint restores
-     *       the post-Memory-GC visibility state, and the GcWal resumes any in-progress Storage
-     *       GC task separately. Once scan completes, bitmaps for non-candidate files are
-     *       immediately released from memory (they are no longer needed by subsequent phases).</li>
+     *       Memory GC) and its own WAL to resume in-progress tasks after a crash. Placing
+     *       it after the checkpoint keeps the two restart paths independent: the GC checkpoint
+     *       rebuilds the post-Memory-GC visibility state, and the GcWal resumes any
+     *       in-progress Storage GC task separately. Once scan completes, bitmaps for
+     *       non-candidate files are immediately released from memory (they are no longer
+     *       needed by subsequent phases).</li>
      *   <li><b>Advance {@code latestGcTimestamp} last</b>: updated only after the entire cycle
      *       succeeds (Memory GC + checkpoint + Storage GC). If any step throws, the timestamp
      *       is not advanced and the next scheduled invocation will retry the full cycle.</li>
@@ -1006,6 +1078,8 @@ public class RetinaResourceManager
                 String rgKey = entry.getKey();
                 long fileId = RetinaUtils.parseFileIdFromRgKey(rgKey);
                 int rgId = RetinaUtils.parseRgIdFromRgKey(rgKey);
+
+                validateRgVisibilityFileRegistered(fileId);
 
                 long[] bitmap = entry.getValue().garbageCollect(timestamp);
                 gcSnapshotBitmaps.put(rgKey, bitmap);

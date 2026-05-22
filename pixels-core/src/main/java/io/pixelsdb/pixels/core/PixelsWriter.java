@@ -63,4 +63,22 @@ public interface PixelsWriter extends Closeable
     int getNumWriteRequests();
 
     long getCompletedBytes();
+
+    /**
+     * Release writer resources without writing the file tail. Caller is
+     * responsible for deleting any partial bytes the underlying physical
+     * writer may have flushed before abort.
+     *
+     * <p>Aborting after one or more row batches have been added is not
+     * supported and results in undefined file contents; aborting an
+     * already-closed writer is a no-op.
+     *
+     * <p>The default implementation falls back to {@link #close()} for
+     * writers that do not distinguish abort from normal close (e.g. test
+     * fakes or stream writers that never produce a file tail).
+     */
+    default void abort() throws IOException
+    {
+        close();
+    }
 }

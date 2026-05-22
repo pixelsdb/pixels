@@ -38,6 +38,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -112,6 +113,7 @@ public class PixelsWriteBuffer
     private int currentMemTableCount;
     private final Queue<FileWriterManager> fileWriterManagers;
     private FileWriterManager currentFileWriterManager;
+    private IngestFilePublisher ingestFilePublisher;
 
     /**
      * Issue #1254: Multi-threaded flush
@@ -177,6 +179,7 @@ public class PixelsWriteBuffer
                 this.targetOrderedStorage, this.memTableSize, this.blockSize,
                 this.replication, this.encodingLevel, this.nullsPadding,
                 idCounter, this.memTableSize * this.maxMemTableCount, retinaHostName, virtualNodeId);
+        this.ingestFilePublisher = new IngestFilePublisher(this.currentFileWriterManager.getFirstBlockId());
 
         this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
                 TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
@@ -192,12 +195,17 @@ public class PixelsWriteBuffer
     }
 
     /**
-     * Add all column values and timestamp into the buffer.
+     * Append a row to the active memTable atomically. On return the row is
+     * query-visible and {@code builder} is populated with its
+     * {@link IndexProto.RowLocation} for downstream MainIndex / primary index
+     * writes. If those writes fail, the caller MUST compensate by writing an
+     * RGVisibility delete on that RowLocation; do not try to rewind the append.
      *
-     * @param values
-     * @param timestamp
-     * @param builder
-     * @return the unique row identifier (rowId) allocated for the added row
+     * @param values the column values of the row.
+     * @param timestamp the commit timestamp of the row.
+     * @param builder the builder of the row location, populated on return.
+     * @return the allocated rowId.
+     * @throws RetinaException if the buffer is fail-closed or rowId allocation fails.
      */
     public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
     {
@@ -209,15 +217,19 @@ public class PixelsWriteBuffer
         long rowId = -1;
         while (rowOffset < 0)
         {
-            currentMemTable = this.activeMemTable;
             try
             {
                 synchronized (rowLock)
                 {
-                    // Ensure rgRowOffset and rowId are allocated synchronously to minimize
-                    // fragmentation after MainIndex flush.
+                    currentMemTable = this.activeMemTable;
+                    FileWriterManager appendFileWriterManager = this.currentFileWriterManager;
+                    // Keep row offsets and row IDs aligned for index flush.
                     rowOffset = currentMemTable.add(values, timestamp);
-                    rowId = rowIdAllocator.getRowId();
+                    if (rowOffset >= 0)
+                    {
+                        rowId = rowIdAllocator.getRowId();
+                        appendFileWriterManager.includeRowId(rowId);
+                    }
                 }
             } catch (NullPointerException e)
             {
@@ -234,7 +246,7 @@ public class PixelsWriteBuffer
             }
         }
         int rgRowOffset = currentMemTable.getStartIndex() + rowOffset;
-        if(rgRowOffset < 0)
+        if (rgRowOffset < 0)
         {
             throw new RetinaException("Expect rgRowOffset >= 0, get " + rgRowOffset);
         }
@@ -253,39 +265,7 @@ public class PixelsWriteBuffer
             {
                 return;
             }
-
-            if (this.currentMemTableCount >= this.maxMemTableCount)
-            {
-                this.currentMemTableCount = 0;
-                this.currentFileWriterManager.setLastBlockId(this.activeMemTable.getId());
-                this.fileWriterManagers.add(this.currentFileWriterManager);
-                this.currentFileWriterManager = new FileWriterManager(
-                        this.tableId, this.schema,
-                        this.targetOrderedDirPath, this.targetOrderedStorage,
-                        this.memTableSize, this.blockSize, this.replication,
-                        this.encodingLevel, this.nullsPadding, this.idCounter,
-                        this.memTableSize * this.maxMemTableCount, this.retinaHostName, virtualNodeId);
-            }
-
-            /*
-             * For activeMemTable, at initialization the reference count is 2 because of *this and superVersion
-             * Here only currentVersion is destroyed, *this is still in use, so only one call to unref() is needed.
-             */
-            MemTable oldMemTable = this.activeMemTable;
-            SuperVersion oldVersion = this.currentVersion;
-            this.immutableMemTables.add(this.activeMemTable);
-            this.activeMemTable = new MemTable(this.idCounter, this.schema,
-                    this.memTableSize, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
-                    this.currentFileWriterManager.getFileId(),
-                    this.currentMemTableCount * this.memTableSize,
-                    this.memTableSize);
-            this.currentMemTableCount += 1;
-            this.idCounter++;
-
-            this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
-            oldVersion.unref();
-
-            triggerFlushToObject(oldMemTable);
+            retireActiveMemTableLocked();
         } catch (Exception e)
         {
             throw new RetinaException("Failed to switch memtable", e);
@@ -293,6 +273,43 @@ public class PixelsWriteBuffer
         {
             this.versionLock.writeLock().unlock();
         }
+    }
+
+    // Caller must hold versionLock.writeLock().
+    private void retireActiveMemTableLocked() throws RetinaException
+    {
+        if (this.currentMemTableCount >= this.maxMemTableCount)
+        {
+            this.currentMemTableCount = 0;
+            this.currentFileWriterManager.setLastBlockId(this.activeMemTable.getId());
+            this.fileWriterManagers.add(this.currentFileWriterManager);
+            this.currentFileWriterManager = new FileWriterManager(
+                    this.tableId, this.schema,
+                    this.targetOrderedDirPath, this.targetOrderedStorage,
+                    this.memTableSize, this.blockSize, this.replication,
+                    this.encodingLevel, this.nullsPadding, this.idCounter,
+                    this.memTableSize * this.maxMemTableCount, this.retinaHostName, virtualNodeId);
+        }
+            
+        /*
+         * For activeMemTable, at initialization the reference count is 2 because of *this and currentVersion
+         * Here only currentVersion is destroyed, *this is still in use, so only one call to unref() is needed.
+         */
+        MemTable oldMemTable = this.activeMemTable;
+        SuperVersion oldVersion = this.currentVersion;
+        this.immutableMemTables.add(this.activeMemTable);
+        this.activeMemTable = new MemTable(this.idCounter, this.schema,
+                this.memTableSize, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
+                this.currentFileWriterManager.getFileId(),
+                this.currentMemTableCount * this.memTableSize,
+                this.memTableSize);
+        this.currentMemTableCount += 1;
+        this.idCounter++;
+
+        this.currentVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
+        oldVersion.unref();
+
+        triggerFlushToObject(oldMemTable);
     }
 
     private void triggerFlushToObject(MemTable flushMemTable)
@@ -305,7 +322,7 @@ public class PixelsWriteBuffer
                 this.objectStorageManager.write(this.tableId, virtualNodeId, id, flushMemTable.serialize());
 
                 ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getFileId(),
-                        flushMemTable.getStartIndex(), flushMemTable.getLength());
+                        flushMemTable.getStartIndex(), flushMemTable.getSize());
                 objectEntry.ref();
 
                 // update watermark
@@ -370,30 +387,63 @@ public class PixelsWriteBuffer
         }
     }
 
-    private void publishFinishedFile(FileWriterManager fileWriterManager) throws RetinaException
+    private List<FileWriterManager> publishFinishedFile(FileWriterManager fileWriterManager) throws RetinaException
     {
         try
         {
-            fileWriterManager.finish().get();
+            fileWriterManager.finish();
 
-            if (this.index == null)
+            if (!fileWriterManager.isIndexFlushed())
             {
-                this.index = MetadataService.Instance().getPrimaryIndex(tableId);
                 if (this.index == null)
                 {
-                    throw new RetinaException("Primary index not found for table " + tableId);
+                    this.index = MetadataService.Instance().getPrimaryIndex(tableId);
+                    if (this.index == null)
+                    {
+                        throw new RetinaException("Primary index not found for table " + tableId);
+                    }
                 }
-            }
 
-            boolean flushed = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local)
-                    .flushIndexEntriesOfFile(
-                            tableId, index.getId(), fileWriterManager.getFileId(), true, indexOption);
-            if (!flushed)
+                boolean flushed = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local)
+                        .flushIndexEntriesOfFile(
+                                tableId, index.getId(), fileWriterManager.getFileId(), true, indexOption);
+                if (!flushed)
+                {
+                    throw new RetinaException("Failed to flush main index for ingest file "
+                            + fileWriterManager.getFileId());
+                }
+                fileWriterManager.markIndexFlushed();
+            }
+        } catch (IndexException e)
+        {
+            throw new RetinaException("Failed to flush main index for ingest file "
+                    + fileWriterManager.getFileId(), e);
+        } catch (MetadataException e)
+        {
+            throw new RetinaException("Failed to load primary index for table " + tableId, e);
+        }
+        return this.ingestFilePublisher.admitReady(fileWriterManager, this::publishPreparedFile);
+    }
+
+    private void publishPreparedFile(FileWriterManager fileWriterManager) throws RetinaException
+    {
+        try
+        {
+            if (!fileWriterManager.isPhysicalClosed())
             {
-                throw new RetinaException("Failed to flush main index for ingest file "
+                throw new RetinaException("Cannot publish ingest file before physical close: fileId="
                         + fileWriterManager.getFileId());
             }
-
+            if (!fileWriterManager.isIndexFlushed())
+            {
+                throw new RetinaException("Cannot publish ingest file before main index flush: fileId="
+                        + fileWriterManager.getFileId());
+            }
+            if (!fileWriterManager.hasRowIds())
+            {
+                throw new RetinaException("Cannot publish ingest file without row-id hull: fileId="
+                        + fileWriterManager.getFileId());
+            }
             File regularFile = fileWriterManager.getFileSnapshot();
             regularFile.setType(File.Type.REGULAR);
             if (!MetadataService.Instance().updateFile(regularFile))
@@ -401,19 +451,9 @@ public class PixelsWriteBuffer
                 throw new RetinaException("Failed to publish ingest file "
                         + fileWriterManager.getFileId() + " as REGULAR");
             }
-        } catch (InterruptedException e)
-        {
-            Thread.currentThread().interrupt();
-            throw new RetinaException("Interrupted while publishing ingest file "
-                    + fileWriterManager.getFileId(), e);
-        } catch (ExecutionException e)
-        {
-            throw new RetinaException("Failed to physically close ingest file "
-                    + fileWriterManager.getFileId(), e.getCause());
-        } catch (IndexException e)
-        {
-            throw new RetinaException("Failed to flush main index for ingest file "
-                    + fileWriterManager.getFileId(), e);
+            RetinaResourceManager.Instance().registerIngestFileMetadata(
+                    fileWriterManager.getFileId(), tableId, fileWriterManager.getVirtualNodeId(),
+                    fileWriterManager.getFirstBlockId());
         } catch (MetadataException e)
         {
             throw new RetinaException("Failed to publish ingest file "
@@ -435,45 +475,15 @@ public class PixelsWriteBuffer
                 while (iterator.hasNext())
                 {
                     FileWriterManager fileWriterManager = iterator.next();
-                    if (fileWriterManager.getLastBlockId() <= this.continuousFlushedId.get())
+                    if (fileWriterManager.getLastBlockId() > this.continuousFlushedId.get())
                     {
-                        publishFinishedFile(fileWriterManager);
-
-                        /*
-                         * Detach only the current write-buffer view while holding versionLock.
-                         * Physical object deletion stays outside the lock so storage I/O does
-                         * not run under the SuperVersion write lock.
-                         */
-                        List<ObjectEntry> toRemove;
-                        this.versionLock.writeLock().lock();
-                        try
-                        {
-                            long firstBlockId = fileWriterManager.getFirstBlockId();
-                            long lastBlockId = fileWriterManager.getLastBlockId();
-                            toRemove = this.objectEntries.stream()
-                                    .filter(objectEntry ->
-                                            objectEntry.getId() >= firstBlockId && objectEntry.getId() <= lastBlockId)
-                                    .collect(Collectors.toList());
-
-                            this.objectEntries.removeAll(toRemove);
-
-                            SuperVersion oldVersion = this.currentVersion;
-                            this.currentVersion = new SuperVersion(
-                                    this.activeMemTable, this.immutableMemTables, this.objectEntries);
-                            oldVersion.unref();
-                        } finally
-                        {
-                            this.versionLock.writeLock().unlock();
-                        }
-
-                        iterator.remove();
-                        for (ObjectEntry objectEntry : toRemove)
-                        {
-                            if (objectEntry.unref())
-                            {
-                                this.objectStorageManager.delete(this.tableId, virtualNodeId, objectEntry.getId());
-                            }
-                        }
+                        break;
+                    }
+                    List<FileWriterManager> publishedFiles = publishFinishedFile(fileWriterManager);
+                    for (FileWriterManager publishedFile : publishedFiles)
+                    {
+                        this.fileWriterManagers.remove(publishedFile);
+                        cleanupPublishedObjects(publishedFile.getFirstBlockId(), publishedFile.getLastBlockId());
                     }
                 }
             } catch (Exception e)
@@ -483,25 +493,46 @@ public class PixelsWriteBuffer
         }, 0, intervalSeconds, TimeUnit.SECONDS);
     }
 
-    /**
-     * Gracefully close the writer buffer, ensuring all in-memory data is persisted.
-     */
-    public void close() throws RetinaException
+    private void cleanupPublishedObjects(long firstBlockId, long lastBlockId) throws RetinaException
     {
-        // First, shut down the flush process to prevent changes to the data view.
-        this.flushObjectExecutor.shutdown();
+        if (lastBlockId < firstBlockId)
+        {
+            return;
+        }
+
+        List<ObjectEntry> toRemove;
+        this.versionLock.writeLock().lock();
         try
         {
-            if (!this.flushObjectExecutor.awaitTermination(60, TimeUnit.SECONDS))
-            {
-                this.flushObjectExecutor.shutdownNow();
-            }
-        } catch (InterruptedException e)
+            toRemove = this.objectEntries.stream()
+                    .filter(objectEntry -> objectEntry.getId() >= firstBlockId && objectEntry.getId() <= lastBlockId)
+                    .collect(Collectors.toList());
+            this.objectEntries.removeAll(toRemove);
+
+            SuperVersion oldVersion = this.currentVersion;
+            this.currentVersion = new SuperVersion(
+                    this.activeMemTable, this.immutableMemTables, this.objectEntries);
+            oldVersion.unref();
+        } finally
         {
-            this.flushObjectExecutor.shutdownNow();
-            Thread.currentThread().interrupt();
-            throw new RetinaException("Close process was interrupted while waiting for flushObjectExecutor", e);
+            this.versionLock.writeLock().unlock();
         }
+
+        for (ObjectEntry objectEntry : toRemove)
+        {
+            if (objectEntry.unref())
+            {
+                this.objectStorageManager.delete(this.tableId, virtualNodeId, objectEntry.getId());
+            }
+        }
+    }
+
+    public void close() throws RetinaException
+    {
+        // The caller (RetinaServer / RetinaResourceManager shutdown path) is
+        // responsible for quiescing append traffic before invoking close().
+        // There is no buffer-internal "append-to-publish" window to drain.
+        // Stop scheduled publishing before the driver thread publishes leftovers.
         if (this.flushFileFuture != null)
         {
             this.flushFileFuture.cancel(false);
@@ -511,88 +542,102 @@ public class PixelsWriteBuffer
         {
             if (!this.flushFileExecutor.awaitTermination(60, TimeUnit.SECONDS))
             {
-                this.flushFileExecutor.shutdownNow();
+                logger.warn("Close timed out waiting for flushFileExecutor to drain; proceeding");
             }
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
-            this.flushFileExecutor.shutdownNow();
             Thread.currentThread().interrupt();
-            throw new RetinaException("Close process was interrupted while waiting for flushDiskExecutor", e);
+            throw new RetinaException("Close process was interrupted while waiting for flushFileExecutor", e);
+        }
+
+        // Retire non-empty active data so file close only replays ObjectEntry bytes.
+        this.versionLock.writeLock().lock();
+        try
+        {
+            if (!this.activeMemTable.isEmpty())
+            {
+                retireActiveMemTableLocked();
+            }
+        }
+        finally
+        {
+            this.versionLock.writeLock().unlock();
+        }
+
+        // Let submitted object flushes finish; never interrupt in-flight uploads.
+        this.flushObjectExecutor.shutdown();
+        try
+        {
+            if (!this.flushObjectExecutor.awaitTermination(60, TimeUnit.SECONDS))
+            {
+                logger.warn("Close timed out waiting for flushObjectExecutor to drain; proceeding");
+            }
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+            throw new RetinaException("Close process was interrupted while waiting for flushObjectExecutor", e);
+        }
+
+        // Publish files with rows; discard an empty current ingest file.
+        if (this.currentFileWriterManager != null)
+        {
+            if (this.currentFileWriterManager.hasRowIds())
+            {
+                this.currentFileWriterManager.setLastBlockId(this.continuousFlushedId.get());
+                this.fileWriterManagers.add(this.currentFileWriterManager);
+            }
+            else
+            {
+                FileWriterManager zeroDataFwm = this.currentFileWriterManager;
+                String filePath = this.targetOrderedDirPath.getUri() + "/"
+                        + zeroDataFwm.getFileName();
+                try
+                {
+                    if (this.targetOrderedStorage.exists(filePath))
+                    {
+                        this.targetOrderedStorage.delete(filePath, false);
+                    }
+                }
+                catch (IOException e)
+                {
+                    logger.warn("Close failed to delete half-written bytes of empty FileWriterManager fileId={}, path={}; continuing",
+                            zeroDataFwm.getFileId(), filePath, e);
+                }
+                try
+                {
+                    zeroDataFwm.discard();
+                }
+                catch (RetinaException e)
+                {
+                    logger.warn("Close failed to discard empty current FileWriterManager fileId={}; continuing",
+                            zeroDataFwm.getFileId(), e);
+                }
+            }
+            this.currentFileWriterManager = null;
         }
 
         SuperVersion sv = getCurrentVersion();
-        boolean completed = false;
         try
         {
-            long maxObjectKey = this.continuousFlushedId.get();
-
-            // process current fileWriterManager
-            this.currentFileWriterManager.setLastBlockId(maxObjectKey);
-            this.currentFileWriterManager.addRowBatch(sv.getActiveMemTable().getRowBatch());
-            long firstBlockId = this.currentFileWriterManager.getFirstBlockId();
-            Iterator<MemTable> iterator = sv.getImmutableMemTables().iterator();
-            while (iterator.hasNext())
+            for (FileWriterManager fwm : new ArrayList<>(this.fileWriterManagers))
             {
-                MemTable immutableMemtable = iterator.next();
-                if (immutableMemtable.getId() >= firstBlockId)
+                List<FileWriterManager> published = publishFinishedFile(fwm);
+                for (FileWriterManager publishedFile : published)
                 {
-                    this.currentFileWriterManager.addRowBatch(immutableMemtable.getRowBatch());
-                    iterator.remove();
+                    this.fileWriterManagers.remove(publishedFile);
+                    cleanupPublishedObjects(publishedFile.getFirstBlockId(), publishedFile.getLastBlockId());
                 }
             }
-            publishFinishedFile(this.currentFileWriterManager);
-
-            // process the remaining fileWriterManager
-            for (FileWriterManager fileWriterManager : this.fileWriterManagers)
-            {
-                firstBlockId = fileWriterManager.getFirstBlockId();
-                long lastBlockId = fileWriterManager.getLastBlockId();
-
-                // all written to object
-                if (lastBlockId <= maxObjectKey)
-                {
-                    publishFinishedFile(fileWriterManager);
-                } else
-                {
-                    // process elements in immutable memTable
-                    iterator = sv.getImmutableMemTables().iterator();
-                    while (iterator.hasNext())
-                    {
-                        MemTable immutableMemtable = iterator.next();
-                        long id = immutableMemtable.getId();
-                        if (id >= firstBlockId && id <= lastBlockId)
-                        {
-                            fileWriterManager.addRowBatch(immutableMemtable.getRowBatch());
-                            iterator.remove();
-                        }
-                    }
-
-                    // elements in object will be processed in finish() later
-                    fileWriterManager.setLastBlockId(maxObjectKey);
-                    publishFinishedFile(fileWriterManager);
-                }
-            }
-            completed = true;
-        } catch (Exception e)
+        }
+        catch (Exception e)
         {
-            throw new RetinaException("Failed to persist data during close operation. Data may be lost", e);
-        } finally
+            throw new RetinaException("Failed to publish ingest files during close", e);
+        }
+        finally
         {
             sv.unref();
-            currentVersion.unref();
-            activeMemTable.unref();
-            for (MemTable immutableMemTable: sv.getImmutableMemTables())
-            {
-                immutableMemTable.unref();
-            }
-
-            for (ObjectEntry objectEntry : sv.getObjectEntries())
-            {
-                if (objectEntry.unref() && completed)
-                {
-                    this.objectStorageManager.delete(this.tableId, virtualNodeId, objectEntry.getId());
-                }
-            }
         }
     }
 }

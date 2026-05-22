@@ -537,24 +537,45 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 {
                     List<IndexProto.PrimaryIndexEntry> primaryEntries = new ArrayList<>(subList.size());
                     List<Long> rowIds = new ArrayList<>(subList.size());
+                    List<IndexProto.RowLocation> insertedLocations = new ArrayList<>(subList.size());
 
-                    // 2c. Insert records
-                    for (RetinaProto.InsertData data : subList)
+                    try
                     {
-                        byte[][] values = data.getColValuesList().stream().map(ByteString::toByteArray).toArray(byte[][]::new);
-                        IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(schemaName, tableName, values, timestamp, virtualNodeId);
-                        builder.setIndexKey(data.getIndexKeys(0));
-                        IndexProto.PrimaryIndexEntry entry = builder.build();
-                        primaryEntries.add(entry);
-                        rowIds.add(entry.getRowId());
+                        // 2b. Insert records
+                        for (RetinaProto.InsertData data : subList)
+                        {
+                            byte[][] values = data.getColValuesList().stream().map(ByteString::toByteArray).toArray(byte[][]::new);
+                            IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(schemaName, tableName, values, timestamp, virtualNodeId);
+                            builder.setIndexKey(data.getIndexKeys(0));
+                            IndexProto.PrimaryIndexEntry entry = builder.build();
+                            primaryEntries.add(entry);
+                            rowIds.add(entry.getRowId());
+                            insertedLocations.add(entry.getRowLocation());
+                        }
+
+                        // 2c. Put primary index entries
+                        long tableId = primaryEntries.get(0).getIndexKey().getTableId();
+                        indexService.putPrimaryIndexEntries(tableId, primaryIndexId, primaryEntries, option);
+
+                        // 2d. Put secondary index entries
+                        processSecondaryIndexes(subList, RetinaProto.InsertData::getIndexKeysList, rowIds, option, false);
                     }
-
-                    // 2d. Put primary index entries
-                    long tableId = primaryEntries.get(0).getIndexKey().getTableId();
-                    indexService.putPrimaryIndexEntries(tableId, primaryIndexId, primaryEntries, option);
-
-                    // 2e. Put secondary index entries
-                    processSecondaryIndexes(subList, RetinaProto.InsertData::getIndexKeysList, rowIds, option, false);
+                    catch (Exception e)
+                    {
+                        for (IndexProto.RowLocation loc : insertedLocations)
+                        {
+                            try
+                            {
+                                this.retinaResourceManager.deleteRecord(loc, timestamp);
+                            }
+                            catch (Exception rollbackEx)
+                            {
+                                logger.error("Failed to roll back visibility for inserted row at fileId={}, rgId={}, rgRowOffset={}",
+                                        loc.getFileId(), loc.getRgId(), loc.getRgRowOffset(), rollbackEx);
+                            }
+                        }
+                        throw e;
+                    }
                 });
             }
             // =================================================================
@@ -570,40 +591,61 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 {
                     List<IndexProto.PrimaryIndexEntry> primaryEntries = new ArrayList<>(subList.size());
                     List<Long> rowIds = new ArrayList<>(subList.size());
+                    List<IndexProto.RowLocation> insertedLocations = new ArrayList<>(subList.size());
 
-                    // 3c. Insert new records
-                    for (RetinaProto.UpdateData data : subList)
-                    {
-                        byte[][] values = data.getColValuesList().stream().map(ByteString::toByteArray).toArray(byte[][]::new);
-                        IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(schemaName, tableName, values, timestamp, virtualNodeId);
-                        builder.setIndexKey(data.getIndexKeys(0));
-                        IndexProto.PrimaryIndexEntry entry = builder.build();
-                        primaryEntries.add(entry);
-                        rowIds.add(entry.getRowId());
-                    }
-
-                    // 3d. Update primary index entries with fine-grained locking
-                    long tableId = primaryEntries.get(0).getIndexKey().getTableId();
-                    String lockKey = "v_" + virtualNodeId + "_b_" + bucketId + "_i_" + primaryIndexId;
-                    Lock lock = updateLocks.get(lockKey);
-
-                    lock.lock();
                     try
                     {
-                        List<IndexProto.RowLocation> prevLocs = indexService.updatePrimaryIndexEntries(tableId, primaryIndexId, primaryEntries, option);
-                        // 3e. Delete previous records
-                        for (IndexProto.RowLocation loc : prevLocs)
+                        // 3b. Insert new records
+                        for (RetinaProto.UpdateData data : subList)
                         {
-                            this.retinaResourceManager.deleteRecord(loc, timestamp);
+                            byte[][] values = data.getColValuesList().stream().map(ByteString::toByteArray).toArray(byte[][]::new);
+                            IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(schemaName, tableName, values, timestamp, virtualNodeId);
+                            builder.setIndexKey(data.getIndexKeys(0));
+                            IndexProto.PrimaryIndexEntry entry = builder.build();
+                            primaryEntries.add(entry);
+                            rowIds.add(entry.getRowId());
+                            insertedLocations.add(entry.getRowLocation());
                         }
-                    }
-                    finally
-                    {
-                        lock.unlock();
-                    }
 
-                    // 3f. Update secondary index entries
-                    processSecondaryIndexes(subList, RetinaProto.UpdateData::getIndexKeysList, rowIds, option, true);
+                        // 3c. Update primary index entries with bucket-level locking
+                        long tableId = primaryEntries.get(0).getIndexKey().getTableId();
+                        String lockKey = "v_" + virtualNodeId + "_b_" + bucketId + "_i_" + primaryIndexId;
+                        Lock lock = updateLocks.get(lockKey);
+
+                        lock.lock();
+                        try
+                        {
+                            List<IndexProto.RowLocation> prevLocs = indexService.updatePrimaryIndexEntries(tableId, primaryIndexId, primaryEntries, option);
+                            // 3d. Delete previous records
+                            for (IndexProto.RowLocation loc : prevLocs)
+                            {
+                                this.retinaResourceManager.deleteRecord(loc, timestamp);
+                            }
+                        }
+                        finally
+                        {
+                            lock.unlock();
+                        }
+
+                        // 3e. Update secondary index entries
+                        processSecondaryIndexes(subList, RetinaProto.UpdateData::getIndexKeysList, rowIds, option, true);
+                    }
+                    catch (Exception e)
+                    {
+                        for (IndexProto.RowLocation loc : insertedLocations)
+                        {
+                            try
+                            {
+                                this.retinaResourceManager.deleteRecord(loc, timestamp);
+                            }
+                            catch (Exception rollbackEx)
+                            {
+                                logger.error("Failed to roll back visibility for inserted row at fileId={}, rgId={}, rgRowOffset={}",
+                                        loc.getFileId(), loc.getRgId(), loc.getRgRowOffset(), rollbackEx);
+                            }
+                        }
+                        throw e;
+                    }
                 });
             }
         }
