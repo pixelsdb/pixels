@@ -1,0 +1,16 @@
+diff --git a/cloud/aws/aws_s3.cc b/cloud/aws/aws_s3.cc
+index 5b3c457d..aa9370d3 100644
+--- a/cloud/aws/aws_s3.cc
++++ b/cloud/aws/aws_s3.cc
+@@ -107,9 +107,9 @@ class AwsS3ClientWrapper {
+       const CloudEnvOptions& cloud_options)
+       : cloud_request_callback_(cloud_options.cloud_request_callback) {
+     if (creds) {
+-      client_ = std::make_shared<Aws::S3::S3Client>(creds, config);
++      client_ = std::make_shared<Aws::S3::S3Client>(creds, config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::RequestDependent, true);
+     } else {
+-      client_ = std::make_shared<Aws::S3::S3Client>(config);
++      client_ = std::make_shared<Aws::S3::S3Client>(config, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::RequestDependent, true);
+     }
+     if (cloud_options.use_aws_transfer_manager) {
+       Aws::Transfer::TransferManagerConfiguration transferManagerConfig(

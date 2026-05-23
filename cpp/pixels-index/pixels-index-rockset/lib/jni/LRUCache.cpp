@@ -31,8 +31,7 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetLRUCache_newLRUCache(
               static_cast<double>(jhigh_pri_pool_ratio),
               nullptr /* memory_allocator */,
               ROCKSDB_NAMESPACE::kDefaultToAdaptiveMutex,
-              ROCKSDB_NAMESPACE::kDefaultCacheMetadataChargePolicy,
-              static_cast<double>(jlow_pri_pool_ratio)));
+              ROCKSDB_NAMESPACE::kDefaultCacheMetadataChargePolicy));
 
   return reinterpret_cast<jlong>(sptr_lru_cache);
 }

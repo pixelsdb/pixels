@@ -2,11 +2,24 @@
 #include <vector>
 #include <string>
 
+#include "rocksdb/pluggable_compaction.h"
 #include "rocksdb/cloud/db_cloud.h"
 #include "rocksdb/options.h"
 #include "rocksdb/db.h"
 #include "portal.h"
 #include "cplusplus_to_java_convert.h"
+
+namespace {
+
+void ThrowJavaException(JNIEnv* env, const char* class_name,
+                        const std::string& message) {
+  jclass exception_class = env->FindClass(class_name);
+  if (exception_class != nullptr) {
+    env->ThrowNew(exception_class, message.c_str());
+  }
+}
+
+}  // namespace
 
 /**
  * This file is modified from RocksDB's own JNI bindings.
@@ -24,11 +37,15 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_open(
     jobjectArray jcf_names,
     jlongArray jcf_options_handles) 
 {
-  // 1. Options*
-  auto* options =
-      reinterpret_cast<ROCKSDB_NAMESPACE::Options*>(joptions);
-  assert(options != nullptr);
-  options->env = reinterpret_cast<ROCKSDB_NAMESPACE::Env*>(cloud_env_ptr);
+  // 1. The Java RocksetDBOptions handle owns a rocksdb::DBOptions, while
+  // DBCloud::Open requires rocksdb::Options.
+  auto* db_options =
+      reinterpret_cast<ROCKSDB_NAMESPACE::DBOptions*>(joptions);
+  assert(db_options != nullptr);
+
+  ROCKSDB_NAMESPACE::Options options;
+  static_cast<ROCKSDB_NAMESPACE::DBOptions&>(options) = *db_options;
+  options.env = reinterpret_cast<ROCKSDB_NAMESPACE::Env*>(cloud_env_ptr);
 
   // 2. db path
   const char* db_path_chars =
@@ -74,7 +91,7 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_open(
   ROCKSDB_NAMESPACE::DBCloud* db = nullptr;
 
   auto status = ROCKSDB_NAMESPACE::DBCloud::Open(
-      *options,
+      options,
       db_path,
       cf_descs,
       "" /* persistent_cache_path */,
@@ -85,6 +102,9 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_open(
   );
 
   if (!status.ok()) {
+    ThrowJavaException(env, "java/io/IOException",
+                       "Failed to open RocksDB Cloud database at " + db_path +
+                           ": " + status.ToString());
     return nullptr;
   }
 
@@ -121,7 +141,7 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_closeDatabase(
 
 JNIEXPORT jobject JNICALL
 Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_listColumnFamilies0(
-    JNIEnv* env, jclass, jstring jdb_path)
+    JNIEnv* env, jclass, jlong cloud_env_ptr, jstring jdb_path)
 {
   const char* path_chars = env->GetStringUTFChars(jdb_path, nullptr);
   if (path_chars == nullptr) {
@@ -129,11 +149,28 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_listColumnFamilies0(
   }
   std::string db_path(path_chars);
   env->ReleaseStringUTFChars(jdb_path, path_chars);
+
+  auto* cloud_env =
+      reinterpret_cast<ROCKSDB_NAMESPACE::CloudEnv*>(cloud_env_ptr);
+  if (cloud_env == nullptr) {
+    ThrowJavaException(env, "java/lang/IllegalArgumentException",
+                       "CloudEnv handle is null");
+    return nullptr;
+  }
+
+  ROCKSDB_NAMESPACE::Status st = cloud_env->PreloadCloudManifest(db_path);
+  if (!st.ok()) {
+    ThrowJavaException(env, "java/io/IOException",
+                       "Failed to preload RocksDB Cloud manifest at " +
+                           db_path + ": " + st.ToString());
+    return nullptr;
+  }
+
   ROCKSDB_NAMESPACE::Options options;
+  options.env = cloud_env;
   std::vector<std::string> column_families;
-  ROCKSDB_NAMESPACE::Status st =
-      ROCKSDB_NAMESPACE::DBCloud::ListColumnFamilies(
-          options, db_path, &column_families);
+  st = ROCKSDB_NAMESPACE::DBCloud::ListColumnFamilies(
+      options, db_path, &column_families);
 
   if (!st.ok()) {
     jclass ex = env->FindClass("java/lang/RuntimeException");
@@ -164,8 +201,13 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_listColumnFamilies0(
 }
 
 JNIEXPORT jlong JNICALL
-Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily0(
-    JNIEnv* env, jobject jdb, jlong jhandle, jbyteArray jcf_name)
+Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily(
+    JNIEnv* env,
+    jclass,
+    jlong jhandle,
+    jbyteArray jcf_name,
+    jint jcf_name_len,
+    jlong jcf_options)
 {
   auto* db = reinterpret_cast<ROCKSDB_NAMESPACE::DB*>(jhandle);
   if (db == nullptr) {
@@ -175,33 +217,35 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_createColumnFamily0(
   }
 
   jsize len = env->GetArrayLength(jcf_name);
+  if (jcf_name_len != len) {
+    jclass ex = env->FindClass("java/lang/IllegalArgumentException");
+    env->ThrowNew(ex, "Column family name length does not match byte array length");
+    return reinterpret_cast<jlong>(nullptr);
+  }
+
   std::string cf_name;
   cf_name.resize(len);
   env->GetByteArrayRegion(
       jcf_name, 0, len,
       reinterpret_cast<jbyte*>(&cf_name[0]));
 
-  ROCKSDB_NAMESPACE::ColumnFamilyOptions cf_options;
+  auto* cf_options =
+      reinterpret_cast<ROCKSDB_NAMESPACE::ColumnFamilyOptions*>(jcf_options);
+  if (cf_options == nullptr) {
+    jclass ex = env->FindClass("java/lang/IllegalArgumentException");
+    env->ThrowNew(ex, "Column family options handle is null");
+    return reinterpret_cast<jlong>(nullptr);
+  }
 
   ROCKSDB_NAMESPACE::ColumnFamilyHandle* cf_handle = nullptr;
   ROCKSDB_NAMESPACE::Status st =
-      db->CreateColumnFamily(cf_options, cf_name, &cf_handle);
+      db->CreateColumnFamily(*cf_options, cf_name, &cf_handle);
 
   if (!st.ok()) {
     jclass ex = env->FindClass("java/lang/RuntimeException");
     env->ThrowNew(ex, st.ToString().c_str());
     return reinterpret_cast<jlong>(nullptr);
   }
-
-  auto* sptr =
-      new std::shared_ptr<ROCKSDB_NAMESPACE::ColumnFamilyHandle>(cf_handle);
-
-  jclass cf_handle_clz =
-      env->FindClass(
-          "io/pixelsdb/pixels/index/rockset/jni/RocksetColumnFamilyHandle");
-
-  jmethodID ctor =
-      env->GetMethodID(cf_handle_clz, "<init>", "(J)V");
 
   return GET_CPLUSPLUS_POINTER(cf_handle);
 }
@@ -350,4 +394,3 @@ Java_io_pixelsdb_pixels_index_rockset_jni_RocksetDB_iterator(
     auto* it = db->NewIterator(*ro, cf);
     return reinterpret_cast<jlong>(it);
 }
-

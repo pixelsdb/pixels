@@ -66,6 +66,10 @@ public final class RocksetDB
         } else 
         {
             long[] var11 = open(env.nativeHandle(), var0.nativeHandle, var1, var4, var5);
+            if (var11 == null)
+            {
+                throw new IllegalStateException("Native RocksDB Cloud open returned null without throwing an exception");
+            }
             RocksetDB var12 = new RocksetDB(var11[0]);
             var12.storeOptionsInstance(var0);
 
@@ -84,7 +88,7 @@ public final class RocksetDB
     public void put(RocksetColumnFamilyHandle var1, RocksetWriteOptions var2, ByteBuffer var3, ByteBuffer var4) throws RuntimeException {
         if (var3.isDirect() && var4.isDirect()) 
         {
-            putDirect(this.nativeHandle, var2.nativeHandle, var3, var3.position(), var3.remaining(), var4, var4.position(), var4.remaining(), var1.nativeHandle);
+            putDirect(this.nativeHandle, var1.nativeHandle, var3, var3.position(), var3.remaining(), var4, var4.position(), var4.remaining(), var2.nativeHandle);
         } 
         else 
         {
@@ -97,7 +101,7 @@ public final class RocksetDB
 
             assert var4.hasArray();
 
-            put(this.nativeHandle, var2.nativeHandle, var3.array(), var3.arrayOffset() + var3.position(), var3.remaining(), var4.array(), var4.arrayOffset() + var4.position(), var4.remaining(), var1.nativeHandle);
+            put(this.nativeHandle, var1.nativeHandle, var3.array(), var3.arrayOffset() + var3.position(), var3.remaining(), var4.array(), var4.arrayOffset() + var4.position(), var4.remaining(), var2.nativeHandle);
         }
 
         var3.position(var3.limit());
@@ -185,7 +189,7 @@ public final class RocksetDB
 
     private static native void closeDatabase(long var0);
     private static native long[] open(long env_handle, long options_handle, String db_path, byte[][] descriptors, long[] cf_handles);
-    public static native List<byte[]> listColumnFamilies0(String dbPath);
+    public static native List<byte[]> listColumnFamilies0(long envHandle, String dbPath);
     private static native long createColumnFamily(final long handle, final byte[] columnFamilyName,
       final int columnFamilyNamelen, final long columnFamilyOptions) throws Exception;
     private static native void putDirect(long var0, long var2, ByteBuffer var4, int var5, int var6, ByteBuffer var7, int var8, int var9, long var10) throws RuntimeException;
@@ -195,4 +199,3 @@ public final class RocksetDB
     private static native long getLongProperty(final long nativeHandle, final long cfHandle,
     final String property, final int propertyLength) throws Exception;
 }
-
