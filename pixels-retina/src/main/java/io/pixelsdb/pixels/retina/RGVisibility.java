@@ -34,6 +34,54 @@ import java.util.concurrent.atomic.AtomicLong;
 public class RGVisibility implements AutoCloseable
 {
     private static final Logger logger = LogManager.getLogger(RGVisibility.class);
+
+    /**
+     * Selects how a visibility DELETE should be applied.
+     *
+     * <p>The modes separate the timestamp semantics from the lifecycle concurrency
+     * guarantees. NORMAL is the live fast path and only appends to the delete chain.
+     * VERSIONED is for replay while READY readers may be active, so historical
+     * deletes fold into baseBitmap through copy-on-write. EXCLUSIVE is for the
+     * RECOVERING replay window where readers and GC are blocked; historical deletes
+     * may fold into baseBitmap in place, with native writer synchronization.</p>
+     */
+    public enum ReplayMode
+    {
+        /**
+         * Normal live apply. The caller is expected to provide delete timestamps
+         * newer than the current baseTimestamp, so native code appends the delete
+         * record to the timestamped chain and does not inspect baseBitmap first.
+         */
+        NORMAL(0),
+
+        /**
+         * Replay while concurrent readers may exist, for example READY backlog
+         * catchup. Deletes with timestamp <= baseTimestamp are folded into
+         * baseBitmap by publishing a new version; newer deletes append to the chain.
+         */
+        VERSIONED(1),
+
+        /**
+         * Replay in an exclusive recovery window. Query and GC readers must be
+         * blocked, but multiple recovery writers may still run; native code uses a
+         * tile-level writer lock and folds historical deletes into baseBitmap in
+         * place.
+         */
+        EXCLUSIVE(2);
+
+        private final int code;
+
+        ReplayMode(int code)
+        {
+            this.code = code;
+        }
+
+        int code()
+        {
+            return code;
+        }
+    }
+
     static
     {
         String pixelsHome = System.getenv("PIXELS_HOME");
@@ -93,7 +141,7 @@ public class RGVisibility implements AutoCloseable
     // native methods
     private native long createNativeObject(long rgRecordNum, long timestamp, long[] bitmap);
     private native void destroyNativeObject(long nativeHandle);
-    private native void deleteRecord(int rgRowOffset, long timestamp, long nativeHandle);
+    private native void deleteRecord(int rgRowOffset, long timestamp, long nativeHandle, int replayMode);
     private native long[] getVisibilityBitmap(long timestamp, long nativeHandle);
     private native long[] garbageCollect(long timestamp, long nativeHandle);
     private native long[] exportChainItemsAfter(long safeGcTs, long nativeHandle);
@@ -104,9 +152,15 @@ public class RGVisibility implements AutoCloseable
 
     public void deleteRecord(int rgRowOffset, long timestamp)
     {
+        deleteRecord(rgRowOffset, timestamp, ReplayMode.NORMAL);
+    }
+
+    public void deleteRecord(int rgRowOffset, long timestamp, ReplayMode replayMode)
+    {
         long handle = nativeHandle.get();
         if (handle == 0) throw new IllegalStateException("RGVisibility is closed");
-        deleteRecord(rgRowOffset, timestamp, handle);
+        if (replayMode == null) throw new IllegalArgumentException("replayMode is null");
+        deleteRecord(rgRowOffset, timestamp, handle, replayMode.code());
     }
 
     public long[] getVisibilityBitmap(long timestamp)

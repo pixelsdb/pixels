@@ -23,6 +23,17 @@
 #include "RGVisibility.h"
 #include <stdexcept>
 
+namespace {
+ReplayMode toReplayMode(jint mode) {
+    switch (mode) {
+        case 0: return ReplayMode::NORMAL;
+        case 1: return ReplayMode::VERSIONED;
+        case 2: return ReplayMode::EXCLUSIVE;
+        default: throw std::invalid_argument("unknown ReplayMode");
+    }
+}
+}
+
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    createNativeObject
@@ -72,13 +83,13 @@ JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_destroyNative
 /*
  * Class:     io_pixelsdb_pixels_retina_RGVisibility
  * Method:    deleteRecord
- * Signature: (JJJ)V
+ * Signature: (IJJI)V
  */
 JNIEXPORT void JNICALL Java_io_pixelsdb_pixels_retina_RGVisibility_deleteRecord
-  (JNIEnv* env, jobject, jint rowId, jlong timestamp, jlong handle) {
+  (JNIEnv* env, jobject, jint rowId, jlong timestamp, jlong handle, jint replayMode) {
     try {
         auto* rgVisibility = reinterpret_cast<RGVisibilityInstance*>(handle);
-        rgVisibility->deleteRGRecord(rowId, timestamp);
+        rgVisibility->deleteRGRecord(rowId, timestamp, toReplayMode(replayMode));
     } catch (const std::exception& e) {
         env->ThrowNew(env->FindClass("java/lang/RuntimeException"), e.what());
     }

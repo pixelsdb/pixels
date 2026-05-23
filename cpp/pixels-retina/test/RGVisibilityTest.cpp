@@ -49,6 +49,50 @@ protected:
     RGVisibilityInstance* rgVisibility;
 };
 
+static bool rgBitSet(const uint64_t* bitmap, uint32_t rowId) {
+    return ((bitmap[rowId / 64] >> (rowId % 64)) & 1ULL) != 0;
+}
+
+static void runConcurrentRGDeletes(RGVisibilityInstance* visibility,
+                                   ReplayMode mode,
+                                   uint64_t ts,
+                                   int rowCount = 64,
+                                   int threadCount = 8) {
+    ASSERT_EQ(rowCount % threadCount, 0);
+    std::atomic<bool> start{false};
+    std::vector<std::thread> threads;
+    int rowsPerThread = rowCount / threadCount;
+
+    for (int t = 0; t < threadCount; t++) {
+        threads.emplace_back([&, t]() {
+            while (!start.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+            for (int i = 0; i < rowsPerThread; i++) {
+                uint32_t rowId = static_cast<uint32_t>(t * rowsPerThread + i);
+                visibility->deleteRGRecord(rowId, ts, mode);
+            }
+        });
+    }
+
+    start.store(true, std::memory_order_release);
+    for (auto& thread : threads) {
+        thread.join();
+    }
+}
+
+static void expectRGRows(RGVisibilityInstance* visibility,
+                         uint64_t queryTs,
+                         int rowCount,
+                         bool expectedSet) {
+    uint64_t* bitmap = visibility->getRGVisibilityBitmap(queryTs);
+    for (int row = 0; row < rowCount; row++) {
+        EXPECT_EQ(expectedSet, rgBitSet(bitmap, static_cast<uint32_t>(row)))
+            << "row=" << row << " queryTs=" << queryTs;
+    }
+    delete[] bitmap;
+}
+
 TEST_F(RGVisibilityTest, BasicDeleteAndVisibility) {
     uint64_t timestamp1 = 100;
     uint64_t timestamp2 = 200;
@@ -65,6 +109,34 @@ TEST_F(RGVisibilityTest, BasicDeleteAndVisibility) {
     uint64_t* bitmap2 = rgVisibility->getRGVisibilityBitmap(timestamp2);
     EXPECT_EQ(bitmap2[0], 0b1000010000100000);
     delete[] bitmap2;
+}
+
+TEST_F(RGVisibilityTest, ConcurrentNormalModeAppendsDeleteChain) {
+    constexpr uint64_t baseTs = 100;
+    RGVisibilityInstance visibility(ROW_COUNT, baseTs, nullptr);
+
+    runConcurrentRGDeletes(&visibility, ReplayMode::NORMAL, baseTs + 1);
+
+    expectRGRows(&visibility, baseTs, 64, false);
+    expectRGRows(&visibility, baseTs + 1, 64, true);
+}
+
+TEST_F(RGVisibilityTest, ConcurrentVersionedModeFoldsWithCow) {
+    constexpr uint64_t baseTs = 100;
+    RGVisibilityInstance visibility(ROW_COUNT, baseTs, nullptr);
+
+    runConcurrentRGDeletes(&visibility, ReplayMode::VERSIONED, baseTs - 1);
+
+    expectRGRows(&visibility, baseTs, 64, true);
+}
+
+TEST_F(RGVisibilityTest, ConcurrentExclusiveModeFoldsWithAtomicOr) {
+    constexpr uint64_t baseTs = 100;
+    RGVisibilityInstance visibility(ROW_COUNT, baseTs, nullptr);
+
+    runConcurrentRGDeletes(&visibility, ReplayMode::EXCLUSIVE, baseTs - 1);
+
+    expectRGRows(&visibility, baseTs, 64, true);
 }
 
 TEST_F(RGVisibilityTest, MultiThread) {
