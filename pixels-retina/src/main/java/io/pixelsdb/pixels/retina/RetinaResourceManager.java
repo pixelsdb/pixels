@@ -692,7 +692,13 @@ public class RetinaResourceManager
 
     public void deleteRecord(long fileId, int rgId, int rgRowOffset, long timestamp) throws RetinaException
     {
-        checkRGVisibility(fileId, rgId).deleteRecord(rgRowOffset, timestamp);
+        deleteRecord(fileId, rgId, rgRowOffset, timestamp, RGVisibility.ReplayMode.NORMAL);
+    }
+
+    public void deleteRecord(long fileId, int rgId, int rgRowOffset, long timestamp,
+                             RGVisibility.ReplayMode replayMode) throws RetinaException
+    {
+        checkRGVisibility(fileId, rgId).deleteRecord(rgRowOffset, timestamp, replayMode);
 
         if (!isDualWriteActive)
         {
@@ -719,7 +725,7 @@ public class RetinaResourceManager
                         int oldGlobal = bwdMapping[rgRowOffset];
                         int oldRgId = rgIdForGlobalRowOffset(oldGlobal, bwd.oldFileRgRowStart);
                         int oldRgOff = oldGlobal - bwd.oldFileRgRowStart[oldRgId];
-                        checkRGVisibility(bwd.oldFileId, oldRgId).deleteRecord(oldRgOff, timestamp);
+                        checkRGVisibility(bwd.oldFileId, oldRgId).deleteRecord(oldRgOff, timestamp, replayMode);
                     }
                 }
             }
@@ -733,7 +739,7 @@ public class RetinaResourceManager
                     int newGlobal = fwdMapping[rgRowOffset];
                     int newRgId = rgIdForGlobalRowOffset(newGlobal, result.newFileRgRowStart);
                     int newRgOff = newGlobal - result.newFileRgRowStart[newRgId];
-                    checkRGVisibility(result.newFileId, newRgId).deleteRecord(newRgOff, timestamp);
+                    checkRGVisibility(result.newFileId, newRgId).deleteRecord(newRgOff, timestamp, replayMode);
                 }
             }
         }
@@ -746,6 +752,14 @@ public class RetinaResourceManager
     public void deleteRecord(IndexProto.RowLocation rowLocation, long timestamp) throws RetinaException
     {
         deleteRecord(rowLocation.getFileId(), rowLocation.getRgId(), rowLocation.getRgRowOffset(), timestamp);
+    }
+
+    public void deleteRecord(IndexProto.RowLocation rowLocation, long timestamp,
+                             RGVisibility.ReplayMode replayMode)
+            throws RetinaException
+    {
+        deleteRecord(rowLocation.getFileId(), rowLocation.getRgId(), rowLocation.getRgRowOffset(),
+                timestamp, replayMode);
     }
 
     /**
