@@ -813,9 +813,11 @@ public class TestSqliteMainIndex
         Assertions.assertEquals(rgRowOffset, location.getRgRowOffset());
     }
 
-    private void assertLocationMissing(long rowId)
+    private void assertLocationMissing(long rowId) throws MainIndexException
     {
-        Assertions.assertThrows(MainIndexException.class, () -> mainIndex.getLocation(rowId));
+        // A missing rowId is reported as null so the caller can treat the absence
+        // as a logical not-found rather than a failure.
+        Assertions.assertNull(mainIndex.getLocation(rowId));
     }
 
     private void assertFlushFailsAndBufferSurvives(long fileId, long firstRowId, long secondRowId) throws Exception

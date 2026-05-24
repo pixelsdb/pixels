@@ -27,8 +27,10 @@ import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.common.index.ResolvedPrimary;
 import io.pixelsdb.pixels.common.index.service.IndexService;
 import io.pixelsdb.pixels.common.index.service.IndexServiceProvider;
+import io.pixelsdb.pixels.common.index.service.LocalIndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -288,10 +290,18 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .setHeader(headerBuilder.build())
                     .build());
         }
-        catch (RetinaException | IndexException e)
+        catch (RetinaException e)
         {
-            logger.error("updateRecord failed for schema={}", request.getSchemaName(), e);
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            logger.error("updateRecord failed for schema={} (retina)", request.getSchemaName(), e);
+            headerBuilder.setErrorCode(1).setErrorMsg("Retina: " + e.getMessage());
+            responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
+                    .setHeader(headerBuilder.build())
+                    .build());
+        }
+        catch (IndexException e)
+        {
+            logger.error("updateRecord failed for schema={} (index)", request.getSchemaName(), e);
+            headerBuilder.setErrorCode(2).setErrorMsg("Index: " + e.getMessage());
             responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
@@ -399,7 +409,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     private <T> void executeParallelByBucket(
             List<T> dataList,
             java.util.function.Function<T, IndexProto.IndexKey> keyExtractor,
-            BucketProcessor<T> processor) throws RetinaException
+            BucketProcessor<T> processor) throws RetinaException, IndexException
     {
         if (dataList == null || dataList.isEmpty())
         {
@@ -411,27 +421,47 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 .collect(Collectors.groupingBy(d ->
                         IndexUtils.getBucketIdFromByteBuffer(keyExtractor.apply(d).getKey())));
 
-        // 2. Parallel Execution: Process each bucket in parallel
+                        // 2. Parallel Execution: Process each bucket in parallel
         // This utilizes the common ForkJoinPool to execute RPCs and logic simultaneously
-        bucketMap.entrySet().parallelStream().forEach(entry ->
+        try
         {
-            int bucketId = entry.getKey();
-            List<T> subList = entry.getValue();
+            bucketMap.entrySet().parallelStream().forEach(entry ->
+            {
+                int bucketId = entry.getKey();
+                List<T> subList = entry.getValue();
 
             // Fetch the pre-initialized IndexOption from the pool (Zero allocation)
-            IndexOption option = this.indexOptionPool[bucketId];
+                IndexOption option = this.indexOptionPool[bucketId];
 
-            try
-            {
+                try
+                {
                 // Execute the specific Delete/Insert/Update logic
-                processor.process(bucketId, subList, option);
-            }
-            catch (Exception e)
-            {
+                    processor.process(bucketId, subList, option);
+                }
+                catch (Exception e)
+                {
                 // Wrap checked exceptions to propagate through the parallel stream
-                throw new RuntimeException("Failure during parallel index processing for Bucket: " + bucketId, e);
+                    throw new RuntimeException("Failure during parallel index processing for Bucket: " + bucketId, e);
+                }
+            });
+        }
+        catch (RuntimeException e)
+        {
+            Throwable cause = e;
+            while (cause instanceof RuntimeException && cause.getCause() != null)
+            {
+                cause = cause.getCause();
             }
-        });
+            if (cause instanceof RetinaException)
+            {
+                throw (RetinaException) cause;
+            }
+            if (cause instanceof IndexException)
+            {
+                throw (IndexException) cause;
+            }
+            throw e;
+        }
     }
 
     /**
@@ -470,6 +500,200 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     /**
+     * Delete phase for one bucket. Hide existing rows before removing primary entries;
+     * secondary cleanup is best effort.
+     */
+    private <T> void executeStagedDeletePhase(
+            List<T> subList,
+            java.util.function.Function<T, List<IndexProto.IndexKey>> keyListExtractor,
+            long primaryIndexId, long timestamp, IndexOption option) throws IndexException, RetinaException
+    {
+        List<List<IndexProto.IndexKey>> keysList = transposeIndexKeys(subList, keyListExtractor::apply);
+        List<IndexProto.IndexKey> primaryKeys = keysList.get(0);
+        long tableId = primaryKeys.get(0).getTableId();
+
+        List<Optional<ResolvedPrimary>> resolved =
+                indexService.resolvePrimary(tableId, primaryIndexId, primaryKeys, option);
+        List<IndexProto.IndexKey> foundKeys = new ArrayList<>(primaryKeys.size());
+        for (int i = 0; i < primaryKeys.size(); i++)
+        {
+            Optional<ResolvedPrimary> r = resolved.get(i);
+            if (r.isPresent())
+            {
+                this.retinaResourceManager.deleteRecord(r.get().getRowLocation(), timestamp);
+                foundKeys.add(primaryKeys.get(i));
+            }
+            // Missing primary keys are no-op deletes.
+        }
+        if (!foundKeys.isEmpty())
+        {
+            indexService.deletePrimaryIndexEntriesOnly(tableId, primaryIndexId, foundKeys, option);
+        }
+
+        for (int i = 1; i < keysList.size(); ++i)
+        {
+            try
+            {
+                indexService.deleteSecondaryIndexEntries(tableId,
+                        keysList.get(i).get(0).getIndexId(), keysList.get(i), option);
+            }
+            catch (IndexException e)
+            {
+                logger.warn("Best-effort staged secondary delete failed for tableId={}, indexId={}",
+                        tableId, keysList.get(i).get(0).getIndexId(), e);
+            }
+        }
+    }
+
+    /**
+     * Insert phase for one bucket. Write main index entries before primary entries
+     * so new primary mappings point to resolvable row locations.
+     */
+    private <T> void executeStagedInsertPhase(
+            String schemaName, String tableName, int virtualNodeId,
+            List<T> subList,
+            java.util.function.Function<T, List<IndexProto.IndexKey>> keyListExtractor,
+            java.util.function.Function<T, List<ByteString>> colValuesExtractor,
+            long primaryIndexId, long timestamp, IndexOption option) throws Exception
+    {
+        List<IndexProto.PrimaryIndexEntry> primaryEntries = new ArrayList<>(subList.size());
+        List<Long> rowIds = new ArrayList<>(subList.size());
+        List<IndexProto.RowLocation> insertedLocations = new ArrayList<>(subList.size());
+
+        try
+        {
+            for (T data : subList)
+            {
+                byte[][] values = colValuesExtractor.apply(data).stream()
+                        .map(ByteString::toByteArray).toArray(byte[][]::new);
+                IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(
+                        schemaName, tableName, values, timestamp, virtualNodeId);
+                builder.setIndexKey(keyListExtractor.apply(data).get(0));
+                IndexProto.PrimaryIndexEntry entry = builder.build();
+                primaryEntries.add(entry);
+                rowIds.add(entry.getRowId());
+                insertedLocations.add(entry.getRowLocation());
+            }
+
+            long tableId = primaryEntries.get(0).getIndexKey().getTableId();
+            indexService.putMainIndexEntriesOnly(tableId, primaryEntries);
+            indexService.putPrimaryIndexEntriesOnly(tableId, primaryIndexId, primaryEntries, option);
+
+            processSecondaryIndexes(subList, keyListExtractor::apply, rowIds, option, false);
+        }
+        catch (Exception e)
+        {
+            for (IndexProto.RowLocation loc : insertedLocations)
+            {
+                try
+                {
+                    this.retinaResourceManager.deleteRecord(loc, timestamp);
+                }
+                catch (Exception rollbackEx)
+                {
+                    logger.error("Failed to roll back visibility for inserted row at fileId={}, rgId={}, rgRowOffset={}",
+                            loc.getFileId(), loc.getRgId(), loc.getRgRowOffset(), rollbackEx);
+                }
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Update phase for one bucket. Resolve current rows, append replacements,
+     * write main index entries, switch primary entries, then hide old rows.
+     */
+    private <T> void executeStagedUpdatePhase(
+            String schemaName, String tableName, int virtualNodeId,
+            int bucketId,
+            List<T> subList,
+            java.util.function.Function<T, List<IndexProto.IndexKey>> keyListExtractor,
+            java.util.function.Function<T, List<ByteString>> colValuesExtractor,
+            long primaryIndexId, long timestamp, IndexOption option) throws Exception
+    {
+        List<IndexProto.PrimaryIndexEntry> primaryEntries = new ArrayList<>(subList.size());
+        List<Long> rowIds = new ArrayList<>(subList.size());
+        List<IndexProto.RowLocation> insertedLocations = new ArrayList<>(subList.size());
+        String lockKey = "v_" + virtualNodeId + "_b_" + bucketId + "_i_" + primaryIndexId;
+        Lock lock = updateLocks.get(lockKey);
+
+        try
+        {
+            lock.lock();
+            try
+            {
+                List<List<IndexProto.IndexKey>> keysList = transposeIndexKeys(subList, keyListExtractor::apply);
+                List<IndexProto.IndexKey> primaryKeys = keysList.get(0);
+                long tableId = primaryKeys.get(0).getTableId();
+
+                List<Optional<ResolvedPrimary>> resolved =
+                        indexService.resolvePrimary(tableId, primaryIndexId, primaryKeys, option);
+                if (resolved.size() != primaryKeys.size())
+                {
+                    throw new IndexException("Resolved primary count mismatch for tableId="
+                            + tableId + ", indexId=" + primaryIndexId);
+                }
+
+                List<IndexProto.RowLocation> previousLocations = new ArrayList<>(primaryKeys.size());
+                for (int i = 0; i < primaryKeys.size(); i++)
+                {
+                    Optional<ResolvedPrimary> r = resolved.get(i);
+                    if (!r.isPresent())
+                    {
+                        throw new IndexException("Primary index entry not found for update, tableId="
+                                + tableId + ", indexId=" + primaryIndexId);
+                    }
+                    previousLocations.add(r.get().getRowLocation());
+                }
+
+                for (T data : subList)
+                {
+                    byte[][] values = colValuesExtractor.apply(data).stream()
+                            .map(ByteString::toByteArray).toArray(byte[][]::new);
+                    IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(
+                            schemaName, tableName, values, timestamp, virtualNodeId);
+                    builder.setIndexKey(keyListExtractor.apply(data).get(0));
+                    IndexProto.PrimaryIndexEntry entry = builder.build();
+                    primaryEntries.add(entry);
+                    rowIds.add(entry.getRowId());
+                    insertedLocations.add(entry.getRowLocation());
+                }
+
+                // TODO: replace this JVM-local lock with an index API that updates only when the
+                // resolved old rowIds still match, so concurrent writers can avoid bucket serialization.
+                indexService.putMainIndexEntriesOnly(tableId, primaryEntries);
+                indexService.updatePrimaryIndexEntriesOnly(tableId, primaryIndexId, primaryEntries, option);
+                for (IndexProto.RowLocation loc : previousLocations)
+                {
+                    this.retinaResourceManager.deleteRecord(loc, timestamp);
+                }
+            }
+            finally
+            {
+                lock.unlock();
+            }
+
+            processSecondaryIndexes(subList, keyListExtractor::apply, rowIds, option, true);
+        }
+        catch (Exception e)
+        {
+            for (IndexProto.RowLocation loc : insertedLocations)
+            {
+                try
+                {
+                    this.retinaResourceManager.deleteRecord(loc, timestamp);
+                }
+                catch (Exception rollbackEx)
+                {
+                    logger.error("Failed to roll back visibility for inserted row at fileId={}, rgId={}, rgRowOffset={}",
+                            loc.getFileId(), loc.getRgId(), loc.getRgRowOffset(), rollbackEx);
+                }
+            }
+            throw e;
+        }
+    }
+
+    /**
      * Common method to process updates for both normal and streaming rpc.
      *
      * @param request
@@ -497,31 +721,11 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             List<RetinaProto.DeleteData> deleteDataList = tableUpdateData.getDeleteDataList();
             if (!deleteDataList.isEmpty())
             {
-                // 1a. Validate the delete data
                 validateIndexData(deleteDataList, d -> d.getIndexKeysList(), primaryIndexId, "Delete");
 
                 executeParallelByBucket(deleteDataList, d -> d.getIndexKeys(0), (bucketId, subList, option) ->
-                {
-                    // 1b. Transpose the index keys
-                    List<List<IndexProto.IndexKey>> keysList = transposeIndexKeys(subList, RetinaProto.DeleteData::getIndexKeysList);
-                    List<IndexProto.IndexKey> primaryKeys = keysList.get(0);
-                    long tableId = primaryKeys.get(0).getTableId();
-
-                    // 1c. Delete primary index entries
-                    List<IndexProto.RowLocation> rowLocations = indexService.deletePrimaryIndexEntries(tableId, primaryIndexId, primaryKeys, option);
-
-                    // 1d. Delete records
-                    for (IndexProto.RowLocation loc : rowLocations)
-                    {
-                        this.retinaResourceManager.deleteRecord(loc, timestamp);
-                    }
-
-                    // 1e. Delete secondary index entries
-                    for (int i = 1; i < keysList.size(); ++i)
-                    {
-                        indexService.deleteSecondaryIndexEntries(tableId, keysList.get(i).get(0).getIndexId(), keysList.get(i), option);
-                    }
-                });
+                        executeStagedDeletePhase(subList, RetinaProto.DeleteData::getIndexKeysList,
+                                primaryIndexId, timestamp, option));
             }
 
             // =================================================================
@@ -530,123 +734,30 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             List<RetinaProto.InsertData> insertDataList = tableUpdateData.getInsertDataList();
             if (!insertDataList.isEmpty())
             {
-                // 2a. Validate the insert data
                 validateIndexData(insertDataList, d -> d.getIndexKeysList(), primaryIndexId, "Insert");
 
                 executeParallelByBucket(insertDataList, d -> d.getIndexKeys(0), (bucketId, subList, option) ->
-                {
-                    List<IndexProto.PrimaryIndexEntry> primaryEntries = new ArrayList<>(subList.size());
-                    List<Long> rowIds = new ArrayList<>(subList.size());
-                    List<IndexProto.RowLocation> insertedLocations = new ArrayList<>(subList.size());
-
-                    try
-                    {
-                        // 2b. Insert records
-                        for (RetinaProto.InsertData data : subList)
-                        {
-                            byte[][] values = data.getColValuesList().stream().map(ByteString::toByteArray).toArray(byte[][]::new);
-                            IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(schemaName, tableName, values, timestamp, virtualNodeId);
-                            builder.setIndexKey(data.getIndexKeys(0));
-                            IndexProto.PrimaryIndexEntry entry = builder.build();
-                            primaryEntries.add(entry);
-                            rowIds.add(entry.getRowId());
-                            insertedLocations.add(entry.getRowLocation());
-                        }
-
-                        // 2c. Put primary index entries
-                        long tableId = primaryEntries.get(0).getIndexKey().getTableId();
-                        indexService.putPrimaryIndexEntries(tableId, primaryIndexId, primaryEntries, option);
-
-                        // 2d. Put secondary index entries
-                        processSecondaryIndexes(subList, RetinaProto.InsertData::getIndexKeysList, rowIds, option, false);
-                    }
-                    catch (Exception e)
-                    {
-                        for (IndexProto.RowLocation loc : insertedLocations)
-                        {
-                            try
-                            {
-                                this.retinaResourceManager.deleteRecord(loc, timestamp);
-                            }
-                            catch (Exception rollbackEx)
-                            {
-                                logger.error("Failed to roll back visibility for inserted row at fileId={}, rgId={}, rgRowOffset={}",
-                                        loc.getFileId(), loc.getRgId(), loc.getRgRowOffset(), rollbackEx);
-                            }
-                        }
-                        throw e;
-                    }
-                });
+                        executeStagedInsertPhase(schemaName, tableName, virtualNodeId, subList,
+                                RetinaProto.InsertData::getIndexKeysList,
+                                RetinaProto.InsertData::getColValuesList,
+                                primaryIndexId, timestamp, option));
             }
             // =================================================================
             // 3. Process Update Data
+            //
+            // UpdateData keeps primary-index update semantics; new row locations
+            // are written before primary entries are switched.
             // =================================================================
             List<RetinaProto.UpdateData> updateDataList = tableUpdateData.getUpdateDataList();
             if (!updateDataList.isEmpty())
             {
-                // 3a. Validate the update data
                 validateIndexData(updateDataList, d -> d.getIndexKeysList(), primaryIndexId, "Update");
 
                 executeParallelByBucket(updateDataList, d -> d.getIndexKeys(0), (bucketId, subList, option) ->
-                {
-                    List<IndexProto.PrimaryIndexEntry> primaryEntries = new ArrayList<>(subList.size());
-                    List<Long> rowIds = new ArrayList<>(subList.size());
-                    List<IndexProto.RowLocation> insertedLocations = new ArrayList<>(subList.size());
-
-                    try
-                    {
-                        // 3b. Insert new records
-                        for (RetinaProto.UpdateData data : subList)
-                        {
-                            byte[][] values = data.getColValuesList().stream().map(ByteString::toByteArray).toArray(byte[][]::new);
-                            IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(schemaName, tableName, values, timestamp, virtualNodeId);
-                            builder.setIndexKey(data.getIndexKeys(0));
-                            IndexProto.PrimaryIndexEntry entry = builder.build();
-                            primaryEntries.add(entry);
-                            rowIds.add(entry.getRowId());
-                            insertedLocations.add(entry.getRowLocation());
-                        }
-
-                        // 3c. Update primary index entries with bucket-level locking
-                        long tableId = primaryEntries.get(0).getIndexKey().getTableId();
-                        String lockKey = "v_" + virtualNodeId + "_b_" + bucketId + "_i_" + primaryIndexId;
-                        Lock lock = updateLocks.get(lockKey);
-
-                        lock.lock();
-                        try
-                        {
-                            List<IndexProto.RowLocation> prevLocs = indexService.updatePrimaryIndexEntries(tableId, primaryIndexId, primaryEntries, option);
-                            // 3d. Delete previous records
-                            for (IndexProto.RowLocation loc : prevLocs)
-                            {
-                                this.retinaResourceManager.deleteRecord(loc, timestamp);
-                            }
-                        }
-                        finally
-                        {
-                            lock.unlock();
-                        }
-
-                        // 3e. Update secondary index entries
-                        processSecondaryIndexes(subList, RetinaProto.UpdateData::getIndexKeysList, rowIds, option, true);
-                    }
-                    catch (Exception e)
-                    {
-                        for (IndexProto.RowLocation loc : insertedLocations)
-                        {
-                            try
-                            {
-                                this.retinaResourceManager.deleteRecord(loc, timestamp);
-                            }
-                            catch (Exception rollbackEx)
-                            {
-                                logger.error("Failed to roll back visibility for inserted row at fileId={}, rgId={}, rgRowOffset={}",
-                                        loc.getFileId(), loc.getRgId(), loc.getRgRowOffset(), rollbackEx);
-                            }
-                        }
-                        throw e;
-                    }
-                });
+                        executeStagedUpdatePhase(schemaName, tableName, virtualNodeId, bucketId, subList,
+                                RetinaProto.UpdateData::getIndexKeysList,
+                                RetinaProto.UpdateData::getColValuesList,
+                                primaryIndexId, timestamp, option));
             }
         }
     }

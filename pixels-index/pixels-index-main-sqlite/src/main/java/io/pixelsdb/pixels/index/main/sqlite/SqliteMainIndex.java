@@ -241,12 +241,9 @@ public class SqliteMainIndex implements MainIndex
         }
         if (location == null)
         {
+            // Return null when the rowId has no mapping in either the buffer or
+            // SQLite, leaving the caller to decide how to handle the miss.
             location = getRowLocationFromSqlite(rowId);
-            if (location == null)
-            {
-                throw new MainIndexException("Failed to get row location for rowId=" + rowId
-                        + " (tableId=" + tableId + ")");
-            }
         }
         return location;
     }
@@ -260,18 +257,18 @@ public class SqliteMainIndex implements MainIndex
         {
             for (long rowId : rowIds)
             {
-                IndexProto.RowLocation location;
-                location = this.indexBuffer.lookup(rowId);
+                IndexProto.RowLocation location = this.indexBuffer.lookup(rowId);
                 if (location == null)
                 {
                     location = getRowLocationFromSqlite(rowId);
-                    if (location == null)
-                    {
-                        throw new MainIndexException("Failed to get row location for rowId=" + rowId
-                                + " (tableId=" + tableId + ")");
-                    }
                 }
-                builder.add(location);
+                // Skip rowIds that have no mapping in either the buffer or SQLite;
+                // the returned list contains only the resolvable locations and the
+                // caller decides how to handle the missing ones.
+                if (location != null)
+                {
+                    builder.add(location);
+                }
             }
         }
         finally

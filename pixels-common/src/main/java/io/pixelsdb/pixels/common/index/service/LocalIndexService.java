@@ -28,12 +28,25 @@ import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 
 public class LocalIndexService implements IndexService
 {
     private static final LocalIndexService defaultInstance = new LocalIndexService();
     private static boolean upsertMode;
+
+    /**
+     * Visible file-id set supplier used by {@link #resolvePrimary} to filter
+     * out RowLocations whose fileId is outside the set. Default returns null,
+     * which disables the filter; install a real supplier via
+     * {@link #setBaselineVisibleFilesSupplier}.
+     */
+    private volatile Supplier<Set<Long>> baselineVisibleFilesSupplier = () -> null;
+
     public static LocalIndexService Instance()
     {
         return defaultInstance;
@@ -42,6 +55,22 @@ public class LocalIndexService implements IndexService
     private LocalIndexService()
     {
         upsertMode = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("retina.upsert-mode.enabled"));
+    }
+
+    /**
+     * Install the visible file-id set supplier. Polled on every
+     * {@link #resolvePrimary} call; a null return disables the filter.
+     * Node-local; not exposed on the {@link IndexService} interface.
+     *
+     * @param supplier non-null; use {@code () -> null} to disable
+     */
+    public void setBaselineVisibleFilesSupplier(Supplier<Set<Long>> supplier)
+    {
+        if (supplier == null)
+        {
+            throw new IllegalArgumentException("supplier must not be null; use () -> null to disable");
+        }
+        this.baselineVisibleFilesSupplier = supplier;
     }
 
     @Override
@@ -60,34 +89,10 @@ public class LocalIndexService implements IndexService
     @Override
     public IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException
     {
-        try
-        {
-            long tableId = key.getTableId();
-            long indexId = key.getIndexId();
-            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
-            long rowId = singlePointIndex.getUniqueRowId(key);
-            if (rowId >= 0)
-            {
-                IndexProto.RowLocation rowLocation = mainIndex.getLocation(rowId);
-                if (rowLocation != null)
-                {
-                    return rowLocation;
-                }
-                else
-                {
-                    throw new IndexException("Failed to get row location for rowId=" + rowId);
-                }
-            }
-            else
-            {
-                return null;
-            }
-        }
-        catch (SinglePointIndexException | MainIndexException e)
-        {
-            throw new IndexException("Failed to lookup unique index for key=" + key, e);
-        }
+        // Delegates to resolvePrimary; only backend errors throw, everything else returns null.
+        List<Optional<ResolvedPrimary>> resolved = resolvePrimary(
+                key.getTableId(), key.getIndexId(), Collections.singletonList(key), indexOption);
+        return resolved.get(0).map(ResolvedPrimary::getRowLocation).orElse(null);
     }
 
     @Override
@@ -134,71 +139,23 @@ public class LocalIndexService implements IndexService
     @Override
     public boolean putPrimaryIndexEntry(IndexProto.PrimaryIndexEntry entry, IndexOption indexOption) throws IndexException
     {
-        try
-        {
-            IndexProto.IndexKey key = entry.getIndexKey();
-            long tableId = key.getTableId();
-            long indexId = key.getIndexId();
-            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
-            // Insert into single point index
-            boolean spSuccess = singlePointIndex.putEntry(entry.getIndexKey(), entry.getRowId());
-            if (!spSuccess)
-            {
-                throw new IndexException("Failed to put entry into single point index for key=" + key);
-            }
-            // Insert into main index
-            boolean mainSuccess = mainIndex.putEntry(entry.getRowId(), entry.getRowLocation());
-            if (!mainSuccess)
-            {
-                throw new IndexException("Failed to put entry into main index for rowId=" + entry.getRowId());
-            }
-            return true;
-        }
-        catch (SinglePointIndexException e)
-        {
-            throw new IndexException("Failed to put entry into single point index for key=" + entry.getIndexKey(), e);
-        }
-        catch (MainIndexException e)
-        {
-            throw new IndexException("Failed to put entry into main index for rowId=" + entry.getRowId(), e);
-        }
+        // Delegates to putPrimaryIndexEntries.
+        IndexProto.IndexKey key = entry.getIndexKey();
+        return putPrimaryIndexEntries(key.getTableId(), key.getIndexId(),
+                Collections.singletonList(entry), indexOption);
     }
 
     @Override
     public boolean putPrimaryIndexEntries(long tableId, long indexId, List<IndexProto.PrimaryIndexEntry> entries, IndexOption indexOption) throws IndexException
     {
-        try
+        if (entries == null || entries.isEmpty())
         {
-            SinglePointIndex singlePointIndex = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
-            // Batch insert into single point index
-            boolean success = singlePointIndex.putPrimaryEntries(entries);
-            if (!success)
-            {
-                throw new IndexException("Failed to put primary entries into single point index, tableId="
-                        + tableId + ", indexId=" + indexId);
-            }
-            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-            for (Boolean mainSuccess : mainIndex.putEntries(entries))
-            {
-                if(!mainSuccess)
-                {
-                    throw new MainIndexException("Failed to put entry into main index, tableId: " + tableId);
-                }
-            }
             return true;
         }
-        catch (SinglePointIndexException e)
-        {
-            throw new IndexException("Failed to put primary entries into single point index, tableId="
-                    + tableId + ", indexId=" + indexId, e);
-        }
-        catch (MainIndexException e)
-        {
-            // Retained for consistency with original code, though normally not expected here
-            throw new IndexException("Failed to put primary entries into main index, tableId="
-                    + tableId + ", indexId=" + indexId, e);
-        }
+        // Crash-safe order: MainIndex first (rowId -> RowLocation), then primary (IndexKey -> rowId).
+        putMainIndexEntriesOnly(tableId, entries);
+        putPrimaryIndexEntriesOnly(tableId, indexId, entries, indexOption);
+        return true;
     }
 
     @Override
@@ -631,6 +588,186 @@ public class LocalIndexService implements IndexService
         catch (SinglePointIndexException | MainIndexException e)
         {
             throw new IndexException("Failed to remove index for tableId=" + tableId + ", indexId=" + indexId, e);
+        }
+    }
+
+    // ==================================================================================
+    // Staged primary-index APIs. Contracts live on the matching IndexService methods.
+    // ==================================================================================
+
+    @Override
+    public List<Optional<ResolvedPrimary>> resolvePrimary(long tableId, long indexId,
+            List<IndexProto.IndexKey> keys, IndexOption indexOption) throws IndexException
+    {
+        if (keys == null || keys.isEmpty())
+        {
+            return Collections.emptyList();
+        }
+        // null = filter disabled
+        Set<Long> visibleFiles = baselineVisibleFilesSupplier.get();
+        try
+        {
+            SinglePointIndex sp = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
+            MainIndex mi = MainIndexFactory.Instance().getMainIndex(tableId);
+            List<Optional<ResolvedPrimary>> result = new ArrayList<>(keys.size());
+            for (IndexProto.IndexKey key : keys)
+            {
+                long rowId = sp.getUniqueRowId(key);
+                if (rowId < 0)
+                {
+                    // missing or tombstoned in primary
+                    result.add(Optional.empty());
+                    continue;
+                }
+                IndexProto.RowLocation location = mi.getLocation(rowId);
+                if (location == null)
+                {
+                    // MainIndex orphan rowId
+                    result.add(Optional.empty());
+                    continue;
+                }
+                if (visibleFiles != null && !visibleFiles.contains(location.getFileId()))
+                {
+                    // fileId outside baseline visible set
+                    result.add(Optional.empty());
+                    continue;
+                }
+                result.add(Optional.of(new ResolvedPrimary(rowId, location)));
+            }
+            return result;
+        }
+        catch (SinglePointIndexException | MainIndexException e)
+        {
+            throw new IndexException("Failed to resolve primary for tableId=" + tableId
+                    + ", indexId=" + indexId, e);
+        }
+    }
+
+    @Override
+    public void putMainIndexEntriesOnly(long tableId, List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
+    {
+        if (entries == null || entries.isEmpty())
+        {
+            return;
+        }
+        try
+        {
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            List<Boolean> results = mainIndex.putEntries(entries);
+            for (Boolean ok : results)
+            {
+                if (ok == null || !ok)
+                {
+                    throw new IndexException("Failed to put main index entry, tableId=" + tableId);
+                }
+            }
+        }
+        catch (MainIndexException e)
+        {
+            throw new IndexException("Failed to put main index entries for tableId=" + tableId, e);
+        }
+    }
+
+    @Override
+    public void putPrimaryIndexEntriesOnly(long tableId, long indexId,
+            List<IndexProto.PrimaryIndexEntry> entries, IndexOption indexOption) throws IndexException
+    {
+        if (entries == null || entries.isEmpty())
+        {
+            return;
+        }
+        try
+        {
+            SinglePointIndex sp = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
+            if (!sp.putPrimaryEntries(entries))
+            {
+                throw new IndexException("Failed to put primary entries into single point index for tableId="
+                        + tableId + ", indexId=" + indexId);
+            }
+        }
+        catch (SinglePointIndexException e)
+        {
+            throw new IndexException("Failed to put primary entries into single point index for tableId="
+                    + tableId + ", indexId=" + indexId, e);
+        }
+    }
+
+    @Override
+    public void deletePrimaryIndexEntriesOnly(long tableId, long indexId,
+            List<IndexProto.IndexKey> resolvedKeys, IndexOption indexOption) throws IndexException
+    {
+        if (resolvedKeys == null || resolvedKeys.isEmpty())
+        {
+            return;
+        }
+        try
+        {
+            SinglePointIndex sp = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
+            // TODO: avoid the repeated primary lookup by adding a tombstone-only index API.
+            sp.deleteEntries(resolvedKeys);
+        }
+        catch (SinglePointIndexException e)
+        {
+            throw new IndexException("Failed to delete primary entries for tableId="
+                    + tableId + ", indexId=" + indexId, e);
+        }
+    }
+
+    @Override
+    public void updatePrimaryIndexEntriesOnly(long tableId, long indexId,
+            List<IndexProto.PrimaryIndexEntry> entries, IndexOption indexOption) throws IndexException
+    {
+        if (entries == null || entries.isEmpty())
+        {
+            return;
+        }
+        try
+        {
+            SinglePointIndex sp = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
+            // TODO: avoid the repeated primary lookup by adding an update API that accepts resolved rowIds.
+            sp.updatePrimaryEntries(entries);
+        }
+        catch (SinglePointIndexException e)
+        {
+            throw new IndexException("Failed to update primary entries for tableId="
+                    + tableId + ", indexId=" + indexId, e);
+        }
+    }
+
+    @Override
+    public void restorePrimaryIndexEntries(long tableId, long indexId,
+            List<RollbackEntry> entries, IndexOption indexOption) throws IndexException
+    {
+        if (entries == null || entries.isEmpty())
+        {
+            return;
+        }
+        // RECOVERING is single-threaded for these entries; read-then-write needs no CAS.
+        try
+        {
+            SinglePointIndex sp = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
+            List<IndexProto.PrimaryIndexEntry> toRestore = new ArrayList<>();
+            for (RollbackEntry entry : entries)
+            {
+                long current = sp.getUniqueRowId(entry.getIndexKey());
+                if (current == entry.getNewRowId())
+                {
+                    toRestore.add(IndexProto.PrimaryIndexEntry.newBuilder()
+                            .setIndexKey(entry.getIndexKey())
+                            .setRowId(entry.getOldRowId())
+                            .build());
+                }
+                // else: primary already tombstoned, reverted, or moved on; skip.
+            }
+            if (!toRestore.isEmpty())
+            {
+                sp.updatePrimaryEntries(toRestore);
+            }
+        }
+        catch (SinglePointIndexException e)
+        {
+            throw new IndexException("Failed to restore primary entries for tableId="
+                    + tableId + ", indexId=" + indexId, e);
         }
     }
 }
