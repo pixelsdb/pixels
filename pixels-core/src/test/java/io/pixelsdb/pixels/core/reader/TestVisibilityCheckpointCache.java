@@ -46,7 +46,7 @@ public class TestVisibilityCheckpointCache
     @Before
     public void setUp() throws IOException
     {
-        testCheckpointDir = ConfigFactory.Instance().getProperty("retina.checkpoint.dir");
+        testCheckpointDir = ConfigFactory.Instance().getProperty("retina.offload.checkpoint.dir");
         storage = StorageFactory.Instance().getStorage(testCheckpointDir);
 
         if (!storage.exists(testCheckpointDir))
@@ -86,7 +86,7 @@ public class TestVisibilityCheckpointCache
     public void testCacheLoading() throws Exception
     {
         long timestamp = 1000L;
-        String checkpointPath = resolve(testCheckpointDir, "vis_gc_tencent_100.bin");
+        String checkpointPath = resolve(testCheckpointDir, "vis_offload_tencent_100.bin");
         long[] dummyBitmap = new long[]{0x1L, 0x2L};
         createDummyCheckpoint(checkpointPath, 1, 1, dummyBitmap);
 

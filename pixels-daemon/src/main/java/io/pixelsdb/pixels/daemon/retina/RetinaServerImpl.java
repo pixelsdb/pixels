@@ -114,7 +114,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     private void initializeRetinaResources() throws Exception
     {
         logger.info("Pre-loading checkpoints...");
-        this.retinaResourceManager.recoverCheckpoints();
+        this.retinaResourceManager.recoverOffloadCheckpoints();
 
         List<Schema> schemas = this.metadataService.getSchemas();
         for (Schema schema : schemas)
@@ -825,7 +825,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .newBuilder()
                     .setHeader(headerBuilder.build());
 
-            String checkpointPath = this.retinaResourceManager.getCheckpointPath(timestamp);
+            String checkpointPath = this.retinaResourceManager.getOffloadCheckpointPath(timestamp);
             if (checkpointPath != null)
             {
                 responseBuilder.setCheckpointPath(checkpointPath);

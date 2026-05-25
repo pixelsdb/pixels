@@ -19,7 +19,6 @@
  */
 package io.pixelsdb.pixels.retina;
 
-import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
@@ -37,8 +36,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class TestPixelsWriteBuffer
 {
@@ -129,24 +126,6 @@ public class TestPixelsWriteBuffer
         {
             System.out.println("error: " + e);
         }
-    }
-
-    @Test
-    public void rgVisibilityRegistryValidationFailsClosed() throws Exception
-    {
-        RetinaResourceManager resourceManager = RetinaResourceManager.Instance();
-
-        try
-        {
-            resourceManager.validateRgVisibilityFileRegistered(500L);
-            fail("Expected missing RGVisibility registry entry to fail closed");
-        } catch (RetinaException expected)
-        {
-            assertTrue(expected.getMessage().contains("RGVisibilityIndex contains fileId=500"));
-        }
-
-        resourceManager.registerIngestFileMetadata(500L, 7L, 3, 0L);
-        resourceManager.validateRgVisibilityFileRegistered(500L);
     }
 
     @Test

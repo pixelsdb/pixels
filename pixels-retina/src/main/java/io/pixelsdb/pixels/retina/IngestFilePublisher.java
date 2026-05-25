@@ -53,6 +53,17 @@ final class IngestFilePublisher
         this.nextCommitFirstBlockId = nextCommitFirstBlockId;
     }
 
+    /**
+     * The {@code firstBlockId} of the next FileWriterManager waiting to be
+     * published. Since block ids are assigned monotonically and commit
+     * timestamps are monotonic across blocks, this is the block whose
+     * minimum ts equals the buffer's earliest not-yet-published commit ts.
+     */
+    synchronized long getNextCommitFirstBlockId()
+    {
+        return this.nextCommitFirstBlockId;
+    }
+
     synchronized List<FileWriterManager> admitReady(FileWriterManager fileWriterManager,
                                                     PublishAction publishAction) throws RetinaException
     {

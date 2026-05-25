@@ -629,14 +629,18 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     }
 
     @Override
-    public void getSafeGcTimestamp(com.google.protobuf.Empty request,
-                                   StreamObserver<TransProto.GetSafeGcTimestampResponse> responseObserver)
+    public void getSafeVisibilityFoldingTimestamp(TransProto.GetSafeVisibilityFoldingTimestampRequest request,
+                                                  StreamObserver<TransProto.GetSafeVisibilityFoldingTimestampResponse> responseObserver)
     {
-        long safeTs = Math.max(0, lowWatermark.get() - 1);
-        TransProto.GetSafeGcTimestampResponse response = TransProto.GetSafeGcTimestampResponse.newBuilder()
-                .setErrorCode(ErrorCode.SUCCESS)
-                .setTimestamp(safeTs)
-                .build();
+        long writerSafeTs = Math.max(0, highWatermark.get() - 1);
+        long safeTs = request.getIncludeRunningQueries()
+                ? Math.min(lowWatermark.get(), writerSafeTs)
+                : writerSafeTs;
+        TransProto.GetSafeVisibilityFoldingTimestampResponse response =
+                TransProto.GetSafeVisibilityFoldingTimestampResponse.newBuilder()
+                        .setErrorCode(ErrorCode.SUCCESS)
+                        .setTimestamp(safeTs)
+                        .build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

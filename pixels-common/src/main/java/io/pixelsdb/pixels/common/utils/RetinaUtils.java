@@ -29,8 +29,8 @@ import io.pixelsdb.pixels.daemon.NodeProto;
 
 public class RetinaUtils
 {
-    public static final String CHECKPOINT_PREFIX_GC = "vis_gc_";
     public static final String CHECKPOINT_PREFIX_OFFLOAD = "vis_offload_";
+    public static final String CHECKPOINT_PREFIX_RECOVERY = "recovery_";
     public static final String CHECKPOINT_SUFFIX = ".bin";
 
     private static volatile RetinaUtils instance;
@@ -132,12 +132,12 @@ public class RetinaUtils
     }
 
     /**
-     * Builds the checkpoint file path from a directory, prefix, hostname and timestamp.
+     * Builds the checkpoint file path from a directory, type prefix, hostname and identifier timestamp.
      *
      * @param checkpointDir directory where checkpoint files reside (may or may not end with '/')
-     * @param prefix        {@link #CHECKPOINT_PREFIX_GC} or {@link #CHECKPOINT_PREFIX_OFFLOAD}
+     * @param prefix        {@link #CHECKPOINT_PREFIX_OFFLOAD} or {@link #CHECKPOINT_PREFIX_RECOVERY}
      * @param hostname      the retina host name
-     * @param timestamp     the GC or offload timestamp
+     * @param timestamp     the checkpoint identifier timestamp (offload ts for offload, applied ts for recovery)
      */
     public static String buildCheckpointPath(String checkpointDir, String prefix, String hostname, long timestamp)
     {

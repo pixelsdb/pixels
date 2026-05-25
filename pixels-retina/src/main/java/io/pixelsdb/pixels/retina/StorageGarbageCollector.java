@@ -1203,7 +1203,6 @@ public class StorageGarbageCollector
 
         for (FileCandidate fc : result.group.files)
         {
-            resourceManager.unregisterIngestFileMetadata(fc.fileId);
             resourceManager.scheduleRetiredFile(
                     new RetinaResourceManager.RetiredFile(
                             fc.fileId, fc.rgCount, fc.filePath, retireDeadline, result.oldRowIds));

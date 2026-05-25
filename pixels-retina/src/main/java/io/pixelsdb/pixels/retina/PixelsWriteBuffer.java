@@ -314,6 +314,9 @@ public class PixelsWriteBuffer
 
     private void triggerFlushToObject(MemTable flushMemTable)
     {
+        // Capture ts before submitting: the memtable will be unref'd after
+        // flush, but checkpoint generation still needs its minCommitTs.
+        long capturedMinCommitTs = flushMemTable.getMinCommitTs();
         flushObjectExecutor.submit(() -> {
             try
             {
@@ -322,7 +325,7 @@ public class PixelsWriteBuffer
                 this.objectStorageManager.write(this.tableId, virtualNodeId, id, flushMemTable.serialize());
 
                 ObjectEntry objectEntry = new ObjectEntry(id, flushMemTable.getFileId(),
-                        flushMemTable.getStartIndex(), flushMemTable.getSize());
+                        flushMemTable.getStartIndex(), flushMemTable.getSize(), capturedMinCommitTs);
                 objectEntry.ref();
 
                 // update watermark
@@ -368,6 +371,52 @@ public class PixelsWriteBuffer
                 logger.error("Failed to flush memTable to shared storage, memTableId={}", flushMemTable.getId(), e);
             }
         });
+    }
+
+    public long getTableId()
+    {
+        return this.tableId;
+    }
+
+    public int getVirtualNodeId()
+    {
+        return this.virtualNodeId;
+    }
+
+    /**
+     * Earliest not-yet-published commit timestamp seen by this buffer.
+     */
+    public long getEarliestPendingMinTs()
+    {
+        long nextBlockId = this.ingestFilePublisher.getNextCommitFirstBlockId();
+        SuperVersion sv = getCurrentVersion();
+        try
+        {
+            for (ObjectEntry oe : sv.getObjectEntries())
+            {
+                if (oe.getId() == nextBlockId)
+                {
+                    return oe.getMinCommitTs();
+                }
+            }
+            for (MemTable mt : sv.getImmutableMemTables())
+            {
+                if (mt.getId() == nextBlockId)
+                {
+                    return mt.getMinCommitTs();
+                }
+            }
+            MemTable activeMt = sv.getActiveMemTable();
+            if (activeMt != null && activeMt.getId() == nextBlockId)
+            {
+                return activeMt.getMinCommitTs();
+            }
+            return Long.MAX_VALUE;
+        }
+        finally
+        {
+            sv.unref();
+        }
     }
 
     /**
@@ -451,9 +500,6 @@ public class PixelsWriteBuffer
                 throw new RetinaException("Failed to publish ingest file "
                         + fileWriterManager.getFileId() + " as REGULAR");
             }
-            RetinaResourceManager.Instance().registerIngestFileMetadata(
-                    fileWriterManager.getFileId(), tableId, fileWriterManager.getVirtualNodeId(),
-                    fileWriterManager.getFirstBlockId());
         } catch (MetadataException e)
         {
             throw new RetinaException("Failed to publish ingest file "

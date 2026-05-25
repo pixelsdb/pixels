@@ -38,6 +38,8 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.index.IndexProto;
+import io.pixelsdb.pixels.retina.RecoveryCheckpoint.PendingSegmentEntry;
+import io.pixelsdb.pixels.retina.RecoveryCheckpoint.VisibilityEntry;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -64,23 +66,25 @@ public class RetinaResourceManager
     private final MetadataService metadataService;
     private final Map<String, RGVisibility> rgVisibilityMap;
     private final Map<String, Map<Integer, PixelsWriteBuffer>> pixelsWriteBufferMap;
-    private final IngestFileMetadataRegistry ingestFileMetadataRegistry;
     private String retinaHostName;
 
     // GC related fields
     private final ScheduledExecutorService gcExecutor;
     private final AtomicBoolean gcScheduled;
     private final StorageGarbageCollector storageGarbageCollector;
+    // Initialised by startBackgroundGc(); recovery checkpoint publication
+    // is part of every GC cycle once the scheduler is running. Null until
+    // then so unit/integration tests that never start the scheduler are
+    // unaffected.
+    private RecoveryCheckpoint recoveryCheckpoint;
 
-    // Checkpoint related fields
-    private final ExecutorService checkpointExecutor;
-    private final Map<Long, String> offloadedCheckpoints;
-    private final Map<Long, CompletableFuture<Void>> checkpointFutures;
-    private final String checkpointDir;
     private volatile long latestGcTimestamp = -1;
     private final int totalVirtualNodeNum;
 
-    private final Map<Long, AtomicInteger> checkpointRefCounts;
+    // Offload checkpoint state (see "Offload Checkpoint Section" at the bottom of this file).
+    private final String offloadCheckpointDir;
+    private final ExecutorService offloadCheckpointExecutor;
+    private final Map<Long, OffloadCheckpoint> offloadCheckpoints = new ConcurrentHashMap<>();
 
     // Dual-write: oldFileId → result AND newFileId → result in a single map.
     // Direction is distinguished by checking fileId == result.newFileId.
@@ -127,32 +131,13 @@ public class RetinaResourceManager
         }
     }
 
-    private enum CheckpointType
-    {
-        GC,
-        OFFLOAD
-    }
-
     private RetinaResourceManager()
     {
         this.metadataService = MetadataService.Instance();
         this.rgVisibilityMap = new ConcurrentHashMap<>();
         this.pixelsWriteBufferMap = new ConcurrentHashMap<>();
-        this.ingestFileMetadataRegistry = new IngestFileMetadataRegistry();
-        this.offloadedCheckpoints = new ConcurrentHashMap<>();
-        this.checkpointFutures = new ConcurrentHashMap<>();
 
         ConfigFactory config = ConfigFactory.Instance();
-
-        this.checkpointRefCounts = new ConcurrentHashMap<>();
-        this.checkpointDir = config.getProperty("retina.checkpoint.dir");
-
-        int cpThreads = Integer.parseInt(config.getProperty("retina.checkpoint.threads"));
-        this.checkpointExecutor = Executors.newFixedThreadPool(cpThreads, r -> {
-            Thread t = new Thread(r, "retina-checkpoint-thread");
-            t.setDaemon(true);
-            return t;
-        });
 
         this.gcExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "retina-gc-thread");
@@ -162,6 +147,15 @@ public class RetinaResourceManager
         this.gcScheduled = new AtomicBoolean(false);
         totalVirtualNodeNum = Integer.parseInt(ConfigFactory.Instance().getProperty("node.virtual.num"));
         this.retinaHostName = NetUtils.getLocalHostName();
+
+        this.offloadCheckpointDir = config.getProperty("retina.offload.checkpoint.dir");
+        this.offloadCheckpointExecutor = Executors.newFixedThreadPool(
+                Integer.parseInt(config.getProperty("retina.offload.checkpoint.threads")),
+                r -> {
+                    Thread t = new Thread(r, "retina-checkpoint-thread");
+                    t.setDaemon(true);
+                    return t;
+                });
 
         StorageGarbageCollector gc = null;
         try
@@ -237,6 +231,12 @@ public class RetinaResourceManager
             logger.debug("Retina background GC scheduler has already been started");
             return;
         }
+
+        // Fail-closed: recovery checkpoint is a durability primitive. If we
+        // cannot construct it (missing/unreadable config, unreachable etcd
+        // or storage backend), refuse to start the GC scheduler rather than
+        // silently run without crash recovery.
+        this.recoveryCheckpoint = RecoveryCheckpoint.createDefault();
 
         try
         {
@@ -339,286 +339,6 @@ public class RetinaResourceManager
         return queryVisibility(fileId, rgId, timestamp, -1);
     }
 
-    /**
-     * Long-running queries register an "Offload" status and ensure that
-     * the required visibility checkpoint is correctly created and manages.
-     * For long-running transactions, newly written data is not required.
-     * Therefore, even if checkpoints are created under the same timestamp
-     * and only one copy is retained, this has virtually no impact on queries.
-     *
-     * @param timestamp
-     * @throws RetinaException
-     */
-    public void registerOffload(long timestamp) throws RetinaException
-    {
-        AtomicInteger refCount = checkpointRefCounts.computeIfAbsent(timestamp, k -> new AtomicInteger(0));
-        CompletableFuture<Void> future;
-
-        synchronized (refCount)
-        {
-            refCount.incrementAndGet();
-
-            // If checkpoint already exists and is fully committed, just return
-            if (offloadedCheckpoints.containsKey(timestamp))
-            {
-                logger.info("Registered offload for Timestamp: {} (already exists)", timestamp);
-                return;
-            }
-
-            // Check if there is an existing future
-            future = checkpointFutures.get(timestamp);
-            if (future != null && future.isCompletedExceptionally())
-            {
-                // If previous attempt failed, remove it so we can retry
-                checkpointFutures.remove(timestamp, future);
-                future = null;
-            }
-
-            if (future == null)
-            {
-                future = checkpointFutures.computeIfAbsent(timestamp, k -> {
-                    try
-                    {
-                        return createCheckpoint(timestamp, CheckpointType.OFFLOAD);
-                    } catch (RetinaException e)
-                    {
-                        throw new CompletionException(e);
-                    }
-                });
-            }
-        }
-
-        try
-        {
-            future.join();
-            logger.info("Registered offload for Timestamp: {}", timestamp);
-        } catch (Exception e)
-        {
-            synchronized (refCount)
-            {
-                refCount.decrementAndGet();
-                // We don't remove from checkpointFutures here anymore, 
-                // because it's handled above in the synchronized block for retries
-                // or let the next caller handle it.
-            }
-            throw new RetinaException("Failed to create checkpoint for timestamp: " + timestamp, e);
-        }
-    }
-
-    public void unregisterOffload(long timestamp)
-    {
-        AtomicInteger refCount = checkpointRefCounts.get(timestamp);
-        if (refCount != null)
-        {
-            synchronized (refCount)
-            {
-                int remaining = refCount.decrementAndGet();
-                if (remaining <= 0)
-                {
-                    offloadedCheckpoints.remove(timestamp);
-                    checkpointFutures.remove(timestamp);
-                    if (refCount.get() > 0)
-                    {
-                        logger.info("Checkpoint resurrection detected, skipping deletion. TS: {}", timestamp);
-                        return;
-                    }
-                    removeCheckpointFile(timestamp, CheckpointType.OFFLOAD);
-                    checkpointRefCounts.remove(timestamp);
-                    logger.info("Offload checkpoint for timestamp {} removed.", timestamp);
-                }
-            }
-        }
-    }
-
-    private CompletableFuture<Void> createCheckpoint(long timestamp, CheckpointType type) throws RetinaException
-    {
-        return createCheckpoint(timestamp, type, null);
-    }
-
-    void registerIngestFileMetadata(long fileId, long tableId, int virtualNodeId,
-                                    long firstBlockId) throws RetinaException
-    {
-        this.ingestFileMetadataRegistry.register(fileId, tableId, virtualNodeId, firstBlockId);
-    }
-
-    void unregisterIngestFileMetadata(long fileId)
-    {
-        this.ingestFileMetadataRegistry.unregister(fileId);
-    }
-
-    IngestFileMetadataRegistry.Entry getIngestFileMetadata(long fileId) throws RetinaException
-    {
-        return this.ingestFileMetadataRegistry.get(fileId);
-    }
-
-    List<IngestFileMetadataRegistry.Entry> listIngestFileMetadataByStream(long tableId, int virtualNodeId)
-    {
-        return this.ingestFileMetadataRegistry.listByStream(tableId, virtualNodeId);
-    }
-
-    void validateRgVisibilityFileRegistered(long fileId) throws RetinaException
-    {
-        if (!this.ingestFileMetadataRegistry.contains(fileId))
-        {
-            throw new RetinaException("RGVisibilityIndex contains fileId=" + fileId
-                    + " but registry has no entry, indicating publisher/retire ordering bug");
-        }
-    }
-
-    private CompletableFuture<Void> createCheckpoint(
-            long timestamp, CheckpointType type, Map<String, long[]> precomputedBitmaps) throws RetinaException
-    {
-        String prefix = (type == CheckpointType.GC) ? RetinaUtils.CHECKPOINT_PREFIX_GC : RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD;
-        String filePath = RetinaUtils.buildCheckpointPath(checkpointDir, prefix, retinaHostName, timestamp);
-
-        // 1. Capture current entries to ensure we process a consistent set of RGs
-        List<Map.Entry<String, RGVisibility>> entries = new ArrayList<>(this.rgVisibilityMap.entrySet());
-        for (Map.Entry<String, RGVisibility> entry : entries)
-        {
-            long fileId = RetinaUtils.parseFileIdFromRgKey(entry.getKey());
-            validateRgVisibilityFileRegistered(fileId);
-        }
-        int totalRgs = entries.size();
-        logger.info("Starting {} checkpoint for {} RGs at timestamp {}", type, totalRgs, timestamp);
-
-        // 2. Use a BlockingQueue for producer-consumer pattern
-        BlockingQueue<CheckpointFileIO.CheckpointEntry> queue = new LinkedBlockingQueue<>(1024);
-
-        // 3. Start producer tasks to fetch bitmaps
-        for (Map.Entry<String, RGVisibility> entry : entries)
-        {
-            checkpointExecutor.submit(() -> {
-                try
-                {
-                    String key = entry.getKey();
-                    long fileId = RetinaUtils.parseFileIdFromRgKey(key);
-                    int rgId = RetinaUtils.parseRgIdFromRgKey(key);
-                    RGVisibility rgVisibility = entry.getValue();
-                    long[] bitmap;
-                    if (precomputedBitmaps != null && precomputedBitmaps.containsKey(key))
-                    {
-                        bitmap = precomputedBitmaps.get(key);
-                    } else
-                    {
-                        bitmap = rgVisibility.getVisibilityBitmap(timestamp);
-                    }
-                    queue.put(new CheckpointFileIO.CheckpointEntry(fileId, rgId, (int) rgVisibility.getRecordNum(), bitmap));
-                } catch (Exception e)
-                {
-                    logger.error("Failed to fetch visibility bitmap for checkpoint", e);
-                }
-            });
-        }
-
-        // 4. Async Write: perform IO in background thread (Consumer).
-        // Use commonPool to avoid deadlocks with checkpointExecutor.
-        // Concurrency safety: for OFFLOAD type, registerOffload() guarantees at most
-        // one future per timestamp via synchronized(refCount) + checkpointFutures.computeIfAbsent.
-        // For GC type, runGC() is single-threaded. No file-level locking is needed here.
-        return CompletableFuture.runAsync(() -> {
-            long startWrite = System.currentTimeMillis();
-            try
-            {
-                CheckpointFileIO.writeCheckpoint(filePath, totalRgs, queue);
-                long endWrite = System.currentTimeMillis();
-                logger.info("Writing {} checkpoint file to {} took {} ms", type, filePath, (endWrite - startWrite));
-
-                if (type == CheckpointType.OFFLOAD)
-                {
-                    offloadedCheckpoints.put(timestamp, filePath);
-                }
-            } catch (Exception e)
-            {
-                logger.error("Failed to commit {} checkpoint file for timestamp: {}", type, timestamp, e);
-                try
-                {
-                    StorageFactory.Instance().getStorage(filePath).delete(filePath, false);
-                } catch (IOException ignored)
-                {
-                }
-                throw new CompletionException(e);
-            }
-        });
-    }
-
-    /**
-     * Writes a checkpoint from pre-built {@link CheckpointFileIO.CheckpointEntry} objects,
-     * bypassing the {@code rgVisibilityMap} traversal and per-entry thread-pool submission
-     * that the other {@code createCheckpoint} overload performs.
-     *
-     * <p>This is used by {@link #runGC()} when the entries have already been constructed
-     * during the Memory GC single-pass, avoiding a redundant second traversal of
-     * {@code rgVisibilityMap}.
-     */
-    private CompletableFuture<Void> createCheckpointDirect(
-            long timestamp, CheckpointType type,
-            List<CheckpointFileIO.CheckpointEntry> preBuiltEntries) throws RetinaException
-    {
-        String prefix = (type == CheckpointType.GC) ? RetinaUtils.CHECKPOINT_PREFIX_GC : RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD;
-        String filePath = RetinaUtils.buildCheckpointPath(checkpointDir, prefix, retinaHostName, timestamp);
-
-        int totalRgs = preBuiltEntries.size();
-        logger.info("Starting {} checkpoint (direct) for {} RGs at timestamp {}", type, totalRgs, timestamp);
-
-        BlockingQueue<CheckpointFileIO.CheckpointEntry> queue = new LinkedBlockingQueue<>(1024);
-
-        // Feed pre-built entries into the queue via the checkpoint executor so that the
-        // producer-consumer pattern with the writer thread is preserved (the queue has a
-        // bounded capacity of 1024, so this may block and must not run on the caller thread).
-        checkpointExecutor.submit(() -> {
-            try
-            {
-                for (CheckpointFileIO.CheckpointEntry entry : preBuiltEntries)
-                {
-                    queue.put(entry);
-                }
-            }
-            catch (InterruptedException e)
-            {
-                Thread.currentThread().interrupt();
-                logger.error("Interrupted while feeding pre-built checkpoint entries", e);
-            }
-        });
-
-        return CompletableFuture.runAsync(() -> {
-            try
-            {
-                CheckpointFileIO.writeCheckpoint(filePath, totalRgs, queue);
-
-                if (type == CheckpointType.OFFLOAD)
-                {
-                    offloadedCheckpoints.put(timestamp, filePath);
-                }
-            }
-            catch (Exception e)
-            {
-                logger.error("Failed to commit {} checkpoint file for timestamp: {}", type, timestamp, e);
-                try
-                {
-                    StorageFactory.Instance().getStorage(filePath).delete(filePath, false);
-                }
-                catch (IOException ignored)
-                {
-                }
-                throw new CompletionException(e);
-            }
-        });
-    }
-
-    private void removeCheckpointFile(long timestamp, CheckpointType type)
-    {
-        String prefix = (type == CheckpointType.GC) ? RetinaUtils.CHECKPOINT_PREFIX_GC : RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD;
-        String path = RetinaUtils.buildCheckpointPath(checkpointDir, prefix, retinaHostName, timestamp);
-
-        try
-        {
-            StorageFactory.Instance().getStorage(path).delete(path, false);
-        } catch (IOException e)
-        {
-            logger.warn("Failed to delete checkpoint file", e);
-        }
-    }
-
     public void reclaimVisibility(long fileId, int rgId, long timestamp) throws RetinaException
     {
         String retinaKey = RetinaUtils.buildRgKey(fileId, rgId);
@@ -683,11 +403,6 @@ public class RetinaResourceManager
             }
             return true;
         });
-    }
-
-    public String getCheckpointPath(long timestamp)
-    {
-        return offloadedCheckpoints.get(timestamp);
     }
 
     public void deleteRecord(long fileId, int rgId, int rgRowOffset, long timestamp) throws RetinaException
@@ -1030,33 +745,29 @@ public class RetinaResourceManager
     }
 
     /**
-     * Run a full GC cycle: Memory GC → checkpoint → Storage GC.
+     * Run a full GC cycle: Memory GC → Storage GC → Recovery Checkpoint.
      *
      * <p>Ordering rationale:
      * <ol>
      *   <li><b>Memory GC first</b>: {@code collectTileGarbage} compacts Deletion Chain blocks
-     *       whose last item ts ≤ lwm into {@code baseBitmap}. After compaction, the remaining
-     *       chain starts at the first block that straddles the lwm boundary, so the subsequent
-     *       {@code getVisibilityBitmap(lwm)} call traverses at most one partial block
-     *       (≤ {@code BLOCK_CAPACITY} items) instead of the entire pre-GC chain. This makes
-     *       checkpoint bitmap serialisation significantly cheaper.</li>
-     *   <li><b>Checkpoint second, unconditional and blocking</b>: written regardless of whether
-     *       Storage GC finds any candidate files. The {@code .join()} ensures the checkpoint
-     *       file is fully on disk before Storage GC begins rewriting any files, so after a
-     *       crash the post-Memory-GC visibility state can be rebuilt from the checkpoint
-     *       independently of any in-progress Storage GC rewrite. {@code gcExecutor} is
-     *       single-threaded, so the blocking join is also the simplest way to guarantee no
-     *       two GC cycles overlap.</li>
-     *   <li><b>Storage GC third</b>: requires an up-to-date {@code baseBitmap} (hence after
-     *       Memory GC) and its own WAL to resume in-progress tasks after a crash. Placing
-     *       it after the checkpoint keeps the two restart paths independent: the GC checkpoint
-     *       rebuilds the post-Memory-GC visibility state, and the GcWal resumes any
-     *       in-progress Storage GC task separately. Once scan completes, bitmaps for
-     *       non-candidate files are immediately released from memory (they are no longer
-     *       needed by subsequent phases).</li>
-     *   <li><b>Advance {@code latestGcTimestamp} last</b>: updated only after the entire cycle
-     *       succeeds (Memory GC + checkpoint + Storage GC). If any step throws, the timestamp
-     *       is not advanced and the next scheduled invocation will retry the full cycle.</li>
+     *       whose last item ts ≤ the safe folding timestamp into {@code baseBitmap}. After compaction,
+     *       the remaining chain starts at the first block that straddles that boundary, so the subsequent
+     *       {@code getVisibilityBitmap(timestamp)} call traverses at most one partial block
+     *       (≤ {@code BLOCK_CAPACITY} items) instead of the entire pre-GC chain. The same pass
+     *       also captures one {@link VisibilityEntry} per RG by reusing the post-fold bitmap,
+     *       so Recovery Checkpoint does not have to traverse RGVisibility a second time.</li>
+     *   <li><b>Storage GC second</b>: requires an up-to-date {@code baseBitmap} (hence after
+     *       Memory GC) and its own WAL to resume in-progress tasks after a crash. Once scan
+     *       completes, bitmaps for non-candidate files are immediately released from memory
+     *       (they are no longer needed by subsequent phases).</li>
+     *   <li><b>Recovery Checkpoint third</b>: receives the {@code rgEntries} collected in
+     *       Step 1 plus per-scope earliest pending commit timestamps, then publishes the
+     *       body + etcd pointer. Unlike Storage GC, a publish failure here aborts the cycle:
+     *       the outer catch skips the {@code latestGcTimestamp} advancement, and the next
+     *       cycle retries the full sequence so crash recovery never silently lags.</li>
+     *   <li><b>Advance {@code latestGcTimestamp} last</b>: updated only after Memory GC and
+     *       Recovery Checkpoint both succeed. Storage GC failures do not block advancement
+     *       because compaction is opportunistic.</li>
      * </ol>
      */
     private void runGC()
@@ -1066,10 +777,10 @@ public class RetinaResourceManager
         long timestamp = 0;
         try
         {
-            timestamp = TransService.Instance().getSafeGcTimestamp();
+            timestamp = TransService.Instance().getSafeVisibilityFoldingTimestamp(true);
         } catch (TransException e)
         {
-            logger.error("Error while getting safe garbage collection timestamp", e);
+            logger.error("Error while getting safe visibility folding timestamp", e);
             return;
         }
 
@@ -1081,24 +792,24 @@ public class RetinaResourceManager
         try
         {
             // Step 1: Single pass over rgVisibilityMap — Memory GC + file-level stats
-            // aggregation + CheckpointEntry pre-building.  Produces everything needed by
-            // checkpoint and Storage GC without any additional traversal.
+            // aggregation + Recovery Checkpoint entries. Produces everything needed by
+            // Storage GC and Recovery Checkpoint without any additional traversal of
+            // rgVisibilityMap or extra native-side bitmap reads.
             Map<String, long[]> gcSnapshotBitmaps = new HashMap<>();
             Map<Long, long[]> fileStats = new HashMap<>();  // fileId → {totalRows, totalInvalid}
-            List<CheckpointFileIO.CheckpointEntry> checkpointEntries = new ArrayList<>();
+            List<VisibilityEntry> rgEntries = new ArrayList<>(this.rgVisibilityMap.size());
 
             for (Map.Entry<String, RGVisibility> entry : this.rgVisibilityMap.entrySet())
             {
                 String rgKey = entry.getKey();
                 long fileId = RetinaUtils.parseFileIdFromRgKey(rgKey);
                 int rgId = RetinaUtils.parseRgIdFromRgKey(rgKey);
+                RGVisibility rgVisibility = entry.getValue();
 
-                validateRgVisibilityFileRegistered(fileId);
-
-                long[] bitmap = entry.getValue().garbageCollect(timestamp);
+                long[] bitmap = rgVisibility.garbageCollect(timestamp);
                 gcSnapshotBitmaps.put(rgKey, bitmap);
 
-                long recordNum = entry.getValue().getRecordNum();
+                long recordNum = rgVisibility.getRecordNum();
                 long rgInvalidCount = 0;
                 for (long word : bitmap)
                 {
@@ -1116,15 +827,14 @@ public class RetinaResourceManager
                     return existing;
                 });
 
-                checkpointEntries.add(
-                        new CheckpointFileIO.CheckpointEntry(fileId, rgId, (int) recordNum, bitmap));
+                // Reuse the post-fold bitmap as the checkpoint entry's bitmap: it
+                // already reflects every delete with delete_ts <= timestamp folded
+                // into base, which is exactly what the loader needs to rebuild
+                // RGVisibility with an empty deletion chain.
+                rgEntries.add(new VisibilityEntry(fileId, rgId, (int) recordNum, timestamp, bitmap));
             }
 
-            // Step 2: Checkpoint — write pre-built entries directly to disk, skipping
-            // the second rgVisibilityMap traversal and per-entry thread-pool submission.
-            createCheckpointDirect(timestamp, CheckpointType.GC, checkpointEntries).join();
-
-            // Step 3: Storage GC — pass file-level stats so that candidate selection
+            // Step 2: Storage GC — pass file-level stats so that candidate selection
             // uses O(1) lookups instead of per-RG aggregation loops.
             if (storageGarbageCollector != null)
             {
@@ -1138,105 +848,282 @@ public class RetinaResourceManager
                 }
             }
 
-            // Step 4: Advance the timestamp only after the full cycle succeeds.
-            // latestGcTimestamp is no longer updated inside createCheckpoint's async
-            // callback for GC type; this is the single authoritative update point.
-            long oldGcTs = this.latestGcTimestamp;
-            this.latestGcTimestamp = timestamp;
-            if (oldGcTs != -1 && oldGcTs != timestamp)
+            // Step 3: Publish a recovery checkpoint at the same timestamp the
+            // Memory GC just folded against, reusing the rgEntries already
+            // collected in Step 1. Unlike Storage GC failures (which we swallow
+            // because compaction is opportunistic), checkpoint publication
+            // failures must propagate: the outer catch will skip the
+            // latestGcTimestamp advancement so the next cycle retries.
+            if (recoveryCheckpoint != null)
             {
-                removeCheckpointFile(oldGcTs, CheckpointType.GC);
+                // Project per-scope earliest pending commit ts. Buffers with
+                // ts == Long.MAX_VALUE have no committed pending data and are
+                // omitted: the scope contributes nothing to recovery replay.
+                List<PendingSegmentEntry> segments = new ArrayList<>();
+                for (Map<Integer, PixelsWriteBuffer> perTable : this.pixelsWriteBufferMap.values())
+                {
+                    for (PixelsWriteBuffer buffer : perTable.values())
+                    {
+                        long ts = buffer.getEarliestPendingMinTs();
+                        if (ts != Long.MAX_VALUE)
+                        {
+                            segments.add(new PendingSegmentEntry(buffer.getTableId(),
+                                    buffer.getVirtualNodeId(), ts));
+                        }
+                    }
+                }
+                recoveryCheckpoint.generate(timestamp, rgEntries, segments);
             }
+
+            // Step 4: Advance the timestamp only after the full cycle succeeds.
+            this.latestGcTimestamp = timestamp;
         } catch (Exception e)
         {
             logger.error("Error while running GC", e);
         }
     }
 
-    public void recoverCheckpoints()
+    // ─────────────────────────────────────────────────────────────────────
+    // Offload Checkpoint Section
+    //
+    // Long-running queries register an "offload" status with a logical
+    // timestamp; this section materialises one visibility checkpoint file per
+    // registered timestamp and reference-counts concurrent registrations so
+    // that the file is created exactly once and deleted only after the last
+    // unregistration.
+    //
+    // State lives in three RRM fields declared at the top of the class:
+    // offloadCheckpointDir, offloadCheckpointExecutor, offloadCheckpoints.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Per-timestamp state aggregating reference count, in-flight creation
+     * future, and the resulting file path. Doubles as the synchronization
+     * monitor for all transitions on this timestamp's lifecycle.
+     */
+    private static final class OffloadCheckpoint
+    {
+        final AtomicInteger refCount = new AtomicInteger(0);
+        /** Set once createOffloadCheckpoint successfully commits the file; null otherwise. */
+        volatile String filePath;
+        /** Tracks the in-flight creation task; cleared lazily on retry after failure. */
+        volatile CompletableFuture<Void> future;
+    }
+
+    /**
+     * Long-running queries register an "Offload" status to ensure that the
+     * required visibility checkpoint is created. Concurrent registrations of
+     * the same timestamp are reference-counted and share a single checkpoint
+     * file, which has virtually no impact on queries since long-running
+     * transactions do not need newly written data.
+     */
+    public void registerOffload(long timestamp) throws RetinaException
+    {
+        OffloadCheckpoint cp = offloadCheckpoints.computeIfAbsent(timestamp, k -> new OffloadCheckpoint());
+        CompletableFuture<Void> future;
+
+        synchronized (cp)
+        {
+            cp.refCount.incrementAndGet();
+
+            if (cp.filePath != null)
+            {
+                logger.info("Registered offload for Timestamp: {} (already exists)", timestamp);
+                return;
+            }
+
+            future = cp.future;
+            if (future != null && future.isCompletedExceptionally())
+            {
+                // Previous attempt failed; drop the stale future so this caller retries.
+                cp.future = null;
+                future = null;
+            }
+
+            if (future == null)
+            {
+                future = createOffloadCheckpoint(timestamp, cp);
+                cp.future = future;
+            }
+        }
+
+        try
+        {
+            future.join();
+            logger.info("Registered offload for Timestamp: {}", timestamp);
+        }
+        catch (Exception e)
+        {
+            synchronized (cp)
+            {
+                cp.refCount.decrementAndGet();
+            }
+            throw new RetinaException("Failed to create checkpoint for timestamp: " + timestamp, e);
+        }
+    }
+
+    public void unregisterOffload(long timestamp)
+    {
+        OffloadCheckpoint cp = offloadCheckpoints.get(timestamp);
+        if (cp == null)
+        {
+            return;
+        }
+        synchronized (cp)
+        {
+            if (cp.refCount.decrementAndGet() > 0)
+            {
+                return;
+            }
+            offloadCheckpoints.remove(timestamp);
+            deleteOffloadCheckpoint(timestamp);
+            logger.info("Offload checkpoint for timestamp {} removed.", timestamp);
+        }
+    }
+
+    public String getOffloadCheckpointPath(long timestamp)
+    {
+        OffloadCheckpoint cp = offloadCheckpoints.get(timestamp);
+        return cp == null ? null : cp.filePath;
+    }
+
+    /**
+     * Cleans up stale offload checkpoint files left over by previous runs of
+     * this node before the service opens for queries. Long-running queries
+     * that owned those checkpoints are no longer active after a restart, so
+     * the files are safe to drop.
+     *
+     * <p>Cross-restart visibility recovery is the responsibility of the
+     * recovery checkpoint flow (see {@code recovery.md}); this method does
+     * not rebuild {@code rgVisibilityMap}.
+     */
+    public void recoverOffloadCheckpoints()
     {
         try
         {
-            Storage storage = StorageFactory.Instance().getStorage(checkpointDir);
-            if (!storage.exists(checkpointDir))
+            Storage storage = StorageFactory.Instance().getStorage(offloadCheckpointDir);
+            if (!storage.exists(offloadCheckpointDir))
             {
-                storage.mkdirs(checkpointDir);
+                storage.mkdirs(offloadCheckpointDir);
                 return;
             }
 
-            List<String> allFiles = storage.listPaths(checkpointDir);
-            // filter only .bin files
-            allFiles = allFiles.stream().filter(p -> p.endsWith(".bin")).collect(Collectors.toList());
-
-            List<Long> gcTimestamps = new ArrayList<>();
-            String offloadPrefix = RetinaUtils.getCheckpointPrefix(RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD, retinaHostName);
-            String gcPrefix = RetinaUtils.getCheckpointPrefix(RetinaUtils.CHECKPOINT_PREFIX_GC, retinaHostName);
-
-            for (String path : allFiles)
+            String offloadPrefix = RetinaUtils.getCheckpointPrefix(
+                    RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD, retinaHostName);
+            for (String path : storage.listPaths(offloadCheckpointDir))
             {
-                // use Paths.get().getFileName() to extract filename from path string
+                if (!path.endsWith(".bin"))
+                {
+                    continue;
+                }
                 String filename = Paths.get(path).getFileName().toString();
-                if (filename.startsWith(offloadPrefix))
+                if (!filename.startsWith(offloadPrefix))
                 {
-                    // delete offload checkpoint files when restarting
-                    try
-                    {
-                        storage.delete(path, false);
-                    } catch (IOException e)
-                    {
-                        logger.error("Failed to delete checkpoint file {}", path, e);
-                    }
-                } else if (filename.startsWith(gcPrefix))
+                    continue;
+                }
+                try
                 {
-                    try
-                    {
-                        gcTimestamps.add(Long.parseLong(filename.replace(gcPrefix, "").replace(".bin", "")));
-                    } catch (Exception e)
-                    {
-                        logger.error("Failed to parse checkpoint timestamp from file {}", path, e);
-                    }
+                    storage.delete(path, false);
+                }
+                catch (IOException e)
+                {
+                    logger.error("Failed to delete stale offload checkpoint file {}", path, e);
                 }
             }
-
-            if (gcTimestamps.isEmpty())
-            {
-                return;
-            }
-
-            Collections.sort(gcTimestamps);
-            long latestTs = gcTimestamps.get(gcTimestamps.size() - 1);
-            this.latestGcTimestamp = latestTs;
-            logger.info("Loading system state from GC checkpoint: {}", latestTs);
-
-            // load to rgVisibilityMap
-            String latestPath = RetinaUtils.buildCheckpointPath(
-                    checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_GC, retinaHostName, latestTs);
-
-            try
-            {
-                Storage latestStorage = StorageFactory.Instance().getStorage(latestPath);
-                if (latestStorage.exists(latestPath))
-                {
-                    final long ts = latestTs;
-                    int rgCount = CheckpointFileIO.readCheckpointParallel(latestPath, entry -> {
-                        addVisibility(entry.fileId, entry.rgId, entry.recordNum, ts, entry.bitmap, true);
-                    }, checkpointExecutor);
-
-                    logger.info("Recovered {} RG entries from GC checkpoint", rgCount);
-                }
-            } catch (IOException e)
-            {
-                logger.error("Failed to read checkpoint file", e);
-            }
-
-            // delete old GC checkpoint files
-            for (int i = 0; i < gcTimestamps.size() - 1; i++)
-            {
-                removeCheckpointFile(gcTimestamps.get(i), CheckpointType.GC);
-            }
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
-            logger.error("Failed to recover checkpoints", e);
+            logger.error("Failed to recover offload checkpoints", e);
+        }
+    }
+
+    /**
+     * Two-phase checkpoint creation:
+     * <ol>
+     *   <li>Fold each RG's deletion chain at {@code timestamp} in parallel.
+     *       A failure in any fold task surfaces through the returned future
+     *       (no swallowed errors, no waiting on the writer's 60s timeout).</li>
+     *   <li>Once all bitmaps are ready, drain them into the queue and write
+     *       the file. On any failure the partial file is removed via the
+     *       {@code whenComplete} side effect.</li>
+     * </ol>
+     *
+     * <p>Concurrency safety: {@link #registerOffload} guarantees at most one
+     * in-flight future per OffloadCheckpoint via {@code synchronized(cp)} +
+     * single-writer of {@code cp.future}, so no file-level locking is needed.
+     */
+    private CompletableFuture<Void> createOffloadCheckpoint(long timestamp, OffloadCheckpoint cp)
+    {
+        String filePath = RetinaUtils.buildCheckpointPath(
+                offloadCheckpointDir, RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD, retinaHostName, timestamp);
+
+        List<Map.Entry<String, RGVisibility>> entries = new ArrayList<>(rgVisibilityMap.entrySet());
+        int totalRgs = entries.size();
+        logger.info("Starting offload checkpoint for {} RGs at timestamp {}", totalRgs, timestamp);
+
+        List<CompletableFuture<CheckpointFileIO.CheckpointEntry>> bitmapFutures = new ArrayList<>(totalRgs);
+        for (Map.Entry<String, RGVisibility> entry : entries)
+        {
+            bitmapFutures.add(CompletableFuture.supplyAsync(() -> {
+                String key = entry.getKey();
+                long fileId = RetinaUtils.parseFileIdFromRgKey(key);
+                int rgId = RetinaUtils.parseRgIdFromRgKey(key);
+                RGVisibility rgVisibility = entry.getValue();
+                long[] bitmap = rgVisibility.getVisibilityBitmap(timestamp);
+                return new CheckpointFileIO.CheckpointEntry(
+                        fileId, rgId, (int) rgVisibility.getRecordNum(), bitmap);
+            }, offloadCheckpointExecutor));
+        }
+
+        return CompletableFuture
+                .allOf(bitmapFutures.toArray(new CompletableFuture[0]))
+                .thenRunAsync(() -> {
+                    long startWrite = System.currentTimeMillis();
+                    BlockingQueue<CheckpointFileIO.CheckpointEntry> queue =
+                            new ArrayBlockingQueue<>(Math.max(1, totalRgs));
+                    try
+                    {
+                        for (CompletableFuture<CheckpointFileIO.CheckpointEntry> f : bitmapFutures)
+                        {
+                            queue.put(f.join());
+                        }
+                        CheckpointFileIO.writeCheckpoint(filePath, totalRgs, queue);
+                        long endWrite = System.currentTimeMillis();
+                        logger.info("Writing offload checkpoint file to {} took {} ms",
+                                filePath, (endWrite - startWrite));
+                        cp.filePath = filePath;
+                    }
+                    catch (Exception e)
+                    {
+                        throw new CompletionException(e);
+                    }
+                }, offloadCheckpointExecutor)
+                .whenComplete((unused, throwable) -> {
+                    if (throwable != null)
+                    {
+                        logger.error("Failed to create offload checkpoint for timestamp: {}",
+                                timestamp, throwable);
+                        deleteOffloadCheckpoint(timestamp);
+                    }
+                });
+    }
+
+    private void deleteOffloadCheckpoint(long timestamp)
+    {
+        String path = RetinaUtils.buildCheckpointPath(
+                offloadCheckpointDir, RetinaUtils.CHECKPOINT_PREFIX_OFFLOAD, retinaHostName, timestamp);
+
+        try
+        {
+            Storage storage = StorageFactory.Instance().getStorage(path);
+            if (storage.exists(path))
+            {
+                storage.delete(path, false);
+            }
+        }
+        catch (IOException e)
+        {
+            logger.warn("Failed to delete offload checkpoint file {}", path, e);
         }
     }
 }

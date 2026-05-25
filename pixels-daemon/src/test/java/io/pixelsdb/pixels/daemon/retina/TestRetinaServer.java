@@ -98,7 +98,7 @@ public class TestRetinaServer
             assertTrue(e.getMessage().contains("Failed to initialize RetinaServerImpl"));
         }
 
-        verify(resourceManager).recoverCheckpoints();
+        verify(resourceManager).recoverOffloadCheckpoints();
         verify(resourceManager, never()).startBackgroundGc();
     }
 
@@ -137,7 +137,7 @@ public class TestRetinaServer
         doAnswer(invocation -> {
             lifecycleEvents.add("recover");
             return null;
-        }).when(resourceManager).recoverCheckpoints();
+        }).when(resourceManager).recoverOffloadCheckpoints();
         doAnswer(invocation -> {
             lifecycleEvents.add("visibility:" + invocation.getArgument(0));
             return null;
@@ -188,7 +188,7 @@ public class TestRetinaServer
         }
 
         InOrder inOrder = inOrder(resourceManager);
-        inOrder.verify(resourceManager).recoverCheckpoints();
+        inOrder.verify(resourceManager).recoverOffloadCheckpoints();
         inOrder.verify(resourceManager).startBackgroundGc();
     }
 

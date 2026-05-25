@@ -88,7 +88,6 @@
         <dependency>
             <groupId>io.etcd</groupId>
             <artifactId>jetcd-core</artifactId>
-            <scope>test</scope>
         </dependency>
 
         <dependency>

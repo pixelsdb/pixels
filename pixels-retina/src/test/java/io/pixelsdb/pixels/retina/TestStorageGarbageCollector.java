@@ -50,7 +50,6 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.PreparedStatement;
@@ -1624,117 +1623,6 @@ public class TestStorageGarbageCollector
                     RetinaResourceManager.rgIdForGlobalRowOffset(first, rgRowStart));
             assertEquals("last offset of rg=" + rg, rg,
                     RetinaResourceManager.rgIdForGlobalRowOffset(last, rgRowStart));
-        }
-    }
-
-    // =======================================================================
-    // Section 7c: createCheckpointDirect vs createCheckpoint consistency
-    // =======================================================================
-
-    /**
-     * Both checkpoint paths (queued via rgVisibilityMap traversal and direct via
-     * pre-built entries) must produce byte-identical files when given the same
-     * visibility state.
-     */
-    @Test
-    public void testCheckpointDirect_matchesStandardCheckpoint() throws Exception
-    {
-        long ts = 500L;
-        int numFiles = 3;
-        int rowsPerRg = 64;
-
-        for (int fid = 1; fid <= numFiles; fid++)
-        {
-            retinaManager.addVisibility(fid, 0, rowsPerRg, 0L, null, false);
-            for (int d = 0; d < fid; d++)
-            {
-                retinaManager.deleteRecord(fid, 0, d, ts - 100);
-            }
-        }
-
-        // Build pre-built entries identical to what runGC() would construct.
-        List<CheckpointFileIO.CheckpointEntry> entries = new ArrayList<>();
-        Field rgMapField = RetinaResourceManager.class.getDeclaredField("rgVisibilityMap");
-        rgMapField.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        Map<String, RGVisibility> rgMap =
-                (Map<String, RGVisibility>) rgMapField.get(retinaManager);
-        for (Map.Entry<String, RGVisibility> e : rgMap.entrySet())
-        {
-            long fileId = RetinaUtils.parseFileIdFromRgKey(e.getKey());
-            int rgId = RetinaUtils.parseRgIdFromRgKey(e.getKey());
-            long[] bitmap = e.getValue().getVisibilityBitmap(ts);
-            entries.add(new CheckpointFileIO.CheckpointEntry(
-                    fileId, rgId, (int) e.getValue().getRecordNum(), bitmap));
-        }
-
-        // Obtain the private CheckpointType.GC enum value via reflection.
-        @SuppressWarnings("unchecked")
-        Class<? extends Enum<?>> checkpointTypeClass = (Class<? extends Enum<?>>)
-                Class.forName("io.pixelsdb.pixels.retina.RetinaResourceManager$CheckpointType");
-        Object gcType = null;
-        for (Object constant : checkpointTypeClass.getEnumConstants())
-        {
-            if (constant.toString().equals("GC"))
-            {
-                gcType = constant;
-                break;
-            }
-        }
-        assertNotNull("CheckpointType.GC must exist", gcType);
-
-        // Call createCheckpoint (standard path)
-        Method createCheckpointMethod = RetinaResourceManager.class.getDeclaredMethod(
-                "createCheckpoint", long.class, checkpointTypeClass);
-        createCheckpointMethod.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        CompletableFuture<Void> f1 = (CompletableFuture<Void>) createCheckpointMethod.invoke(
-                retinaManager, ts, gcType);
-        f1.join();
-
-        // Call createCheckpointDirect (optimized path) with a different timestamp to get a different file name
-        long ts2 = ts + 1;
-        Method createCheckpointDirectMethod = RetinaResourceManager.class.getDeclaredMethod(
-                "createCheckpointDirect", long.class, checkpointTypeClass, List.class);
-        createCheckpointDirectMethod.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        CompletableFuture<Void> f2 = (CompletableFuture<Void>) createCheckpointDirectMethod.invoke(
-                retinaManager, ts2, gcType, entries);
-        f2.join();
-
-        // Read both checkpoint files and compare entries.
-        // Files may have entries in different order (due to producer-consumer concurrency),
-        // so we normalize by sorting entries by (fileId, rgId) before comparing.
-        Field checkpointDirField = RetinaResourceManager.class.getDeclaredField("checkpointDir");
-        checkpointDirField.setAccessible(true);
-        String checkpointDir = (String) checkpointDirField.get(retinaManager);
-
-        Field hostField = RetinaResourceManager.class.getDeclaredField("retinaHostName");
-        hostField.setAccessible(true);
-        String hostName = (String) hostField.get(retinaManager);
-
-        String path1 = RetinaUtils.buildCheckpointPath(
-                checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_GC, hostName, ts);
-        String path2 = RetinaUtils.buildCheckpointPath(
-                checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_GC, hostName, ts2);
-
-        Map<String, long[]> standard = new HashMap<>();
-        CheckpointFileIO.readCheckpointParallel(path1, entry ->
-                standard.put(entry.fileId + "_" + entry.rgId,
-                        Arrays.copyOf(entry.bitmap, entry.bitmap.length)));
-
-        Map<String, long[]> direct = new HashMap<>();
-        CheckpointFileIO.readCheckpointParallel(path2, entry ->
-                direct.put(entry.fileId + "_" + entry.rgId,
-                        Arrays.copyOf(entry.bitmap, entry.bitmap.length)));
-
-        assertEquals("entry count must match", standard.size(), direct.size());
-        for (Map.Entry<String, long[]> e : standard.entrySet())
-        {
-            long[] directBitmap = direct.get(e.getKey());
-            assertNotNull("direct checkpoint must contain key=" + e.getKey(), directBitmap);
-            assertTrue("bitmaps must be identical for key=" + e.getKey(),
-                    Arrays.equals(e.getValue(), directBitmap));
         }
     }
 
