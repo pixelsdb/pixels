@@ -22,6 +22,8 @@ package io.pixelsdb.pixels.retina;
 import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.exception.TransException;
+import io.pixelsdb.pixels.common.index.service.IndexService;
+import io.pixelsdb.pixels.common.index.service.IndexServiceProvider;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
@@ -64,6 +66,7 @@ public class RetinaResourceManager
     private static final Logger logger = LogManager.getLogger(RetinaResourceManager.class);
 
     private final MetadataService metadataService;
+    private final IndexService indexService;
     private final Map<String, RGVisibility> rgVisibilityMap;
     private final Map<String, Map<Integer, PixelsWriteBuffer>> pixelsWriteBufferMap;
     private String retinaHostName;
@@ -134,6 +137,7 @@ public class RetinaResourceManager
     private RetinaResourceManager()
     {
         this.metadataService = MetadataService.Instance();
+        this.indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
         this.rgVisibilityMap = new ConcurrentHashMap<>();
         this.pixelsWriteBufferMap = new ConcurrentHashMap<>();
 
@@ -171,7 +175,7 @@ public class RetinaResourceManager
                 EncodingLevel encodingLevel = EncodingLevel.from(
                         Integer.parseInt(config.getProperty("retina.storage.gc.encoding.level")));
                 long retireDelayMs = (long) (Double.parseDouble(config.getProperty("retina.storage.gc.file.retire.delay.hours")) * 3_600_000L);
-                gc = new StorageGarbageCollector(this, this.metadataService,
+                gc = new StorageGarbageCollector(this, this.metadataService, this.indexService,
                         threshold, targetFileSize, maxFilesPerGroup, maxGroups,
                         rowGroupSize, encodingLevel, retireDelayMs);
                 logger.info("Storage GC enabled (threshold={}, targetFileSize={}, maxFilesPerGroup={}, maxGroups={})",

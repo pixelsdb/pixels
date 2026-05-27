@@ -23,10 +23,9 @@ import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.index.IndexOption;
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexFactory;
-import io.pixelsdb.pixels.common.index.RowIdRange;
-import io.pixelsdb.pixels.common.index.SinglePointIndexFactory;
+import io.pixelsdb.pixels.common.index.ResolvedPrimary;
+import io.pixelsdb.pixels.common.index.RollbackEntry;
+import io.pixelsdb.pixels.common.index.service.IndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.KeyColumns;
@@ -67,6 +66,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -84,6 +84,7 @@ public class StorageGarbageCollector
 
     private final RetinaResourceManager resourceManager;
     private final MetadataService metadataService;
+    private final IndexService indexService;
     private final double gcThreshold;
     private final long targetFileSize;
     private final int maxFilesPerGroup;
@@ -213,9 +214,9 @@ public class StorageGarbageCollector
          * <br/>
          * <b>Alignment invariant:</b> {@code oldRowIds.size() == pendingIndexEntries.size()}; each
          * slot corresponds 1:1 to the same-position entry in {@link #pendingIndexEntries}. Slots
-         * where {@link io.pixelsdb.pixels.common.index.SinglePointIndex#updatePrimaryEntry} returned
-         * a negative value (i.e. no prior entry to replace) are stored as {@code -1L} placeholders,
-         * so that rollback can pair each {@code PendingIndexEntry} with its own old rowId.
+         * where {@link IndexService#resolvePrimary} returned an empty optional (i.e. no prior entry
+         * to replace) are stored as {@code -1L} placeholders, so that rollback can pair each
+         * {@code PendingIndexEntry} with its own old rowId.
          */
         List<Long> oldRowIds;
 
@@ -243,6 +244,7 @@ public class StorageGarbageCollector
 
     StorageGarbageCollector(RetinaResourceManager resourceManager,
                             MetadataService metadataService,
+                            IndexService indexService,
                             double gcThreshold,
                             long targetFileSize,
                             int maxFilesPerGroup,
@@ -253,6 +255,7 @@ public class StorageGarbageCollector
     {
         this.resourceManager = resourceManager;
         this.metadataService = metadataService;
+        this.indexService = indexService;
         this.gcThreshold = gcThreshold;
         this.targetFileSize = targetFileSize;
         this.maxFilesPerGroup = maxFilesPerGroup;
@@ -1099,21 +1102,23 @@ public class StorageGarbageCollector
             return;
         }
 
-        MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-        IndexProto.RowIdBatch rowIdBatch = mainIndex.allocateRowIdBatch(tableId, totalRows);
+        long primaryIndexId = metadataService.getPrimaryIndex(tableId).getId();
+        IndexOption indexOption = IndexOption.builder().vNodeId(result.group.virtualNodeId).build();
+
+        IndexProto.RowIdBatch rowIdBatch = indexService.allocateRowIdBatch(tableId, totalRows);
         long newRowIdStart = rowIdBatch.getRowIdStart();
         result.newRowIdStart = newRowIdStart;
 
-        insertMainIndexEntries(result, mainIndex, newRowIdStart);
+        insertMainIndexEntries(result, tableId, primaryIndexId, indexOption, newRowIdStart);
 
         if (!result.pendingIndexEntries.isEmpty())
         {
-            result.oldRowIds = updateSinglePointIndex(result, tableId, newRowIdStart);
+            result.oldRowIds = updateSinglePointIndex(result, tableId, primaryIndexId, indexOption, newRowIdStart);
         }
     }
 
-    private void insertMainIndexEntries(RewriteResult result, MainIndex mainIndex,
-                                        long newRowIdStart) throws Exception
+    private void insertMainIndexEntries(RewriteResult result, long tableId, long primaryIndexId,
+                                        IndexOption indexOption, long newRowIdStart) throws Exception
     {
         int totalRows = result.newFileRgRowStart[result.newFileRgCount];
         List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>(totalRows);
@@ -1132,39 +1137,61 @@ public class StorageGarbageCollector
                             .setFileId(result.newFileId).setRgId(curRgId).setRgRowOffset(rgOff))
                     .build());
         }
-        mainIndex.putEntries(entries);
-        mainIndex.flushCache(result.newFileId);
+        indexService.putMainIndexEntriesOnly(tableId, entries);
+        indexService.flushIndexEntriesOfFile(tableId, primaryIndexId, result.newFileId, true, indexOption);
     }
 
-    private List<Long> updateSinglePointIndex(RewriteResult result, long tableId,
-                                              long newRowIdStart) throws Exception
+    /**
+     * Mirrors Retina's write-path "resolve + Only" pattern: one batch resolve to capture
+     * pre-update rowIds (recorded for rollback), then one batch updatePrimaryIndexEntriesOnly
+     * to swing the primary pointers onto the freshly allocated rowIds.
+     *
+     * <p>TODO(concurrency): This pair of calls is not atomic, unlike the previous single-shot
+     * {@code SinglePointIndex#updatePrimaryEntry} (per-key atomic getAndSet). If a concurrent
+     * writer mutates the same primary key between {@code resolvePrimary} and
+     * {@code updatePrimaryIndexEntriesOnly}, the {@code oldRowIds} we record can be stale w.r.t.
+     * the value actually clobbered by our update. Rollback is still safe — {@code restorePrimaryIndexEntries}
+     * only writes back when the current pointer still equals our {@code newRowId}, so concurrent
+     * writes that ran after our update are never overwritten — but a rollback in the narrow
+     * resolve→update window can restore a stale {@code oldRowId} instead of the concurrent
+     * writer's value. This matches the rest of Retina's write path and is acceptable here because
+     * Storage GC by design targets files dominated by deleted rows. Revisit if/when
+     * {@code IndexService} grows a batch API that returns the rowIds atomically replaced.
+     */
+    private List<Long> updateSinglePointIndex(RewriteResult result, long tableId, long primaryIndexId,
+                                              IndexOption indexOption, long newRowIdStart) throws Exception
     {
-        io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex primaryIndex =
-                metadataService.getPrimaryIndex(tableId);
-        IndexOption indexOption = IndexOption.builder().vNodeId(result.group.virtualNodeId).build();
-        io.pixelsdb.pixels.common.index.SinglePointIndex spIndex =
-                SinglePointIndexFactory.Instance().getSinglePointIndex(
-                        tableId, primaryIndex.getId(), indexOption);
-
-        // Keep oldRowIds aligned 1:1 with pendingIndexEntries: slots where
-        // updatePrimaryEntry returned a negative value are stored as -1L placeholders.
-        // rollbackSinglePointIndex relies on this alignment to pair each PendingIndexEntry
-        // with its own old rowId.
-        List<Long> oldRowIds = new ArrayList<>(result.pendingIndexEntries.size());
+        int size = result.pendingIndexEntries.size();
+        List<IndexProto.IndexKey> keys = new ArrayList<>(size);
+        List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>(size);
         for (PendingIndexEntry pe : result.pendingIndexEntries)
         {
-            long newRowId = newRowIdStart + pe.newGlobalRowOffset;
             IndexProto.IndexKey key = IndexProto.IndexKey.newBuilder()
-                    .setTableId(tableId).setIndexId(primaryIndex.getId())
+                    .setTableId(tableId).setIndexId(primaryIndexId)
                     .setKey(pe.pkBytes).setTimestamp(pe.createTs).build();
-            long oldRowId = spIndex.updatePrimaryEntry(key, newRowId);
+            keys.add(key);
+            entries.add(IndexProto.PrimaryIndexEntry.newBuilder()
+                    .setIndexKey(key)
+                    .setRowId(newRowIdStart + pe.newGlobalRowOffset)
+                    .build());
+        }
+
+        List<Optional<ResolvedPrimary>> resolved =
+                indexService.resolvePrimary(tableId, primaryIndexId, keys, indexOption);
+        List<Long> oldRowIds = new ArrayList<>(size);
+        for (int i = 0; i < size; i++)
+        {
+            long oldRowId = resolved.get(i).map(ResolvedPrimary::getRowId).orElse(-1L);
             oldRowIds.add(oldRowId);
             if (oldRowId < 0)
             {
-                logger.warn("StorageGC syncIndex: updatePrimaryEntry returned {} for tableId={}, " +
-                        "newGlobalRowOffset={} — index may be inconsistent", oldRowId, tableId, pe.newGlobalRowOffset);
+                logger.warn("StorageGC syncIndex: no resolvable primary for tableId={}, " +
+                        "newGlobalRowOffset={} — index may be inconsistent",
+                        tableId, result.pendingIndexEntries.get(i).newGlobalRowOffset);
             }
         }
+
+        indexService.updatePrimaryIndexEntriesOnly(tableId, primaryIndexId, entries, indexOption);
         return oldRowIds;
     }
 
@@ -1237,20 +1264,9 @@ public class StorageGarbageCollector
                 rollbackSinglePointIndex(result);
             }
 
-            if (result.newRowIdStart > 0)
-            {
-                try
-                {
-                    int totalRows = result.newFileRgRowStart[result.newFileRgCount];
-                    MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(result.group.tableId);
-                    mainIndex.deleteRowIdRange(new RowIdRange(result.newRowIdStart,
-                            result.newRowIdStart + totalRows, result.newFileId, 0, 0, totalRows));
-                }
-                catch (Exception ex)
-                {
-                    logger.warn("Rollback: failed to clean MainIndex for fileId={}", result.newFileId, ex);
-                }
-            }
+            // TODO: MainIndex entries for [newRowIdStart, newRowIdStart + totalRows) on newFileId are not cleaned here.
+            // Safe under current invariants (rowIds are monotonic and never reused; newFileId is deleted from catalog
+            // and not reused; no scanner traverses MainIndex globally). Revisit if any of these invariants change.
 
             unregisterDualWrite(result);
 
@@ -1308,10 +1324,8 @@ public class StorageGarbageCollector
             {
                 return;
             }
+            long primaryIndexId = primaryIndex.getId();
             IndexOption indexOption = IndexOption.builder().vNodeId(result.group.virtualNodeId).build();
-            io.pixelsdb.pixels.common.index.SinglePointIndex spIndex =
-                    SinglePointIndexFactory.Instance().getSinglePointIndex(
-                            result.group.tableId, primaryIndex.getId(), indexOption);
 
             // Alignment invariant: oldRowIds.size() == pendingIndexEntries.size()
             // (established in updateSinglePointIndex). Walk them in lockstep by
@@ -1324,6 +1338,7 @@ public class StorageGarbageCollector
                                 "rolling back the common prefix only — index may remain inconsistent",
                         result.pendingIndexEntries.size(), result.oldRowIds.size());
             }
+            List<RollbackEntry> rollbackEntries = new ArrayList<>(n);
             for (int i = 0; i < n; i++)
             {
                 long oldRowId = result.oldRowIds.get(i);
@@ -1333,9 +1348,15 @@ public class StorageGarbageCollector
                 }
                 PendingIndexEntry pe = result.pendingIndexEntries.get(i);
                 IndexProto.IndexKey key = IndexProto.IndexKey.newBuilder()
-                        .setTableId(result.group.tableId).setIndexId(primaryIndex.getId())
+                        .setTableId(result.group.tableId).setIndexId(primaryIndexId)
                         .setKey(pe.pkBytes).setTimestamp(pe.createTs).build();
-                spIndex.updatePrimaryEntry(key, oldRowId);
+                long newRowId = result.newRowIdStart + pe.newGlobalRowOffset;
+                rollbackEntries.add(new RollbackEntry(key, oldRowId, newRowId));
+            }
+            if (!rollbackEntries.isEmpty())
+            {
+                indexService.restorePrimaryIndexEntries(
+                        result.group.tableId, primaryIndexId, rollbackEntries, indexOption);
             }
         }
         catch (Exception e)

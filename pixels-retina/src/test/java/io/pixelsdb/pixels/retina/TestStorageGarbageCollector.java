@@ -19,6 +19,7 @@
  */
 package io.pixelsdb.pixels.retina;
 
+import io.pixelsdb.pixels.common.index.service.LocalIndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
@@ -178,8 +179,8 @@ public class TestStorageGarbageCollector
         retinaManager = RetinaResourceManager.Instance();
         resetManagerState();
         cleanupOrderedDir();
-        gc = new StorageGarbageCollector(retinaManager, metadataService, 0.5, 134_217_728L, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2, 86_400_000L);
+        gc = new StorageGarbageCollector(retinaManager, metadataService, LocalIndexService.Instance(),
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L);
     }
 
     @After
@@ -1664,7 +1665,7 @@ public class TestStorageGarbageCollector
         // batch (any encoded pixel exceeds 1 byte), preserving the 1:1 old-RG-to-new-RG
         // mapping so each thread targets a distinct new RGVisibility object.
         StorageGarbageCollector localGc = new StorageGarbageCollector(
-                retinaManager, metadataService, 0.5, 134_217_728L,
+                retinaManager, metadataService, LocalIndexService.Instance(), 0.5, 134_217_728L,
                 Integer.MAX_VALUE, 10, 1, EncodingLevel.EL2, 86_400_000L);
 
         StorageGarbageCollector.RewriteResult result =
@@ -3322,7 +3323,7 @@ public class TestStorageGarbageCollector
             long targetFileSize, int maxFilesPerGroup, int maxGroups)
     {
         return new StorageGarbageCollector(
-                null, null, 0.5, targetFileSize, maxFilesPerGroup, maxGroups,
+                null, null, null, 0.5, targetFileSize, maxFilesPerGroup, maxGroups,
                 1048576, EncodingLevel.EL2, 86_400_000L);
     }
 
@@ -3994,7 +3995,7 @@ public class TestStorageGarbageCollector
         DirectScanStorageGC(RetinaResourceManager rm, double threshold,
                             int maxGroups, List<FakeFileEntry> fakeEntries)
         {
-            super(rm, null, threshold, 134_217_728L, Integer.MAX_VALUE, maxGroups,
+            super(rm, null, null, threshold, 134_217_728L, Integer.MAX_VALUE, maxGroups,
                     1048576, EncodingLevel.EL2, 86_400_000L);
             this.fakeEntries = fakeEntries;
         }
@@ -4051,7 +4052,7 @@ public class TestStorageGarbageCollector
 
         TrackingRunStorageGC(List<FileGroup> groupsToReturn)
         {
-            super(null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+            super(null, null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
                     1048576, EncodingLevel.EL2, 86_400_000L);
             this.groupsToReturn = groupsToReturn;
         }
@@ -4093,7 +4094,7 @@ public class TestStorageGarbageCollector
 
         FailFirstGroupGC()
         {
-            super(null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+            super(null, null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
                     1048576, EncodingLevel.EL2, 86_400_000L);
         }
 
@@ -4131,7 +4132,7 @@ public class TestStorageGarbageCollector
                       int maxGroups, int rowGroupSize, EncodingLevel encodingLevel,
                       long retireDelayMs)
         {
-            super(rm, ms, threshold, targetFileSize, maxFilesPerGroup, maxGroups,
+            super(rm, ms, null, threshold, targetFileSize, maxFilesPerGroup, maxGroups,
                     rowGroupSize, encodingLevel, retireDelayMs);
         }
 
