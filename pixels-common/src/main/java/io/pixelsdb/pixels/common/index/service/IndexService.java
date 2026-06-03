@@ -330,5 +330,22 @@ public interface IndexService
         throw new UnsupportedOperationException(
                 "restorePrimaryIndexEntries is not supported by this IndexService scheme");
     }
+
+    /**
+     * Delete rowId -> RowLocation mappings for a contiguous main-index range.
+     * The range is half-open: [rowIdStart, rowIdStart + rowCount).
+     *
+     * @param tableId the table id of the main index
+     * @param fileId the file id owning the rowId range
+     * @param rowIdStart the first row id to delete
+     * @param rowCount the number of row ids to delete
+     * @throws IndexException on backend error
+     */
+    default void deleteMainIndexRange(long tableId, long fileId, long rowIdStart, int rowCount)
+            throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "deleteMainIndexRange is not supported by this IndexService scheme");
+    }
 }
 

@@ -770,4 +770,34 @@ public class LocalIndexService implements IndexService
                     + tableId + ", indexId=" + indexId, e);
         }
     }
+
+    @Override
+    public void deleteMainIndexRange(long tableId, long fileId, long rowIdStart, int rowCount)
+            throws IndexException
+    {
+        if (rowCount <= 0)
+        {
+            return;
+        }
+        try
+        {
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            if (mainIndex.hasCache())
+            {
+                mainIndex.flushCache(fileId);
+            }
+            RowIdRange rowIdRange = new RowIdRange(rowIdStart, rowIdStart + rowCount,
+                    fileId, 0, 0, rowCount);
+            if (!mainIndex.deleteRowIdRange(rowIdRange))
+            {
+                throw new IndexException("Failed to delete main index range for tableId="
+                        + tableId + ", fileId=" + fileId);
+            }
+        }
+        catch (MainIndexException e)
+        {
+            throw new IndexException("Failed to delete main index range for tableId="
+                    + tableId + ", fileId=" + fileId, e);
+        }
+    }
 }
