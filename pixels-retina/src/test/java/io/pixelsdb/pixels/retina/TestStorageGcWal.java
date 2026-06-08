@@ -39,6 +39,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -237,7 +238,7 @@ public class TestStorageGcWal
         StorageGcWal.RecoveryHandler handler = new StorageGcWal.RecoveryHandler(
                 wal, mock(MetadataService.class), mock(IndexService.class));
         // Baseline includes both 201L (first-round output) and 301L (second-round output)
-        handler.recover(Set.of(201L, 301L));
+        handler.recover(new HashSet<>(Arrays.asList(201L, 301L)));
 
         assertEquals(StorageGcWal.State.CHECKPOINTED, wal.getTask("second-round").get().getState());
         assertEquals(StorageGcWal.State.CHECKPOINTED, wal.getTask("first-round").get().getState());
