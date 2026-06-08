@@ -24,12 +24,10 @@ import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.common.utils.EtcdUtil;
 import io.pixelsdb.pixels.common.utils.NetUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -39,15 +37,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.zip.CRC32;
-import java.util.zip.CheckedOutputStream;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 
 /**
  * Single owner of the recovery-checkpoint contract for a Retina host:
  * binary format, value object ({@link Body} with its entry POJOs), and
  * the etcd-pointer + Storage IO protocol that publishes and loads
  * bodies. Catalog reconciliation, replay-start computation, and orphan
- * retirement are not this class's concern; see {@link RecoveryProcedure}.
+ * retirement are not this class's concern; see {@code RetinaServerImpl}.
  * <p>
  * High-level surface:
  * <ul>
@@ -61,34 +60,23 @@ import java.util.zip.CheckedOutputStream;
  *   <li>{@link #load()} — read the etcd pointer, fetch the body it
  *       references, and run minimal header-level acceptability checks
  *       (matching {@code retinaNodeId}, sane {@code checkpointAppliedTs},
- *       and a fail-closed {@code virtualNodesPerNode} match). Returns
- *       {@code null} when the pointer is absent or the body is unusable
- *       so the caller can fall back to fresh-deployment handling.</li>
- *   <li>{@link Body#serialize()} / {@link Body#readFrom(byte[])} — the
- *       on-disk format codec; bytes route through {@link CRC32} and the
- *       loader rejects bodies whose trailer length or CRC disagrees.</li>
+ *       and a {@code virtualNodesPerNode} match). Returns {@code null}
+ *       <em>only</em> when the pointer is absent (the sole legitimate
+ *       fresh-deployment signal); once the pointer exists every failure
+ *       fails closed by throwing, so a transient read error or corrupted
+ *       body is never mistaken for "no checkpoint".</li>
+ *   <li>{@link Body#writeTo(DataOutputStream)} / {@link Body#readFrom(byte[])} — the
+ *       on-disk format codec; integrity is delegated to the underlying storage layer.</li>
  * </ul>
  */
 public final class RecoveryCheckpoint
 {
     private static final Logger logger = LogManager.getLogger(RecoveryCheckpoint.class);
 
-    // ============================================================
-    //   Section 1 — On-disk format constants
-    // ============================================================
-
     private static final int MAGIC = 0x5052434B;
 
-    /** Body length (4) + CRC32 (4). */
-    private static final int TRAILER_SIZE = 4 + 4;
-
-    /** Initial buffer capacity hint; ByteArrayOutputStream grows as needed. */
-    private static final int INITIAL_BUFFER_HINT = 4 * 1024;
-
-    private static final int WRITE_BUFFER = 4 * 1024 * 1024;
-
     // ============================================================
-    //   Section 2 — Configuration / IO state
+    //   Section 1 — Configuration / IO state
     // ============================================================
 
     private final Storage storage;
@@ -98,9 +86,9 @@ public final class RecoveryCheckpoint
     private final String retinaNodeId;
     private final String pointerKey;
     /** Last checkpointAppliedTs that was successfully persisted; -1 before the first round. */
-    private long lastFoldingTs = -1L;
+    private long lastCheckpointAppliedTs = -1L;
 
-    public RecoveryCheckpoint(Storage storage,
+    RecoveryCheckpoint(Storage storage,
                               String checkpointDir,
                               EtcdUtil etcd,
                               int virtualNodesPerNode,
@@ -115,21 +103,24 @@ public final class RecoveryCheckpoint
     }
 
     /**
-     * Build a recovery checkpoint using the default wiring (service
-     * singletons, shared {@link EtcdUtil#Instance()}, body storage resolved
-     * from {@code retina.recovery.checkpoint.dir}). The local hostname is
-     * used as the per-host retinaNodeId.
+     * Build a recovery checkpoint from the running configuration (shared
+     * {@link EtcdUtil#Instance()}, storage resolved from
+     * {@code retina.recovery.checkpoint.dir}, vnode count from
+     * {@code node.virtual.num}). The local hostname is used as the
+     * per-host retinaNodeId.
      */
-    public static RecoveryCheckpoint createDefault() throws RetinaException
+    public static RecoveryCheckpoint createFromConfig() throws RetinaException
     {
         ConfigFactory config = ConfigFactory.Instance();
         String retinaNodeId = NetUtils.getLocalHostName();
-        String dir = config.getProperty("retina.recovery.checkpoint.dir");
-        String checkpointDir = trimTrailingSlash(dir);
+        String checkpointDir = config.getProperty("retina.recovery.checkpoint.dir");
         Storage storage;
-        try {
+        try
+        {
             storage = StorageFactory.Instance().getStorage(checkpointDir);
-        } catch (IOException e) {
+        }
+        catch (IOException e)
+        {
             throw new RetinaException("Failed to resolve storage for " + checkpointDir, e);
         }
         int virtualNodesPerNode = Integer.parseInt(config.getProperty("node.virtual.num"));
@@ -147,13 +138,8 @@ public final class RecoveryCheckpoint
         return virtualNodesPerNode;
     }
 
-    public String getRetinaNodeId()
-    {
-        return retinaNodeId;
-    }
-
     // ============================================================
-    //   Section 3 — Entry POJOs serialised inside a body
+    //   Section 2 — Entry POJOs serialised inside a body
     // ============================================================
 
     /**
@@ -166,18 +152,15 @@ public final class RecoveryCheckpoint
      */
     public static final class PendingSegmentEntry
     {
-        private final long tableId;
         private final int virtualNodeId;
         private final long minCommitTs;
 
-        public PendingSegmentEntry(long tableId, int virtualNodeId, long minCommitTs)
+        public PendingSegmentEntry(int virtualNodeId, long minCommitTs)
         {
-            this.tableId = tableId;
             this.virtualNodeId = virtualNodeId;
             this.minCommitTs = minCommitTs;
         }
 
-        public long getTableId() { return tableId; }
         public int getVirtualNodeId() { return virtualNodeId; }
         public long getMinCommitTs() { return minCommitTs; }
     }
@@ -214,22 +197,18 @@ public final class RecoveryCheckpoint
     }
 
     // ============================================================
-    //   Section 4 — Body value object + format codec
+    //   Section 3 — Body value object + format codec
     // ============================================================
 
     /**
      * Immutable in-memory representation of one checkpoint body.
-     * Use {@link Body#builder()} to construct, {@link #serialize()} to
-     * write, and {@link #readFrom(byte[])} to parse; both routes thread
-     * header+payload through {@link CRC32}.
+     * Use {@link Body#builder()} to construct, {@link #writeTo(DataOutputStream)} to
+     * write, and {@link #readFrom(byte[])} to parse.
      */
     public static final class Body
     {
         private final long writeTimeMs;
-        private final long checkpointSnapshotTs;
         private final long checkpointAppliedTs;
-        /** FNV-1a hash of {@code retinaNodeId = host:port}, used as a defence-in-depth check. */
-        private final long retinaNodeIdHash;
         /** Value of {@code node.virtual.num} at checkpoint time; mismatch aborts recovery. */
         private final int virtualNodesPerNode;
         /** Original retinaNodeId string, stored for diagnostics. */
@@ -241,126 +220,76 @@ public final class RecoveryCheckpoint
         private Body(Builder builder)
         {
             this.writeTimeMs = builder.writeTimeMs;
-            this.checkpointSnapshotTs = builder.checkpointSnapshotTs;
             this.checkpointAppliedTs = builder.checkpointAppliedTs;
-            this.retinaNodeIdHash = fnv1a64(builder.retinaNodeId);
             this.virtualNodesPerNode = builder.virtualNodesPerNode;
             this.retinaNodeId = builder.retinaNodeId;
-            this.segmentEntries = Collections.unmodifiableList(new ArrayList<>(emptyIfNull(builder.segmentEntries)));
-            this.rgEntries = Collections.unmodifiableList(new ArrayList<>(emptyIfNull(builder.rgEntries)));
+            this.segmentEntries = Collections.unmodifiableList(new ArrayList<>(
+                    builder.segmentEntries == null ? Collections.emptyList() : builder.segmentEntries));
+            this.rgEntries = Collections.unmodifiableList(new ArrayList<>(
+                    builder.rgEntries == null ? Collections.emptyList() : builder.rgEntries));
         }
 
         public long getWriteTimeMs() { return writeTimeMs; }
-        public long getCheckpointSnapshotTs() { return checkpointSnapshotTs; }
         public long getCheckpointAppliedTs() { return checkpointAppliedTs; }
-        public long getRetinaNodeIdHash() { return retinaNodeIdHash; }
         public int getVirtualNodesPerNode() { return virtualNodesPerNode; }
         public String getRetinaNodeId() { return retinaNodeId; }
         public List<PendingSegmentEntry> getSegmentEntries() { return segmentEntries; }
         public List<VisibilityEntry> getRgEntries() { return rgEntries; }
 
-        /**
-         * Serialise this body and append the trailer (bodyLength + CRC32 over
-         * header+payload bytes).
-         */
-        public byte[] serialize() throws IOException
+        public void writeTo(DataOutputStream out) throws IOException
         {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(INITIAL_BUFFER_HINT);
-            CRC32 crc = new CRC32();
-            CheckedOutputStream cos = new CheckedOutputStream(baos, crc);
-            DataOutputStream dos = new DataOutputStream(cos);
-            writeHeader(dos);
-            writePayload(dos);
-            dos.flush();
+            out.writeInt(MAGIC);
+            out.writeLong(writeTimeMs);
+            out.writeLong(checkpointAppliedTs);
+            out.writeInt(virtualNodesPerNode);
+            out.writeInt(segmentEntries.size());
+            out.writeInt(rgEntries.size());
 
-            int bodyLen = baos.size();
-            long crcValue = crc.getValue();
-            DataOutputStream trailerOut = new DataOutputStream(baos);
-            trailerOut.writeInt(bodyLen);
-            trailerOut.writeInt((int) (crcValue & 0xFFFFFFFFL));
-            trailerOut.flush();
-            return baos.toByteArray();
-        }
-
-        private void writeHeader(DataOutputStream dos) throws IOException
-        {
-            dos.writeInt(MAGIC);
-            dos.writeLong(retinaNodeIdHash);
-            dos.writeLong(writeTimeMs);
-            dos.writeLong(checkpointSnapshotTs);
-            dos.writeLong(checkpointAppliedTs);
-            dos.writeInt(virtualNodesPerNode);
-            dos.writeInt(segmentEntries.size());
-            dos.writeInt(rgEntries.size());
-        }
-
-        private void writePayload(DataOutputStream dos) throws IOException
-        {
             byte[] nodeIdBytes = retinaNodeId.getBytes(StandardCharsets.UTF_8);
-            dos.writeInt(nodeIdBytes.length);
-            dos.write(nodeIdBytes);
+            out.writeInt(nodeIdBytes.length);
+            out.write(nodeIdBytes);
 
             for (PendingSegmentEntry se : segmentEntries)
             {
-                dos.writeLong(se.tableId);
-                dos.writeInt(se.virtualNodeId);
-                dos.writeLong(se.minCommitTs);
+                out.writeInt(se.virtualNodeId);
+                out.writeLong(se.minCommitTs);
             }
 
             for (VisibilityEntry ve : rgEntries)
             {
-                dos.writeLong(ve.fileId);
-                dos.writeInt(ve.rgId);
-                dos.writeInt(ve.recordNum);
-                dos.writeLong(ve.baseTimestamp);
+                out.writeLong(ve.fileId);
+                out.writeInt(ve.rgId);
+                out.writeInt(ve.recordNum);
+                out.writeLong(ve.baseTimestamp);
                 long[] bitmap = ve.bitmap;
                 int bitmapLen = bitmap == null ? 0 : bitmap.length;
-                dos.writeInt(bitmapLen);
+                out.writeInt(bitmapLen);
                 for (int i = 0; i < bitmapLen; i++)
                 {
-                    dos.writeLong(bitmap[i]);
+                    out.writeLong(bitmap[i]);
                 }
             }
         }
 
         /**
          * Parse the supplied bytes. Throws {@link RetinaException} on
-         * magic / version mismatch, truncated trailer, or CRC mismatch.
+         * magic mismatch or malformed content.
          */
         public static Body readFrom(byte[] bytes) throws RetinaException
         {
-            if (bytes == null || bytes.length < TRAILER_SIZE)
+            if (bytes == null || bytes.length == 0)
             {
-                throw new RetinaException("body too small: " + (bytes == null ? -1 : bytes.length));
+                throw new RetinaException("body is empty");
             }
 
-            int trailerOffset = bytes.length - TRAILER_SIZE;
-            int declaredLen = readIntBE(bytes, trailerOffset);
-            int declaredCrc = readIntBE(bytes, trailerOffset + 4);
-            if (declaredLen != trailerOffset)
-            {
-                throw new RetinaException("trailer length mismatch: declared=" + declaredLen
-                        + ", actual=" + trailerOffset);
-            }
-            CRC32 crc = new CRC32();
-            crc.update(bytes, 0, trailerOffset);
-            long expected = ((long) declaredCrc) & 0xFFFFFFFFL;
-            if (crc.getValue() != expected)
-            {
-                throw new RetinaException("checksum mismatch: expected=" + expected
-                        + ", actual=" + crc.getValue());
-            }
-
-            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(bytes, 0, trailerOffset)))
+            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(bytes)))
             {
                 int magic = dis.readInt();
                 if (magic != MAGIC)
                 {
                     throw new RetinaException("bad magic: " + Integer.toHexString(magic));
                 }
-                long retinaNodeIdHash = dis.readLong();
                 long writeTimeMs = dis.readLong();
-                long checkpointSnapshotTs = dis.readLong();
                 long checkpointAppliedTs = dis.readLong();
                 int virtualNodesPerNode = dis.readInt();
                 int segmentEntryCount = dis.readInt();
@@ -371,28 +300,20 @@ public final class RecoveryCheckpoint
                 }
 
                 int nodeIdLen = dis.readInt();
-                if (nodeIdLen < 0 || nodeIdLen > dis.available())
+                if (nodeIdLen < 0 || nodeIdLen > 1024 || nodeIdLen > dis.available())
                 {
                     throw new RetinaException("invalid retinaNodeId length: " + nodeIdLen);
                 }
                 byte[] nodeIdBytes = new byte[nodeIdLen];
                 dis.readFully(nodeIdBytes);
                 String retinaNodeId = new String(nodeIdBytes, StandardCharsets.UTF_8);
-                long computedHash = fnv1a64(retinaNodeId);
-                if (computedHash != retinaNodeIdHash)
-                {
-                    throw new RetinaException("retinaNodeId hash mismatch: header="
-                            + Long.toHexString(retinaNodeIdHash)
-                            + ", body=" + Long.toHexString(computedHash));
-                }
 
                 List<PendingSegmentEntry> segments = new ArrayList<>();
                 for (int i = 0; i < segmentEntryCount; i++)
                 {
-                    long tableId = dis.readLong();
                     int virtualNodeId = dis.readInt();
                     long minCommitTs = dis.readLong();
-                    segments.add(new PendingSegmentEntry(tableId, virtualNodeId, minCommitTs));
+                    segments.add(new PendingSegmentEntry(virtualNodeId, minCommitTs));
                 }
                 List<VisibilityEntry> rgs = new ArrayList<>();
                 for (int i = 0; i < rgEntryCount; i++)
@@ -402,7 +323,7 @@ public final class RecoveryCheckpoint
                     int recordNum = dis.readInt();
                     long baseTimestamp = dis.readLong();
                     int bitmapLen = dis.readInt();
-                    if (rgId < 0 || recordNum <= 0 || bitmapLen < 0 || bitmapLen > dis.available() / Long.BYTES)
+                    if (rgId < 0 || recordNum < 0 || bitmapLen < 0 || (long) bitmapLen * Long.BYTES > dis.available())
                     {
                         throw new RetinaException("invalid visibility entry for fileId=" + fileId
                                 + ", rgId=" + rgId + ", recordNum=" + recordNum
@@ -423,7 +344,6 @@ public final class RecoveryCheckpoint
                 return Body.builder()
                         .retinaNodeId(retinaNodeId)
                         .writeTimeMs(writeTimeMs)
-                        .checkpointSnapshotTs(checkpointSnapshotTs)
                         .checkpointAppliedTs(checkpointAppliedTs)
                         .virtualNodesPerNode(virtualNodesPerNode)
                         .segmentEntries(segments)
@@ -444,7 +364,6 @@ public final class RecoveryCheckpoint
         public static final class Builder
         {
             private long writeTimeMs;
-            private long checkpointSnapshotTs;
             private long checkpointAppliedTs;
             private int virtualNodesPerNode;
             private String retinaNodeId;
@@ -452,7 +371,6 @@ public final class RecoveryCheckpoint
             private List<VisibilityEntry> rgEntries = Collections.emptyList();
 
             public Builder writeTimeMs(long writeTimeMs) { this.writeTimeMs = writeTimeMs; return this; }
-            public Builder checkpointSnapshotTs(long ts) { this.checkpointSnapshotTs = ts; return this; }
             public Builder checkpointAppliedTs(long ts) { this.checkpointAppliedTs = ts; return this; }
             public Builder virtualNodesPerNode(int n) { this.virtualNodesPerNode = n; return this; }
             public Builder retinaNodeId(String id) { this.retinaNodeId = id; return this; }
@@ -471,47 +389,24 @@ public final class RecoveryCheckpoint
     }
 
     // ============================================================
-    //   Section 5 — Round / load results
+    //   Section 4 — Load result
     // ============================================================
-
-    /** Result of one successful checkpoint round. */
-    public static final class Result
-    {
-        private final String bodyObjectName;
-        private final long checkpointAppliedTs;
-        private final int segmentEntryCount;
-        private final int rgEntryCount;
-
-        public Result(String bodyObjectName, long checkpointAppliedTs,
-                      int segmentEntryCount, int rgEntryCount)
-        {
-            this.bodyObjectName = bodyObjectName;
-            this.checkpointAppliedTs = checkpointAppliedTs;
-            this.segmentEntryCount = segmentEntryCount;
-            this.rgEntryCount = rgEntryCount;
-        }
-
-        public String getBodyObjectName() { return bodyObjectName; }
-        public long getCheckpointAppliedTs() { return checkpointAppliedTs; }
-        public int getSegmentEntryCount() { return segmentEntryCount; }
-        public int getRgEntryCount() { return rgEntryCount; }
-    }
 
     /** Body loaded from the etcd pointer. */
     public static final class LoadedCheckpoint
     {
-        public final String bodyObjectName;
+        public final String bodyPath;
         public final Body body;
 
-        LoadedCheckpoint(String bodyObjectName, Body body)
+        LoadedCheckpoint(String bodyPath, Body body)
         {
-            this.bodyObjectName = bodyObjectName;
+            this.bodyPath = bodyPath;
             this.body = body;
         }
     }
 
     // ============================================================
-    //   Section 6 — Write path: generate()
+    //   Section 5 — Write path: generate()
     // ============================================================
 
     /**
@@ -527,19 +422,19 @@ public final class RecoveryCheckpoint
      *         Sorted in-place to the canonical on-disk order.
      * @param segments per-scope earliest pending commit timestamps already
      *         snapshotted by the caller. Sorted in-place.
-     * @return result of this checkpoint round, or {@code null} when
-     *         {@code checkpointAppliedTs} has not advanced since the last
-     *         successful round (no new committed transactions, nothing to flush).
+     *         <p>A no-op when {@code checkpointAppliedTs} has not advanced since
+     *         the last successful round (no new committed transactions, nothing
+     *         to flush). The published body and pointer are logged at INFO.
      */
-    public Result generate(long checkpointAppliedTs,
-                           List<VisibilityEntry> rgEntries,
-                           List<PendingSegmentEntry> segments) throws RetinaException
+    public void generate(long checkpointAppliedTs,
+                         List<VisibilityEntry> rgEntries,
+                         List<PendingSegmentEntry> segments) throws RetinaException
     {
-        if (checkpointAppliedTs == lastFoldingTs)
+        if (checkpointAppliedTs == lastCheckpointAppliedTs)
         {
             logger.debug("Recovery checkpoint: checkpointAppliedTs={} unchanged since last round; skipping",
                     checkpointAppliedTs);
-            return null;
+            return;
         }
         long now = System.currentTimeMillis();
 
@@ -548,75 +443,63 @@ public final class RecoveryCheckpoint
             if (byFile != 0) return byFile;
             return Integer.compare(a.getRgId(), b.getRgId());
         });
-        sortSegments(segments);
+        segments.sort((a, b) -> Integer.compare(a.getVirtualNodeId(), b.getVirtualNodeId()));
 
         Body body = Body.builder()
                 .retinaNodeId(retinaNodeId)
                 .writeTimeMs(now)
-                .checkpointSnapshotTs(now)
                 .checkpointAppliedTs(checkpointAppliedTs)
                 .virtualNodesPerNode(virtualNodesPerNode)
                 .segmentEntries(segments)
                 .rgEntries(rgEntries)
                 .build();
 
-        String bodyObjectName = RetinaUtils.getCheckpointFileName(
-                RetinaUtils.CHECKPOINT_PREFIX_RECOVERY, retinaNodeId, checkpointAppliedTs);
-        String bodyPath = checkpointDir + "/" + bodyObjectName;
-        try
+        String bodyPath = RetinaUtils.buildCheckpointPath(
+                checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_RECOVERY, retinaNodeId, checkpointAppliedTs);
+        try (DataOutputStream out = storage.create(bodyPath, true, Constants.CHECKPOINT_BUFFER_SIZE))
         {
-            byte[] serialised = body.serialize();
-            try (DataOutputStream out = storage.create(bodyPath, true, WRITE_BUFFER))
-            {
-                out.write(serialised);
-                out.flush();
-            }
+            body.writeTo(out);
+            out.flush();
         }
         catch (IOException e)
         {
-            throw new RetinaException("Failed to write recovery checkpoint body " + bodyObjectName, e);
+            throw new RetinaException("Failed to write recovery checkpoint body " + bodyPath, e);
         }
 
         // Body is durable; publish the pointer atomically. If publish fails the
         // body becomes a one-round orphan and is overwritten/cleaned next round.
-        String displacedOld = publishPointer(bodyObjectName);
-        if (displacedOld != null && !displacedOld.isEmpty())
+        String displacedPath = publishPointer(bodyPath);
+        if (displacedPath != null && !displacedPath.isEmpty())
         {
-            String displacedPath = checkpointDir + "/" + displacedOld;
             try
             {
-                if (storage.exists(displacedPath))
-                {
-                    storage.delete(displacedPath, false);
-                }
+                storage.delete(displacedPath, false);
             }
             catch (IOException e)
             {
-                logger.warn("Failed to delete orphan checkpoint body {} under {}; will retry next round",
-                        displacedOld, checkpointDir, e);
+                logger.warn("Failed to delete orphan checkpoint body {}; will retry next round",
+                        displacedPath, e);
             }
         }
 
         logger.info("Recovery checkpoint published: body={}, checkpointAppliedTs={}, segments={}, rgs={}",
-                bodyObjectName, checkpointAppliedTs,
+                bodyPath, checkpointAppliedTs,
                 segments.size(), rgEntries.size());
-        lastFoldingTs = checkpointAppliedTs;
-        return new Result(bodyObjectName, checkpointAppliedTs,
-                segments.size(), rgEntries.size());
+        lastCheckpointAppliedTs = checkpointAppliedTs;
     }
 
     /**
      * Atomically replace the published checkpoint pointer.
      *
-     * @return the displaced old body name (null on first publish).
+     * @return the displaced old body path (null on first publish).
      */
-    private String publishPointer(String newBodyName) throws RetinaException
+    private String publishPointer(String newBodyPath) throws RetinaException
     {
         String old = readPointer();
         boolean committed;
         try
         {
-            committed = etcd.compareAndPut(pointerKey, old, newBodyName);
+            committed = etcd.compareAndPut(pointerKey, old, newBodyPath);
         }
         catch (Exception e)
         {
@@ -630,43 +513,42 @@ public final class RecoveryCheckpoint
         return old;
     }
 
-    private static void sortSegments(List<PendingSegmentEntry> segments)
-    {
-        segments.sort((a, b) -> {
-            int byTable = Long.compare(a.getTableId(), b.getTableId());
-            if (byTable != 0) return byTable;
-            return Integer.compare(a.getVirtualNodeId(), b.getVirtualNodeId());
-        });
-    }
-
     // ============================================================
-    //   Section 7 — Read path: load()
+    //   Section 6 — Read path: load()
     // ============================================================
 
     /**
      * Read the etcd pointer and load the body it references. Returns
-     * {@code null} when the pointer is absent or the body is unusable
-     * (caller falls back to fresh-deployment handling). Throws when the
-     * body's {@code virtualNodesPerNode} disagrees with the local config:
-     * recovery must fail closed rather than rebuild with a stale vnode
-     * mapping.
+     * {@code null} <em>only</em> when the pointer is absent, which is the
+     * sole legitimate fresh-deployment signal (this node has never
+     * checkpointed). Once the pointer exists a checkpoint was definitely
+     * taken, so every subsequent failure — a transient read error, a
+     * corrupted body, a stale vnode mapping, or any other unusable body —
+     * fails closed by throwing. Recovery must abort and retry (or wait for
+     * operator intervention) rather than silently rebuild from scratch,
+     * which would wipe real visibility state and serve dirty reads while
+     * CDC replay catches up.
      */
     public LoadedCheckpoint load() throws RetinaException
     {
-        String bodyName = readPointer();
-        if (bodyName == null || bodyName.isEmpty())
+        String bodyPath = readPointer();
+        if (bodyPath == null || bodyPath.isEmpty())
         {
             return null;
         }
         byte[] bytes;
         try
         {
-            bytes = readBody(bodyName);
+            bytes = readBody(bodyPath);
         }
         catch (IOException e)
         {
-            logger.warn("Recovery loader: pointer references {} but read failed", bodyName, e);
-            return null;
+            // Fail-closed: the pointer exists, so a checkpoint was taken; a
+            // transient read failure is not the same as "no checkpoint".
+            // Abort and let recovery retry rather than fresh-deploy.
+            throw new RetinaException(String.format(
+                    "Recovery aborted: pointer references %s but reading the checkpoint body failed. "
+                            + "Refusing to treat a transient read error as a fresh deployment.", bodyPath), e);
         }
         Body body;
         try
@@ -675,8 +557,12 @@ public final class RecoveryCheckpoint
         }
         catch (RetinaException e)
         {
-            logger.warn("Recovery loader: body {} is corrupted/unreadable", bodyName, e);
-            return null;
+            // Fail-closed: a corrupted/truncated body (e.g. a half-written
+            // body from a power loss) must not be misread as "no checkpoint".
+            throw new RetinaException(String.format(
+                    "Recovery aborted: checkpoint body %s is corrupted/unreadable. "
+                            + "Operator intervention required; refusing to fresh-deploy over a damaged checkpoint.",
+                    bodyPath), e);
         }
         // Fail-closed: configuration changed since last checkpoint. Abort
         // recovery and let the operator intervene rather than rebuild with
@@ -686,13 +572,13 @@ public final class RecoveryCheckpoint
             throw new RetinaException(String.format(
                     "Recovery aborted: body %s was written with node.virtual.num=%d, current=%d. "
                             + "Configuration changed since last checkpoint; refusing to recover with stale vnode mapping.",
-                    bodyName, body.getVirtualNodesPerNode(), virtualNodesPerNode));
+                    bodyPath, body.getVirtualNodesPerNode(), virtualNodesPerNode));
         }
-        if (!isAcceptable(body, bodyName))
-        {
-            return null;
-        }
-        return new LoadedCheckpoint(bodyName, body);
+        // Fail-closed: the pointer named this body, so it must be usable.
+        // A mismatched node id or illegal timestamp is corruption, not a
+        // fresh-deployment signal.
+        ensureAcceptable(body, bodyPath);
+        return new LoadedCheckpoint(bodyPath, body);
     }
 
     private String readPointer()
@@ -706,84 +592,41 @@ public final class RecoveryCheckpoint
         return value.isEmpty() ? null : value;
     }
 
-    private byte[] readBody(String objectName) throws IOException
+    private byte[] readBody(String path) throws IOException
     {
-        String path = checkpointDir + "/" + objectName;
-        long length = storage.getStatus(path).getLength();
-        if (length <= 0)
-        {
-            throw new IOException("empty body file at " + path);
-        }
-        if (length > Integer.MAX_VALUE)
-        {
-            throw new IOException("body too large to read into memory: " + length + " bytes at " + path);
-        }
-        byte[] result = new byte[(int) length];
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
         try (DataInputStream in = storage.open(path))
         {
-            in.readFully(result);
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = in.read(chunk)) != -1)
+            {
+                buf.write(chunk, 0, n);
+            }
+        }
+        byte[] result = buf.toByteArray();
+        if (result.length == 0)
+        {
+            throw new IOException("empty body file at " + path);
         }
         return result;
     }
 
-    private boolean isAcceptable(Body body, String bodyName)
+    private void ensureAcceptable(Body body, String bodyPath) throws RetinaException
     {
         if (!retinaNodeId.equals(body.getRetinaNodeId()))
         {
-            logger.warn("Recovery loader: body {} retinaNodeId='{}' does not match expected '{}'",
-                    bodyName, body.getRetinaNodeId(), retinaNodeId);
-            return false;
+            throw new RetinaException(String.format(
+                    "Recovery aborted: body %s retinaNodeId='%s' does not match expected '%s'. "
+                            + "Pointer references a body for a different node; refusing to fresh-deploy.",
+                    bodyPath, body.getRetinaNodeId(), retinaNodeId));
         }
         if (body.getCheckpointAppliedTs() < 0)
         {
-            logger.warn("Recovery loader: body {} has illegal checkpointAppliedTs={}",
-                    bodyName, body.getCheckpointAppliedTs());
-            return false;
+            throw new RetinaException(String.format(
+                    "Recovery aborted: body %s has illegal checkpointAppliedTs=%d. "
+                            + "Corrupted checkpoint; refusing to fresh-deploy.",
+                    bodyPath, body.getCheckpointAppliedTs()));
         }
-        return true;
-    }
-
-    // ============================================================
-    //   Section 8 — Misc helpers
-    // ============================================================
-
-    /** FNV-1a 64-bit hash, used for {@code retinaNodeId}. */
-    static long fnv1a64(String s)
-    {
-        long hash = 0xcbf29ce484222325L;
-        if (s == null)
-        {
-            return hash;
-        }
-        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-        for (byte b : bytes)
-        {
-            hash ^= (b & 0xFFL);
-            hash *= 0x100000001b3L;
-        }
-        return hash;
-    }
-
-    private static int readIntBE(byte[] arr, int off)
-    {
-        return ((arr[off] & 0xFF) << 24)
-                | ((arr[off + 1] & 0xFF) << 16)
-                | ((arr[off + 2] & 0xFF) << 8)
-                | (arr[off + 3] & 0xFF);
-    }
-
-    private static <T> List<T> emptyIfNull(List<T> values)
-    {
-        return values == null ? Collections.emptyList() : values;
-    }
-
-    private static String trimTrailingSlash(String dir)
-    {
-        int len = dir.length();
-        while (len > 0 && dir.charAt(len - 1) == '/')
-        {
-            len--;
-        }
-        return dir.substring(0, len);
     }
 }

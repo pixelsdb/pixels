@@ -32,20 +32,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 
 public class LocalIndexService implements IndexService
 {
     private static final LocalIndexService defaultInstance = new LocalIndexService();
     private static boolean upsertMode;
-
-    /**
-     * Visible file-id set supplier used by {@link #resolvePrimary} to filter
-     * out RowLocations whose fileId is outside the set. Default returns null,
-     * which disables the filter; install a real supplier via
-     * {@link #setBaselineVisibleFilesSupplier}.
-     */
-    private volatile Supplier<Set<Long>> baselineVisibleFilesSupplier = () -> null;
 
     public static LocalIndexService Instance()
     {
@@ -55,22 +46,6 @@ public class LocalIndexService implements IndexService
     private LocalIndexService()
     {
         upsertMode = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("retina.upsert-mode.enabled"));
-    }
-
-    /**
-     * Install the visible file-id set supplier. Polled on every
-     * {@link #resolvePrimary} call; a null return disables the filter.
-     * Node-local; not exposed on the {@link IndexService} interface.
-     *
-     * @param supplier non-null; use {@code () -> null} to disable
-     */
-    public void setBaselineVisibleFilesSupplier(Supplier<Set<Long>> supplier)
-    {
-        if (supplier == null)
-        {
-            throw new IllegalArgumentException("supplier must not be null; use () -> null to disable");
-        }
-        this.baselineVisibleFilesSupplier = supplier;
     }
 
     @Override
@@ -603,8 +578,6 @@ public class LocalIndexService implements IndexService
         {
             return Collections.emptyList();
         }
-        // null = filter disabled
-        Set<Long> visibleFiles = baselineVisibleFilesSupplier.get();
         try
         {
             SinglePointIndex sp = SinglePointIndexFactory.Instance().getSinglePointIndex(tableId, indexId, indexOption);
@@ -623,12 +596,6 @@ public class LocalIndexService implements IndexService
                 if (location == null)
                 {
                     // MainIndex orphan rowId
-                    result.add(Optional.empty());
-                    continue;
-                }
-                if (visibleFiles != null && !visibleFiles.contains(location.getFileId()))
-                {
-                    // fileId outside baseline visible set
                     result.add(Optional.empty());
                     continue;
                 }

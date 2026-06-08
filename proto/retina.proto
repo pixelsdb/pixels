@@ -35,6 +35,8 @@ service RetinaWorkerService {
     rpc UpdateRecord (UpdateRecordRequest) returns (UpdateRecordResponse);
     // Bidirectional streaming method
     rpc StreamUpdateRecord (stream UpdateRecordRequest) returns (stream UpdateRecordResponse);
+    rpc GetRetinaStatus (GetRetinaStatusRequest) returns (GetRetinaStatusResponse);
+    rpc MarkReady (MarkReadyRequest) returns (MarkReadyResponse);
     rpc AddVisibility (AddVisibilityRequest) returns (AddVisibilityResponse);
     rpc QueryVisibility (QueryVisibilityRequest) returns (QueryVisibilityResponse);
     rpc ReclaimVisibility (ReclaimVisibilityRequest) returns (ReclaimVisibilityResponse);
@@ -62,6 +64,18 @@ message ResponseHeader {
 // auxiliary structure
 message VisibilityBitmap {
     repeated uint64 bitmap = 1;
+}
+
+enum RetinaState {
+    UNKNOWN = 0;
+    RECOVERING = 1;
+    READY = 2;
+    FAILED = 3;
+}
+
+message VnodeReplayStart {
+    uint32 virtualNodeId = 1;
+    uint64 startTs = 2;
 }
 
 // DeleteData: describes the deleted rows in a table
@@ -110,6 +124,26 @@ message UpdateRecordRequest {
 }
 
 message UpdateRecordResponse {
+    ResponseHeader header = 1;
+}
+
+message GetRetinaStatusRequest {
+    RequestHeader header = 1;
+}
+
+message GetRetinaStatusResponse {
+    ResponseHeader header = 1;
+    RetinaState state = 2;
+    string recoveryEpoch = 3;
+    repeated VnodeReplayStart vnodeReplayStarts = 4;
+}
+
+message MarkReadyRequest {
+    RequestHeader header = 1;
+    string recoveryEpoch = 2;
+}
+
+message MarkReadyResponse {
     ResponseHeader header = 1;
 }
 

@@ -32,6 +32,8 @@ public class RetinaUtils
     public static final String CHECKPOINT_PREFIX_OFFLOAD = "vis_offload_";
     public static final String CHECKPOINT_PREFIX_RECOVERY = "recovery_";
     public static final String CHECKPOINT_SUFFIX = ".bin";
+    public static final String STORAGE_GC_JOURNAL_TASK_PREFIX = "sgc_";
+    public static final String STORAGE_GC_JOURNAL_SUFFIX = ".sgcj";
 
     private static volatile RetinaUtils instance;
     private final int bucketNum;
@@ -132,6 +134,17 @@ public class RetinaUtils
     }
 
     /**
+     * Joins a storage directory and an object name, inserting a '/' separator when needed.
+     *
+     * @param dir  storage directory (may or may not end with '/')
+     * @param name object name to append
+     */
+    public static String joinPath(String dir, String name)
+    {
+        return dir.endsWith("/") ? dir + name : dir + "/" + name;
+    }
+
+    /**
      * Builds the checkpoint file path from a directory, type prefix, hostname and identifier timestamp.
      *
      * @param checkpointDir directory where checkpoint files reside (may or may not end with '/')
@@ -141,8 +154,31 @@ public class RetinaUtils
      */
     public static String buildCheckpointPath(String checkpointDir, String prefix, String hostname, long timestamp)
     {
-        String fileName = getCheckpointFileName(prefix, hostname, timestamp);
-        return checkpointDir.endsWith("/") ? checkpointDir + fileName : checkpointDir + "/" + fileName;
+        return joinPath(checkpointDir, getCheckpointFileName(prefix, hostname, timestamp));
+    }
+
+    /**
+     * Builds the unique Storage GC journal task identifier for a rewrite of one file group.
+     * The id is opaque (never parsed back); uniqueness relies on {@code newFileId}.
+     *
+     * @param tableId       the table owning the rewritten files
+     * @param virtualNodeId the virtual node of the rewritten file group
+     * @param newFileId     the freshly allocated rewrite-target file id
+     */
+    public static String buildStorageGcJournalTaskId(long tableId, int virtualNodeId, long newFileId)
+    {
+        return STORAGE_GC_JOURNAL_TASK_PREFIX + tableId + "_" + virtualNodeId + "_" + newFileId;
+    }
+
+    /**
+     * Builds the Storage GC journal task file path under {@code journalDir}.
+     *
+     * @param journalDir directory where journal tasks are persisted (may or may not end with '/')
+     * @param taskId     unique journal task identifier
+     */
+    public static String buildStorageGcJournalPath(String journalDir, String taskId)
+    {
+        return joinPath(journalDir, taskId + STORAGE_GC_JOURNAL_SUFFIX);
     }
 
     // ── writeBufferKey utilities ────────────────────────────────────

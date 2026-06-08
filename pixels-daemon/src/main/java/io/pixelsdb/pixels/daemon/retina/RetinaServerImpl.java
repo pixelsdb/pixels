@@ -24,39 +24,43 @@ import com.google.common.util.concurrent.Striped;
 import com.google.protobuf.ByteString;
 import com.sun.management.OperatingSystemMXBean;
 import io.grpc.stub.StreamObserver;
+import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.exception.IndexException;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.common.index.ResolvedPrimary;
 import io.pixelsdb.pixels.common.index.service.IndexService;
 import io.pixelsdb.pixels.common.index.service.IndexServiceProvider;
-import io.pixelsdb.pixels.common.index.service.LocalIndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
-import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.IndexUtils;
+import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
+import io.pixelsdb.pixels.daemon.heartbeat.NodeStatus;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.RGVisibility;
+import io.pixelsdb.pixels.retina.RecoveryCheckpoint;
+import io.pixelsdb.pixels.retina.RecoveryCheckpoint.Body;
+import io.pixelsdb.pixels.retina.RecoveryCheckpoint.LoadedCheckpoint;
+import io.pixelsdb.pixels.retina.RecoveryCheckpoint.PendingSegmentEntry;
+import io.pixelsdb.pixels.retina.RecoveryCheckpoint.VisibilityEntry;
 import io.pixelsdb.pixels.retina.RetinaProto;
+import io.pixelsdb.pixels.retina.RetinaProto.RetinaState;
 import io.pixelsdb.pixels.retina.RetinaResourceManager;
 import io.pixelsdb.pixels.retina.RetinaWorkerServiceGrpc;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
+import io.pixelsdb.pixels.retina.StorageGcWal;
 import java.lang.management.ManagementFactory;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -70,6 +74,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     private final IndexService indexService;
     private final RetinaResourceManager retinaResourceManager;
     private final Striped<Lock> updateLocks = Striped.lock(1024);
+    private volatile RetinaStatus status;
     private IndexOption[] indexOptionPool;
 
     /**
@@ -99,120 +104,349 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
         try
         {
-            initializeRetinaResources();
-            this.retinaResourceManager.startBackgroundGc();
+            RecoveryContext recoveryContext = prepareRecoveryContext();
+            RecoveryResult recoveryResult = recoverRetinaState(recoveryContext);
+            initializeRecoveredResources();
+            publishStartupLifecycle(recoveryContext, recoveryResult);
             startRetinaMetricsLogThread();
-            logger.info("Retina service is ready");
+            boolean ready = this.status.getState() == RetinaState.READY;
+            logger.info(ready ? "Retina service is ready" : "Retina service is recovering");
         }
         catch (Exception e)
         {
+            RetinaStatus base = this.status;
+            RetinaStatus.Builder builder = base == null
+                    ? RetinaStatus.newBuilder()
+                    : base.toBuilder();
+            this.status = builder
+                    .setState(RetinaState.FAILED)
+                    .build();
+            this.retinaResourceManager.setRecovering(false);
+            HeartbeatWorker.setCurrentStatus(NodeStatus.INIT);
             logger.error("Error while initializing RetinaServerImpl", e);
             throw new IllegalStateException("Failed to initialize RetinaServerImpl", e);
         }
     }
 
-    private void initializeRetinaResources() throws Exception
+    private RecoveryContext prepareRecoveryContext() throws RetinaException
     {
-        logger.info("Pre-loading checkpoints...");
-        this.retinaResourceManager.recoverOffloadCheckpoints();
+        String recoveryEpoch = UUID.randomUUID().toString();
 
+        RecoveryCheckpoint recoveryCheckpoint = RecoveryCheckpoint.createFromConfig();
+        int virtualNodesPerNode = recoveryCheckpoint.getVirtualNodesPerNode();
+        if (virtualNodesPerNode <= 0)
+        {
+            throw new RetinaException("virtualNodesPerNode must be positive, got " + virtualNodesPerNode);
+        }
+        // Config only provides vnode count; expected vnode ids are derived as [0, N).
+        Set<Integer> expectedVnodes = new HashSet<>(virtualNodesPerNode);
+        for (int i = 0; i < virtualNodesPerNode; i++)
+        {
+            expectedVnodes.add(i);
+        }
+
+        StorageGcWal storageGcWal = retinaResourceManager.getStorageGcWal();
+        StorageGcWal.RecoveryHandler storageGcWalRecoveryHandler = new StorageGcWal.RecoveryHandler(
+                storageGcWal, metadataService, indexService);
+
+        return new RecoveryContext(
+                recoveryEpoch,
+                storageGcWal,
+                storageGcWalRecoveryHandler,
+                recoveryCheckpoint.load(),
+                expectedVnodes);
+    }
+
+    private RecoveryResult recoverRetinaState(RecoveryContext context) throws RetinaException
+    {
+        LoadedCheckpoint loaded = context.loadedCheckpoint;
+        if (loaded == null)
+        {
+            context.storageGcWalRecoveryHandler.recover(Collections.emptySet());
+            try
+            {
+                if (!metadataService.getFilesByType(EnumSet.of(File.Type.REGULAR)).isEmpty())
+                {
+                    throw new RetinaException("Recovery aborted: no checkpoint body found but catalog has REGULAR files");
+                }
+            }
+            catch (MetadataException e)
+            {
+                throw new RetinaException("Recovery catalog probe failed", e);
+            }
+            return new RecoveryResult(true, computeReplay(0L, Collections.emptyList(), context.expectedVnodes));
+        }
+
+        Body body = loaded.body;
+        logger.info("Recovery: applying checkpoint body={} (checkpointAppliedTs={})",
+                loaded.bodyPath, body.getCheckpointAppliedTs());
+
+        int warnCount = 0;
+        Map<Long, File> catalogByFileId = new HashMap<>();
+        Set<Long> droppedFileIds = new HashSet<>();
+        List<VisibilityEntry> validRgEntries = new ArrayList<>(body.getRgEntries().size());
+        Set<Long> recoverableFileIds = new HashSet<>();
+
+        for (VisibilityEntry ve : body.getRgEntries())
+        {
+            long fileId = ve.getFileId();
+            if (droppedFileIds.contains(fileId))
+            {
+                warnCount++;
+                continue;
+            }
+            File catalog = catalogByFileId.get(fileId);
+            if (catalog == null)
+            {
+                try
+                {
+                    catalog = metadataService.getFileById(fileId);
+                }
+                catch (MetadataException e)
+                {
+                    throw new RetinaException("Recovery cleanser: catalog lookup failed for fileId=" + fileId, e);
+                }
+                if (catalog == null)
+                {
+                    logger.warn("Recovery cleanser: dropping VisibilityEntry fileId={}, rgId={} because fileId is not in catalog",
+                            fileId, ve.getRgId());
+                    droppedFileIds.add(fileId);
+                    warnCount++;
+                    continue;
+                }
+                if (catalog.getType() != File.Type.REGULAR)
+                {
+                    logger.warn("Recovery cleanser: dropping VisibilityEntry fileId={}, rgId={} because catalog type is {}",
+                            fileId, ve.getRgId(), catalog.getType());
+                    droppedFileIds.add(fileId);
+                    warnCount++;
+                    continue;
+                }
+                if (catalog.getMinRowId() < 0 || catalog.getMaxRowId() < catalog.getMinRowId())
+                {
+                    logger.warn("Recovery cleanser: dropping VisibilityEntry fileId={}, rgId={} because catalog hull is invalid: min={}, max={}",
+                            fileId, ve.getRgId(), catalog.getMinRowId(), catalog.getMaxRowId());
+                    droppedFileIds.add(fileId);
+                    warnCount++;
+                    continue;
+                }
+                catalogByFileId.put(fileId, catalog);
+            }
+            if (ve.getRgId() < 0 || ve.getRecordNum() <= 0 || catalog.getNumRowGroup() <= ve.getRgId())
+            {
+                logger.warn("Recovery cleanser: dropping VisibilityEntry fileId={}, rgId={}, recordNum={}, catalogRowGroups={}",
+                        fileId, ve.getRgId(), ve.getRecordNum(), catalog.getNumRowGroup());
+                warnCount++;
+                continue;
+            }
+            validRgEntries.add(ve);
+            recoverableFileIds.add(fileId);
+        }
+
+        context.storageGcWalRecoveryHandler.recover(recoverableFileIds);
+
+        for (VisibilityEntry ve : validRgEntries)
+        {
+            retinaResourceManager.addVisibility(ve.getFileId(), ve.getRgId(),
+                    ve.getRecordNum(), ve.getBaseTimestamp(), ve.getBitmap(), true);
+        }
+
+        ReplayResult replay = computeReplay(
+                body.getCheckpointAppliedTs(),
+                body.getSegmentEntries(),
+                context.expectedVnodes);
+
+        long cleanupAt = System.currentTimeMillis();
+        Set<Long> pendingJournalFileIds;
+        try
+        {
+            pendingJournalFileIds = context.storageGcWal.collectPendingFileIds();
+        }
+        catch (RuntimeException e)
+        {
+            throw new RetinaException("Recovery retirer: failed to load Storage GC journal tasks", e);
+        }
+
+        List<File> catalogRegulars;
+        try
+        {
+            catalogRegulars = metadataService.getFilesByType(EnumSet.of(File.Type.REGULAR));
+        }
+        catch (MetadataException e)
+        {
+            throw new RetinaException("Recovery retirer: catalog-wide REGULAR scan failed", e);
+        }
+
+        int retiredCount = 0;
+        int protectedCount = 0;
+        for (File catalog : catalogRegulars)
+        {
+            long fileId = catalog.getId();
+            if (recoverableFileIds.contains(fileId))
+            {
+                continue;
+            }
+            if (pendingJournalFileIds.contains(fileId))
+            {
+                protectedCount++;
+                continue;
+            }
+            catalog.setType(File.Type.RETIRED);
+            catalog.setCleanupAt(cleanupAt);
+            try
+            {
+                if (!metadataService.updateFile(catalog))
+                {
+                    throw new RetinaException("Recovery retirer: updateFile returned false for fileId=" + fileId);
+                }
+                retiredCount++;
+            }
+            catch (MetadataException e)
+            {
+                throw new RetinaException("Recovery retirer: failed to retire fileId=" + fileId, e);
+            }
+        }
+
+        logger.info("Recovery complete: checkpointId={}, checkpointAppliedTs={}, baselineFiles={}, retired={}, protected={}, nodeReplayFromTs={}, warns={}",
+                loaded.bodyPath,
+                body.getCheckpointAppliedTs(),
+                recoverableFileIds.size(),
+                retiredCount,
+                protectedCount,
+                replay.nodeReplayFromTs,
+                warnCount);
+
+        // Clean up terminal tasks related to this checkpoint to prevent blocking future recoveries
+        try
+        {
+            List<StorageGcWal.Task> terminalTasks = context.storageGcWal.listTerminalTasks();
+            if (!terminalTasks.isEmpty())
+            {
+                List<String> tasksToDelete = new ArrayList<>(terminalTasks.size());
+                for (StorageGcWal.Task task : terminalTasks)
+                {
+                    tasksToDelete.add(task.getTaskId());
+                }
+                context.storageGcWal.deleteTerminalTasks(tasksToDelete);
+                logger.info("Cleaned up {} terminal Storage GC WAL tasks after checkpoint ts={}",
+                        tasksToDelete.size(), body.getCheckpointAppliedTs());
+            }
+        }
+        catch (Exception e)
+        {
+            logger.warn("Failed to cleanup terminal Storage GC journal tasks: {}", e.getMessage());
+        }
+
+        return new RecoveryResult(false, replay);
+    }
+
+    private void initializeRecoveredResources() throws Exception
+    {
+        this.retinaResourceManager.recoverOffloadCheckpoints();
         List<Schema> schemas = this.metadataService.getSchemas();
         for (Schema schema : schemas)
         {
             List<Table> tables = this.metadataService.getTables(schema.getName());
             for (Table table : tables)
             {
-                List<Layout> layouts = this.metadataService.getLayouts(schema.getName(), table.getName());
-                List<String> files = new LinkedList<>();
-                for (Layout layout : layouts)
-                {
-                    if (layout.isReadable())
-                    {
-                        /*
-                         * Issue #946: always add visibility to all files
-                         */
-                        // add visibility for ordered files
-                        List<Path> orderedPaths = layout.getOrderedPaths();
-                        validateOrderedOrCompactPaths(orderedPaths);
-                        List<File> orderedFiles = this.metadataService.getRegularFiles(orderedPaths.get(0).getId());
-                        files.addAll(orderedFiles.stream()
-                                .map(file -> orderedPaths.get(0).getUri() + "/" + file.getName())
-                                .collect(Collectors.toList()));
-
-                        // add visibility for compact files
-                        List<Path> compactPaths = layout.getCompactPaths();
-                        validateOrderedOrCompactPaths(compactPaths);
-                        List<File> compactFiles = this.metadataService.getRegularFiles(compactPaths.get(0).getId());
-                        files.addAll(compactFiles.stream()
-                                .map(file -> compactPaths.get(0).getUri() + "/" + file.getName())
-                                .collect(Collectors.toList()));
-                    }
-                }
-
-                int threadNum = Integer.parseInt
-                        (ConfigFactory.Instance().getProperty("retina.service.init.threads"));
-                ExecutorService executorService = Executors.newFixedThreadPool(threadNum);
-                AtomicBoolean success = new AtomicBoolean(true);
-                AtomicReference<Exception> e = new AtomicReference<>();
-                try
-                {
-                    for (String filePath : files)
-                    {
-                        executorService.submit(() ->
-                        {
-                            try
-                            {
-                                this.retinaResourceManager.addVisibility(filePath);
-                            }
-                            catch (Exception ex)
-                            {
-                                success.set(false);
-                                e.set(ex);
-                            }
-                        });
-                    }
-                }
-                finally
-                {
-                    executorService.shutdown();
-                }
-
-                executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-
-                if (!success.get())
-                {
-                    throw new RetinaException("Can't add visibility", e.get());
-                }
-
                 this.retinaResourceManager.addWriteBuffer(schema.getName(), table.getName());
             }
         }
     }
 
-    /**
-     * Check if the order or compact paths from pixels metadata is valid.
-     *
-     * @param paths the order or compact paths from pixels metadata.
-     */
-    public static void validateOrderedOrCompactPaths(List<Path> paths) throws RetinaException
+    private void publishStartupLifecycle(RecoveryContext context, RecoveryResult result) throws RetinaException
     {
-        requireNonNull(paths, "paths is null");
-        checkArgument(!paths.isEmpty(), "paths must contain at least one valid directory");
-        try
+        this.retinaResourceManager.setRecovering(true);
+        HeartbeatWorker.setCurrentStatus(NodeStatus.INIT);
+        this.status = RetinaStatus.newBuilder()
+                .setState(RetinaState.RECOVERING)
+                .setRecoveryEpoch(context.recoveryEpoch)
+                .putAllVnodeReplayStarts(result.replay.vnodeReplayStarts)
+                .build();
+
+        if (result.freshDeployment)
         {
-            Storage.Scheme firstScheme = Storage.Scheme.fromPath(paths.get(0).getUri());
-            assert firstScheme != null;
-            for (int i = 1; i < paths.size(); ++i)
+            retinaResourceManager.startBackgroundGc();
+            this.status = this.status.toBuilder()
+                    .setState(RetinaState.READY)
+                    .build();
+            this.retinaResourceManager.setRecovering(false);
+            HeartbeatWorker.setCurrentStatus(NodeStatus.READY);
+        }
+    }
+
+    private static final class RecoveryContext
+    {
+        final String recoveryEpoch;
+        final StorageGcWal storageGcWal;
+        final StorageGcWal.RecoveryHandler storageGcWalRecoveryHandler;
+        final LoadedCheckpoint loadedCheckpoint;
+        final Set<Integer> expectedVnodes;
+
+        RecoveryContext(String recoveryEpoch,
+                        StorageGcWal storageGcWal,
+                        StorageGcWal.RecoveryHandler storageGcWalRecoveryHandler,
+                        LoadedCheckpoint loadedCheckpoint,
+                        Set<Integer> expectedVnodes)
+        {
+            this.recoveryEpoch = recoveryEpoch;
+            this.storageGcWal = storageGcWal;
+            this.storageGcWalRecoveryHandler = storageGcWalRecoveryHandler;
+            this.loadedCheckpoint = loadedCheckpoint;
+            this.expectedVnodes = expectedVnodes;
+        }
+    }
+
+    private static final class RecoveryResult
+    {
+        final boolean freshDeployment;
+        final ReplayResult replay;
+
+        RecoveryResult(boolean freshDeployment, ReplayResult replay)
+        {
+            this.freshDeployment = freshDeployment;
+            this.replay = replay;
+        }
+    }
+
+    private static final class ReplayResult
+    {
+        final Map<Integer, Long> vnodeReplayStarts;
+        final long nodeReplayFromTs;
+
+        ReplayResult(Map<Integer, Long> vnodeReplayStarts, long nodeReplayFromTs)
+        {
+            this.vnodeReplayStarts = Collections.unmodifiableMap(new HashMap<>(vnodeReplayStarts));
+            this.nodeReplayFromTs = nodeReplayFromTs;
+        }
+    }
+
+    private static ReplayResult computeReplay(long checkpointAppliedTs,
+                                              List<PendingSegmentEntry> segmentEntries,
+                                              Set<Integer> expectedVnodes)
+    {
+        Map<Integer, Long> vnodeReplayStarts = new HashMap<>();
+        for (PendingSegmentEntry se : segmentEntries)
+        {
+            long ts = se.getMinCommitTs() == Long.MAX_VALUE
+                    ? checkpointAppliedTs
+                    : Math.min(checkpointAppliedTs, se.getMinCommitTs());
+            vnodeReplayStarts.merge(se.getVirtualNodeId(), ts, Math::min);
+        }
+        for (Integer vnode : expectedVnodes)
+        {
+            vnodeReplayStarts.putIfAbsent(vnode, checkpointAppliedTs);
+        }
+        long nodeReplayFromTs = checkpointAppliedTs;
+        if (!vnodeReplayStarts.isEmpty())
+        {
+            nodeReplayFromTs = Long.MAX_VALUE;
+            for (Long v : vnodeReplayStarts.values())
             {
-                Storage.Scheme scheme = Storage.Scheme.fromPath(paths.get(i).getUri());
-                checkArgument(firstScheme.equals(scheme),
-                        "all the directories in the paths must have the same storage scheme");
+                nodeReplayFromTs = Math.min(nodeReplayFromTs, v);
             }
         }
-        catch (Throwable e)
-        {
-            throw new RetinaException("Failed to parse storage scheme from paths", e);
-        }
+        return new ReplayResult(vnodeReplayStarts, nodeReplayFromTs);
     }
 
     private static String getRetinaMetrics(OperatingSystemMXBean osBean)
@@ -293,7 +527,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         catch (RetinaException e)
         {
             logger.error("updateRecord failed for schema={} (retina)", request.getSchemaName(), e);
-            headerBuilder.setErrorCode(1).setErrorMsg("Retina: " + e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_UPDATE_FAILED).setErrorMsg("Retina: " + e.getMessage());
             responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
@@ -301,7 +535,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         catch (IndexException e)
         {
             logger.error("updateRecord failed for schema={} (index)", request.getSchemaName(), e);
-            headerBuilder.setErrorCode(2).setErrorMsg("Index: " + e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_UPDATE_FAILED).setErrorMsg("Index: " + e.getMessage());
             responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
@@ -333,7 +567,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 }
                 catch (RetinaException e)
                 {
-                    headerBuilder.setErrorCode(1).setErrorMsg("Retina: " + e.getMessage());
+                    headerBuilder.setErrorCode(ErrorCode.RETINA_UPDATE_FAILED).setErrorMsg("Retina: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
@@ -341,7 +575,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 }
                 catch (IndexException e)
                 {
-                    headerBuilder.setErrorCode(2).setErrorMsg("Index: " + e.getMessage());
+                    headerBuilder.setErrorCode(ErrorCode.RETINA_UPDATE_FAILED).setErrorMsg("Index: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
@@ -349,7 +583,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 }
                 catch (Exception e)
                 {
-                    headerBuilder.setErrorCode(3).setErrorMsg("Internal error: " + e.getMessage());
+                    headerBuilder.setErrorCode(ErrorCode.RETINA_UPDATE_FAILED).setErrorMsg("Internal error: " + e.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
@@ -357,7 +591,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 }
                 catch (Throwable t)
                 {
-                    headerBuilder.setErrorCode(4).setErrorMsg("Fatal error: " + t.getMessage());
+                    headerBuilder.setErrorCode(ErrorCode.RETINA_UPDATE_FAILED).setErrorMsg("Fatal error: " + t.getMessage());
                     responseObserver.onNext(RetinaProto.UpdateRecordResponse.newBuilder()
                             .setHeader(headerBuilder.build())
                             .build());
@@ -781,6 +1015,69 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     }
 
     @Override
+    public void getRetinaStatus(RetinaProto.GetRetinaStatusRequest request,
+                                StreamObserver<RetinaProto.GetRetinaStatusResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        RetinaProto.GetRetinaStatusResponse.Builder response =
+                RetinaProto.GetRetinaStatusResponse.newBuilder().setHeader(headerBuilder);
+        RetinaStatus current = this.status;
+        response.setState(current.getState())
+                .setRecoveryEpoch(current.getRecoveryEpoch());
+        // vnodeReplayStarts is only meaningful while RECOVERING; CDC drives
+        // replay from those timestamps. Once published, the plan is ready by
+        // construction, so no separate readiness flag is needed.
+        if (current.getState() == RetinaState.RECOVERING)
+        {
+            current.getVnodeReplayStartsMap().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> response.addVnodeReplayStarts(RetinaProto.VnodeReplayStart.newBuilder()
+                            .setVirtualNodeId(entry.getKey())
+                            .setStartTs(entry.getValue())
+                            .build()));
+        }
+        responseObserver.onNext(response.build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void markReady(RetinaProto.MarkReadyRequest request,
+                          StreamObserver<RetinaProto.MarkReadyResponse> responseObserver)
+    {
+        RetinaProto.ResponseHeader.Builder headerBuilder = RetinaProto.ResponseHeader.newBuilder()
+                .setToken(request.getHeader().getToken());
+        try
+        {
+            RetinaStatus current = this.status;
+            if (!current.getRecoveryEpoch().equals(request.getRecoveryEpoch()))
+            {
+                throw new RetinaException("MarkReady recoveryEpoch mismatch");
+            }
+            if (current.getState() != RetinaState.RECOVERING && current.getState() != RetinaState.READY)
+            {
+                throw new RetinaException("Retina is " + current.getState() + "; cannot mark READY");
+            }
+
+            // Start GC before publishing READY so a failed scheduler start remains retryable.
+            retinaResourceManager.startBackgroundGc();
+            this.status = current.toBuilder()
+                    .setState(RetinaState.READY)
+                    .build();
+            this.retinaResourceManager.setRecovering(false);
+            HeartbeatWorker.setCurrentStatus(NodeStatus.READY);
+        }
+        catch (RetinaException e)
+        {
+            headerBuilder.setErrorCode(ErrorCode.RETINA_MARK_READY_FAILED).setErrorMsg(e.getMessage());
+        }
+        responseObserver.onNext(RetinaProto.MarkReadyResponse.newBuilder()
+                .setHeader(headerBuilder.build())
+                .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void addVisibility(RetinaProto.AddVisibilityRequest request,
                               StreamObserver<RetinaProto.AddVisibilityResponse> responseObserver)
     {
@@ -799,7 +1096,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
         catch (RetinaException e)
         {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_VISIBILITY_FAILED).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.AddVisibilityResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
@@ -846,7 +1143,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
         catch (RetinaException e)
         {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_VISIBILITY_FAILED).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.QueryVisibilityResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
@@ -878,7 +1175,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
         catch (RetinaException e)
         {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_VISIBILITY_FAILED).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.ReclaimVisibilityResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
@@ -903,7 +1200,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
         catch (RetinaException e)
         {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_NOT_READY).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.AddWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
@@ -929,7 +1226,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         }
         catch (RetinaException e)
         {
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_NOT_READY).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.GetWriteBufferResponse.newBuilder()
                     .setHeader(headerBuilder.build())
                     .build());
@@ -954,7 +1251,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         {
             logger.error("registerOffload failed for timestamp={}",
                     request.getTimestamp(), e);
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_NOT_READY).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.RegisterOffloadResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build());
         }
@@ -981,7 +1278,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         {
             logger.error("unregisterOffload failed for timestamp={}",
                     request.getTimestamp(), e);
-            headerBuilder.setErrorCode(1).setErrorMsg(e.getMessage());
+            headerBuilder.setErrorCode(ErrorCode.RETINA_NOT_READY).setErrorMsg(e.getMessage());
             responseObserver.onNext(RetinaProto.UnregisterOffloadResponse.newBuilder()
                     .setHeader(headerBuilder.build()).build());
         }
@@ -1106,6 +1403,60 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             {
                 return originalData.size();
             }
+        }
+    }
+
+    /**
+     * In-memory lifecycle status of this Retina server. This struct is intentionally
+     * kept inside RetinaServerImpl because it is never transmitted: outbound RPCs
+     * project the relevant subset onto GetRetinaStatusResponse.
+     */
+    private static final class RetinaStatus
+    {
+        private final RetinaState state;
+        private final String recoveryEpoch;
+        private final Map<Integer, Long> vnodeReplayStarts;
+
+        private RetinaStatus(Builder b)
+        {
+            this.state = b.state;
+            this.recoveryEpoch = b.recoveryEpoch;
+            this.vnodeReplayStarts = Collections.unmodifiableMap(new LinkedHashMap<>(b.vnodeReplayStarts));
+        }
+
+        static Builder newBuilder()
+        {
+            return new Builder();
+        }
+
+        Builder toBuilder()
+        {
+            Builder b = new Builder();
+            b.state = this.state;
+            b.recoveryEpoch = this.recoveryEpoch;
+            b.vnodeReplayStarts = new LinkedHashMap<>(this.vnodeReplayStarts);
+            return b;
+        }
+
+        String getRecoveryEpoch() { return recoveryEpoch; }
+        Map<Integer, Long> getVnodeReplayStartsMap() { return vnodeReplayStarts; }
+        RetinaState getState() { return state; }
+
+        static final class Builder
+        {
+            private RetinaState state = RetinaState.UNKNOWN;
+            private String recoveryEpoch = "";
+            private Map<Integer, Long> vnodeReplayStarts = new LinkedHashMap<>();
+
+            Builder setState(RetinaState v) { this.state = v; return this; }
+            Builder setRecoveryEpoch(String v) { this.recoveryEpoch = v; return this; }
+            Builder putAllVnodeReplayStarts(Map<Integer, Long> m)
+            {
+                this.vnodeReplayStarts.putAll(m);
+                return this;
+            }
+
+            RetinaStatus build() { return new RetinaStatus(this); }
         }
     }
 }

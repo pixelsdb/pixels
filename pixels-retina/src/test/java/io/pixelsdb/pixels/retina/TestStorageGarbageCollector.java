@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.retina;
 import io.pixelsdb.pixels.common.index.service.LocalIndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
@@ -50,6 +51,7 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -120,6 +122,7 @@ public class TestStorageGarbageCollector
 
     private RetinaResourceManager retinaManager;
     private StorageGarbageCollector gc;
+    private StorageGcWal storageGcWal;
 
     // -----------------------------------------------------------------------
     // Class-level setup / teardown
@@ -174,13 +177,16 @@ public class TestStorageGarbageCollector
     // -----------------------------------------------------------------------
 
     @Before
-    public void setUp()
+    public void setUp() throws Exception
     {
         retinaManager = RetinaResourceManager.Instance();
         resetManagerState();
         cleanupOrderedDir();
+        cleanupJournalDir();
+        storageGcWal = new StorageGcWal();
         gc = new StorageGarbageCollector(retinaManager, metadataService, LocalIndexService.Instance(),
-                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L);
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L,
+                storageGcWal);
     }
 
     @After
@@ -188,6 +194,20 @@ public class TestStorageGarbageCollector
     {
         resetManagerState();
         cleanupOrderedDir();
+    }
+
+    private static void cleanupJournalDir() throws IOException
+    {
+        String journalDir = ConfigFactory.Instance().getProperty("retina.storage.gc.journal.dir");
+        Storage storage = StorageFactory.Instance().getStorage(journalDir);
+        if (!storage.exists(journalDir))
+        {
+            return;
+        }
+        for (String path : storage.listPaths(journalDir))
+        {
+            storage.delete(path, false);
+        }
     }
 
     /**
@@ -1666,7 +1686,7 @@ public class TestStorageGarbageCollector
         // mapping so each thread targets a distinct new RGVisibility object.
         StorageGarbageCollector localGc = new StorageGarbageCollector(
                 retinaManager, metadataService, LocalIndexService.Instance(), 0.5, 134_217_728L,
-                Integer.MAX_VALUE, 10, 1, EncodingLevel.EL2, 86_400_000L);
+                Integer.MAX_VALUE, 10, 1, EncodingLevel.EL2, 86_400_000L, storageGcWal);
 
         StorageGarbageCollector.RewriteResult result =
                 localGc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
@@ -2286,6 +2306,86 @@ public class TestStorageGarbageCollector
                 fileStorage.exists(result.newFilePath));
 
         assertFileGone(result.newFileId, "Catalog entry should be deleted after rollback");
+    }
+
+    // =======================================================================
+    // Section: Storage GC WAL ordering invariant (runStorageGC synchrony)
+    //
+    // Recovery (StorageGcWal.RecoveryHandler) relies on the invariant that a
+    // checkpoint baseline can only ever contain a newFile whose task already
+    // reached SWAPPED_NOT_CHECKPOINTED. That holds because RRM.runGC publishes
+    // the checkpoint (Step 3) strictly after runStorageGC returns (Step 2), and
+    // runStorageGC is synchronous: every WAL task opened during a GC round is
+    // terminalized (SWAPPED on commit, ABORTED on rollback) before the
+    // synchronous entry point returns — never left lingering in INDEX_SWITCHING.
+    // These tests lock that load-bearing synchrony property; a regression here
+    // (e.g. making the GC asynchronous) would surface the recovery fail-fast.
+    // =======================================================================
+
+    /**
+     * Successful GC round: {@code processFileGroup} must leave the WAL task in
+     * SWAPPED_NOT_CHECKPOINTED, never INDEX_SWITCHING, by the time it returns.
+     */
+    @Test
+    public void testProcessFileGroup_commitLeavesWalSwapped_neverIndexSwitching() throws Exception
+    {
+        long[] ids = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        long[] ts = new long[10];
+        Arrays.fill(ts, 100);
+        String filePath = writeTestFile("wal_commit_src.pxl", LONG_ID_SCHEMA, ids, true, ts);
+        long srcFileId = registerTestFile("wal_commit_src.pxl", File.Type.REGULAR, 1, 0, 9);
+        retinaManager.addVisibility(srcFileId, 0, 10, 50, null, true);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), makeBitmap(10, 6));
+
+        WalTrackingSyncGC walGc = new WalTrackingSyncGC(retinaManager, metadataService, storageGcWal,
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L, false);
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, filePath, LONG_ID_SCHEMA);
+
+        walGc.processFileGroup(group, 100L, bitmaps);
+
+        List<StorageGcWal.Task> tasks = storageGcWal.listAllTasks();
+        assertEquals("exactly one WAL task expected", 1, tasks.size());
+        assertEquals("committed GC round must leave the task SWAPPED",
+                StorageGcWal.State.SWAPPED_NOT_CHECKPOINTED, tasks.get(0).getState());
+        assertNoIndexSwitchingTask(tasks);
+        assertFileRegular(tasks.get(0).getNewFileId(), "new file must be REGULAR after commit");
+    }
+
+    /**
+     * Crash inside the swap→markSwapped window (simulated by throwing right after the WAL
+     * task is opened): {@code processFileGroup} must catch it and roll back, terminalizing
+     * the task to ABORTED — never leaving it in INDEX_SWITCHING — and leaving the source
+     * file REGULAR with the new file cleaned up.
+     */
+    @Test
+    public void testProcessFileGroup_crashDuringIndexSwitch_walAborted_neverIndexSwitching() throws Exception
+    {
+        long[] ids = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        long[] ts = new long[10];
+        Arrays.fill(ts, 100);
+        String filePath = writeTestFile("wal_abort_src.pxl", LONG_ID_SCHEMA, ids, true, ts);
+        long srcFileId = registerTestFile("wal_abort_src.pxl", File.Type.REGULAR, 1, 0, 9);
+        retinaManager.addVisibility(srcFileId, 0, 10, 50, null, true);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), makeBitmap(10, 6));
+
+        WalTrackingSyncGC walGc = new WalTrackingSyncGC(retinaManager, metadataService, storageGcWal,
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L, true);
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, filePath, LONG_ID_SCHEMA);
+
+        // processFileGroup swallows the injected failure and rolls back internally.
+        walGc.processFileGroup(group, 100L, bitmaps);
+
+        List<StorageGcWal.Task> tasks = storageGcWal.listAllTasks();
+        assertEquals("exactly one WAL task expected", 1, tasks.size());
+        assertEquals("crashed GC round must be rolled back to ABORTED",
+                StorageGcWal.State.ABORTED, tasks.get(0).getState());
+        assertNoIndexSwitchingTask(tasks);
+        assertFileRegular(srcFileId, "source must stay REGULAR after a rolled-back GC round");
+        assertFileGone(tasks.get(0).getNewFileId(), "new file catalog must be removed after rollback");
     }
 
     /** Delayed cleanup removes old file Visibility and physical file after wall-clock deadline passes. */
@@ -3315,6 +3415,15 @@ public class TestStorageGarbageCollector
         assertNotNull(msg, f.getCleanupAt());
     }
 
+    private static void assertNoIndexSwitchingTask(List<StorageGcWal.Task> tasks)
+    {
+        for (StorageGcWal.Task t : tasks)
+        {
+            assertFalse("no WAL task may be left in INDEX_SWITCHING after a synchronous GC round",
+                    t.getState() == StorageGcWal.State.INDEX_SWITCHING);
+        }
+    }
+
     // =======================================================================
     // Helpers: GC factory for grouping tests
     // =======================================================================
@@ -3324,7 +3433,7 @@ public class TestStorageGarbageCollector
     {
         return new StorageGarbageCollector(
                 null, null, null, 0.5, targetFileSize, maxFilesPerGroup, maxGroups,
-                1048576, EncodingLevel.EL2, 86_400_000L);
+                1048576, EncodingLevel.EL2, 86_400_000L, new StorageGcWal());
     }
 
     // =======================================================================
@@ -3996,7 +4105,7 @@ public class TestStorageGarbageCollector
                             int maxGroups, List<FakeFileEntry> fakeEntries)
         {
             super(rm, null, null, threshold, 134_217_728L, Integer.MAX_VALUE, maxGroups,
-                    1048576, EncodingLevel.EL2, 86_400_000L);
+                    1048576, EncodingLevel.EL2, 86_400_000L, new StorageGcWal());
             this.fakeEntries = fakeEntries;
         }
 
@@ -4053,7 +4162,7 @@ public class TestStorageGarbageCollector
         TrackingRunStorageGC(List<FileGroup> groupsToReturn)
         {
             super(null, null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                    1048576, EncodingLevel.EL2, 86_400_000L);
+                    1048576, EncodingLevel.EL2, 86_400_000L, new StorageGcWal());
             this.groupsToReturn = groupsToReturn;
         }
 
@@ -4095,7 +4204,7 @@ public class TestStorageGarbageCollector
         FailFirstGroupGC()
         {
             super(null, null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                    1048576, EncodingLevel.EL2, 86_400_000L);
+                    1048576, EncodingLevel.EL2, 86_400_000L, new StorageGcWal());
         }
 
         @Override
@@ -4133,12 +4242,64 @@ public class TestStorageGarbageCollector
                       long retireDelayMs)
         {
             super(rm, ms, null, threshold, targetFileSize, maxFilesPerGroup, maxGroups,
-                    rowGroupSize, encodingLevel, retireDelayMs);
+                    rowGroupSize, encodingLevel, retireDelayMs, new StorageGcWal());
         }
 
         @Override
         void syncIndex(RewriteResult result, long tableId) throws Exception
         {
+        }
+    }
+
+    /**
+     * Test double that performs the WAL bookkeeping of the production {@code syncIndex}
+     * (open a task → INDEX_SWITCHING, flush) against an injected {@link StorageGcWal}, but
+     * skips the heavy primary-index machinery. Optionally throws right after the task is
+     * opened to simulate a crash inside the swap→markSwapped window, so tests can assert
+     * that the synchronous GC entry point ({@code processFileGroup}) never leaves a task in
+     * INDEX_SWITCHING — committing it to SWAPPED or rolling it back to ABORTED.
+     */
+    static class WalTrackingSyncGC extends StorageGarbageCollector
+    {
+        private final StorageGcWal wal;
+        private final boolean throwAfterOpen;
+
+        WalTrackingSyncGC(RetinaResourceManager rm, MetadataService ms, StorageGcWal wal,
+                          double threshold, long targetFileSize, int maxFilesPerGroup,
+                          int maxGroups, int rowGroupSize, EncodingLevel encodingLevel,
+                          long retireDelayMs, boolean throwAfterOpen)
+        {
+            super(rm, ms, LocalIndexService.Instance(), threshold, targetFileSize,
+                    maxFilesPerGroup, maxGroups, rowGroupSize, encodingLevel, retireDelayMs, wal);
+            this.wal = wal;
+            this.throwAfterOpen = throwAfterOpen;
+        }
+
+        @Override
+        void syncIndex(RewriteResult result, long tableId) throws Exception
+        {
+            int totalRows = result.newFileRgRowStart[result.newFileRgCount];
+            if (totalRows == 0)
+            {
+                return;
+            }
+            result.newRowIdStart = 0L;
+            String journalTaskId = "storage-gc-test-" + tableId + "-" + result.newFileId;
+            List<Long> oldFileIds = new ArrayList<>();
+            for (FileCandidate fc : result.group.files)
+            {
+                oldFileIds.add(fc.fileId);
+            }
+            result.walWriter = wal.createTask(journalTaskId, tableId,
+                    result.group.virtualNodeId, oldFileIds, result.newFileId,
+                    result.newFilePath, 0L, totalRows);
+            result.walWriter.flush();
+            // Task is now durably INDEX_SWITCHING. A crash here must be terminalized to
+            // ABORTED by processFileGroup's rollback, never left lingering.
+            if (throwAfterOpen)
+            {
+                throw new RuntimeException("injected crash mid index-switch");
+            }
         }
     }
 }

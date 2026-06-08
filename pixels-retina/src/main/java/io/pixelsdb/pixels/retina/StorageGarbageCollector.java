@@ -35,7 +35,6 @@ import io.pixelsdb.pixels.common.metadata.domain.Schema;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-
 import io.pixelsdb.pixels.common.utils.NetUtils;
 import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
@@ -52,9 +51,6 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.index.IndexProto;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -69,6 +65,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+
 
 /**
  * Storage GC: identifies high-deletion-ratio files and rewrites them
@@ -92,6 +92,7 @@ public class StorageGarbageCollector
     private final int rowGroupSize;
     private final EncodingLevel encodingLevel;
     private final long retireDelayMs;
+    private final StorageGcWal wal;
 
     // -------------------------------------------------------------------------
     // Value types
@@ -209,6 +210,8 @@ public class StorageGarbageCollector
 
         /** Set by {@link #syncIndex} after allocating new rowIds. */
         long newRowIdStart = -1;
+        /** Set by {@link #syncIndex}: open WAL writer; closed by commitFileGroup or rollback. */
+        StorageGcWal.Writer walWriter;
         /**
          * Set by {@link #syncIndex} after updating SinglePointIndex; old rowIds that were replaced.
          * <br/>
@@ -251,7 +254,8 @@ public class StorageGarbageCollector
                             int maxFileGroupsPerRun,
                             int rowGroupSize,
                             EncodingLevel encodingLevel,
-                            long retireDelayMs)
+                            long retireDelayMs,
+                            StorageGcWal wal)
     {
         this.resourceManager = resourceManager;
         this.metadataService = metadataService;
@@ -263,6 +267,7 @@ public class StorageGarbageCollector
         this.rowGroupSize = rowGroupSize;
         this.encodingLevel = encodingLevel;
         this.retireDelayMs = retireDelayMs;
+        this.wal = wal;
     }
 
     // -------------------------------------------------------------------------
@@ -408,11 +413,9 @@ public class StorageGarbageCollector
                             continue;
                         }
 
+                        // stats is guaranteed non-null with stats[0] > 0: candidateFileIds was
+                        // built in runStorageGC from these same fileStats entries.
                         long[] stats = fileStats.get(file.getId());
-                        if (stats == null || stats[0] == 0)
-                        {
-                            continue;
-                        }
                         double invalidRatio = (double) stats[1] / stats[0];
 
                         long sizeBytes;
@@ -947,12 +950,12 @@ public class StorageGarbageCollector
             {
                 if (!metadataService.deleteFiles(Collections.singletonList(newFileId)))
                 {
-                    throw new MetadataException("failed to delete temporary GC catalog entry for fileId=" + newFileId);
+                    logger.warn("StorageGC cleanup: catalog delete returned false for fileId={}", newFileId);
                 }
             }
-            catch (Exception ex)
+            catch (MetadataException ex)
             {
-                logger.warn("StorageGC cleanup: failed to delete catalog entry for fileId={}", newFileId, ex);
+                logger.warn("StorageGC cleanup: metadata service failed to delete catalog entry for fileId={}", newFileId, ex);
             }
         }
         try
@@ -989,10 +992,6 @@ public class StorageGarbageCollector
         for (FileCandidate fc : result.group.files)
         {
             Map<Integer, int[]> fileMapping = result.forwardRgMappings.get(fc.fileId);
-            if (fileMapping == null)
-            {
-                continue;
-            }
             for (int rgId = 0; rgId < fc.rgCount; rgId++)
             {
                 long[] items = resourceManager.exportChainItemsAfter(fc.fileId, rgId, safeGcTs);
@@ -1001,10 +1000,6 @@ public class StorageGarbageCollector
                     continue;
                 }
                 int[] fwdMapping = fileMapping.get(rgId);
-                if (fwdMapping == null)
-                {
-                    continue;
-                }
 
                 for (int i = 0; i < items.length; i += 2)
                 {
@@ -1111,6 +1106,14 @@ public class StorageGarbageCollector
 
         insertMainIndexEntries(result, tableId, primaryIndexId, indexOption, newRowIdStart);
 
+        String journalTaskId = RetinaUtils.buildStorageGcJournalTaskId(
+                tableId, result.group.virtualNodeId, result.newFileId);
+        List<Long> oldFileIds = result.group.files.stream()
+                .map(fc -> fc.fileId).collect(Collectors.toList());
+        result.walWriter = wal.createTask(journalTaskId, tableId,
+                result.group.virtualNodeId, oldFileIds, result.newFileId, result.newFilePath,
+                newRowIdStart, totalRows);
+
         if (!result.pendingIndexEntries.isEmpty())
         {
             result.oldRowIds = updateSinglePointIndex(result, tableId, primaryIndexId, indexOption, newRowIdStart);
@@ -1189,7 +1192,12 @@ public class StorageGarbageCollector
                         "newGlobalRowOffset={} — index may be inconsistent",
                         tableId, result.pendingIndexEntries.get(i).newGlobalRowOffset);
             }
+            result.walWriter.appendRollbackEntry(
+                    keys.get(i), oldRowId, entries.get(i).getRowId());
         }
+        // Flush all rollback entries to durable storage before the batch index update so
+        // that recovery can restore the old rowIds if we crash between this flush and commit.
+        result.walWriter.flush();
 
         indexService.updatePrimaryIndexEntriesOnly(tableId, primaryIndexId, entries, indexOption);
         return oldRowIds;
@@ -1224,6 +1232,12 @@ public class StorageGarbageCollector
             {
                 throw e;
             }
+        }
+
+        if (result.walWriter != null)
+        {
+            result.walWriter.markSwapped();
+            result.walWriter = null;
         }
 
         unregisterDualWrite(result);
@@ -1264,9 +1278,24 @@ public class StorageGarbageCollector
                 rollbackSinglePointIndex(result);
             }
 
-            // TODO: MainIndex entries for [newRowIdStart, newRowIdStart + totalRows) on newFileId are not cleaned here.
-            // Safe under current invariants (rowIds are monotonic and never reused; newFileId is deleted from catalog
-            // and not reused; no scanner traverses MainIndex globally). Revisit if any of these invariants change.
+            // Only delete the MainIndex range if rowIds were actually allocated. newRowIdStart
+            // stays -1 when rollback runs before syncIndex's allocateRowIdBatch (e.g. syncVisibility
+            // threw); deleting [newRowIdStart, newRowIdStart+totalRows) with newRowIdStart=-1 would
+            // wipe an unrelated global rowId band (deleteRowIdRange is not scoped by fileId).
+            int totalRows = result.newFileRgRowStart == null ? 0 : result.newFileRgRowStart[result.newFileRgCount];
+            if (result.newRowIdStart >= 0)
+            {
+                try
+                {
+                    indexService.deleteMainIndexRange(result.group.tableId, result.newFileId,
+                            result.newRowIdStart, totalRows);
+                }
+                catch (Exception ex)
+                {
+                    logger.warn("Rollback: failed to delete MainIndex range for fileId={}, rowIdStart={}, rowCount={}",
+                            result.newFileId, result.newRowIdStart, totalRows, ex);
+                }
+            }
 
             unregisterDualWrite(result);
 
@@ -1287,12 +1316,12 @@ public class StorageGarbageCollector
             {
                 if (!metadataService.deleteFiles(Collections.singletonList(result.newFileId)))
                 {
-                    throw new MetadataException("failed to rollback GC catalog entry for fileId=" + result.newFileId);
+                    logger.warn("Rollback: catalog delete returned false for fileId={}", result.newFileId);
                 }
             }
-            catch (Exception ex)
+            catch (MetadataException ex)
             {
-                logger.warn("Rollback: failed to delete catalog entry for fileId={}", result.newFileId, ex);
+                logger.warn("Rollback: metadata service failed to delete catalog entry for fileId={}", result.newFileId, ex);
             }
 
             try
@@ -1307,10 +1336,28 @@ public class StorageGarbageCollector
             {
                 logger.warn("Rollback: failed to delete physical file {}", result.newFilePath, ex);
             }
+
         }
         catch (Exception e)
         {
             logger.error("Rollback failed for FileGroup tableId={}", result.group.tableId, e);
+        }
+        finally
+        {
+            if (result.walWriter != null)
+            {
+                try
+                {
+                    result.walWriter.markAborted();
+                }
+                catch (IOException e)
+                {
+                    logger.warn("Rollback: failed to write ABORTED to WAL for taskId={}",
+                            result.walWriter.getTaskId(), e);
+                    try { result.walWriter.close(); } catch (IOException ignored) {}
+                }
+                result.walWriter = null;
+            }
         }
     }
 
@@ -1403,19 +1450,14 @@ public class StorageGarbageCollector
         {
             logger.error("StorageGC failed for FileGroup tableId={}, vNodeId={}",
                     group.tableId, group.virtualNodeId, e);
-            releaseGroupBitmaps(group, gcSnapshotBitmaps);
-            rollback(result);
-        }
-    }
-
-    private void releaseGroupBitmaps(FileGroup group, Map<String, long[]> gcSnapshotBitmaps)
-    {
-        for (FileCandidate fc : group.files)
-        {
-            for (int rgId = 0; rgId < fc.rgCount; rgId++)
+            for (FileCandidate fc : group.files)
             {
-                gcSnapshotBitmaps.remove(RetinaUtils.buildRgKey(fc.fileId, rgId));
+                for (int rgId = 0; rgId < fc.rgCount; rgId++)
+                {
+                    gcSnapshotBitmaps.remove(RetinaUtils.buildRgKey(fc.fileId, rgId));
+                }
             }
+            rollback(result);
         }
     }
 }

@@ -26,11 +26,8 @@ import org.junit.jupiter.api.*;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -236,31 +233,6 @@ class TestLocalIndexService
     }
 
     @Test
-    @Order(12)
-    void testStagedResolvePrimaryAppliesBaselineVisibleFilesFilter() throws Exception
-    {
-        IndexOption opt = IndexOption.builder().vNodeId(0).build();
-        // Install a baseline visible set that EXCLUDES fileId=100 (the one populated above).
-        Set<Long> visible = new HashSet<>(Collections.singletonList(999L));
-        Supplier<Set<Long>> originalSupplier = () -> null;
-        indexService.setBaselineVisibleFilesSupplier(() -> visible);
-        try
-        {
-            IndexProto.IndexKey k0 = stagedEntry("staged-k0", 0L, 100L, 0, 0).getIndexKey();
-            List<Optional<ResolvedPrimary>> resolved = indexService.resolvePrimary(
-                    STAGED_TABLE_ID, STAGED_PRIMARY_INDEX_ID, Collections.singletonList(k0), opt);
-            assertEquals(1, resolved.size());
-            assertFalse(resolved.get(0).isPresent(),
-                    "RowLocation.fileId=100 must be filtered out by baseline visible set {999}");
-        }
-        finally
-        {
-            // Reset to the default (no filtering) so subsequent tests see a clean state.
-            indexService.setBaselineVisibleFilesSupplier(originalSupplier);
-        }
-    }
-
-    @Test
     @Order(13)
     void testStagedTombstonePrimaryResolvedIsIdempotent() throws Exception
     {
@@ -330,13 +302,5 @@ class TestLocalIndexService
                 STAGED_TABLE_ID, STAGED_PRIMARY_INDEX_ID, Collections.singletonList(k1), opt).get(0);
         assertTrue(after.isPresent());
         assertEquals(currentRowId, after.get().getRowId());
-    }
-
-    @Test
-    @Order(16)
-    void testStagedSetBaselineVisibleFilesSupplierRejectsNull()
-    {
-        assertThrows(IllegalArgumentException.class,
-                () -> indexService.setBaselineVisibleFilesSupplier(null));
     }
 }
