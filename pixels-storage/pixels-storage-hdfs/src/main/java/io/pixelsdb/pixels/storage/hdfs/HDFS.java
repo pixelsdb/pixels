@@ -321,6 +321,12 @@ public final class HDFS implements Storage
     }
 
     @Override
+    public DataOutputStream append(String path, int bufferSize) throws IOException
+    {
+        return fs.append(new Path(path), bufferSize);
+    }
+
+    @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
         return fs.delete(new Path(path), recursive);
