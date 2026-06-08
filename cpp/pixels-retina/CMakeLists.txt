@@ -21,7 +21,7 @@ find_package(Java REQUIRED)
 find_package(JNI REQUIRED)
 
 # --- Jemalloc Configuration ---
-option(ENABLE_JEMALLOC "Enable jemalloc with pixels_ prefix" ON)
+option(ENABLE_JEMALLOC "Enable jemalloc for pixels-retina" ON)
 include(ExternalProject)
 
 if(ENABLE_JEMALLOC)
@@ -33,7 +33,6 @@ if(ENABLE_JEMALLOC)
             URL https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
             CONFIGURE_COMMAND <SOURCE_DIR>/configure
             --prefix=${JEMALLOC_INSTALL_DIR}
-            --with-jemalloc-prefix=je_
             --enable-prof
             --enable-stats
             --enable-shared
