@@ -21,8 +21,12 @@ package io.pixelsdb.pixels.common.index.service;
 
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.index.IndexOption;
+import io.pixelsdb.pixels.common.index.ResolvedPrimary;
+import io.pixelsdb.pixels.common.index.RollbackEntry;
 import io.pixelsdb.pixels.index.IndexProto;
+
 import java.util.List;
+import java.util.Optional;
 
 public interface IndexService
 {
@@ -40,7 +44,7 @@ public interface IndexService
     /**
      * Lookup a unique index.
      * @param key the index key
-     * @return the row location or null if the index entry is not found
+     * @return the row location, or null if the key is missing or maps to an orphan
      */
     IndexProto.RowLocation lookupUniqueIndex(IndexProto.IndexKey key, IndexOption indexOption) throws IndexException;
 
@@ -87,6 +91,7 @@ public interface IndexService
 
     /**
      * Delete an entry from the primary index. The deleted index entry is marked as deleted using a tombstone.
+     * Crash-unsafe; prefer {@link #resolvePrimary} + {@link #deletePrimaryIndexEntriesOnly}.
      * @param key the index key
      * @return the row location of the deleted index entry
      * @throws IndexException if no existing entry to delete
@@ -103,6 +108,7 @@ public interface IndexService
 
     /**
      * Delete entries from the primary index. Each deleted index entry is marked as deleted using a tombstone.
+     * Crash-unsafe; prefer {@link #resolvePrimary} + {@link #deletePrimaryIndexEntriesOnly}.
      * @param tableId the table id of the index
      * @param indexId the index id of the index
      * @param keys the keys of the entries to delete
@@ -126,6 +132,7 @@ public interface IndexService
 
     /**
      * Update the entry of a primary index.
+     * Crash-unsafe; prefer DELETE + INSERT.
      * @param indexEntry the index entry to update
      * @return the previous row location of the index entry
      * @throws IndexException if no existing entry to update
@@ -142,6 +149,7 @@ public interface IndexService
 
     /**
      * Update the entries of a primary index.
+     * Crash-unsafe; prefer DELETE + INSERT.
      * @param tableId the table id of the primary index
      * @param indexId the index id of the primary index
      * @param indexEntries the index entries to update
@@ -215,5 +223,129 @@ public interface IndexService
      * @return true on success
      */
     boolean removeIndex(long tableId, long indexId, boolean isPrimary, IndexOption option) throws IndexException;
+
+    // ==================================================================================
+    // Staged primary-index APIs. Default implementations throw UnsupportedOperationException; 
+    // LocalIndexService provides the in-process implementation.
+    // ==================================================================================
+
+    /**
+     * Resolve a batch of primary index keys to {@link ResolvedPrimary} (rowId + RowLocation),
+     * positionally aligned with keys. Returns Optional.empty() for keys
+     * that are missing, tombstoned, orphan in MainIndex, or filtered out by the
+     * baseline visible file set; throws on backend error.
+     *
+     * @param tableId the table id of the primary index
+     * @param indexId the index id of the primary index
+     * @param keys the primary index keys to resolve
+     * @param indexOption optional index option
+     * @return positional list of resolved primaries
+     * @throws IndexException on backend error
+     */
+    default List<Optional<ResolvedPrimary>> resolvePrimary(long tableId, long indexId,
+            List<IndexProto.IndexKey> keys, IndexOption indexOption) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "resolvePrimary is not supported by this IndexService scheme");
+    }
+
+    /**
+     * Write rowId -> RowLocation entries into the main index.
+     *
+     * @param tableId the table id of the main index
+     * @param entries the entries to persist
+     * @throws IndexException on backend error
+     */
+    default void putMainIndexEntriesOnly(long tableId,
+            List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "putMainIndexEntriesOnly is not supported by this IndexService scheme");
+    }
+
+    /**
+     * Write IndexKey -> rowId entries into the primary single point index.
+     *
+     * @param tableId the table id of the primary index
+     * @param indexId the index id of the primary index
+     * @param entries the entries to persist
+     * @param indexOption optional index option
+     * @throws IndexException on backend error
+     */
+    default void putPrimaryIndexEntriesOnly(long tableId, long indexId,
+            List<IndexProto.PrimaryIndexEntry> entries, IndexOption indexOption) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "putPrimaryIndexEntriesOnly is not supported by this IndexService scheme");
+    }
+
+    /**
+     * Delete primary index entries for keys already resolved by {@link #resolvePrimary}.
+     * Repeating on an already-deleted key is a no-op.
+     *
+     * @param tableId the table id of the primary index
+     * @param indexId the index id of the primary index
+     * @param resolvedKeys the keys to delete
+     * @param indexOption optional index option
+     * @throws IndexException on backend error
+     */
+    default void deletePrimaryIndexEntriesOnly(long tableId, long indexId,
+            List<IndexProto.IndexKey> resolvedKeys, IndexOption indexOption) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "deletePrimaryIndexEntriesOnly is not supported by this IndexService scheme");
+    }
+
+    /**
+     * Update primary index entries to the new IndexKey -> rowId mapping;
+     * does not look up the previous rowId.
+     *
+     * @param tableId the table id of the primary index
+     * @param indexId the index id of the primary index
+     * @param entries the new IndexKey -> rowId mappings
+     * @param indexOption optional index option
+     * @throws IndexException on backend error
+     */
+    default void updatePrimaryIndexEntriesOnly(long tableId, long indexId,
+            List<IndexProto.PrimaryIndexEntry> entries, IndexOption indexOption) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "updatePrimaryIndexEntriesOnly is not supported by this IndexService scheme");
+    }
+
+    /**
+     * Restore primary index entries to oldRowId where the current pointer
+     * still equals newRowId; skip otherwise. Intended for single-threaded
+     * rollback windows and does not require atomic conditional update from the backend.
+     *
+     * @param tableId the table id of the primary index
+     * @param indexId the index id of the primary index
+     * @param entries rollback entries describing each oldRowId -> newRowId transition
+     * @param indexOption optional index option
+     * @throws IndexException on backend error
+     */
+    default void restorePrimaryIndexEntries(long tableId, long indexId,
+            List<RollbackEntry> entries, IndexOption indexOption) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "restorePrimaryIndexEntries is not supported by this IndexService scheme");
+    }
+
+    /**
+     * Delete rowId -> RowLocation mappings for a contiguous main-index range.
+     * The range is half-open: [rowIdStart, rowIdStart + rowCount).
+     *
+     * @param tableId the table id of the main index
+     * @param fileId the file id owning the rowId range
+     * @param rowIdStart the first row id to delete
+     * @param rowCount the number of row ids to delete
+     * @throws IndexException on backend error
+     */
+    default void deleteMainIndexRange(long tableId, long fileId, long rowIdStart, int rowCount)
+            throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "deleteMainIndexRange is not supported by this IndexService scheme");
+    }
 }
 

@@ -163,4 +163,11 @@ public class ErrorCode
     public static final int NODE_RETINA_INFO_FAIL = ERROR_NODE_SERVER + 1;
     public static final int NODE_NO_AVAILABLE = ERROR_NODE_SERVER + 2;
     public static final int NODE_INVALID_BUCKET = ERROR_NODE_SERVER + 3;
+
+    // error code for retina lifecycle/recovery
+    private static final int ERROR_RETINA_SERVER = ERROR_BASE + 800;
+    public static final int RETINA_NOT_READY = ERROR_RETINA_SERVER + 1;
+    public static final int RETINA_MARK_READY_FAILED = ERROR_RETINA_SERVER + 2;
+    public static final int RETINA_UPDATE_FAILED = ERROR_RETINA_SERVER + 3;
+    public static final int RETINA_VISIBILITY_FAILED = ERROR_RETINA_SERVER + 4;
 }

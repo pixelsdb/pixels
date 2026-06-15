@@ -31,7 +31,8 @@ public:
                           const std::vector<uint64_t>* initialBitmap = nullptr);
     ~RGVisibility() override;
 
-    void deleteRGRecord(uint32_t rowId, uint64_t timestamp);
+    void deleteRGRecord(uint32_t rowId, uint64_t timestamp,
+                        ReplayMode replayMode = ReplayMode::NORMAL);
     uint64_t* getRGVisibilityBitmap(uint64_t timestamp);
 
     std::vector<uint64_t> collectRGGarbage(uint64_t timestamp);

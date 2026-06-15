@@ -65,7 +65,7 @@ service MetadataService {
     rpc UpdatePath (UpdatePathRequest) returns (UpdatePathResponse);
     rpc DeletePaths (DeletePathsRequest) returns (DeletePathsResponse);
     rpc AddFiles (AddFilesRequest) returns (AddFilesResponse);
-    rpc GetFiles (GetFilesRequest) returns (GetFilesResponse);
+    rpc GetFilesByType (GetFilesByTypeRequest) returns (GetFilesByTypeResponse);
     rpc GetFileId (GetFileIdRequest) returns (GetFileIdResponse);
     rpc GetFileType (GetFileTypeRequest) returns (GetFileTypeResponse);
     rpc UpdateFile (UpdateFileRequest) returns (UpdateFileResponse);
@@ -174,8 +174,10 @@ message Path {
 
 message File {
     enum Type {
-        TEMPORARY = 0;
+        TEMPORARY_INGEST = 0;
         REGULAR = 1;
+        TEMPORARY_GC = 2;
+        RETIRED = 3;
     }
     uint64 id = 1;
     string name = 2;
@@ -184,6 +186,7 @@ message File {
     uint64 minRowId = 5;
     uint64 maxRowId = 6;
     uint64 pathId = 7;
+    optional uint64 cleanupAt = 8;
 }
 
 message SchemaVersion {
@@ -679,12 +682,14 @@ message AddFilesResponse {
     ResponseHeader header = 1;
 }
 
-message GetFilesRequest {
+message GetFilesByTypeRequest {
+    // If set, restricts the scan to one path; otherwise scans across paths.
     RequestHeader header = 1;
-    uint64 pathId = 2;
+    optional uint64 pathId = 2;
+    repeated File.Type fileTypes = 3;
 }
 
-message GetFilesResponse {
+message GetFilesByTypeResponse {
     ResponseHeader header = 1;
     repeated File files = 2;
 }
@@ -706,7 +711,7 @@ message GetFileTypeRequest {
 
 message GetFileTypeResponse {
     ResponseHeader header = 1;
-    File.Type fileType = 2; // the type of the file, e.g., REGULAR or EMPTY
+    File.Type fileType = 2; // the type of the file, e.g., REGULAR or RETIRED
 }
 
 message UpdateFileRequest {
@@ -741,6 +746,7 @@ message AtomicSwapFilesRequest {
     RequestHeader header = 1;
     uint64 newFileId = 2;
     repeated uint64 oldFileIds = 3;
+    optional uint64 cleanupAt = 4;
 }
 
 message AtomicSwapFilesResponse {

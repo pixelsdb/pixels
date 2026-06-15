@@ -53,6 +53,40 @@ public class MainIndexBuffer implements Closeable
     private final MainIndexCache indexCache;
     private boolean populateCache = false;
 
+    public static final class FlushSnapshot
+    {
+        private final long fileId;
+        private final int entryCount;
+        private final List<RowIdRange> rowIdRanges;
+
+        private FlushSnapshot(long fileId, int entryCount, List<RowIdRange> rowIdRanges)
+        {
+            this.fileId = fileId;
+            this.entryCount = entryCount;
+            this.rowIdRanges = Collections.unmodifiableList(new ArrayList<>(rowIdRanges));
+        }
+
+        public long getFileId()
+        {
+            return fileId;
+        }
+
+        public int getEntryCount()
+        {
+            return entryCount;
+        }
+
+        public List<RowIdRange> getRowIdRanges()
+        {
+            return rowIdRanges;
+        }
+
+        public boolean isEmpty()
+        {
+            return entryCount == 0;
+        }
+    }
+
     /**
      * Create a main index buffer and bind the main index cache to it.
      * Entries put into this buffer will also be put into the cache.
@@ -143,20 +177,19 @@ public class MainIndexBuffer implements Closeable
     }
 
     /**
-     * Flush the (row id -> row location) mappings of the given file id into ranges and remove them from the buffer.
-     * This method does not evict the main index cache bind to this buffer as the cached entries are not out of date.
-     * However, this method may disable synchronous cache population and clear the cache if remaining file ids in the
-     * buffer is below or equals to the {@link #CACHE_POP_ENABLE_THRESHOLD}.
+     * Build a stable snapshot of the (row id -> row location) mappings of the given file id.
+     * This method must not mutate the buffer or cache; callers should only discard the buffered
+     * entries after the snapshot has been durably committed.
      * @param fileId the given file id to flush
-     * @return the flushed row id ranges to be persisited into the storage
+     * @return the row id range snapshot to be persisted into the storage
      * @throws MainIndexException
      */
-    public List<RowIdRange> flush(long fileId) throws MainIndexException
+    public FlushSnapshot snapshotForFlush(long fileId) throws MainIndexException
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(fileId);
         if (fileBuffer == null)
         {
-            return null;
+            return new FlushSnapshot(fileId, 0, Collections.emptyList());
         }
         ImmutableList.Builder<RowIdRange> ranges = ImmutableList.builder();
         RowIdRange.Builder currRangeBuilder = new RowIdRange.Builder();
@@ -210,16 +243,34 @@ public class MainIndexBuffer implements Closeable
         // release the flushed file index buffer
         if(fileBuffer.size() != rowIds.length)
         {
-            throw new MainIndexException("FileBuffer Changed while flush");
+            throw new MainIndexException("FileBuffer changed while building flush snapshot");
+        }
+        return new FlushSnapshot(fileId, rowIds.length, ranges.build());
+    }
+
+    /**
+     * Discard a flush snapshot after the backing store has durably committed it.
+     * @param snapshot the committed snapshot
+     * @throws MainIndexException if the buffer no longer matches the committed snapshot
+     */
+    public void discardFlushed(FlushSnapshot snapshot) throws MainIndexException
+    {
+        if (snapshot.isEmpty())
+        {
+            return;
+        }
+        Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(snapshot.getFileId());
+        if (fileBuffer == null || fileBuffer.size() != snapshot.getEntryCount())
+        {
+            throw new MainIndexException("FileBuffer changed before committed flush discard");
         }
         fileBuffer.clear();
-        this.indexBuffer.remove(fileId);
+        this.indexBuffer.remove(snapshot.getFileId());
         if (this.indexBuffer.size() <= CACHE_POP_ENABLE_THRESHOLD)
         {
             this.populateCache = false;
             this.indexCache.evictAllEntries();
         }
-        return ranges.build();
     }
 
     public List<Long> cachedFileIds()

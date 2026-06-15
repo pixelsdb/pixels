@@ -23,10 +23,9 @@ import com.google.protobuf.ByteString;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.index.IndexOption;
-import io.pixelsdb.pixels.common.index.MainIndex;
-import io.pixelsdb.pixels.common.index.MainIndexFactory;
-import io.pixelsdb.pixels.common.index.RowIdRange;
-import io.pixelsdb.pixels.common.index.SinglePointIndexFactory;
+import io.pixelsdb.pixels.common.index.ResolvedPrimary;
+import io.pixelsdb.pixels.common.index.RollbackEntry;
+import io.pixelsdb.pixels.common.index.service.IndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.KeyColumns;
@@ -36,7 +35,6 @@ import io.pixelsdb.pixels.common.metadata.domain.Schema;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-
 import io.pixelsdb.pixels.common.utils.NetUtils;
 import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
@@ -53,9 +51,6 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.index.IndexProto;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -67,8 +62,13 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+
 
 /**
  * Storage GC: identifies high-deletion-ratio files and rewrites them
@@ -84,6 +84,7 @@ public class StorageGarbageCollector
 
     private final RetinaResourceManager resourceManager;
     private final MetadataService metadataService;
+    private final IndexService indexService;
     private final double gcThreshold;
     private final long targetFileSize;
     private final int maxFilesPerGroup;
@@ -91,6 +92,7 @@ public class StorageGarbageCollector
     private final int rowGroupSize;
     private final EncodingLevel encodingLevel;
     private final long retireDelayMs;
+    private final StorageGcWal wal;
 
     // -------------------------------------------------------------------------
     // Value types
@@ -208,14 +210,16 @@ public class StorageGarbageCollector
 
         /** Set by {@link #syncIndex} after allocating new rowIds. */
         long newRowIdStart = -1;
+        /** Set by {@link #syncIndex}: open WAL writer; closed by commitFileGroup or rollback. */
+        StorageGcWal.Writer walWriter;
         /**
          * Set by {@link #syncIndex} after updating SinglePointIndex; old rowIds that were replaced.
          * <br/>
          * <b>Alignment invariant:</b> {@code oldRowIds.size() == pendingIndexEntries.size()}; each
          * slot corresponds 1:1 to the same-position entry in {@link #pendingIndexEntries}. Slots
-         * where {@link io.pixelsdb.pixels.common.index.SinglePointIndex#updatePrimaryEntry} returned
-         * a negative value (i.e. no prior entry to replace) are stored as {@code -1L} placeholders,
-         * so that rollback can pair each {@code PendingIndexEntry} with its own old rowId.
+         * where {@link IndexService#resolvePrimary} returned an empty optional (i.e. no prior entry
+         * to replace) are stored as {@code -1L} placeholders, so that rollback can pair each
+         * {@code PendingIndexEntry} with its own old rowId.
          */
         List<Long> oldRowIds;
 
@@ -243,16 +247,19 @@ public class StorageGarbageCollector
 
     StorageGarbageCollector(RetinaResourceManager resourceManager,
                             MetadataService metadataService,
+                            IndexService indexService,
                             double gcThreshold,
                             long targetFileSize,
                             int maxFilesPerGroup,
                             int maxFileGroupsPerRun,
                             int rowGroupSize,
                             EncodingLevel encodingLevel,
-                            long retireDelayMs)
+                            long retireDelayMs,
+                            StorageGcWal wal)
     {
         this.resourceManager = resourceManager;
         this.metadataService = metadataService;
+        this.indexService = indexService;
         this.gcThreshold = gcThreshold;
         this.targetFileSize = targetFileSize;
         this.maxFilesPerGroup = maxFilesPerGroup;
@@ -260,6 +267,7 @@ public class StorageGarbageCollector
         this.rowGroupSize = rowGroupSize;
         this.encodingLevel = encodingLevel;
         this.retireDelayMs = retireDelayMs;
+        this.wal = wal;
     }
 
     // -------------------------------------------------------------------------
@@ -381,7 +389,7 @@ public class StorageGarbageCollector
                     List<File> files;
                     try
                     {
-                        files = metadataService.getFiles(path.getId());
+                        files = metadataService.getRegularFiles(path.getId());
                     }
                     catch (MetadataException e)
                     {
@@ -405,11 +413,9 @@ public class StorageGarbageCollector
                             continue;
                         }
 
+                        // stats is guaranteed non-null with stats[0] > 0: candidateFileIds was
+                        // built in runStorageGC from these same fileStats entries.
                         long[] stats = fileStats.get(file.getId());
-                        if (stats == null || stats[0] == 0)
-                        {
-                            continue;
-                        }
                         double invalidRatio = (double) stats[1] / stats[0];
 
                         long sizeBytes;
@@ -607,7 +613,7 @@ public class StorageGarbageCollector
      * Rewrites all files in one {@link FileGroup} into a single new file, filtering out
      * rows marked as deleted in {@code gcSnapshotBitmaps}.
      *
-     * <p>The new file is registered as {@code TEMPORARY} in the catalog and its
+     * <p>The new file is registered as {@code TEMPORARY_GC} in the catalog and its
      * {@link RGVisibility} objects are initialised with {@code baseTimestamp = safeGcTs}.
      *
      * <p>After rewriting completes the {@code gcSnapshotBitmaps} entries for this group
@@ -877,7 +883,7 @@ public class StorageGarbageCollector
             backwardInfos.add(new BackwardInfo(fc.fileId, bwdMappings, oldFileRgRowStart));
         }
 
-        // Register the new file as TEMPORARY in the catalog and initialise Visibility.
+        // Register the new file as TEMPORARY_GC in the catalog and initialise Visibility.
         // Track registration progress so that partial state can be cleaned up on failure.
         long newFileId = -1;
         int registeredRgCount = 0;
@@ -891,12 +897,15 @@ public class StorageGarbageCollector
             }
             File newFile = new File();
             newFile.setName(newFileName);
-            newFile.setType(File.Type.TEMPORARY);
+            newFile.setType(File.Type.TEMPORARY_GC);
             newFile.setNumRowGroup(newFileRgCount);
             newFile.setMinRowId(minRowId);
             newFile.setMaxRowId(maxRowId);
             newFile.setPathId(group.files.get(0).file.getPathId());
-            metadataService.addFiles(Collections.singletonList(newFile));
+            if (!metadataService.addFiles(Collections.singletonList(newFile)))
+            {
+                throw new MetadataException("failed to add metadata for GC rewrite file " + newFilePath);
+            }
             newFileId = metadataService.getFileId(newFilePath);
 
             for (int rgId = 0; rgId < newFileRgCount; rgId++)
@@ -917,7 +926,7 @@ public class StorageGarbageCollector
     }
 
     /**
-     * Best-effort cleanup of a partially-created TEMPORARY file.  Removes the
+     * Best-effort cleanup of a partially-created TEMPORARY_GC file.  Removes the
      * catalog record, the physical file, and any RGVisibility keys that were
      * registered before the failure.
      */
@@ -939,11 +948,14 @@ public class StorageGarbageCollector
             }
             try
             {
-                metadataService.deleteFiles(Collections.singletonList(newFileId));
+                if (!metadataService.deleteFiles(Collections.singletonList(newFileId)))
+                {
+                    logger.warn("StorageGC cleanup: catalog delete returned false for fileId={}", newFileId);
+                }
             }
-            catch (Exception ex)
+            catch (MetadataException ex)
             {
-                logger.warn("StorageGC cleanup: failed to delete catalog entry for fileId={}", newFileId, ex);
+                logger.warn("StorageGC cleanup: metadata service failed to delete catalog entry for fileId={}", newFileId, ex);
             }
         }
         try
@@ -980,10 +992,6 @@ public class StorageGarbageCollector
         for (FileCandidate fc : result.group.files)
         {
             Map<Integer, int[]> fileMapping = result.forwardRgMappings.get(fc.fileId);
-            if (fileMapping == null)
-            {
-                continue;
-            }
             for (int rgId = 0; rgId < fc.rgCount; rgId++)
             {
                 long[] items = resourceManager.exportChainItemsAfter(fc.fileId, rgId, safeGcTs);
@@ -992,10 +1000,6 @@ public class StorageGarbageCollector
                     continue;
                 }
                 int[] fwdMapping = fileMapping.get(rgId);
-                if (fwdMapping == null)
-                {
-                    continue;
-                }
 
                 for (int i = 0; i < items.length; i += 2)
                 {
@@ -1093,21 +1097,31 @@ public class StorageGarbageCollector
             return;
         }
 
-        MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-        IndexProto.RowIdBatch rowIdBatch = mainIndex.allocateRowIdBatch(tableId, totalRows);
+        long primaryIndexId = metadataService.getPrimaryIndex(tableId).getId();
+        IndexOption indexOption = IndexOption.builder().vNodeId(result.group.virtualNodeId).build();
+
+        IndexProto.RowIdBatch rowIdBatch = indexService.allocateRowIdBatch(tableId, totalRows);
         long newRowIdStart = rowIdBatch.getRowIdStart();
         result.newRowIdStart = newRowIdStart;
 
-        insertMainIndexEntries(result, mainIndex, newRowIdStart);
+        insertMainIndexEntries(result, tableId, primaryIndexId, indexOption, newRowIdStart);
+
+        String journalTaskId = RetinaUtils.buildStorageGcJournalTaskId(
+                tableId, result.group.virtualNodeId, result.newFileId);
+        List<Long> oldFileIds = result.group.files.stream()
+                .map(fc -> fc.fileId).collect(Collectors.toList());
+        result.walWriter = wal.createTask(journalTaskId, tableId,
+                result.group.virtualNodeId, oldFileIds, result.newFileId, result.newFilePath,
+                newRowIdStart, totalRows);
 
         if (!result.pendingIndexEntries.isEmpty())
         {
-            result.oldRowIds = updateSinglePointIndex(result, tableId, newRowIdStart);
+            result.oldRowIds = updateSinglePointIndex(result, tableId, primaryIndexId, indexOption, newRowIdStart);
         }
     }
 
-    private void insertMainIndexEntries(RewriteResult result, MainIndex mainIndex,
-                                        long newRowIdStart) throws Exception
+    private void insertMainIndexEntries(RewriteResult result, long tableId, long primaryIndexId,
+                                        IndexOption indexOption, long newRowIdStart) throws Exception
     {
         int totalRows = result.newFileRgRowStart[result.newFileRgCount];
         List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>(totalRows);
@@ -1126,39 +1140,66 @@ public class StorageGarbageCollector
                             .setFileId(result.newFileId).setRgId(curRgId).setRgRowOffset(rgOff))
                     .build());
         }
-        mainIndex.putEntries(entries);
-        mainIndex.flushCache(result.newFileId);
+        indexService.putMainIndexEntriesOnly(tableId, entries);
+        indexService.flushIndexEntriesOfFile(tableId, primaryIndexId, result.newFileId, true, indexOption);
     }
 
-    private List<Long> updateSinglePointIndex(RewriteResult result, long tableId,
-                                              long newRowIdStart) throws Exception
+    /**
+     * Mirrors Retina's write-path "resolve + Only" pattern: one batch resolve to capture
+     * pre-update rowIds (recorded for rollback), then one batch updatePrimaryIndexEntriesOnly
+     * to swing the primary pointers onto the freshly allocated rowIds.
+     *
+     * <p>TODO(concurrency): This pair of calls is not atomic, unlike the previous single-shot
+     * {@code SinglePointIndex#updatePrimaryEntry} (per-key atomic getAndSet). If a concurrent
+     * writer mutates the same primary key between {@code resolvePrimary} and
+     * {@code updatePrimaryIndexEntriesOnly}, the {@code oldRowIds} we record can be stale w.r.t.
+     * the value actually clobbered by our update. Rollback is still safe — {@code restorePrimaryIndexEntries}
+     * only writes back when the current pointer still equals our {@code newRowId}, so concurrent
+     * writes that ran after our update are never overwritten — but a rollback in the narrow
+     * resolve→update window can restore a stale {@code oldRowId} instead of the concurrent
+     * writer's value. This matches the rest of Retina's write path and is acceptable here because
+     * Storage GC by design targets files dominated by deleted rows. Revisit if/when
+     * {@code IndexService} grows a batch API that returns the rowIds atomically replaced.
+     */
+    private List<Long> updateSinglePointIndex(RewriteResult result, long tableId, long primaryIndexId,
+                                              IndexOption indexOption, long newRowIdStart) throws Exception
     {
-        io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex primaryIndex =
-                metadataService.getPrimaryIndex(tableId);
-        IndexOption indexOption = IndexOption.builder().vNodeId(result.group.virtualNodeId).build();
-        io.pixelsdb.pixels.common.index.SinglePointIndex spIndex =
-                SinglePointIndexFactory.Instance().getSinglePointIndex(
-                        tableId, primaryIndex.getId(), indexOption);
-
-        // Keep oldRowIds aligned 1:1 with pendingIndexEntries: slots where
-        // updatePrimaryEntry returned a negative value are stored as -1L placeholders.
-        // rollbackSinglePointIndex relies on this alignment to pair each PendingIndexEntry
-        // with its own old rowId.
-        List<Long> oldRowIds = new ArrayList<>(result.pendingIndexEntries.size());
+        int size = result.pendingIndexEntries.size();
+        List<IndexProto.IndexKey> keys = new ArrayList<>(size);
+        List<IndexProto.PrimaryIndexEntry> entries = new ArrayList<>(size);
         for (PendingIndexEntry pe : result.pendingIndexEntries)
         {
-            long newRowId = newRowIdStart + pe.newGlobalRowOffset;
             IndexProto.IndexKey key = IndexProto.IndexKey.newBuilder()
-                    .setTableId(tableId).setIndexId(primaryIndex.getId())
+                    .setTableId(tableId).setIndexId(primaryIndexId)
                     .setKey(pe.pkBytes).setTimestamp(pe.createTs).build();
-            long oldRowId = spIndex.updatePrimaryEntry(key, newRowId);
+            keys.add(key);
+            entries.add(IndexProto.PrimaryIndexEntry.newBuilder()
+                    .setIndexKey(key)
+                    .setRowId(newRowIdStart + pe.newGlobalRowOffset)
+                    .build());
+        }
+
+        List<Optional<ResolvedPrimary>> resolved =
+                indexService.resolvePrimary(tableId, primaryIndexId, keys, indexOption);
+        List<Long> oldRowIds = new ArrayList<>(size);
+        for (int i = 0; i < size; i++)
+        {
+            long oldRowId = resolved.get(i).map(ResolvedPrimary::getRowId).orElse(-1L);
             oldRowIds.add(oldRowId);
             if (oldRowId < 0)
             {
-                logger.warn("StorageGC syncIndex: updatePrimaryEntry returned {} for tableId={}, " +
-                        "newGlobalRowOffset={} — index may be inconsistent", oldRowId, tableId, pe.newGlobalRowOffset);
+                logger.warn("StorageGC syncIndex: no resolvable primary for tableId={}, " +
+                        "newGlobalRowOffset={} — index may be inconsistent",
+                        tableId, result.pendingIndexEntries.get(i).newGlobalRowOffset);
             }
+            result.walWriter.appendRollbackEntry(
+                    keys.get(i), oldRowId, entries.get(i).getRowId());
         }
+        // Flush all rollback entries to durable storage before the batch index update so
+        // that recovery can restore the old rowIds if we crash between this flush and commit.
+        result.walWriter.flush();
+
+        indexService.updatePrimaryIndexEntriesOnly(tableId, primaryIndexId, entries, indexOption);
         return oldRowIds;
     }
 
@@ -1167,17 +1208,18 @@ public class StorageGarbageCollector
     // -------------------------------------------------------------------------
 
     /**
-     * Atomically promotes the new TEMPORARY file to REGULAR, deletes old files from
+     * Atomically promotes the new TEMPORARY_GC file to REGULAR, retires old files in
      * the catalog, unregisters dual-write, and enqueues the old files for delayed cleanup.
      */
     void commitFileGroup(RewriteResult result) throws Exception
     {
         List<Long> oldFileIds = result.group.files.stream()
                 .map(fc -> fc.fileId).collect(Collectors.toList());
+        long retireDeadline = System.currentTimeMillis() + retireDelayMs;
 
         try
         {
-            metadataService.atomicSwapFiles(result.newFileId, oldFileIds);
+            metadataService.atomicSwapFiles(result.newFileId, oldFileIds, retireDeadline);
         }
         catch (Exception e)
         {
@@ -1192,9 +1234,14 @@ public class StorageGarbageCollector
             }
         }
 
+        if (result.walWriter != null)
+        {
+            result.walWriter.markSwapped();
+            result.walWriter = null;
+        }
+
         unregisterDualWrite(result);
 
-        long retireDeadline = System.currentTimeMillis() + retireDelayMs;
         for (FileCandidate fc : result.group.files)
         {
             resourceManager.scheduleRetiredFile(
@@ -1231,18 +1278,22 @@ public class StorageGarbageCollector
                 rollbackSinglePointIndex(result);
             }
 
-            if (result.newRowIdStart > 0)
+            // Only delete the MainIndex range if rowIds were actually allocated. newRowIdStart
+            // stays -1 when rollback runs before syncIndex's allocateRowIdBatch (e.g. syncVisibility
+            // threw); deleting [newRowIdStart, newRowIdStart+totalRows) with newRowIdStart=-1 would
+            // wipe an unrelated global rowId band (deleteRowIdRange is not scoped by fileId).
+            int totalRows = result.newFileRgRowStart == null ? 0 : result.newFileRgRowStart[result.newFileRgCount];
+            if (result.newRowIdStart >= 0)
             {
                 try
                 {
-                    int totalRows = result.newFileRgRowStart[result.newFileRgCount];
-                    MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(result.group.tableId);
-                    mainIndex.deleteRowIdRange(new RowIdRange(result.newRowIdStart,
-                            result.newRowIdStart + totalRows, result.newFileId, 0, 0, totalRows));
+                    indexService.deleteMainIndexRange(result.group.tableId, result.newFileId,
+                            result.newRowIdStart, totalRows);
                 }
                 catch (Exception ex)
                 {
-                    logger.warn("Rollback: failed to clean MainIndex for fileId={}", result.newFileId, ex);
+                    logger.warn("Rollback: failed to delete MainIndex range for fileId={}, rowIdStart={}, rowCount={}",
+                            result.newFileId, result.newRowIdStart, totalRows, ex);
                 }
             }
 
@@ -1263,11 +1314,14 @@ public class StorageGarbageCollector
 
             try
             {
-                metadataService.deleteFiles(Collections.singletonList(result.newFileId));
+                if (!metadataService.deleteFiles(Collections.singletonList(result.newFileId)))
+                {
+                    logger.warn("Rollback: catalog delete returned false for fileId={}", result.newFileId);
+                }
             }
-            catch (Exception ex)
+            catch (MetadataException ex)
             {
-                logger.warn("Rollback: failed to delete catalog entry for fileId={}", result.newFileId, ex);
+                logger.warn("Rollback: metadata service failed to delete catalog entry for fileId={}", result.newFileId, ex);
             }
 
             try
@@ -1282,10 +1336,28 @@ public class StorageGarbageCollector
             {
                 logger.warn("Rollback: failed to delete physical file {}", result.newFilePath, ex);
             }
+
         }
         catch (Exception e)
         {
             logger.error("Rollback failed for FileGroup tableId={}", result.group.tableId, e);
+        }
+        finally
+        {
+            if (result.walWriter != null)
+            {
+                try
+                {
+                    result.walWriter.markAborted();
+                }
+                catch (IOException e)
+                {
+                    logger.warn("Rollback: failed to write ABORTED to WAL for taskId={}",
+                            result.walWriter.getTaskId(), e);
+                    try { result.walWriter.close(); } catch (IOException ignored) {}
+                }
+                result.walWriter = null;
+            }
         }
     }
 
@@ -1299,10 +1371,8 @@ public class StorageGarbageCollector
             {
                 return;
             }
+            long primaryIndexId = primaryIndex.getId();
             IndexOption indexOption = IndexOption.builder().vNodeId(result.group.virtualNodeId).build();
-            io.pixelsdb.pixels.common.index.SinglePointIndex spIndex =
-                    SinglePointIndexFactory.Instance().getSinglePointIndex(
-                            result.group.tableId, primaryIndex.getId(), indexOption);
 
             // Alignment invariant: oldRowIds.size() == pendingIndexEntries.size()
             // (established in updateSinglePointIndex). Walk them in lockstep by
@@ -1315,6 +1385,7 @@ public class StorageGarbageCollector
                                 "rolling back the common prefix only — index may remain inconsistent",
                         result.pendingIndexEntries.size(), result.oldRowIds.size());
             }
+            List<RollbackEntry> rollbackEntries = new ArrayList<>(n);
             for (int i = 0; i < n; i++)
             {
                 long oldRowId = result.oldRowIds.get(i);
@@ -1324,9 +1395,15 @@ public class StorageGarbageCollector
                 }
                 PendingIndexEntry pe = result.pendingIndexEntries.get(i);
                 IndexProto.IndexKey key = IndexProto.IndexKey.newBuilder()
-                        .setTableId(result.group.tableId).setIndexId(primaryIndex.getId())
+                        .setTableId(result.group.tableId).setIndexId(primaryIndexId)
                         .setKey(pe.pkBytes).setTimestamp(pe.createTs).build();
-                spIndex.updatePrimaryEntry(key, oldRowId);
+                long newRowId = result.newRowIdStart + pe.newGlobalRowOffset;
+                rollbackEntries.add(new RollbackEntry(key, oldRowId, newRowId));
+            }
+            if (!rollbackEntries.isEmpty())
+            {
+                indexService.restorePrimaryIndexEntries(
+                        result.group.tableId, primaryIndexId, rollbackEntries, indexOption);
             }
         }
         catch (Exception e)
@@ -1373,19 +1450,14 @@ public class StorageGarbageCollector
         {
             logger.error("StorageGC failed for FileGroup tableId={}, vNodeId={}",
                     group.tableId, group.virtualNodeId, e);
-            releaseGroupBitmaps(group, gcSnapshotBitmaps);
-            rollback(result);
-        }
-    }
-
-    private void releaseGroupBitmaps(FileGroup group, Map<String, long[]> gcSnapshotBitmaps)
-    {
-        for (FileCandidate fc : group.files)
-        {
-            for (int rgId = 0; rgId < fc.rgCount; rgId++)
+            for (FileCandidate fc : group.files)
             {
-                gcSnapshotBitmaps.remove(RetinaUtils.buildRgKey(fc.fileId, rgId));
+                for (int rgId = 0; rgId < fc.rgCount; rgId++)
+                {
+                    gcSnapshotBitmaps.remove(RetinaUtils.buildRgKey(fc.fileId, rgId));
+                }
             }
+            rollback(result);
         }
     }
 }

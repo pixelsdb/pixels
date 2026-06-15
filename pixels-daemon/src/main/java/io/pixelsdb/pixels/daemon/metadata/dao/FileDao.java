@@ -38,7 +38,13 @@ public abstract class FileDao implements Dao<MetadataProto.File>
         throw new UnsupportedOperationException("getAll is not supported.");
     }
 
-    public abstract List<MetadataProto.File> getAllByPathId(long pathId);
+    /**
+     * Return files of the requested types.
+     *
+     * @param pathId path scope, or {@code null} for all paths
+     * @param types file types to include; null or empty returns no files
+     */
+    public abstract List<MetadataProto.File> getFilesByType(Long pathId, List<MetadataProto.File.Type> types);
 
     public abstract MetadataProto.File getByPathIdAndFileName(long pathId, String fileName);
 
@@ -75,10 +81,11 @@ public abstract class FileDao implements Dao<MetadataProto.File>
     abstract public boolean deleteByIds (List<Long> ids);
 
     /**
-     * Atomically promote a TEMPORARY file to REGULAR and delete the old files in a single transaction.
-     * @param newFileId the id of the new TEMPORARY file to promote
-     * @param oldFileIds the ids of old files to delete
+     * Atomically promote a temporary GC file to REGULAR and retire old files in a single transaction.
+     * @param newFileId the id of the new temporary GC file to promote
+     * @param oldFileIds the ids of old regular files to retire
+     * @param cleanupAt the cleanup deadline to write on retired old files
      * @return true if the transaction committed successfully
      */
-    abstract public boolean atomicSwapFiles(long newFileId, List<Long> oldFileIds);
+    abstract public boolean atomicSwapFiles(long newFileId, List<Long> oldFileIds, long cleanupAt);
 }

@@ -31,13 +31,19 @@ public class ObjectEntry implements Referenceable
     private final long fileId;
     private final int startIndex;
     private final int length;
+    /**
+     * Min commit timestamp captured from the source memtable at flush time.
+     * {@link Long#MAX_VALUE} indicates "no rows captured".
+     */
+    private final long minCommitTs;
 
-    public ObjectEntry(long id, long fileId, int startIndex, int length)
+    public ObjectEntry(long id, long fileId, int startIndex, int length, long minCommitTs)
     {
         this.id = id;
         this.fileId = fileId;
         this.startIndex = startIndex;
         this.length = length;
+        this.minCommitTs = minCommitTs;
     }
 
     public long getId()
@@ -58,6 +64,11 @@ public class ObjectEntry implements Referenceable
     public int getLength()
     {
         return this.length;
+    }
+
+    public long getMinCommitTs()
+    {
+        return this.minCommitTs;
     }
 
     @Override

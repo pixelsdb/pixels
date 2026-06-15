@@ -21,18 +21,22 @@ package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.index.IndexProto;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.junit.Assert.assertEquals;
+
 public class TestPixelsWriteBuffer
 {
     private List<String> columnNames = new ArrayList<>();
@@ -44,29 +48,32 @@ public class TestPixelsWriteBuffer
     @Before
     public void setup()
     {
+        columnNames.clear();
+        columnTypes.clear();
+        columnNames.add("id");
+        columnNames.add("name");
+        columnTypes.add("int");
+        columnTypes.add("int");
+        schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
+
         targetOrderDirPath = new Path();
         targetOrderDirPath.setUri("file:///home/gengdy/data/tpch/1g/customer/v-0-ordered");
         targetOrderDirPath.setId(1);    // path id get from mysql `PATHS` table
         targetCompactDirPath = new Path();
         targetCompactDirPath.setUri("file:///home/gengdy/data/tpch/1g/customer/v-0-compact");
         targetCompactDirPath.setId(2);  // get from mysql `PATHS` table
+    }
+
+    @Test
+    public void testConcurrentWriteOperations()
+    {
         try
         {
-            columnNames.add("id");
-            columnNames.add("name");
-            columnTypes.add("int");
-            columnTypes.add("int");
-
-            schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
             buffer = new PixelsWriteBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath, "localhost", 0);  // table id get from mysql `TBLS` table
         } catch (Exception e)
         {
             System.out.println("setup error: " + e);
         }
-    }
-    @Test
-    public void testConcurrentWriteOperations()
-    {
 
 //        // print pid if you want to attach a profiler like async-profiler or YourKit
 //        try
@@ -114,10 +121,45 @@ public class TestPixelsWriteBuffer
         {
             completionLatch.await();
             Thread.sleep(10000);    // wait for async flush to complete
-                buffer.close();
-            } catch (Exception e)
-            {
-                System.out.println("error: " + e);
-            }
+            buffer.close();
+        } catch (Exception e)
+        {
+            System.out.println("error: " + e);
         }
     }
+
+    @Test
+    public void appendedRowsAreImmediatelyVisibleAndAdvanceCommitTsBounds() throws Exception
+    {
+        // After removing the two-phase publish, append is the only step and a
+        // row is query-visible as soon as it returns. The hidden ts column
+        // bounds therefore cover all appended rows immediately, and serialize()
+        // returns the full row batch with no truncation.
+        MemTable memTable = newMemTable(4);
+
+        memTable.add(row(1), 10L);
+        assertEquals(1, memTable.getSize());
+        assertEquals(1, VectorizedRowBatch.deserialize(memTable.serialize()).size);
+        assertEquals(10L, memTable.getMinCommitTs());
+        assertEquals(10L, memTable.getMaxCommitTs());
+
+        memTable.add(row(2), 20L);
+        assertEquals(2, memTable.getSize());
+        assertEquals(2, VectorizedRowBatch.deserialize(memTable.serialize()).size);
+        assertEquals(10L, memTable.getMinCommitTs());
+        assertEquals(20L, memTable.getMaxCommitTs());
+    }
+
+    private static MemTable newMemTable(int size)
+    {
+        TypeDescription schema = TypeDescription.createSchemaFromStrings(
+                Arrays.asList("id"), Arrays.asList("int"));
+        return new MemTable(0L, schema, size,
+                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, 100L, 0, size);
+    }
+
+    private static byte[][] row(int value)
+    {
+        return new byte[][] {ByteBuffer.allocate(Integer.BYTES).putInt(value).array()};
+    }
+}

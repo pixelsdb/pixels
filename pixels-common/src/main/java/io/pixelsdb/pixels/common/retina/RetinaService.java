@@ -147,6 +147,20 @@ public class RetinaService
         }
     }
 
+    private static void checkHeader(String operation, String expectedToken,
+                                    RetinaProto.ResponseHeader header) throws RetinaException
+    {
+        if (header.getErrorCode() != 0)
+        {
+            throw new RetinaException("Failed to " + operation + ": "
+                    + header.getErrorCode() + " " + header.getErrorMsg());
+        }
+        if (!header.getToken().equals(expectedToken))
+        {
+            throw new RetinaException("Response token does not match");
+        }
+    }
+
     public boolean updateRecord(String schemaName, int virtualNodeId, List<RetinaProto.TableUpdateData> tableUpdateData) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
@@ -157,15 +171,7 @@ public class RetinaService
                 .addAllTableUpdateData(tableUpdateData)
                 .build();
         RetinaProto.UpdateRecordResponse response = this.stub.updateRecord(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("Failed to update record: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("Response token does not match");
-        }
+        checkHeader("update record", token, response.getHeader());
         return true;
     }
 
@@ -295,6 +301,29 @@ public class RetinaService
         return handler;
     }
 
+    public RetinaProto.GetRetinaStatusResponse getRetinaStatus() throws RetinaException
+    {
+        String token = UUID.randomUUID().toString();
+        RetinaProto.GetRetinaStatusRequest request = RetinaProto.GetRetinaStatusRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .build();
+        RetinaProto.GetRetinaStatusResponse response = this.stub.getRetinaStatus(request);
+        checkHeader("get retina status", token, response.getHeader());
+        return response;
+    }
+
+    public boolean markReady(String recoveryEpoch) throws RetinaException
+    {
+        String token = UUID.randomUUID().toString();
+        RetinaProto.MarkReadyRequest request = RetinaProto.MarkReadyRequest.newBuilder()
+                .setHeader(RetinaProto.RequestHeader.newBuilder().setToken(token).build())
+                .setRecoveryEpoch(recoveryEpoch)
+                .build();
+        RetinaProto.MarkReadyResponse response = this.stub.markReady(request);
+        checkHeader("mark retina ready", token, response.getHeader());
+        return true;
+    }
+
     public boolean addVisibility(String filePath) throws RetinaException
     {
         String token = UUID.randomUUID().toString();
@@ -303,15 +332,7 @@ public class RetinaService
                 .setFilePath(filePath)
                 .build();
         RetinaProto.AddVisibilityResponse response = this.stub.addVisibility(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("Failed to add visibility: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("Response token does not match");
-        }
+        checkHeader("add visibility", token, response.getHeader());
         return true;
     }
 
@@ -374,15 +395,7 @@ public class RetinaService
             requestBuilder.setTransId(transId);
         }
         RetinaProto.QueryVisibilityResponse response = this.stub.queryVisibility(requestBuilder.build());
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("Failed to query visibility: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("Response token does not match");
-        }
+        checkHeader("query visibility", token, response.getHeader());
 
         if (response.getCheckpointPath() != null && !response.getCheckpointPath().isEmpty())
         {
@@ -408,15 +421,7 @@ public class RetinaService
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.ReclaimVisibilityResponse response = this.stub.reclaimVisibility(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("Failed to garbage collect: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("Response token does not match");
-        }
+        checkHeader("reclaim visibility", token, response.getHeader());
         return true;
     }
 
@@ -431,15 +436,8 @@ public class RetinaService
                 .setTimestamp(timeStamp)
                 .build();
         RetinaProto.GetWriteBufferResponse response = this.stub.getWriteBuffer(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("Schema: " + schemaName + "\tTable: " + tableName + ", failed to get superversion: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("Response token does not match");
-        }
+        checkHeader("get write buffer for schema " + schemaName + ", table " + tableName,
+                token, response.getHeader());
         return response;
     }
 
@@ -456,15 +454,8 @@ public class RetinaService
                 .setTableName(tableName)
                 .build();
         RetinaProto.AddWriteBufferResponse response = this.stub.addWriteBuffer(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("Failed to add writer: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("Response token does not match");
-        }
+        checkHeader("add write buffer for schema " + schemaName + ", table " + tableName,
+                token, response.getHeader());
         return true;
     }
 
@@ -483,15 +474,7 @@ public class RetinaService
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.RegisterOffloadResponse response = this.stub.registerOffload(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("Failed to register offload: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("Response token does not match");
-        }
+        checkHeader("register offload", token, response.getHeader());
         return true;
     }
 
@@ -510,15 +493,7 @@ public class RetinaService
                 .setTimestamp(timestamp)
                 .build();
         RetinaProto.UnregisterOffloadResponse response = this.stub.unregisterOffload(request);
-        if (response.getHeader().getErrorCode() != 0)
-        {
-            throw new RetinaException("Failed to unregister offload: " + response.getHeader().getErrorCode()
-                    + " " + response.getHeader().getErrorMsg());
-        }
-        if (!response.getHeader().getToken().equals(token))
-        {
-            throw new RetinaException("Response token does not match");
-        }
+        checkHeader("unregister offload", token, response.getHeader());
         return true;
     }
 }

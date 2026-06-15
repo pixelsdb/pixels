@@ -24,7 +24,11 @@ import io.etcd.jetcd.Client;
 import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.Watch;
 import io.etcd.jetcd.kv.PutResponse;
+import io.etcd.jetcd.kv.TxnResponse;
 import io.etcd.jetcd.lease.LeaseGrantResponse;
+import io.etcd.jetcd.op.Cmp;
+import io.etcd.jetcd.op.CmpTarget;
+import io.etcd.jetcd.op.Op;
 import io.etcd.jetcd.options.DeleteOption;
 import io.etcd.jetcd.options.GetOption;
 import io.etcd.jetcd.options.PutOption;
@@ -258,6 +262,33 @@ public class EtcdUtil
             logger.error("error when put key-value with lease id into etcd.", e);
         }
         return 0L;
+    }
+
+    /**
+     * Atomic compare-and-swap put.
+     * 
+     * @param key
+     * @param expectedValue
+     * @param newValue
+     * @return true if the txn committed; false if CAS failed
+     */
+    public boolean compareAndPut(String key, String expectedValue, String newValue)
+            throws ExecutionException, InterruptedException
+    {
+        ByteSequence keyBs = ByteSequence.from(key, StandardCharsets.UTF_8);
+        Cmp cmp = (expectedValue == null)
+                ? new Cmp(keyBs, Cmp.Op.EQUAL, CmpTarget.version(0L))
+                : new Cmp(keyBs, Cmp.Op.EQUAL, CmpTarget.value(
+                        ByteSequence.from(expectedValue, StandardCharsets.UTF_8)));
+        Op putOp = Op.put(keyBs,
+                ByteSequence.from(newValue, StandardCharsets.UTF_8),
+                PutOption.DEFAULT);
+        TxnResponse resp = this.client.getKVClient().txn()
+                .If(cmp)
+                .Then(putOp)
+                .commit()
+                .get();
+        return resp.isSucceeded();
     }
 
     /**

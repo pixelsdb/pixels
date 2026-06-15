@@ -272,6 +272,26 @@ public final class LocalFS implements Storage
         return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file), bufferSize));
     }
 
+    @Override
+    public DataOutputStream append(String path, int bufferSize) throws IOException
+    {
+        FilePath p = new FilePath(path);
+        if (!p.valid)
+        {
+            throw new IOException("Path '" + path + "' is not a valid local fs path.");
+        }
+        File file = new File(p.realPath);
+        if (!file.exists())
+        {
+            throw new IOException("File '" + p.realPath + "' does not exist, cannot append.");
+        }
+        if (file.isDirectory())
+        {
+            throw new IOException("Path '" + p.realPath + "' is a directory, it must be a file.");
+        }
+        return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file, true), bufferSize));
+    }
+
     public PixelsRandomAccessFile openRaf(String path) throws IOException
     {
         FilePath p = new FilePath(path);

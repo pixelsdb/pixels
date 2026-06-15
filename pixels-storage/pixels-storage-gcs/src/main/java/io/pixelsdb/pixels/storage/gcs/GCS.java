@@ -317,6 +317,12 @@ public class GCS implements Storage
     }
 
     @Override
+    public DataOutputStream append(String path, int bufferSize)
+    {
+        throw new UnsupportedOperationException("append is not supported by storage backend: " + getScheme());
+    }
+
+    @Override
     public boolean delete(String path, boolean recursive) throws IOException
     {
         ObjectPath p = new ObjectPath(path);

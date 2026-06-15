@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 /**
@@ -91,6 +92,38 @@ public class MemTable implements Referenceable
     public int getLength()
     {
         return this.length;
+    }
+
+    public synchronized int getSize()
+    {
+        return this.rowBatch.size;
+    }
+
+    /**
+     * Minimum commit timestamp over the appended rows, derived from the hidden
+     * timestamp column. Same-stream input is monotonically increasing by
+     * contract, so the first appended row carries the minimum.
+     */
+    public synchronized long getMinCommitTs()
+    {
+        if (this.rowBatch.size == 0)
+        {
+            return Long.MAX_VALUE;
+        }
+        return ((LongColumnVector) this.rowBatch.cols[this.schema.getChildren().size()]).vector[0];
+    }
+
+    /**
+     * Maximum commit timestamp over the appended rows, derived from the hidden
+     * timestamp column rather than a separately maintained field.
+     */
+    public synchronized long getMaxCommitTs()
+    {
+        if (this.rowBatch.size == 0)
+        {
+            return Long.MIN_VALUE;
+        }
+        return ((LongColumnVector) this.rowBatch.cols[this.schema.getChildren().size()]).vector[this.rowBatch.size - 1];
     }
 
     public VectorizedRowBatch getRowBatch()

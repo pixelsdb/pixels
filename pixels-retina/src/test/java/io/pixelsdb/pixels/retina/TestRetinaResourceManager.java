@@ -20,10 +20,27 @@
 package io.pixelsdb.pixels.retina;
 
 import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import org.junit.Ignore;
 import org.junit.Test;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 public class TestRetinaResourceManager
 {
@@ -43,6 +60,150 @@ public class TestRetinaResourceManager
     {
         long targetLong = visibility[rowId / 64];
         return (targetLong & (1L << (rowId % 64))) != 0;
+    }
+
+    private RetinaResourceManager newIsolatedManager() throws Exception
+    {
+        Constructor<RetinaResourceManager> constructor = RetinaResourceManager.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        return constructor.newInstance();
+    }
+
+    private void setGcExecutor(RetinaResourceManager manager,
+                               ScheduledExecutorService executor) throws Exception
+    {
+        Field field = RetinaResourceManager.class.getDeclaredField("gcExecutor");
+        field.setAccessible(true);
+        field.set(manager, executor);
+    }
+
+    @Test
+    public void testBackgroundGcIsNotStartedByConstructor() throws Exception
+    {
+        Constructor<RetinaResourceManager> constructor = RetinaResourceManager.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        RetinaResourceManager manager = constructor.newInstance();
+
+        assertFalse("background GC must be started by lifecycle only",
+                manager.isBackgroundGcStarted());
+    }
+
+    @Test
+    public void testStartBackgroundGcIsExplicitAndIdempotent() throws Exception
+    {
+        String originalInterval = ConfigFactory.Instance().getProperty("retina.gc.interval");
+        RetinaResourceManager manager = newIsolatedManager();
+        ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+        setGcExecutor(manager, executor);
+        try
+        {
+            ConfigFactory.Instance().addProperty("retina.gc.interval", "300");
+
+            manager.startBackgroundGc();
+            manager.startBackgroundGc();
+
+            assertTrue("explicit lifecycle start must mark background GC as started",
+                    manager.isBackgroundGcStarted());
+            verify(executor).scheduleAtFixedRate(any(Runnable.class), eq(300L), eq(300L), eq(TimeUnit.SECONDS));
+            verifyNoMoreInteractions(executor);
+        }
+        finally
+        {
+            ConfigFactory.Instance().addProperty("retina.gc.interval", originalInterval);
+        }
+    }
+
+    @Test
+    public void testStartBackgroundGcDisabledByNonPositiveInterval() throws Exception
+    {
+        String originalInterval = ConfigFactory.Instance().getProperty("retina.gc.interval");
+        RetinaResourceManager manager = newIsolatedManager();
+        try
+        {
+            ConfigFactory.Instance().addProperty("retina.gc.interval", "0");
+
+            manager.startBackgroundGc();
+
+            assertFalse("disabled interval must not mark background GC as started",
+                    manager.isBackgroundGcStarted());
+        }
+        finally
+        {
+            ConfigFactory.Instance().addProperty("retina.gc.interval", originalInterval);
+        }
+    }
+
+    @Test
+    public void testStartBackgroundGcInvalidIntervalFailsWithoutStarting() throws Exception
+    {
+        String originalInterval = ConfigFactory.Instance().getProperty("retina.gc.interval");
+        RetinaResourceManager manager = newIsolatedManager();
+        try
+        {
+            ConfigFactory.Instance().addProperty("retina.gc.interval", "not-a-number");
+
+            try
+            {
+                manager.startBackgroundGc();
+                fail("invalid GC interval must fail closed");
+            }
+            catch (RetinaException e)
+            {
+                assertTrue(e.getMessage().contains("Invalid retina GC interval configuration"));
+            }
+
+            assertFalse("failed lifecycle start must not mark GC as started",
+                    manager.isBackgroundGcStarted());
+        }
+        finally
+        {
+            ConfigFactory.Instance().addProperty("retina.gc.interval", originalInterval);
+        }
+    }
+
+    @Test
+    public void testStartBackgroundGcSchedulerFailureRollsBackStartedFlag() throws Exception
+    {
+        String originalInterval = ConfigFactory.Instance().getProperty("retina.gc.interval");
+        RetinaResourceManager manager = newIsolatedManager();
+        ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+        setGcExecutor(manager, executor);
+        try
+        {
+            ConfigFactory.Instance().addProperty("retina.gc.interval", "300");
+            when(executor.scheduleAtFixedRate(any(Runnable.class), eq(300L), eq(300L), eq(TimeUnit.SECONDS)))
+                    .thenThrow(new RuntimeException("scheduler rejected"));
+
+            try
+            {
+                manager.startBackgroundGc();
+                fail("scheduler failure must fail closed");
+            }
+            catch (RetinaException e)
+            {
+                assertTrue(e.getMessage().contains("Failed to start retina background GC"));
+            }
+
+            assertFalse("scheduler failure must roll back started flag",
+                    manager.isBackgroundGcStarted());
+        }
+        finally
+        {
+            ConfigFactory.Instance().addProperty("retina.gc.interval", originalInterval);
+        }
+    }
+
+    @Test
+    public void testRunGcBeforeLifecycleStartIsRejected() throws Exception
+    {
+        RetinaResourceManager manager = newIsolatedManager();
+        Method runGc = RetinaResourceManager.class.getDeclaredMethod("runGC");
+        runGc.setAccessible(true);
+
+        runGc.invoke(manager);
+
+        assertFalse("manual GC invocation before lifecycle start must be ignored",
+                manager.isBackgroundGcStarted());
     }
 
     @Test
@@ -80,6 +241,7 @@ public class TestRetinaResourceManager
         return row;
     }
 
+    @Ignore("Integration test requires real tpch.nation metadata and storage state.")
     @Test
     public void testWriteBuffer()
     {

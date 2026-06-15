@@ -68,7 +68,71 @@ TileVisibility<CAPACITY>::~TileVisibility() {
 }
 
 template<size_t CAPACITY>
-void TileVisibility<CAPACITY>::deleteTileRecord(uint16_t rowId, uint64_t ts) {
+void TileVisibility<CAPACITY>::deleteTileRecord(uint16_t rowId, uint64_t ts,
+                                                ReplayMode replayMode) {
+    switch (replayMode) {
+        case ReplayMode::NORMAL:
+            appendDeleteChain(rowId, ts);
+            return;
+        case ReplayMode::VERSIONED:
+            deleteTileRecordVersioned(rowId, ts);
+            return;
+        case ReplayMode::EXCLUSIVE:
+            deleteTileRecordExclusive(rowId, ts);
+            return;
+        default:
+            throw std::invalid_argument("unknown ReplayMode");
+    }
+}
+
+template<size_t CAPACITY>
+void TileVisibility<CAPACITY>::deleteTileRecordVersioned(uint16_t rowId, uint64_t ts) {
+    // READY backlog replay can race with getTileVisibilityBitmap readers. Fold
+    // historical deletes by publishing a new VersionedData instead of mutating
+    // baseBitmap observed by an existing reader.
+    // Keep ts=0 out of this path because item=0 is the chain-slot sentinel.
+    while (ts > 0) {
+        VersionedData<CAPACITY>* cur = currentVersion.load(std::memory_order_acquire);
+        if (ts > cur->baseTimestamp) {
+            break;
+        }
+        if ((cur->baseBitmap[rowId / 64] & (1ULL << (rowId % 64))) != 0) {
+            return;
+        }
+        uint64_t newBaseBitmap[NUM_WORDS];
+        std::memcpy(newBaseBitmap, cur->baseBitmap, NUM_WORDS * sizeof(uint64_t));
+        SET_BITMAP_BIT(newBaseBitmap, rowId);
+        VersionedData<CAPACITY>* newVer =
+            new VersionedData<CAPACITY>(cur->baseTimestamp, newBaseBitmap, cur->head);
+        if (currentVersion.compare_exchange_strong(cur, newVer, std::memory_order_acq_rel)) {
+            pendingRetire.store(cur, std::memory_order_release);
+            return;
+        }
+        delete newVer;
+    }
+
+    appendDeleteChain(rowId, ts);
+}
+
+template<size_t CAPACITY>
+void TileVisibility<CAPACITY>::deleteTileRecordExclusive(uint16_t rowId, uint64_t ts) {
+    // RECOVERING replay blocks readers and GC, so historical deletes can fold
+    // into baseBitmap in place. Atomic OR prevents lost updates when concurrent
+    // recovery writers touch the same bitmap word.
+    VersionedData<CAPACITY>* cur = currentVersion.load(std::memory_order_acquire);
+    if (ts > 0 && ts <= cur->baseTimestamp) {
+        uint64_t mask = 1ULL << (rowId % 64);
+        __atomic_fetch_or(&cur->baseBitmap[rowId / 64], mask, __ATOMIC_RELAXED);
+        return;
+    }
+
+    appendDeleteChain(rowId, ts);
+}
+
+template<size_t CAPACITY>
+void TileVisibility<CAPACITY>::appendDeleteChain(uint16_t rowId, uint64_t ts) {
+    // Normal live apply assumes a current timestamp and records the delete in
+    // the append-only chain, leaving baseBitmap untouched for the hot path.
     uint64_t item = makeDeleteIndex(rowId, ts);
     while (true) {
         DeleteIndexBlock *curTail = tail.load(std::memory_order_acquire);

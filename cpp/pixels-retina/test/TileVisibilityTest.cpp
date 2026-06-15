@@ -695,3 +695,162 @@ TEST_F(TileVisibilityTest, ImportDeletionItems_EmptyChainTailClaim) {
     v->getTileVisibilityBitmap(500, actualBitmap);
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
+
+// =========================================================================
+// COW fold of `ts <= baseTimestamp` deletes into baseBitmap.
+// Three ts relations plus duplicate replay.
+// =========================================================================
+
+class TileVisibilityCowFoldTest : public ::testing::Test {
+protected:
+    static constexpr uint64_t kBaseTimestamp = 100;
+    TileVisibility<RETINA_CAPACITY>* v;
+
+    void SetUp() override {
+        // Start with a non-zero baseTimestamp so the fold guard is exercised.
+        v = new TileVisibility<RETINA_CAPACITY>(kBaseTimestamp, nullptr);
+    }
+
+    void TearDown() override {
+        delete v;
+    }
+
+    bool bitSet(const uint64_t* bitmap, uint16_t rowId) {
+        return ((bitmap[rowId / 64] >> (rowId % 64)) & 1ULL) != 0;
+    }
+
+    void runConcurrentDeletes(ReplayMode mode, uint64_t ts, int rowCount = 64, int threadCount = 8) {
+        ASSERT_EQ(rowCount % threadCount, 0);
+        std::atomic<bool> start{false};
+        std::vector<std::thread> threads;
+        int rowsPerThread = rowCount / threadCount;
+
+        for (int t = 0; t < threadCount; t++) {
+            threads.emplace_back([&, t]() {
+                while (!start.load(std::memory_order_acquire)) {
+                    std::this_thread::yield();
+                }
+                for (int i = 0; i < rowsPerThread; i++) {
+                    uint16_t rowId = static_cast<uint16_t>(t * rowsPerThread + i);
+                    v->deleteTileRecord(rowId, ts, mode);
+                }
+            });
+        }
+
+        start.store(true, std::memory_order_release);
+        for (auto& thread : threads) {
+            thread.join();
+        }
+    }
+
+    void expectRows(uint64_t queryTs, int rowCount, bool expectedSet) {
+        uint64_t bitmap[BITMAP_SIZE] = {0};
+        v->getTileVisibilityBitmap(queryTs, bitmap);
+        for (int row = 0; row < rowCount; row++) {
+            EXPECT_EQ(expectedSet, bitSet(bitmap, static_cast<uint16_t>(row)))
+                << "row=" << row << " queryTs=" << queryTs;
+        }
+    }
+};
+
+TEST_F(TileVisibilityCowFoldTest, FoldsWhenTsLessThanBaseTimestamp) {
+    // ts < baseTimestamp: row must be folded into baseBitmap and visible at any
+    // snap_ts >= baseTimestamp.
+    v->deleteTileRecord(7, kBaseTimestamp - 50, ReplayMode::VERSIONED);
+
+    uint64_t bitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp, bitmap);
+    EXPECT_TRUE(bitSet(bitmap, 7));
+
+    // Even at a much later snap_ts the row should still be visible-as-deleted.
+    uint64_t bitmap2[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp + 1000, bitmap2);
+    EXPECT_TRUE(bitSet(bitmap2, 7));
+}
+
+TEST_F(TileVisibilityCowFoldTest, FoldsWhenTsEqualsBaseTimestamp) {
+    v->deleteTileRecord(9, kBaseTimestamp, ReplayMode::VERSIONED);
+
+    uint64_t bitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp, bitmap);
+    EXPECT_TRUE(bitSet(bitmap, 9));
+}
+
+TEST_F(TileVisibilityCowFoldTest, NormalModeDoesNotFoldHistoricalTimestamp) {
+    v->deleteTileRecord(10, kBaseTimestamp - 1, ReplayMode::NORMAL);
+
+    uint64_t bitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp, bitmap);
+    EXPECT_FALSE(bitSet(bitmap, 10));
+}
+
+TEST_F(TileVisibilityCowFoldTest, ExclusiveModeFoldsHistoricalTimestamp) {
+    v->deleteTileRecord(12, kBaseTimestamp - 1, ReplayMode::EXCLUSIVE);
+
+    uint64_t bitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp, bitmap);
+    EXPECT_TRUE(bitSet(bitmap, 12));
+}
+
+TEST_F(TileVisibilityCowFoldTest, ConcurrentNormalModeAppendsDeleteChain) {
+    runConcurrentDeletes(ReplayMode::NORMAL, kBaseTimestamp + 1);
+
+    expectRows(kBaseTimestamp, 64, false);
+    expectRows(kBaseTimestamp + 1, 64, true);
+}
+
+TEST_F(TileVisibilityCowFoldTest, ConcurrentVersionedModeFoldsWithCow) {
+    runConcurrentDeletes(ReplayMode::VERSIONED, kBaseTimestamp - 1);
+
+    expectRows(kBaseTimestamp, 64, true);
+}
+
+TEST_F(TileVisibilityCowFoldTest, ConcurrentExclusiveModeFoldsWithAtomicOr) {
+    runConcurrentDeletes(ReplayMode::EXCLUSIVE, kBaseTimestamp - 1);
+
+    expectRows(kBaseTimestamp, 64, true);
+}
+
+TEST_F(TileVisibilityCowFoldTest, AppendsToChainWhenTsGreaterThanBaseTimestamp) {
+    // ts > baseTimestamp: should take the append-to-chain path. The row must be
+    // invisible at snap_ts < ts and visible at snap_ts >= ts.
+    v->deleteTileRecord(11, kBaseTimestamp + 50, ReplayMode::VERSIONED);
+
+    uint64_t before[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp + 49, before);
+    EXPECT_FALSE(bitSet(before, 11));
+
+    uint64_t after[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp + 50, after);
+    EXPECT_TRUE(bitSet(after, 11));
+}
+
+TEST_F(TileVisibilityCowFoldTest, DuplicateFoldOnAlreadyDeletedRowIsIdempotent) {
+    // A replayed historical DELETE for a row already folded into baseBitmap should
+    // remain a no-op semantically. This guards the fast path that returns before
+    // cloning another VersionedData when the base bit is already set.
+    v->deleteTileRecord(13, kBaseTimestamp - 10, ReplayMode::VERSIONED);
+    for (int i = 0; i < 32; i++) {
+        v->deleteTileRecord(13, kBaseTimestamp - 20, ReplayMode::VERSIONED);
+    }
+
+    uint64_t atBase[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp, atBase);
+    EXPECT_TRUE(bitSet(atBase, 13));
+    EXPECT_FALSE(bitSet(atBase, 14));
+
+    // The duplicate fold must not corrupt the append-to-chain path or later GC.
+    v->deleteTileRecord(14, kBaseTimestamp + 5, ReplayMode::VERSIONED);
+    uint64_t beforeAppendTs[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp + 4, beforeAppendTs);
+    EXPECT_TRUE(bitSet(beforeAppendTs, 13));
+    EXPECT_FALSE(bitSet(beforeAppendTs, 14));
+
+    uint64_t gcBitmap[BITMAP_SIZE] = {0};
+    v->collectTileGarbage(kBaseTimestamp + 5, gcBitmap);
+
+    uint64_t afterGc[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(kBaseTimestamp + 5, afterGc);
+    EXPECT_TRUE(bitSet(afterGc, 13));
+    EXPECT_TRUE(bitSet(afterGc, 14));
+}

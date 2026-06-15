@@ -22,8 +22,6 @@
 
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
-
 option java_multiple_files = false;
 option java_package = "io.pixelsdb.pixels.daemon";
 option java_outer_classname = "TransProto";
@@ -45,7 +43,8 @@ service TransService {
     rpc GetTransConcurrency (GetTransConcurrencyRequest) returns (GetTransConcurrencyResponse);
     rpc BindExternalTraceId (BindExternalTraceIdRequest) returns (BindExternalTraceIdResponse);
     rpc DumpTrans (DumpTransRequest) returns (DumpTransResponse);
-    rpc GetSafeGcTimestamp(google.protobuf.Empty) returns (GetSafeGcTimestampResponse);
+    rpc GetSafeVisibilityFoldingTimestamp(GetSafeVisibilityFoldingTimestampRequest)
+        returns (GetSafeVisibilityFoldingTimestampResponse);
     rpc MarkTransOffloaded (MarkTransOffloadedRequest) returns (MarkTransOffloadedResponse);
 }
 
@@ -219,7 +218,12 @@ message DumpTransResponse {
     int32 errorCode = 1;
 }
 
-message GetSafeGcTimestampResponse {
+message GetSafeVisibilityFoldingTimestampRequest {
+    // True when the returned timestamp must remain safe for live running queries.
+    bool includeRunningQueries = 1;
+}
+
+message GetSafeVisibilityFoldingTimestampResponse {
     int32 errorCode = 1;
     uint64 timestamp = 2;
 }

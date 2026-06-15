@@ -318,10 +318,11 @@ CREATE TABLE IF NOT EXISTS `pixels_metadata`.`PEER_PATHS` (
 CREATE TABLE IF NOT EXISTS `pixels_metadata`.`FILES` (
     `FILE_ID` BIGINT NOT NULL AUTO_INCREMENT,
     `FILE_NAME` VARCHAR(128) NOT NULL,
-    `FILE_TYPE` TINYINT NOT NULL COMMENT "Valid value can be 0 (temporary), or 1 (regular).",
+    `FILE_TYPE` TINYINT NOT NULL COMMENT "Valid value can be 0 (temporary ingest), 1 (regular), 2 (temporary gc), or 3 (retired).",
     `FILE_NUM_RG` INT NOT NULL,
     `FILE_MIN_ROW_ID` BIGINT NOT NULL,
     `FILE_MAX_ROW_ID` BIGINT NOT NULL,
+    `FILE_CLEANUP_AT` BIGINT NULL COMMENT "Earliest cleanup deadline in epoch milliseconds; meaningful only when FILE_TYPE = 3 (retired).",
     `PATHS_PATH_ID` BIGINT NOT NULL,
     PRIMARY KEY (`FILE_ID`),
     INDEX `fk_FILES_PATHS_idx` (`PATHS_PATH_ID` ASC),

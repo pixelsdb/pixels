@@ -19,8 +19,11 @@
  */
 package io.pixelsdb.pixels.retina;
 
+import io.pixelsdb.pixels.common.index.service.LocalIndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
@@ -48,10 +51,11 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -70,6 +74,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Tests for {@link StorageGarbageCollector}, covering scan/grouping, data rewrite,
@@ -93,6 +98,7 @@ import static org.junit.Assert.assertTrue;
  * </ul>
  * Legacy test names (pre-convention) are preserved for CI stability.
  */
+@Ignore("Integration suite requires a running metadata server and external metadata DB state.")
 public class TestStorageGarbageCollector
 {
     // -----------------------------------------------------------------------
@@ -116,6 +122,7 @@ public class TestStorageGarbageCollector
 
     private RetinaResourceManager retinaManager;
     private StorageGarbageCollector gc;
+    private StorageGcWal storageGcWal;
 
     // -----------------------------------------------------------------------
     // Class-level setup / teardown
@@ -170,13 +177,16 @@ public class TestStorageGarbageCollector
     // -----------------------------------------------------------------------
 
     @Before
-    public void setUp()
+    public void setUp() throws Exception
     {
         retinaManager = RetinaResourceManager.Instance();
         resetManagerState();
         cleanupOrderedDir();
-        gc = new StorageGarbageCollector(retinaManager, metadataService, 0.5, 134_217_728L, Integer.MAX_VALUE, 10,
-                1048576, EncodingLevel.EL2, 86_400_000L);
+        cleanupJournalDir();
+        storageGcWal = new StorageGcWal();
+        gc = new StorageGarbageCollector(retinaManager, metadataService, LocalIndexService.Instance(),
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L,
+                storageGcWal);
     }
 
     @After
@@ -184,6 +194,20 @@ public class TestStorageGarbageCollector
     {
         resetManagerState();
         cleanupOrderedDir();
+    }
+
+    private static void cleanupJournalDir() throws IOException
+    {
+        String journalDir = ConfigFactory.Instance().getProperty("retina.storage.gc.journal.dir");
+        Storage storage = StorageFactory.Instance().getStorage(journalDir);
+        if (!storage.exists(journalDir))
+        {
+            return;
+        }
+        for (String path : storage.listPaths(journalDir))
+        {
+            storage.delete(path, false);
+        }
     }
 
     /**
@@ -702,96 +726,166 @@ public class TestStorageGarbageCollector
     // =======================================================================
 
     /**
-     * After {@code runStorageGC}, the {@code gcSnapshotBitmaps} map must have had
-     * non-candidate entries removed.  Candidate bitmaps must be retained for the rewrite phase.
+     * When no file crosses the strict deletion-ratio threshold,
+     * {@code runStorageGC} must return before metadata scan and keep the bitmap
+     * snapshot intact for the already-written GC checkpoint.
      */
     @Test
-    public void testRunStorageGC_trimsBitmapMapToCandidate()
+    public void testRunStorageGC_noCandidateDoesNotScanOrTrim()
     {
-        long candidateFileId = 66001L;
-        long otherFileId     = 66002L;
+        long belowThresholdFileId = 66101L;
+        long exactlyThresholdFileId = 66102L;
+
+        Map<Long, long[]> fileStats = new HashMap<>();
+        fileStats.put(belowThresholdFileId, makeRgStats(100, 40));
+        fileStats.put(exactlyThresholdFileId, makeRgStats(100, 50));
 
         Map<String, long[]> bitmaps = new HashMap<>();
-        bitmaps.put(candidateFileId + "_0", makeBitmap(100, 60));
-        bitmaps.put(otherFileId + "_0", makeBitmap(100, 20));
+        bitmaps.put(RetinaUtils.buildRgKey(belowThresholdFileId, 0), makeBitmap(100, 40));
+        bitmaps.put(RetinaUtils.buildRgKey(exactlyThresholdFileId, 0), makeBitmap(100, 50));
 
-        // File-level stats: candidateFileId has 60% deletion, otherFileId has 20%
+        TrackingRunStorageGC trackingGc = new TrackingRunStorageGC(Collections.emptyList());
+
+        trackingGc.runStorageGC(301L, fileStats, bitmaps);
+
+        assertFalse("no candidate means metadata scan must not run", trackingGc.scanCalled);
+        assertFalse("no candidate means process phase must not run", trackingGc.processCalled);
+        assertTrue("below-threshold bitmap must remain for checkpoint recovery",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(belowThresholdFileId, 0)));
+        assertTrue("exact-threshold bitmap must remain because threshold is strict >",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(exactlyThresholdFileId, 0)));
+        assertEquals("bitmap snapshot must remain unchanged", 2, bitmaps.size());
+    }
+
+    /**
+     * Candidate selection must be driven by file-level stats only.  Files at the
+     * threshold, with zero rows, or below threshold must not be passed to scan;
+     * their bitmap entries are released before rewrite processing starts.
+     */
+    @Test
+    public void testRunStorageGC_passesOnlyStrictFileLevelCandidatesToScan()
+    {
+        long candidateA = 66201L;
+        long candidateB = 66202L;
+        long exactlyThreshold = 66203L;
+        long zeroRows = 66204L;
+        long belowThreshold = 66205L;
+
         Map<Long, long[]> fileStats = new HashMap<>();
-        fileStats.put(candidateFileId, makeRgStats(100, 60));
+        fileStats.put(candidateA, makeRgStats(100, 51));
+        fileStats.put(candidateB, makeRgStats(200, 120));
+        fileStats.put(exactlyThreshold, makeRgStats(100, 50));
+        fileStats.put(zeroRows, new long[]{0, 10});
+        fileStats.put(belowThreshold, makeRgStats(100, 49));
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        for (long fileId : Arrays.asList(candidateA, candidateB, exactlyThreshold, zeroRows, belowThreshold))
+        {
+            bitmaps.put(RetinaUtils.buildRgKey(fileId, 0), makeBitmap(100, 1));
+        }
+        bitmaps.put(RetinaUtils.buildRgKey(candidateB, 1), makeBitmap(100, 1));
+
+        TrackingRunStorageGC trackingGc = new TrackingRunStorageGC(Collections.emptyList());
+
+        trackingGc.runStorageGC(302L, fileStats, bitmaps);
+
+        assertTrue("candidate scan must run when at least one file qualifies", trackingGc.scanCalled);
+        assertEquals(new HashSet<>(Arrays.asList(candidateA, candidateB)), trackingGc.capturedCandidateFileIds);
+        assertEquals("only candidate RG bitmaps should remain", 3, bitmaps.size());
+        assertTrue(bitmaps.containsKey(RetinaUtils.buildRgKey(candidateA, 0)));
+        assertTrue(bitmaps.containsKey(RetinaUtils.buildRgKey(candidateB, 0)));
+        assertTrue(bitmaps.containsKey(RetinaUtils.buildRgKey(candidateB, 1)));
+        assertFalse(bitmaps.containsKey(RetinaUtils.buildRgKey(exactlyThreshold, 0)));
+        assertFalse(bitmaps.containsKey(RetinaUtils.buildRgKey(zeroRows, 0)));
+        assertFalse(bitmaps.containsKey(RetinaUtils.buildRgKey(belowThreshold, 0)));
+        assertFalse("empty scan result must skip process phase", trackingGc.processCalled);
+    }
+
+    /**
+     * The process phase must see the safe GC timestamp, the groups returned from
+     * scan, and a bitmap map already trimmed to candidate files.  This protects
+     * the Storage GC rewrite path from accidentally consuming non-candidate RGs.
+     */
+    @Test
+    public void testRunStorageGC_processSeesTrimmedCandidateBitmapsAndSafeTs()
+    {
+        long candidateFileId = 66301L;
+        long otherFileId = 66302L;
+        long safeGcTs = 303L;
+
+        StorageGarbageCollector.FileGroup group = new StorageGarbageCollector.FileGroup(
+                7L, 4, Collections.singletonList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(candidateFileId, 2), "fake_candidate", candidateFileId, 2, 7L, 4, 0.75, 0L)));
+        TrackingRunStorageGC trackingGc = new TrackingRunStorageGC(Collections.singletonList(group));
+
+        Map<Long, long[]> fileStats = new HashMap<>();
+        fileStats.put(candidateFileId, makeRgStats(100, 75));
+        fileStats.put(otherFileId, makeRgStats(100, 10));
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(candidateFileId, 0), makeBitmap(100, 75));
+        bitmaps.put(RetinaUtils.buildRgKey(candidateFileId, 1), makeBitmap(100, 60));
+        bitmaps.put(RetinaUtils.buildRgKey(otherFileId, 0), makeBitmap(100, 10));
+
+        trackingGc.runStorageGC(safeGcTs, fileStats, bitmaps);
+
+        assertTrue("process phase must run for non-empty groups", trackingGc.processCalled);
+        assertEquals("safeGcTs must be forwarded to process phase", safeGcTs, trackingGc.capturedSafeGcTs);
+        assertEquals("scan groups must be forwarded unchanged", 1, trackingGc.capturedFileGroups.size());
+        assertEquals(candidateFileId, trackingGc.capturedFileGroups.get(0).files.get(0).fileId);
+        assertEquals(new HashSet<>(Arrays.asList(
+                RetinaUtils.buildRgKey(candidateFileId, 0),
+                RetinaUtils.buildRgKey(candidateFileId, 1))), trackingGc.bitmapKeysSeenByProcess);
+        assertFalse("non-candidate bitmap must be trimmed before process",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(otherFileId, 0)));
+    }
+
+    /**
+     * If the downstream process phase fails, {@code runStorageGC} must already
+     * have released non-candidate bitmaps.  This mirrors the real GC ordering:
+     * checkpoint is complete, then candidate-only rewrite state is retained.
+     */
+    @Test
+    public void testRunStorageGC_processFailureKeepsOnlyCandidateBitmaps()
+    {
+        long candidateFileId = 66401L;
+        long otherFileId = 66402L;
+
+        StorageGarbageCollector.FileGroup group = new StorageGarbageCollector.FileGroup(
+                8L, 0, Collections.singletonList(
+                new StorageGarbageCollector.FileCandidate(
+                        makeFile(candidateFileId, 1), "fake_candidate", candidateFileId, 1, 8L, 0, 0.80, 0L)));
+        TrackingRunStorageGC trackingGc = new TrackingRunStorageGC(Collections.singletonList(group));
+        trackingGc.processFailure = new RuntimeException("simulated process failure");
+
+        Map<Long, long[]> fileStats = new HashMap<>();
+        fileStats.put(candidateFileId, makeRgStats(100, 80));
         fileStats.put(otherFileId, makeRgStats(100, 20));
 
-        List<FakeFileEntry> fakeFiles = Arrays.asList(
-                new FakeFileEntry(candidateFileId, 1, 1L, 0),
-                new FakeFileEntry(otherFileId, 1, 1L, 0));
-
-        DirectScanStorageGC gc = new DirectScanStorageGC(
-                retinaManager, 0.5, 10, fakeFiles);
-
-        gc.runStorageGC(300L, fileStats, bitmaps);
-
-        assertTrue("candidate RG key must be retained",
-                bitmaps.containsKey(candidateFileId + "_0"));
-        assertFalse("non-candidate RG key must be removed",
-                bitmaps.containsKey(otherFileId + "_0"));
-    }
-
-    // =======================================================================
-    // Section 4: runStorageGC end-to-end scan → process
-    // =======================================================================
-
-    /**
-     * A file whose invalidRatio is exactly equal to the threshold (0.5) must NOT
-     * be selected as a candidate.  The design uses strict {@code >}, not {@code >=}.
-     */
-    @Test
-    public void testRunStorageGC_thresholdExactlyEqual()
-    {
-        long fileId = 57001L;
-
-        Map<Long, long[]> fileStats = new HashMap<>();
-        fileStats.put(fileId, makeRgStats(100, 50));  // exactly 50% = threshold
-
         Map<String, long[]> bitmaps = new HashMap<>();
-        bitmaps.put(fileId + "_0", makeBitmap(100, 50));
+        bitmaps.put(RetinaUtils.buildRgKey(candidateFileId, 0), makeBitmap(100, 80));
+        bitmaps.put(RetinaUtils.buildRgKey(otherFileId, 0), makeBitmap(100, 20));
 
-        DirectScanStorageGC gc = new DirectScanStorageGC(
-                retinaManager, 0.5, 10,
-                Collections.singletonList(new FakeFileEntry(fileId, 1, 1L, 0)));
+        try
+        {
+            trackingGc.runStorageGC(304L, fileStats, bitmaps);
+            fail("process failure should propagate to the caller");
+        }
+        catch (RuntimeException e)
+        {
+            assertEquals("simulated process failure", e.getMessage());
+        }
 
-        gc.runStorageGC(400L, fileStats, bitmaps);
-
-        assertTrue("file at exactly threshold must NOT be trimmed (no candidates)",
-                bitmaps.containsKey(fileId + "_0"));
-        assertEquals(1, bitmaps.size());
-    }
-
-    /**
-     * A file whose {@code fileStats} entry has {@code totalRows=0} must not
-     * produce a candidate even if invalidCount is also 0 (division by zero guard).
-     */
-    @Test
-    public void testRunStorageGC_skipsTotalRowsZero()
-    {
-        long fileId = 58001L;
-
-        Map<Long, long[]> fileStats = new HashMap<>();
-        fileStats.put(fileId, new long[]{0, 0});  // totalRows=0
-
-        Map<String, long[]> bitmaps = new HashMap<>();
-        bitmaps.put(fileId + "_0", new long[]{0L});
-
-        DirectScanStorageGC gc = new DirectScanStorageGC(
-                retinaManager, 0.5, 10,
-                Collections.singletonList(new FakeFileEntry(fileId, 1, 1L, 0)));
-
-        gc.runStorageGC(500L, fileStats, bitmaps);
-
-        assertTrue("totalRows=0 file must remain untouched (no candidates)",
-                bitmaps.containsKey(fileId + "_0"));
+        assertTrue("process phase should have been entered", trackingGc.processCalled);
+        assertTrue("candidate bitmap remains available for failure handling",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(candidateFileId, 0)));
+        assertFalse("non-candidate bitmap must remain released after failure",
+                bitmaps.containsKey(RetinaUtils.buildRgKey(otherFileId, 0)));
     }
 
     // =======================================================================
-    // Section 4b: processFileGroups error handling
+    // Section 4: processFileGroups error handling
     // =======================================================================
 
     /**
@@ -1554,117 +1648,6 @@ public class TestStorageGarbageCollector
     }
 
     // =======================================================================
-    // Section 7c: createCheckpointDirect vs createCheckpoint consistency
-    // =======================================================================
-
-    /**
-     * Both checkpoint paths (queued via rgVisibilityMap traversal and direct via
-     * pre-built entries) must produce byte-identical files when given the same
-     * visibility state.
-     */
-    @Test
-    public void testCheckpointDirect_matchesStandardCheckpoint() throws Exception
-    {
-        long ts = 500L;
-        int numFiles = 3;
-        int rowsPerRg = 64;
-
-        for (int fid = 1; fid <= numFiles; fid++)
-        {
-            retinaManager.addVisibility(fid, 0, rowsPerRg, 0L, null, false);
-            for (int d = 0; d < fid; d++)
-            {
-                retinaManager.deleteRecord(fid, 0, d, ts - 100);
-            }
-        }
-
-        // Build pre-built entries identical to what runGC() would construct.
-        List<CheckpointFileIO.CheckpointEntry> entries = new ArrayList<>();
-        Field rgMapField = RetinaResourceManager.class.getDeclaredField("rgVisibilityMap");
-        rgMapField.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        Map<String, RGVisibility> rgMap =
-                (Map<String, RGVisibility>) rgMapField.get(retinaManager);
-        for (Map.Entry<String, RGVisibility> e : rgMap.entrySet())
-        {
-            long fileId = RetinaUtils.parseFileIdFromRgKey(e.getKey());
-            int rgId = RetinaUtils.parseRgIdFromRgKey(e.getKey());
-            long[] bitmap = e.getValue().getVisibilityBitmap(ts);
-            entries.add(new CheckpointFileIO.CheckpointEntry(
-                    fileId, rgId, (int) e.getValue().getRecordNum(), bitmap));
-        }
-
-        // Obtain the private CheckpointType.GC enum value via reflection.
-        @SuppressWarnings("unchecked")
-        Class<? extends Enum<?>> checkpointTypeClass = (Class<? extends Enum<?>>)
-                Class.forName("io.pixelsdb.pixels.retina.RetinaResourceManager$CheckpointType");
-        Object gcType = null;
-        for (Object constant : checkpointTypeClass.getEnumConstants())
-        {
-            if (constant.toString().equals("GC"))
-            {
-                gcType = constant;
-                break;
-            }
-        }
-        assertNotNull("CheckpointType.GC must exist", gcType);
-
-        // Call createCheckpoint (standard path)
-        Method createCheckpointMethod = RetinaResourceManager.class.getDeclaredMethod(
-                "createCheckpoint", long.class, checkpointTypeClass);
-        createCheckpointMethod.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        CompletableFuture<Void> f1 = (CompletableFuture<Void>) createCheckpointMethod.invoke(
-                retinaManager, ts, gcType);
-        f1.join();
-
-        // Call createCheckpointDirect (optimized path) with a different timestamp to get a different file name
-        long ts2 = ts + 1;
-        Method createCheckpointDirectMethod = RetinaResourceManager.class.getDeclaredMethod(
-                "createCheckpointDirect", long.class, checkpointTypeClass, List.class);
-        createCheckpointDirectMethod.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        CompletableFuture<Void> f2 = (CompletableFuture<Void>) createCheckpointDirectMethod.invoke(
-                retinaManager, ts2, gcType, entries);
-        f2.join();
-
-        // Read both checkpoint files and compare entries.
-        // Files may have entries in different order (due to producer-consumer concurrency),
-        // so we normalize by sorting entries by (fileId, rgId) before comparing.
-        Field checkpointDirField = RetinaResourceManager.class.getDeclaredField("checkpointDir");
-        checkpointDirField.setAccessible(true);
-        String checkpointDir = (String) checkpointDirField.get(retinaManager);
-
-        Field hostField = RetinaResourceManager.class.getDeclaredField("retinaHostName");
-        hostField.setAccessible(true);
-        String hostName = (String) hostField.get(retinaManager);
-
-        String path1 = RetinaUtils.buildCheckpointPath(
-                checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_GC, hostName, ts);
-        String path2 = RetinaUtils.buildCheckpointPath(
-                checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_GC, hostName, ts2);
-
-        Map<String, long[]> standard = new HashMap<>();
-        CheckpointFileIO.readCheckpointParallel(path1, entry ->
-                standard.put(entry.fileId + "_" + entry.rgId,
-                        Arrays.copyOf(entry.bitmap, entry.bitmap.length)));
-
-        Map<String, long[]> direct = new HashMap<>();
-        CheckpointFileIO.readCheckpointParallel(path2, entry ->
-                direct.put(entry.fileId + "_" + entry.rgId,
-                        Arrays.copyOf(entry.bitmap, entry.bitmap.length)));
-
-        assertEquals("entry count must match", standard.size(), direct.size());
-        for (Map.Entry<String, long[]> e : standard.entrySet())
-        {
-            long[] directBitmap = direct.get(e.getKey());
-            assertNotNull("direct checkpoint must contain key=" + e.getKey(), directBitmap);
-            assertTrue("bitmaps must be identical for key=" + e.getKey(),
-                    Arrays.equals(e.getValue(), directBitmap));
-        }
-    }
-
-    // =======================================================================
     // Section 7d: concurrent dual-write pressure test
     // =======================================================================
 
@@ -1702,8 +1685,8 @@ public class TestStorageGarbageCollector
         // batch (any encoded pixel exceeds 1 byte), preserving the 1:1 old-RG-to-new-RG
         // mapping so each thread targets a distinct new RGVisibility object.
         StorageGarbageCollector localGc = new StorageGarbageCollector(
-                retinaManager, metadataService, 0.5, 134_217_728L,
-                Integer.MAX_VALUE, 10, 1, EncodingLevel.EL2, 86_400_000L);
+                retinaManager, metadataService, LocalIndexService.Instance(), 0.5, 134_217_728L,
+                Integer.MAX_VALUE, 10, 1, EncodingLevel.EL2, 86_400_000L, storageGcWal);
 
         StorageGarbageCollector.RewriteResult result =
                 localGc.rewriteFileGroup(makeGroup(fileId, srcPath, schema), 100L, bitmaps);
@@ -1808,10 +1791,10 @@ public class TestStorageGarbageCollector
     // =======================================================================
 
     /**
-     * Atomicity with multiple old files: one TEMPORARY new file and three REGULAR
+     * Atomicity with multiple old files: one TEMPORARY_GC new file and three REGULAR
      * old files are swapped in a single call.  Verifies that after the call the new
-     * file is promoted to REGULAR and <b>all</b> old files are removed from the
-     * catalog—i.e., the UPDATE and DELETE execute as one indivisible transaction.
+     * file is promoted to REGULAR and <b>all</b> old files are marked RETIRED with
+     * the same cleanup deadline—i.e., both UPDATE steps execute as one transaction.
      */
     @Test
     public void testAtomicSwap_multipleOldFilesAtomicity() throws Exception
@@ -1827,82 +1810,392 @@ public class TestStorageGarbageCollector
                 new String[]{"atom_old1.pxl", "atom_old2.pxl", "atom_old3.pxl"},
                 new File.Type[]{File.Type.REGULAR, File.Type.REGULAR, File.Type.REGULAR},
                 new int[]{1, 1, 1}, new long[]{0, 0, 0}, new long[]{1, 1, 1});
-        long newFileId = registerTestFile("atom_new.pxl", File.Type.TEMPORARY, 1, 0, 1);
+        long newFileId = registerTestFile("atom_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 1);
+        long cleanupAt = 1_700_000_010_000L;
 
         File preSwapNew = metadataService.getFileById(newFileId);
         assertNotNull("New file must exist before swap", preSwapNew);
-        assertEquals("New file should be TEMPORARY before swap",
-                File.Type.TEMPORARY, preSwapNew.getType());
+        assertEquals("New file should be TEMPORARY_GC before swap",
+                File.Type.TEMPORARY_GC, preSwapNew.getType());
 
-        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1], oldIds[2]));
+        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1], oldIds[2]), cleanupAt);
 
         assertFileRegular(newFileId, "New file should be REGULAR after swap");
         for (long oldId : oldIds)
         {
-            assertFileGone(oldId, "Old file " + oldId + " should be gone after swap");
+            assertFileRetired(oldId, cleanupAt,
+                    "Old file " + oldId + " should be retired after swap");
         }
     }
 
     /**
      * Idempotency: calling {@code atomicSwapFiles} a second time after the swap has
-     * already committed must not throw.  The UPDATE is a no-op (already REGULAR) and
-     * the DELETE is a no-op (old files already removed).
+     * already committed must not throw.  The new file remains REGULAR and the old file
+     * remains RETIRED with the retry's cleanup deadline.
      */
     @Test
     public void testAtomicSwap_idempotent() throws Exception
     {
         writeTestFile("idem_old.pxl", LONG_ID_SCHEMA, new long[]{0, 1, 2}, true, new long[]{100, 100, 100});
         long oldFileId = registerTestFile("idem_old.pxl", File.Type.REGULAR, 1, 0, 2);
-        long newFileId = registerTestFile("idem_new.pxl", File.Type.TEMPORARY, 1, 0, 2);
+        long newFileId = registerTestFile("idem_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 2);
+        long firstCleanupAt = 1_700_000_020_000L;
+        long retryCleanupAt = 1_700_000_030_000L;
 
-        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId));
+        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId), firstCleanupAt);
         assertFileRegular(newFileId, "File should be REGULAR after first swap");
+        assertFileRetired(oldFileId, firstCleanupAt, "Old file should be RETIRED after first swap");
 
-        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId));
+        metadataService.atomicSwapFiles(newFileId, Collections.singletonList(oldFileId), retryCleanupAt);
 
         assertFileRegular(newFileId, "File should remain REGULAR after idempotent retry");
-        assertFileGone(oldFileId, "Old file should remain absent after idempotent retry");
+        assertFileRetired(oldFileId, retryCleanupAt,
+                "Old file should remain RETIRED after idempotent retry");
+    }
+
+    // -----------------------------------------------------------------------
+    // Coverage for getRegularFiles(pathId) REGULAR-only enumeration.
+    // -----------------------------------------------------------------------
+
+    /**
+     * A path containing REGULAR and non-REGULAR FILE_TYPE values returns only REGULAR entries.
+     */
+    @Test
+    public void testGetFiles_mixedAllFileTypes_onlyRegular() throws Exception
+    {
+        long regularId = -1L;
+        long tempId = -1L;
+        long nonRegularPositiveId = -1L;
+        long negativeId = -1L;
+        long extremeId = -1L;
+        try
+        {
+            String suffix = Long.toString(System.nanoTime());
+            regularId = registerTestFile("mix_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 1L);
+            tempId = registerTestFile("mix_temp_" + suffix + ".pxl",
+                    File.Type.TEMPORARY_INGEST, 1, 0L, 1L);
+            nonRegularPositiveId = insertRawFileWithType("mix_non_regular_" + suffix + ".pxl",
+                    File.Type.TEMPORARY_GC.getNumber(), 1, 0L, 1L);
+            negativeId = insertRawFileWithType("mix_negative_" + suffix + ".pxl",
+                    -2, 1, 0L, 1L);
+            extremeId = insertRawFileWithType("mix_extreme_max_" + suffix + ".pxl",
+                    Integer.MAX_VALUE, 1, 0L, 1L);
+
+            List<File> files = metadataService.getRegularFiles(testPathId);
+            Set<Long> visible = new HashSet<>();
+            for (File f : files)
+            {
+                assertEquals("getRegularFiles must only emit REGULAR",
+                        File.Type.REGULAR, f.getType());
+                visible.add(f.getId());
+            }
+            assertTrue("REGULAR member of the mix must be visible",
+                    visible.contains(regularId));
+            assertFalse("TEMPORARY_INGEST (FILE_TYPE=0) must be hidden",
+                    visible.contains(tempId));
+            assertFalse("non-REGULAR positive FILE_TYPE must be hidden",
+                    visible.contains(nonRegularPositiveId));
+            assertFalse("negative FILE_TYPE must be hidden",
+                    visible.contains(negativeId));
+            assertFalse("Integer.MAX_VALUE FILE_TYPE must be hidden",
+                    visible.contains(extremeId));
+        }
+        finally
+        {
+            List<Long> cleanup = new ArrayList<>();
+            if (regularId > 0) cleanup.add(regularId);
+            if (tempId > 0) cleanup.add(tempId);
+            if (nonRegularPositiveId > 0) cleanup.add(nonRegularPositiveId);
+            if (negativeId > 0) cleanup.add(negativeId);
+            if (extremeId > 0) cleanup.add(extremeId);
+            if (!cleanup.isEmpty()) metadataService.deleteFiles(cleanup);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // c01.1 regression — RETIRED is a new File.Type and must be invisible to
+    // query-time enumeration just like the two TEMPORARY_* states.  These tests
+    // pin down the contract that the DAO filters FILE_TYPE = REGULAR and nothing
+    // else, so future refactors cannot accidentally widen the visible set.
+    // -------------------------------------------------------------------------
+
+
+
+    /**
+     * Exhaustive coverage: for every defined non-REGULAR {@link File.Type}, getFiles must
+     * exclude that file.  Using {@link File.Type#values()} guards against future enum
+     * additions silently leaking into query results.
+     */
+    @Test
+    public void testGetFiles_allNonRegularTypes_allHidden() throws Exception
+    {
+        List<Long> registeredIds = new ArrayList<>();
+        long regularId = -1L;
+        try
+        {
+            String suffix = Long.toString(System.nanoTime());
+            regularId = registerTestFile("all_types_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 1L);
+
+            // Register one file per non-REGULAR type, including RETIRED.
+            Set<Long> nonRegularIds = new HashSet<>();
+            for (File.Type t : File.Type.values())
+            {
+                if (t == File.Type.REGULAR) continue;
+                long id = insertRawFileWithType(
+                        "all_types_" + t + "_" + suffix + ".pxl",
+                        t.getNumber(), 1, 0L, 1L);
+                registeredIds.add(id);
+                nonRegularIds.add(id);
+            }
+            registeredIds.add(regularId);
+
+            List<File> visible = metadataService.getRegularFiles(testPathId);
+            Set<Long> visibleIds = new HashSet<>();
+            for (File f : visible)
+            {
+                assertEquals("every visible file must carry FILE_TYPE = REGULAR",
+                        File.Type.REGULAR, f.getType());
+                visibleIds.add(f.getId());
+            }
+            assertTrue("the seed REGULAR file must be visible",
+                    visibleIds.contains(regularId));
+            for (long id : nonRegularIds)
+            {
+                assertFalse("non-REGULAR file (id=" + id + ") leaked into getFiles",
+                        visibleIds.contains(id));
+            }
+        }
+        finally
+        {
+            if (!registeredIds.isEmpty()) metadataService.deleteFiles(registeredIds);
+        }
     }
 
     /**
-     * TEMPORARY visibility semantics: before the swap, {@code getFiles(pathId)} must
-     * <b>not</b> return the TEMPORARY new file (the DAO filters {@code FILE_TYPE <> 0}).
-     * After the swap the promoted file is visible and the old file disappears.
+     * After the swap of a TEMPORARY_GC -> REGULAR, a RETIRED tombstone for the *old* file
+     * (i.e. the same file ids that were just deleted) cannot pollute the new visible set
+     * even if the catalog still carries unrelated RETIRED entries on the same path.
      */
     @Test
-    public void testAtomicSwap_temporaryInvisibleViaGetFiles() throws Exception
+    public void testGetFiles_retiredCoexistsWithFreshlyPromoted() throws Exception
     {
-        writeTestFile("vis_old.pxl", LONG_ID_SCHEMA, new long[]{0, 1}, true, new long[]{100, 100});
-        long[] fileIds = registerTestFiles(
-                new String[]{"vis_old.pxl", "vis_new_temp.pxl"},
-                new File.Type[]{File.Type.REGULAR, File.Type.TEMPORARY},
-                new int[]{1, 1}, new long[]{0, 0}, new long[]{1, 1});
-        long oldFileId = fileIds[0];
-        long tempFileId = fileIds[1];
+        long oldRegularId = -1L;
+        long tempGcId = -1L;
+        long retiredCoexistingId = -1L;
+        try
+        {
+            String suffix = Long.toString(System.nanoTime());
 
-        List<File> beforeSwap = metadataService.getFiles(testPathId);
+            // Pre-existing RETIRED file on the same path.  This must remain hidden
+            // throughout the entire scenario.
+            retiredCoexistingId = insertRawFileWithType(
+                    "coexist_retired_" + suffix + ".pxl",
+                    File.Type.RETIRED.getNumber(), 1, 0L, 1L);
+
+            // The classic swap pair.
+            oldRegularId = registerTestFile("coexist_old_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 1L);
+            tempGcId = registerTestFile("coexist_new_temp_gc_" + suffix + ".pxl",
+                    File.Type.TEMPORARY_GC, 1, 0L, 1L);
+
+            // Before swap: only oldRegular visible; RETIRED + TEMPORARY_GC hidden.
+            Set<Long> beforeIds = new HashSet<>();
+            for (File f : metadataService.getRegularFiles(testPathId)) beforeIds.add(f.getId());
+            assertTrue("old REGULAR must be visible before swap",
+                    beforeIds.contains(oldRegularId));
+            assertFalse("RETIRED tombstone must be hidden before swap",
+                    beforeIds.contains(retiredCoexistingId));
+            assertFalse("TEMPORARY_GC must be hidden before swap",
+                    beforeIds.contains(tempGcId));
+
+            long cleanupAt = 1_700_000_050_000L;
+            metadataService.atomicSwapFiles(tempGcId, Collections.singletonList(oldRegularId), cleanupAt);
+
+            // After swap: tempGcId is now REGULAR (visible); old REGULAR is now RETIRED and
+            // hidden; the coexisting RETIRED file must STILL be hidden (the swap did not promote it).
+            Set<Long> afterIds = new HashSet<>();
+            for (File f : metadataService.getRegularFiles(testPathId))
+            {
+                assertEquals("getRegularFiles must only emit REGULAR after swap",
+                        File.Type.REGULAR, f.getType());
+                afterIds.add(f.getId());
+            }
+            assertTrue("freshly-promoted file must be visible after swap",
+                    afterIds.contains(tempGcId));
+            assertFalse("the retired old REGULAR must be hidden after swap",
+                    afterIds.contains(oldRegularId));
+            assertFileRetired(oldRegularId, cleanupAt,
+                    "the old REGULAR must become RETIRED after swap");
+            assertFalse("the unrelated RETIRED tombstone must remain hidden after swap",
+                    afterIds.contains(retiredCoexistingId));
+        }
+        finally
+        {
+            List<Long> cleanup = new ArrayList<>();
+            if (oldRegularId > 0) cleanup.add(oldRegularId);
+            if (tempGcId > 0) cleanup.add(tempGcId);
+            if (retiredCoexistingId > 0) cleanup.add(retiredCoexistingId);
+            if (!cleanup.isEmpty()) metadataService.deleteFiles(cleanup);
+        }
+    }
+
+    /**
+     * A minimum-size REGULAR file is returned with its catalog fields intact.
+     */
+    @Test
+    public void testGetFiles_singleRegularMinimumData() throws Exception
+    {
+        long fileId = -1L;
+        try
+        {
+            fileId = registerTestFile("min_single_regular_" + System.nanoTime() + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 0L);
+            List<File> files = metadataService.getRegularFiles(testPathId);
+            File found = null;
+            for (File f : files)
+            {
+                if (f.getId() == fileId)
+                {
+                    found = f;
+                }
+                assertEquals("every returned entry must be REGULAR",
+                        File.Type.REGULAR, f.getType());
+            }
+            assertNotNull("the single REGULAR minimum-data file must be visible", found);
+            assertEquals("type must be REGULAR", File.Type.REGULAR, found.getType());
+            assertEquals("numRowGroup of minimum file must be 1", 1, found.getNumRowGroup());
+            assertEquals("minRowId of minimum file must be 0", 0L, found.getMinRowId());
+            assertEquals("maxRowId of minimum file must be 0", 0L, found.getMaxRowId());
+        }
+        finally
+        {
+            if (fileId > 0)
+            {
+                metadataService.deleteFiles(Collections.singletonList(fileId));
+            }
+        }
+    }
+
+    /**
+     * A deleted REGULAR file is no longer returned by {@code getFiles}.
+     */
+    @Test
+    public void testGetFiles_deletedRegular_notVisible() throws Exception
+    {
+        long regularId = registerTestFile("delete_visibility_" + System.nanoTime() + ".pxl",
+                File.Type.REGULAR, 1, 0L, 1L);
+
+        List<File> beforeDelete = metadataService.getRegularFiles(testPathId);
         Set<Long> beforeIds = new HashSet<>();
-        for (File f : beforeSwap)
-        {
-            beforeIds.add(f.getId());
-        }
-        assertTrue("REGULAR old file should be visible via getFiles before swap",
-                beforeIds.contains(oldFileId));
-        assertFalse("TEMPORARY new file must NOT be visible via getFiles before swap",
-                beforeIds.contains(tempFileId));
+        for (File f : beforeDelete) beforeIds.add(f.getId());
+        assertTrue("REGULAR file must be visible before delete",
+                beforeIds.contains(regularId));
 
-        metadataService.atomicSwapFiles(tempFileId, Collections.singletonList(oldFileId));
+        metadataService.deleteFiles(Collections.singletonList(regularId));
 
-        List<File> afterSwap = metadataService.getFiles(testPathId);
-        Set<Long> afterIds = new HashSet<>();
-        for (File f : afterSwap)
+        List<File> afterDelete = metadataService.getRegularFiles(testPathId);
+        for (File f : afterDelete)
         {
-            afterIds.add(f.getId());
+            assertFalse("deleted REGULAR file must no longer be visible",
+                    f.getId() == regularId);
         }
-        assertTrue("Promoted file should be visible via getFiles after swap",
-                afterIds.contains(tempFileId));
-        assertFalse("Old file should NOT be visible via getFiles after swap",
-                afterIds.contains(oldFileId));
+    }
+
+    /**
+     * Concurrent readers observe a consistent REGULAR-only result.
+     */
+    @Test
+    public void testGetFiles_concurrentReaders_consistentRegularOnly() throws Exception
+    {
+        long regularId = -1L;
+        long tempId = -1L;
+        long nonRegularPositiveId = -1L;
+        ExecutorService pool = null;
+        try
+        {
+            String suffix = Long.toString(System.nanoTime());
+            regularId = registerTestFile("conc_regular_" + suffix + ".pxl",
+                    File.Type.REGULAR, 1, 0L, 1L);
+            tempId = registerTestFile("conc_temp_" + suffix + ".pxl",
+                    File.Type.TEMPORARY_INGEST, 1, 0L, 1L);
+            nonRegularPositiveId = insertRawFileWithType("conc_non_regular_" + suffix + ".pxl",
+                    File.Type.TEMPORARY_GC.getNumber(), 1, 0L, 1L);
+
+            final int threads = 8;
+            final int iterations = 16;
+            pool = Executors.newFixedThreadPool(threads);
+            CyclicBarrier startGate = new CyclicBarrier(threads);
+            AtomicInteger leakedTemporary = new AtomicInteger();
+            AtomicInteger leakedNonRegular = new AtomicInteger();
+            AtomicInteger missingRegular = new AtomicInteger();
+
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            final long pinnedRegular = regularId;
+            final long pinnedTemp = tempId;
+            final long pinnedNonRegular = nonRegularPositiveId;
+            for (int t = 0; t < threads; t++)
+            {
+                futures.add(CompletableFuture.runAsync(() ->
+                {
+                    try
+                    {
+                        startGate.await();
+                        for (int i = 0; i < iterations; i++)
+                        {
+                            List<File> snapshot = metadataService.getRegularFiles(testPathId);
+                            boolean sawRegular = false;
+                            for (File f : snapshot)
+                            {
+                                if (f.getType() != File.Type.REGULAR)
+                                {
+                                    leakedNonRegular.incrementAndGet();
+                                }
+                                if (f.getId() == pinnedRegular) sawRegular = true;
+                                if (f.getId() == pinnedTemp) leakedTemporary.incrementAndGet();
+                                if (f.getId() == pinnedNonRegular) leakedNonRegular.incrementAndGet();
+                            }
+                            if (!sawRegular) missingRegular.incrementAndGet();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        throw new RuntimeException(e);
+                    }
+                }, pool));
+            }
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .get(30, java.util.concurrent.TimeUnit.SECONDS);
+
+            assertEquals("no concurrent reader may observe a TEMPORARY_INGEST file",
+                    0, leakedTemporary.get());
+            assertEquals("no concurrent reader may observe a non-REGULAR file",
+                    0, leakedNonRegular.get());
+            assertEquals("every concurrent reader must observe the REGULAR file",
+                    0, missingRegular.get());
+
+            // A follow-up call should remain REGULAR-only after the concurrent burst.
+            List<File> followUp = metadataService.getRegularFiles(testPathId);
+            assertNotNull("follow-up getFiles must not return null", followUp);
+            for (File f : followUp)
+            {
+                assertEquals("follow-up entries must all be REGULAR",
+                        File.Type.REGULAR, f.getType());
+            }
+        }
+        finally
+        {
+            if (pool != null)
+            {
+                pool.shutdownNow();
+            }
+            List<Long> cleanup = new ArrayList<>();
+            if (regularId > 0) cleanup.add(regularId);
+            if (tempId > 0) cleanup.add(tempId);
+            if (nonRegularPositiveId > 0) cleanup.add(nonRegularPositiveId);
+            if (!cleanup.isEmpty()) metadataService.deleteFiles(cleanup);
+        }
     }
 
     /**
@@ -1910,7 +2203,7 @@ public class TestStorageGarbageCollector
      * thread, so {@code atomicSwapFiles} is never called concurrently in production.
      * This test reflects that design: N independent (newFile, oldFile) pairs are
      * swapped one after another, and every new file ends up REGULAR while every
-     * old file is removed.
+     * old file is marked RETIRED with its cleanup deadline.
      */
     @Test
     public void testAtomicSwap_multipleSerialSwaps() throws Exception
@@ -1922,6 +2215,7 @@ public class TestStorageGarbageCollector
 
         long[] newFileIds = new long[nPairs];
         long[] oldFileIds = new long[nPairs];
+        long[] cleanupAts = new long[nPairs];
 
         for (int i = 0; i < nPairs; i++)
         {
@@ -1931,30 +2225,32 @@ public class TestStorageGarbageCollector
 
             long[] pair = registerTestFiles(
                     new String[]{oldName, newName},
-                    new File.Type[]{File.Type.REGULAR, File.Type.TEMPORARY},
+                    new File.Type[]{File.Type.REGULAR, File.Type.TEMPORARY_GC},
                     new int[]{1, 1}, new long[]{0, 0}, new long[]{0, 0});
             oldFileIds[i] = pair[0];
             newFileIds[i] = pair[1];
+            cleanupAts[i] = 1_700_000_060_000L + i;
         }
 
         for (int i = 0; i < nPairs; i++)
         {
             metadataService.atomicSwapFiles(newFileIds[i],
-                    Collections.singletonList(oldFileIds[i]));
+                    Collections.singletonList(oldFileIds[i]), cleanupAts[i]);
         }
 
         for (int i = 0; i < nPairs; i++)
         {
             assertFileRegular(newFileIds[i], "Promoted file " + i + " must be REGULAR");
-            assertFileGone(oldFileIds[i], "Old file " + i + " should be gone");
+            assertFileRetired(oldFileIds[i], cleanupAts[i],
+                    "Old file " + i + " should be RETIRED");
         }
     }
 
     /**
      * Partial old-files-already-gone: one old file is deleted before the swap, but
-     * {@code atomicSwapFiles} is called with both IDs.  The DELETE-WHERE-IN for an
-     * already-absent row is a no-op; the transaction must still commit, promoting the
-     * new file and removing the remaining old file.
+     * {@code atomicSwapFiles} is called with both IDs.  The UPDATE for an already-absent
+     * row is a no-op; the transaction must still commit, promoting the new file and
+     * retiring the remaining old file.
      */
     @Test
     public void testAtomicSwap_partialOldFilesAlreadyGone() throws Exception
@@ -1970,16 +2266,17 @@ public class TestStorageGarbageCollector
         metadataService.deleteFiles(Collections.singletonList(oldIds[0]));
         assertFileGone(oldIds[0], "old1 should be gone before swap");
 
-        long newFileId = registerTestFile("partial_new.pxl", File.Type.TEMPORARY, 1, 0, 1);
-        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1]));
+        long newFileId = registerTestFile("partial_new.pxl", File.Type.TEMPORARY_GC, 1, 0, 1);
+        long cleanupAt = 1_700_000_070_000L;
+        metadataService.atomicSwapFiles(newFileId, Arrays.asList(oldIds[0], oldIds[1]), cleanupAt);
 
         assertFileRegular(newFileId, "New file must be REGULAR");
-        assertFileGone(oldIds[1], "Remaining old file should be gone");
+        assertFileRetired(oldIds[1], cleanupAt, "Remaining old file should be RETIRED");
     }
 
     /**
      * Rollback after rewrite + dual-write: verifies that Visibility entries for the new
-     * file are removed, dual-write is unregistered, the TEMPORARY catalog entry is deleted,
+     * file are removed, dual-write is unregistered, the TEMPORARY_GC catalog entry is deleted,
      * and the physical file is cleaned up.
      */
     @Test
@@ -2009,6 +2306,86 @@ public class TestStorageGarbageCollector
                 fileStorage.exists(result.newFilePath));
 
         assertFileGone(result.newFileId, "Catalog entry should be deleted after rollback");
+    }
+
+    // =======================================================================
+    // Section: Storage GC WAL ordering invariant (runStorageGC synchrony)
+    //
+    // Recovery (StorageGcWal.RecoveryHandler) relies on the invariant that a
+    // checkpoint baseline can only ever contain a newFile whose task already
+    // reached SWAPPED_NOT_CHECKPOINTED. That holds because RRM.runGC publishes
+    // the checkpoint (Step 3) strictly after runStorageGC returns (Step 2), and
+    // runStorageGC is synchronous: every WAL task opened during a GC round is
+    // terminalized (SWAPPED on commit, ABORTED on rollback) before the
+    // synchronous entry point returns — never left lingering in INDEX_SWITCHING.
+    // These tests lock that load-bearing synchrony property; a regression here
+    // (e.g. making the GC asynchronous) would surface the recovery fail-fast.
+    // =======================================================================
+
+    /**
+     * Successful GC round: {@code processFileGroup} must leave the WAL task in
+     * SWAPPED_NOT_CHECKPOINTED, never INDEX_SWITCHING, by the time it returns.
+     */
+    @Test
+    public void testProcessFileGroup_commitLeavesWalSwapped_neverIndexSwitching() throws Exception
+    {
+        long[] ids = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        long[] ts = new long[10];
+        Arrays.fill(ts, 100);
+        String filePath = writeTestFile("wal_commit_src.pxl", LONG_ID_SCHEMA, ids, true, ts);
+        long srcFileId = registerTestFile("wal_commit_src.pxl", File.Type.REGULAR, 1, 0, 9);
+        retinaManager.addVisibility(srcFileId, 0, 10, 50, null, true);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), makeBitmap(10, 6));
+
+        WalTrackingSyncGC walGc = new WalTrackingSyncGC(retinaManager, metadataService, storageGcWal,
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L, false);
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, filePath, LONG_ID_SCHEMA);
+
+        walGc.processFileGroup(group, 100L, bitmaps);
+
+        List<StorageGcWal.Task> tasks = storageGcWal.listAllTasks();
+        assertEquals("exactly one WAL task expected", 1, tasks.size());
+        assertEquals("committed GC round must leave the task SWAPPED",
+                StorageGcWal.State.SWAPPED_NOT_CHECKPOINTED, tasks.get(0).getState());
+        assertNoIndexSwitchingTask(tasks);
+        assertFileRegular(tasks.get(0).getNewFileId(), "new file must be REGULAR after commit");
+    }
+
+    /**
+     * Crash inside the swap→markSwapped window (simulated by throwing right after the WAL
+     * task is opened): {@code processFileGroup} must catch it and roll back, terminalizing
+     * the task to ABORTED — never leaving it in INDEX_SWITCHING — and leaving the source
+     * file REGULAR with the new file cleaned up.
+     */
+    @Test
+    public void testProcessFileGroup_crashDuringIndexSwitch_walAborted_neverIndexSwitching() throws Exception
+    {
+        long[] ids = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+        long[] ts = new long[10];
+        Arrays.fill(ts, 100);
+        String filePath = writeTestFile("wal_abort_src.pxl", LONG_ID_SCHEMA, ids, true, ts);
+        long srcFileId = registerTestFile("wal_abort_src.pxl", File.Type.REGULAR, 1, 0, 9);
+        retinaManager.addVisibility(srcFileId, 0, 10, 50, null, true);
+
+        Map<String, long[]> bitmaps = new HashMap<>();
+        bitmaps.put(RetinaUtils.buildRgKey(srcFileId, 0), makeBitmap(10, 6));
+
+        WalTrackingSyncGC walGc = new WalTrackingSyncGC(retinaManager, metadataService, storageGcWal,
+                0.5, 134_217_728L, Integer.MAX_VALUE, 10, 1048576, EncodingLevel.EL2, 86_400_000L, true);
+        StorageGarbageCollector.FileGroup group = makeGroup(srcFileId, filePath, LONG_ID_SCHEMA);
+
+        // processFileGroup swallows the injected failure and rolls back internally.
+        walGc.processFileGroup(group, 100L, bitmaps);
+
+        List<StorageGcWal.Task> tasks = storageGcWal.listAllTasks();
+        assertEquals("exactly one WAL task expected", 1, tasks.size());
+        assertEquals("crashed GC round must be rolled back to ABORTED",
+                StorageGcWal.State.ABORTED, tasks.get(0).getState());
+        assertNoIndexSwitchingTask(tasks);
+        assertFileRegular(srcFileId, "source must stay REGULAR after a rolled-back GC round");
+        assertFileGone(tasks.get(0).getNewFileId(), "new file catalog must be removed after rollback");
     }
 
     /** Delayed cleanup removes old file Visibility and physical file after wall-clock deadline passes. */
@@ -2063,7 +2440,7 @@ public class TestStorageGarbageCollector
      * Phase 3 (ts=200, dual-write active): delete row 3 → propagated to both files
      * Sync visibility → export + coord-transform + import
      * Phase 4 (ts=300, post-sync, dual-write still active): delete row 5
-     * Commit → atomic swap (TEMPORARY→REGULAR), old file removed from catalog
+     * Commit -> atomic swap (TEMPORARY_GC -> REGULAR), old file removed from catalog
      * Verify: multi-snap_ts consistency on new file at ts=100..500
      * Verify: old file gone from catalog, new file REGULAR
      * </pre>
@@ -2168,7 +2545,8 @@ public class TestStorageGarbageCollector
         e2eGc.commitFileGroup(result);
 
         assertFileRegular(newFileId, "new file should be REGULAR after commit");
-        assertFileGone(srcFileId, "old file should be gone from catalog after commit");
+        assertFileRetiredWithCleanupAt(srcFileId,
+                "old file should be RETIRED in catalog after commit");
 
         assertTrue("old physical file should still exist (delayed cleanup, not yet due)",
                 fileStorage.exists(srcPath));
@@ -2453,7 +2831,7 @@ public class TestStorageGarbageCollector
 
         // 3b. Verify catalog state
         assertFileRegular(newFileId, "new file should be REGULAR");
-        assertFileGone(srcFileId, "old file should be gone from catalog");
+        assertFileRetiredWithCleanupAt(srcFileId, "old file should be RETIRED in catalog");
 
         // 3c. Forward mapping
         int[] fwd = result.forwardRgMappings.get(srcFileId).get(0);
@@ -2831,10 +3209,10 @@ public class TestStorageGarbageCollector
         assertNotNull("file-B must still exist (not GCed)", metadataService.getFileById(fileIdB));
         assertNotNull("file-C must still exist", metadataService.getFileById(fileIdC));
 
-        // Old generations gone from catalog
-        assertFileGone(fileIdA, "file-A should be gone from catalog");
-        assertFileGone(fileIdAprime, "file-A' should be gone from catalog");
-        assertFileGone(fileIdAdoubleprime, "file-A'' should be gone from catalog");
+        // Old generations are retired in catalog
+        assertFileRetiredWithCleanupAt(fileIdA, "file-A should be RETIRED in catalog");
+        assertFileRetiredWithCleanupAt(fileIdAprime, "file-A' should be RETIRED in catalog");
+        assertFileRetiredWithCleanupAt(fileIdAdoubleprime, "file-A'' should be RETIRED in catalog");
 
         // Physical files from generations 1 and 2 cleaned up
         assertFalse("file-A physical should not exist", fileStorage.exists(pathA));
@@ -2952,6 +3330,27 @@ public class TestStorageGarbageCollector
         return id;
     }
 
+    private long insertRawFileWithType(String name, int fileType,
+                                       int numRg, long minRow, long maxRow)
+            throws Exception
+    {
+        String sql = "INSERT INTO FILES(FILE_NAME, FILE_TYPE, FILE_NUM_RG, FILE_MIN_ROW_ID, FILE_MAX_ROW_ID, PATHS_PATH_ID) " +
+                "VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement pst = MetaDBUtil.Instance().getConnection().prepareStatement(sql))
+        {
+            pst.setString(1, name);
+            pst.setInt(2, fileType);
+            pst.setInt(3, numRg);
+            pst.setLong(4, minRow);
+            pst.setLong(5, maxRow);
+            pst.setLong(6, testPathId);
+            assertEquals("raw test file insert should affect one row", 1, pst.executeUpdate());
+        }
+        long id = metadataService.getFileId(testOrderedPathUri + "/" + name);
+        assertTrue(name + " must have valid id", id > 0);
+        return id;
+    }
+
     private long[] registerTestFiles(String[] names, File.Type[] types,
                                      int[] numRgs, long[] minRows, long[] maxRows)
             throws Exception
@@ -3000,6 +3399,31 @@ public class TestStorageGarbageCollector
         assertEquals(msg, File.Type.REGULAR, f.getType());
     }
 
+    private void assertFileRetired(long fileId, long cleanupAt, String msg) throws Exception
+    {
+        File f = metadataService.getFileById(fileId);
+        assertNotNull(msg, f);
+        assertEquals(msg, File.Type.RETIRED, f.getType());
+        assertEquals(msg, Long.valueOf(cleanupAt), f.getCleanupAt());
+    }
+
+    private void assertFileRetiredWithCleanupAt(long fileId, String msg) throws Exception
+    {
+        File f = metadataService.getFileById(fileId);
+        assertNotNull(msg, f);
+        assertEquals(msg, File.Type.RETIRED, f.getType());
+        assertNotNull(msg, f.getCleanupAt());
+    }
+
+    private static void assertNoIndexSwitchingTask(List<StorageGcWal.Task> tasks)
+    {
+        for (StorageGcWal.Task t : tasks)
+        {
+            assertFalse("no WAL task may be left in INDEX_SWITCHING after a synchronous GC round",
+                    t.getState() == StorageGcWal.State.INDEX_SWITCHING);
+        }
+    }
+
     // =======================================================================
     // Helpers: GC factory for grouping tests
     // =======================================================================
@@ -3008,8 +3432,8 @@ public class TestStorageGarbageCollector
             long targetFileSize, int maxFilesPerGroup, int maxGroups)
     {
         return new StorageGarbageCollector(
-                null, null, 0.5, targetFileSize, maxFilesPerGroup, maxGroups,
-                1048576, EncodingLevel.EL2, 86_400_000L);
+                null, null, null, 0.5, targetFileSize, maxFilesPerGroup, maxGroups,
+                1048576, EncodingLevel.EL2, 86_400_000L, new StorageGcWal());
     }
 
     // =======================================================================
@@ -3680,8 +4104,8 @@ public class TestStorageGarbageCollector
         DirectScanStorageGC(RetinaResourceManager rm, double threshold,
                             int maxGroups, List<FakeFileEntry> fakeEntries)
         {
-            super(rm, null, threshold, 134_217_728L, Integer.MAX_VALUE, maxGroups,
-                    1048576, EncodingLevel.EL2, 86_400_000L);
+            super(rm, null, null, threshold, 134_217_728L, Integer.MAX_VALUE, maxGroups,
+                    1048576, EncodingLevel.EL2, 86_400_000L, new StorageGcWal());
             this.fakeEntries = fakeEntries;
         }
 
@@ -3720,6 +4144,53 @@ public class TestStorageGarbageCollector
     }
 
     /**
+     * StorageGarbageCollector subclass that records the boundaries between
+     * {@code runStorageGC}'s candidate calculation, scan, bitmap trimming, and
+     * process phases without touching real metadata or Pixels files.
+     */
+    static class TrackingRunStorageGC extends StorageGarbageCollector
+    {
+        private final List<FileGroup> groupsToReturn;
+        boolean scanCalled;
+        boolean processCalled;
+        RuntimeException processFailure;
+        Set<Long> capturedCandidateFileIds = Collections.emptySet();
+        List<FileGroup> capturedFileGroups = Collections.emptyList();
+        long capturedSafeGcTs = Long.MIN_VALUE;
+        Set<String> bitmapKeysSeenByProcess = Collections.emptySet();
+
+        TrackingRunStorageGC(List<FileGroup> groupsToReturn)
+        {
+            super(null, null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                    1048576, EncodingLevel.EL2, 86_400_000L, new StorageGcWal());
+            this.groupsToReturn = groupsToReturn;
+        }
+
+        @Override
+        List<FileGroup> scanAndGroupFiles(Set<Long> candidateFileIds,
+                                          Map<Long, long[]> fileStats)
+        {
+            this.scanCalled = true;
+            this.capturedCandidateFileIds = new HashSet<>(candidateFileIds);
+            return groupsToReturn;
+        }
+
+        @Override
+        void processFileGroups(List<FileGroup> fileGroups, long safeGcTs,
+                               Map<String, long[]> gcSnapshotBitmaps)
+        {
+            this.processCalled = true;
+            this.capturedFileGroups = new ArrayList<>(fileGroups);
+            this.capturedSafeGcTs = safeGcTs;
+            this.bitmapKeysSeenByProcess = new HashSet<>(gcSnapshotBitmaps.keySet());
+            if (processFailure != null)
+            {
+                throw processFailure;
+            }
+        }
+    }
+
+    /**
      * StorageGarbageCollector subclass where {@code rewriteFileGroup} throws on
      * the first call and succeeds (cleaning up bitmaps) on subsequent calls.
      * Used by {@link #testProcessFileGroups_firstGroupFailsSecondContinues} to
@@ -3732,8 +4203,8 @@ public class TestStorageGarbageCollector
 
         FailFirstGroupGC()
         {
-            super(null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
-                    1048576, EncodingLevel.EL2, 86_400_000L);
+            super(null, null, null, 0.5, 0L, Integer.MAX_VALUE, 10,
+                    1048576, EncodingLevel.EL2, 86_400_000L, new StorageGcWal());
         }
 
         @Override
@@ -3770,13 +4241,65 @@ public class TestStorageGarbageCollector
                       int maxGroups, int rowGroupSize, EncodingLevel encodingLevel,
                       long retireDelayMs)
         {
-            super(rm, ms, threshold, targetFileSize, maxFilesPerGroup, maxGroups,
-                    rowGroupSize, encodingLevel, retireDelayMs);
+            super(rm, ms, null, threshold, targetFileSize, maxFilesPerGroup, maxGroups,
+                    rowGroupSize, encodingLevel, retireDelayMs, new StorageGcWal());
         }
 
         @Override
         void syncIndex(RewriteResult result, long tableId) throws Exception
         {
+        }
+    }
+
+    /**
+     * Test double that performs the WAL bookkeeping of the production {@code syncIndex}
+     * (open a task → INDEX_SWITCHING, flush) against an injected {@link StorageGcWal}, but
+     * skips the heavy primary-index machinery. Optionally throws right after the task is
+     * opened to simulate a crash inside the swap→markSwapped window, so tests can assert
+     * that the synchronous GC entry point ({@code processFileGroup}) never leaves a task in
+     * INDEX_SWITCHING — committing it to SWAPPED or rolling it back to ABORTED.
+     */
+    static class WalTrackingSyncGC extends StorageGarbageCollector
+    {
+        private final StorageGcWal wal;
+        private final boolean throwAfterOpen;
+
+        WalTrackingSyncGC(RetinaResourceManager rm, MetadataService ms, StorageGcWal wal,
+                          double threshold, long targetFileSize, int maxFilesPerGroup,
+                          int maxGroups, int rowGroupSize, EncodingLevel encodingLevel,
+                          long retireDelayMs, boolean throwAfterOpen)
+        {
+            super(rm, ms, LocalIndexService.Instance(), threshold, targetFileSize,
+                    maxFilesPerGroup, maxGroups, rowGroupSize, encodingLevel, retireDelayMs, wal);
+            this.wal = wal;
+            this.throwAfterOpen = throwAfterOpen;
+        }
+
+        @Override
+        void syncIndex(RewriteResult result, long tableId) throws Exception
+        {
+            int totalRows = result.newFileRgRowStart[result.newFileRgCount];
+            if (totalRows == 0)
+            {
+                return;
+            }
+            result.newRowIdStart = 0L;
+            String journalTaskId = "storage-gc-test-" + tableId + "-" + result.newFileId;
+            List<Long> oldFileIds = new ArrayList<>();
+            for (FileCandidate fc : result.group.files)
+            {
+                oldFileIds.add(fc.fileId);
+            }
+            result.walWriter = wal.createTask(journalTaskId, tableId,
+                    result.group.virtualNodeId, oldFileIds, result.newFileId,
+                    result.newFilePath, 0L, totalRows);
+            result.walWriter.flush();
+            // Task is now durably INDEX_SWITCHING. A crash here must be terminalized to
+            // ABORTED by processFileGroup's rollback, never left lingering.
+            if (throwAfterOpen)
+            {
+                throw new RuntimeException("injected crash mid index-switch");
+            }
         }
     }
 }

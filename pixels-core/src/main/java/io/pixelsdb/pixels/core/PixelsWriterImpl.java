@@ -588,6 +588,68 @@ public class PixelsWriterImpl implements PixelsWriter
         }
     }
 
+    /**
+     * Abort the writer: release underlying resources without writing the
+     * file tail. Caller must ensure no row batches have been added; calling
+     * abort after data has been written results in undefined file contents
+     * and the caller should also delete any partial bytes the physical
+     * writer may have flushed.
+     *
+     * <p>Errors closing component writers are logged and the first failure
+     * is rethrown after all components have been attempted, so resources are
+     * released as eagerly as possible.
+     */
+    @Override
+    public void abort() throws IOException
+    {
+        IOException firstFailure = null;
+        try
+        {
+            physicalWriter.close();
+        }
+        catch (IOException e)
+        {
+            firstFailure = e;
+            LOGGER.warn("PixelsWriterImpl.abort: physicalWriter close failed", e);
+        }
+        for (ColumnWriter cw : columnWriters)
+        {
+            try
+            {
+                cw.close();
+            }
+            catch (IOException e)
+            {
+                if (firstFailure == null)
+                {
+                    firstFailure = e;
+                }
+                LOGGER.warn("PixelsWriterImpl.abort: columnWriter close failed", e);
+            }
+        }
+        if (hasHiddenColumn)
+        {
+            try
+            {
+                hiddenColumnWriter.close();
+            }
+            catch (IOException e)
+            {
+                if (firstFailure == null)
+                {
+                    firstFailure = e;
+                }
+                LOGGER.warn("PixelsWriterImpl.abort: hiddenColumnWriter close failed", e);
+            }
+        }
+        columnWriterService.shutdown();
+        columnWriterService.shutdownNow();
+        if (firstFailure != null)
+        {
+            throw firstFailure;
+        }
+    }
+
     private void writeRowGroup() throws IOException
     {
         int rowGroupDataLength = 0;

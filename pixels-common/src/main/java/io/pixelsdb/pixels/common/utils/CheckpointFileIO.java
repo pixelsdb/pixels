@@ -23,8 +23,6 @@ import io.pixelsdb.pixels.common.physical.PhysicalReader;
 import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -58,8 +56,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class CheckpointFileIO
 {
-    private static final Logger logger = LogManager.getLogger(CheckpointFileIO.class);
-
     /**
      * A checkpoint entry containing the visibility information of a single Row Group.
      */
@@ -107,7 +103,7 @@ public class CheckpointFileIO
     public static void writeCheckpoint(String path, int totalRgs, BlockingQueue<CheckpointEntry> queue) throws Exception
     {
         Storage storage = StorageFactory.Instance().getStorage(path);
-        try (DataOutputStream out = storage.create(path, true, 8 * 1024 * 1024))
+        try (DataOutputStream out = storage.create(path, true, Constants.CHECKPOINT_BUFFER_SIZE))
         {
             out.writeInt(totalRgs);
             for (int i = 0; i < totalRgs; i++)

@@ -48,6 +48,22 @@ inline uint64_t extractTimestamp(uint64_t raw) {
     return (raw & 0x0000FFFFFFFFFFFFULL);
 }
 
+/**
+ * Controls how DELETE replay interacts with the compacted base bitmap.
+ *
+ * NORMAL is the live append path: the caller provides a current delete
+ * timestamp and the record is appended to the chain. VERSIONED is used when
+ * replay may race with READY readers; historical deletes publish a new
+ * VersionedData with a folded baseBitmap. EXCLUSIVE is used only while recovery
+ * blocks readers and GC; historical deletes may update baseBitmap in place, but
+ * concurrent recovery writers still need tile-level synchronization.
+ */
+enum class ReplayMode : uint8_t {
+    NORMAL = 0,
+    VERSIONED = 1,
+    EXCLUSIVE = 2
+};
+
 struct DeleteIndexBlock : public pixels::RetinaBase<DeleteIndexBlock> {
     static constexpr size_t BLOCK_CAPACITY = 8;
     uint64_t items[BLOCK_CAPACITY] = {0};
@@ -96,7 +112,7 @@ class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     // timestamp defaults to 0; bitmap defaults to all-zeros.
     explicit TileVisibility(uint64_t timestamp = 0, const uint64_t* bitmap = nullptr);
     ~TileVisibility() override;
-    void deleteTileRecord(uint16_t rowId, uint64_t ts);
+    void deleteTileRecord(uint16_t rowId, uint64_t ts, ReplayMode replayMode = ReplayMode::NORMAL);
     void getTileVisibilityBitmap(uint64_t ts, uint64_t* outBitmap) const;
     void collectTileGarbage(uint64_t ts, uint64_t* gcSnapshotBitmap);
     void exportChainItemsAfter(uint32_t tileId, uint64_t safeGcTs,
@@ -108,6 +124,14 @@ class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     TileVisibility &operator=(const TileVisibility &) = delete;
 
     void reclaimRetiredVersions();
+
+    void appendDeleteChain(uint16_t rowId, uint64_t ts);
+
+    // VERSIONED: replay with possible readers; historical deletes use COW fold.
+    void deleteTileRecordVersioned(uint16_t rowId, uint64_t ts);
+
+    // EXCLUSIVE: recovery replay without readers; historical deletes fold in place.
+    void deleteTileRecordExclusive(uint16_t rowId, uint64_t ts);
 
     std::atomic<VersionedData<CAPACITY>*> currentVersion;
     std::atomic<DeleteIndexBlock *> tail;

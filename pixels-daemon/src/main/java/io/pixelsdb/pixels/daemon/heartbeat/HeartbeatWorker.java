@@ -42,11 +42,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class HeartbeatWorker implements Server
 {
     private static final Logger logger = LogManager.getLogger(HeartbeatWorker.class);
-    private static final AtomicInteger currentStatus = new AtomicInteger(NodeStatus.READY.StatusCode);
+    private static final AtomicInteger currentStatus = new AtomicInteger(NodeStatus.INIT.StatusCode);
     private final HeartbeatConfig heartbeatConfig = new HeartbeatConfig();
     private final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
     private final NodeProto.NodeRole role;
     private String hostName;
+    private String workerKey;
     private WorkerRegister workerRegister;
     private boolean initializeSuccess = false;
     private CountDownLatch runningLatch;
@@ -57,6 +58,15 @@ public class HeartbeatWorker implements Server
         this.hostName = NetUtils.getLocalHostName();
         logger.debug("HostName: {}", hostName);
         initialize();
+    }
+
+    public static void setCurrentStatus(NodeStatus status)
+    {
+        if (status == null)
+        {
+            throw new IllegalArgumentException("status is null");
+        }
+        currentStatus.set(status.StatusCode);
     }
 
     /**
@@ -92,13 +102,16 @@ public class HeartbeatWorker implements Server
                 default:
                     throw new IllegalStateException("Unknown heartbeat role: " + role);
             }
+            this.workerKey = key;
+            currentStatus.set(role == NodeProto.NodeRole.RETINA
+                    ? NodeStatus.INIT.StatusCode
+                    : NodeStatus.READY.StatusCode);
             EtcdUtil.Instance().putKeyValueWithLeaseId(key, String.valueOf(currentStatus.get()), leaseId);
             // start a scheduled thread to update node status periodically
             this.workerRegister = new WorkerRegister(key, leaseClient, leaseId);
             scheduledExecutor.scheduleAtFixedRate(workerRegister,
                     0, heartbeatConfig.getNodeHeartbeatPeriod(), TimeUnit.SECONDS);
             initializeSuccess = true;
-            currentStatus.set(NodeStatus.READY.StatusCode);
             logger.info("Heartbeat worker on {} is initialized", hostName);
         } catch (Exception e)
         {
@@ -126,10 +139,16 @@ public class HeartbeatWorker implements Server
         switch (role)
         {
             case WORKER:
-                EtcdUtil.Instance().deleteByPrefix(Constants.HEARTBEAT_WORKER_LITERAL);
+                if (workerKey != null)
+                {
+                    EtcdUtil.Instance().delete(workerKey);
+                }
                 break;
             case RETINA:
-                EtcdUtil.Instance().deleteByPrefix(Constants.HEARTBEAT_RETINA_LITERAL);
+                if (workerKey != null)
+                {
+                    EtcdUtil.Instance().delete(workerKey);
+                }
                 break;
             default:
                 throw new IllegalStateException("Unknown heartbeat role: " + role);

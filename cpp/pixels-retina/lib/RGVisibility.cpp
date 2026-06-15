@@ -70,9 +70,10 @@ TileVisibility<CAPACITY>* RGVisibility<CAPACITY>::getTileVisibility(uint32_t row
 }
 
 template<size_t CAPACITY>
-void RGVisibility<CAPACITY>::deleteRGRecord(uint32_t rowId, uint64_t timestamp) {
+void RGVisibility<CAPACITY>::deleteRGRecord(uint32_t rowId, uint64_t timestamp,
+                                            ReplayMode replayMode) {
     TileVisibility<CAPACITY>* tileVisibility = getTileVisibility(rowId);
-    tileVisibility->deleteTileRecord(rowId % VISIBILITY_RECORD_CAPACITY, timestamp);
+    tileVisibility->deleteTileRecord(rowId % VISIBILITY_RECORD_CAPACITY, timestamp, replayMode);
 }
 
 template<size_t CAPACITY>

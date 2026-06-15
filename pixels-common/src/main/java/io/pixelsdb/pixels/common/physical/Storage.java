@@ -263,6 +263,17 @@ public interface Storage
     }
 
     /**
+     * Opens an existing file for appending.
+     * Backends that do not support append (e.g. S3, GCS) throw {@link UnsupportedOperationException}.
+     * @param path the path of the existing file
+     * @param bufferSize write-buffer size in bytes
+     * @return an output stream positioned at the end of the file
+     * @throws IOException if the file does not exist or the backend reports an error
+     * @throws UnsupportedOperationException if the storage backend does not support append
+     */
+    DataOutputStream append(String path, int bufferSize) throws IOException;
+
+    /**
      * For local fs, path is considered as local.
      * @param path the path to delete
      * @param recursive whether delete recursively
