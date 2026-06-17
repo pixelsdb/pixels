@@ -29,6 +29,7 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -133,6 +134,15 @@ public class WorkerCommon
                 return s3qs;
         }
         throw new UnsupportedOperationException("scheme " + scheme + " is not supported");
+    }
+
+    public static void initOptionalShuffleStorage(ShuffleInfo shuffleInfo)
+    {
+        if (shuffleInfo == null)
+        {
+            return;
+        }
+        initStorage(requireNonNull(shuffleInfo.getStorageInfo(), "shuffle storageInfo is null"));
     }
 
     /**

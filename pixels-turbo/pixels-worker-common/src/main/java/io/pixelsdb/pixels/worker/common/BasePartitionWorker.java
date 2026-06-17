@@ -102,6 +102,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 
             WorkerCommon.initStorage(inputStorageInfo);
             WorkerCommon.initStorage(outputStorageInfo);
+            WorkerCommon.initOptionalShuffleStorage(event.getOutput().getShuffleInfo());
 
             String[] columnsToRead = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);

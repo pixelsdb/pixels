@@ -141,6 +141,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
 
             WorkerCommon.initStorage(leftInputStorageInfo);
             WorkerCommon.initStorage(rightInputStorageInfo);
+            WorkerCommon.initOptionalShuffleStorage(event.getSmallTable().getShuffleInfo());
+            WorkerCommon.initOptionalShuffleStorage(event.getLargeTable().getShuffleInfo());
             WorkerCommon.initStorage(outputStorageInfo);
 
             // build the joiner.
