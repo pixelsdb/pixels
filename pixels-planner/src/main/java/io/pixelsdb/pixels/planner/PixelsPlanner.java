@@ -63,6 +63,7 @@ public class PixelsPlanner
     private static final StorageInfo InputStorageInfo;
     private static final StorageInfo IntermediateStorageInfo;
     private static final StorageInfo StreamStorageInfo;
+    private static final StorageInfo ShuffleStorageInfo;
     private static final String IntermediateFolder;
     private static final int IntraWorkerParallelism;
     private static final ExchangeMethod EnabledExchangeMethod;
@@ -106,6 +107,7 @@ public class PixelsPlanner
                 .getProperty("executor.intra.worker.parallelism"));
 
         StreamStorageInfo = StorageInfoBuilder.BuildFromConfig(Storage.Scheme.httpstream);
+        ShuffleStorageInfo = getShuffleStorageInfo();
     }
 
     /**
@@ -169,6 +171,57 @@ public class PixelsPlanner
     public static String getIntermediateFolderForTrans(long transId)
     {
         return IntermediateFolder + transId + "/";
+    }
+
+    private static StorageInfo getShuffleStorageInfo()
+    {
+        String shuffleStorageScheme = ConfigFactory.Instance().getProperty("executor.shuffle.storage.scheme");
+        if (shuffleStorageScheme == null || shuffleStorageScheme.trim().isEmpty())
+        {
+            return null;
+        }
+
+        Storage.Scheme scheme = Storage.Scheme.from(shuffleStorageScheme.trim());
+        checkArgument(scheme == Storage.Scheme.s3qs,
+                "executor.shuffle.storage.scheme only supports s3qs currently: %s", shuffleStorageScheme);
+        return StorageInfoBuilder.BuildFromConfig(scheme);
+    }
+
+    private static boolean isS3QSShuffleEnabled()
+    {
+        return EnabledExchangeMethod == ExchangeMethod.batch &&
+                ShuffleStorageInfo != null &&
+                ShuffleStorageInfo.getScheme() == Storage.Scheme.s3qs;
+    }
+
+    private ShuffleInfo createShuffleInfo(Table inputTable, String outputBase, int numPartitions, int producerCount)
+    {
+        String objectPathPrefix = outputBase.endsWith("/") ? outputBase : outputBase + "/";
+        String shuffleSuffix = Integer.toUnsignedString(objectPathPrefix.hashCode());
+        String shuffleId = transId + "/" + inputTable.getSchemaName() + "/" + inputTable.getTableName() +
+                "/" + shuffleSuffix;
+        ImmutableList.Builder<ShuffleQueueInfo> queues = ImmutableList.builderWithExpectedSize(numPartitions);
+        for (int i = 0; i < numPartitions; ++i)
+        {
+            queues.add(new ShuffleQueueInfo(i, buildShuffleQueueName(shuffleSuffix, i), null));
+        }
+        return new ShuffleInfo(shuffleId, ShuffleStorageInfo, objectPathPrefix, numPartitions,
+                producerCount, numPartitions, 20, queues.build());
+    }
+
+    private String buildShuffleQueueName(String shuffleSuffix, int partitionId)
+    {
+        return "pixels-shuffle-" + transId + "-" + shuffleSuffix + "-" + partitionId;
+    }
+
+    private static ShuffleInfo getShuffleInfo(List<PartitionInput> partitionInputs)
+    {
+        if (partitionInputs == null || partitionInputs.isEmpty())
+        {
+            return null;
+        }
+        OutputInfo output = partitionInputs.get(0).getOutput();
+        return output == null ? null : output.getShuffleInfo();
     }
 
     private ScanOperator getScanOperator(BaseTable scanTable) throws IOException, MetadataException
@@ -1347,23 +1400,29 @@ public class PixelsPlanner
 
         int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
         String[] newColumnsToRead = rewriteColumnsToReadForPartitionedJoin(table.getColumnNames(), partitionProjection);
+        ShuffleInfo shuffleInfo = getShuffleInfo(partitionInputs);
 
+        PartitionedTableInfo tableInfo;
         if (config.getProperty("executor.exchange.method").equals(ExchangeMethod.stream.name()))
         {
-          return new PartitionedTableInfo(table.getTableName(), true,
-                  newColumnsToRead, StreamStorageInfo, rightPartitionedFiles.build(),
-                  IntraWorkerParallelism, newKeyColumnIds);
+            tableInfo = new PartitionedTableInfo(table.getTableName(), true,
+                    newColumnsToRead, StreamStorageInfo, rightPartitionedFiles.build(),
+                    IntraWorkerParallelism, newKeyColumnIds);
         } else if (table.getTableType() == Table.TableType.BASE)
         {
-            return new PartitionedTableInfo(table.getTableName(), true,
-                    newColumnsToRead, InputStorageInfo, rightPartitionedFiles.build(),
+            tableInfo = new PartitionedTableInfo(table.getTableName(), true,
+                    newColumnsToRead, shuffleInfo == null ? InputStorageInfo : ShuffleStorageInfo,
+                    rightPartitionedFiles.build(),
                     IntraWorkerParallelism, newKeyColumnIds);
         } else
         {
-            return new PartitionedTableInfo(table.getTableName(), false,
-                    newColumnsToRead, IntermediateStorageInfo, rightPartitionedFiles.build(),
+            tableInfo = new PartitionedTableInfo(table.getTableName(), false,
+                    newColumnsToRead, shuffleInfo == null ? IntermediateStorageInfo : ShuffleStorageInfo,
+                    rightPartitionedFiles.build(),
                     IntraWorkerParallelism, newKeyColumnIds);
         }
+        tableInfo.setShuffleInfo(shuffleInfo);
+        return tableInfo;
     }
 
     private SortedTableInfo getSortedTableInfo(
@@ -1396,6 +1455,9 @@ public class PixelsPlanner
     {
         ImmutableList.Builder<PartitionInput> partitionInputsBuilder = ImmutableList.builder();
         int outputId = 0;
+        int producerCount = (inputSplits.size() + IntraWorkerParallelism - 1) / IntraWorkerParallelism;
+        ShuffleInfo shuffleInfo = isS3QSShuffleEnabled() ?
+                createShuffleInfo(inputTable, outputBase, numPartition, producerCount) : null;
         for (int i = 0; i < inputSplits.size();)
         {
             PartitionInput partitionInput = new PartitionInput();
@@ -1432,7 +1494,10 @@ public class PixelsPlanner
                 partitionInput.setOutput(new OutputInfo("", StreamStorageInfo, true));
             } else
             {
-                partitionInput.setOutput(new OutputInfo(outputBase + (outputId++) + "/part", InputStorageInfo, true));
+                OutputInfo output = new OutputInfo(outputBase + (outputId++) + "/part",
+                        shuffleInfo == null ? InputStorageInfo : ShuffleStorageInfo, true);
+                output.setShuffleInfo(shuffleInfo);
+                partitionInput.setOutput(output);
             }
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));

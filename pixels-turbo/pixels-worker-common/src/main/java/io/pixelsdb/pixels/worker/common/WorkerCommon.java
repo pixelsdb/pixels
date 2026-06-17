@@ -64,6 +64,7 @@ public class WorkerCommon
     protected static Storage minio;
     private static Storage redis;
     private static Storage stream;
+    private static Storage s3qs;
     public static final int rowBatchSize;
     protected static final int pixelStride;
     protected static final int rowGroupSize;
@@ -106,6 +107,10 @@ public class WorkerCommon
             {
                 WorkerCommon.stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
             }
+            else if (WorkerCommon.s3qs == null && storageInfo.getScheme() == Storage.Scheme.s3qs)
+            {
+                WorkerCommon.s3qs = StorageFactory.Instance().getStorage(Storage.Scheme.s3qs);
+            }
         } catch (Throwable e)
         {
             throw new WorkerException("failed to initialize the storage of scheme " + storageInfo.getScheme(), e);
@@ -124,6 +129,8 @@ public class WorkerCommon
                 return redis;
             case httpstream:
                 return stream;
+            case s3qs:
+                return s3qs;
         }
         throw new UnsupportedOperationException("scheme " + scheme + " is not supported");
     }
