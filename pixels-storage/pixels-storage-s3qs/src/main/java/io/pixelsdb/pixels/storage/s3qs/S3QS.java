@@ -115,6 +115,20 @@ public final class S3QS extends AbstractS3
         return queue.offer(mesg);
     }
 
+    /**
+     * Publish a structured message that does not require writing an S3 object,
+     * such as a producer-end marker.
+     */
+    public void publish(S3QueueMessage mesg) throws IOException
+    {
+        S3Queue queue = partitionQueues.get(mesg.getPartitionNum());
+        if (queue == null)
+        {
+            throw new IOException("queue is not registered for partition " + mesg.getPartitionNum());
+        }
+        queue.push(mesg);
+    }
+
     public synchronized String registerQueue(int partitionId, String queueName, String queueUrl) throws IOException
     {
         S3Queue queue = partitionQueues.get(partitionId);
@@ -214,6 +228,35 @@ public final class S3QS extends AbstractS3
         try
         {
             return queue.poll(timeoutSec);
+        }
+        catch (TaskErrorException e)
+        {
+            throw new IOException("failed to poll queue for partition " + mesg.getPartitionNum(), e);
+        }
+    }
+
+    /**
+     * Poll a structured shuffle message from the partition queue.
+     *
+     * This is the preferred API for S3QS shuffle consumers. It lets callers
+     * distinguish DATA messages from producer-end markers before deciding
+     * whether to open an S3 object.
+     */
+    public S3QueuePollResult pollMessage(S3QueueMessage mesg, int timeoutSec) throws IOException
+    {
+        S3Queue queue = partitionQueues.get(mesg.getPartitionNum());
+        if(queue == null)
+        {
+            throw new IOException("queue is not registered for partition " + mesg.getPartitionNum());
+        }
+        if(queue.isClosed())
+        {
+            throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
+        }
+
+        try
+        {
+            return queue.pollMessage(timeoutSec);
         }
         catch (TaskErrorException e)
         {
