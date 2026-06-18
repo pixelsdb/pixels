@@ -44,7 +44,14 @@ public class TestS3QS
         Future<?> future = this.executor.submit(() -> {
             byte[] buffer = new byte[8 * 1024 * 1024];
             long startTime = System.currentTimeMillis();
-            s3qs.addProducer(0); s3qs.addProducer(1);
+            try
+            {
+                s3qs.registerQueue(99, "pixels-shuffle-test-" + System.currentTimeMillis(), null);
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException(e);
+            }
             for (int i = 0; i < 2; i++)
             {
                 S3QueueMessage body = new S3QueueMessage()
@@ -150,6 +157,14 @@ public class TestS3QS
         {
             byte[] buffer = new byte[8 * 1024 * 1024];
             long startTime = System.currentTimeMillis();
+            try
+            {
+                s3qs.registerQueue(2, "pixels-shuffle-test-" + System.currentTimeMillis(), null);
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException(e);
+            }
             for (int i = 0; i < 2; i++)
             {
                 S3QueueMessage body = new S3QueueMessage()
@@ -202,6 +217,14 @@ public class TestS3QS
         {
             byte[] buffer = new byte[8 * 1024 * 1024];
             long startTime = System.currentTimeMillis();
+            try
+            {
+                s3qs.registerQueue(9, "pixels-shuffle-test-" + System.currentTimeMillis(), null);
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException(e);
+            }
             for (int i = 0; i < 2; i++)
             {
                 S3QueueMessage body = new S3QueueMessage()

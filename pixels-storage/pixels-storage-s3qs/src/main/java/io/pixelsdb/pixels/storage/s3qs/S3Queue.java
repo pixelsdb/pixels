@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.UUID;
 
 import static software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT;
 
@@ -72,15 +73,11 @@ public class S3Queue implements Closeable
 
     private final S3QS s3qs;
 
-    private final HashSet<Integer>consumerSet;
-
     private final Lock lock = new ReentrantLock();
 
     private boolean closed = false;
 
-    private boolean stopInput = false;
-
-    private int invisibleTime;
+    private final int invisibleTime;
 
     public S3Queue(S3QS s3qs, String queueUrl, int invisibleTime)
     {
@@ -88,7 +85,6 @@ public class S3Queue implements Closeable
         this.queueUrl = queueUrl;
         this.sqsClient = this.s3qs.getSqsClient();
         this.invisibleTime = invisibleTime;
-        this.consumerSet = new HashSet<>();
     }
     public S3Queue(S3QS s3qs, String queueUrl)
     {
@@ -105,36 +101,6 @@ public class S3Queue implements Closeable
     {
         return this.invisibleTime;
     }
-
-
-    //s3qs is the highest manager of a shuffle, so producerSet is in charge of s3qs.
-    private void removeProducer(int workerId) throws IOException
-    {
-        this.s3qs.producerSet.remove(workerId);
-        if(this.s3qs.producerSet.isEmpty())
-        {
-            this.stopInput();
-            //this.push("");
-        }
-    }
-
-    public void addConsumer(int workerId)
-    {
-        if(!(this.consumerSet).contains(workerId))
-        {
-            this.consumerSet.add(workerId);
-        }
-    }
-
-    //maybe unnecessary
-    public boolean removeConsumer(int workerId)
-    {
-        this.consumerSet.remove(workerId);
-        // TODO: close queue
-        return consumerSet.isEmpty();
-    }
-
-    //TODO(OUT-OF-DATE): Implement DLQ to handle bad message.
 
 
     /**
@@ -248,39 +214,22 @@ public class S3Queue implements Closeable
      */
     public PhysicalWriter offer(S3QueueMessage body) throws IOException
     {
-        //TODO: same name issue
         String objectPath = getObjectPath(body);
         PhysicalS3QSWriter writer = (PhysicalS3QSWriter) PhysicalWriterUtil
                 .newPhysicalWriter(this.s3qs, objectPath, false);
         writer.setQueue(this);
-        if(endWork(body)) removeProducer(body.getWorkerNum());
         return writer;
     }
 
     private String getObjectPath(S3QueueMessage body) throws IOException
     {
-        return body.getObjectPath()+body.getPartitionNum() + "/"+ String.valueOf(System.currentTimeMillis()) ;
-    }
-
-    private boolean endWork(S3QueueMessage body) throws IOException
-    {
-        return body.getEndWork();
+        return body.getObjectPath() + body.getPartitionNum() + "/" + UUID.randomUUID();
     }
 
 
     public boolean isClosed()
     {
         return closed;
-    }
-
-    public void stopInput()
-    {
-        this.stopInput = true;
-    }
-
-    public boolean getStopInput()
-    {
-        return this.stopInput;
     }
 
     @Override

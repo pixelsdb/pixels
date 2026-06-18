@@ -30,7 +30,9 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleQueueInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
+import io.pixelsdb.pixels.storage.s3qs.S3QS;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -142,7 +144,45 @@ public class WorkerCommon
         {
             return;
         }
-        initStorage(requireNonNull(shuffleInfo.getStorageInfo(), "shuffle storageInfo is null"));
+        StorageInfo storageInfo = requireNonNull(shuffleInfo.getStorageInfo(), "shuffle storageInfo is null");
+        initStorage(storageInfo);
+        if (storageInfo.getScheme() == Storage.Scheme.s3qs)
+        {
+            registerS3QSShuffleQueues(shuffleInfo);
+        }
+    }
+
+    private static void registerS3QSShuffleQueues(ShuffleInfo shuffleInfo)
+    {
+        List<ShuffleQueueInfo> queues = requireNonNull(shuffleInfo.getQueues(), "shuffle queues is null");
+        checkArgument(shuffleInfo.getNumPartitions() > 0, "shuffle numPartitions must be positive");
+        checkArgument(queues.size() == shuffleInfo.getNumPartitions(),
+                "shuffle queues size does not match numPartitions");
+
+        Storage storage = getStorage(Storage.Scheme.s3qs);
+        if (!(storage instanceof S3QS))
+        {
+            throw new WorkerException("storage of scheme s3qs is not S3QS");
+        }
+
+        S3QS s3qsStorage = (S3QS) storage;
+        try
+        {
+            for (ShuffleQueueInfo queue : queues)
+            {
+                requireNonNull(queue, "shuffle queue is null");
+                checkArgument(queue.getPartitionId() >= 0 && queue.getPartitionId() < shuffleInfo.getNumPartitions(),
+                        "shuffle queue partitionId is out of range");
+                String queueUrl = s3qsStorage.registerQueue(queue.getPartitionId(),
+                        queue.getQueueName(), queue.getQueueUrl());
+                queue.setQueueUrl(queueUrl);
+            }
+        }
+        catch (IOException e)
+        {
+            throw new WorkerException("failed to register s3qs shuffle queues for " +
+                    shuffleInfo.getShuffleId(), e);
+        }
     }
 
     /**
