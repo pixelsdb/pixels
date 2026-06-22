@@ -26,7 +26,7 @@ import java.util.List;
 /**
  * The shared metadata of one shuffle edge between producer and consumer stages.
  *
- * @author yanhaoting
+ * @author Haoting Yan
  * @create 2026-06-17
  */
 public class ShuffleInfo

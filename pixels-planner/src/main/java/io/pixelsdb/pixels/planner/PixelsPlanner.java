@@ -1494,10 +1494,12 @@ public class PixelsPlanner
                 partitionInput.setOutput(new OutputInfo("", StreamStorageInfo, true));
             } else
             {
-                OutputInfo output = new OutputInfo(outputBase + (outputId++) + "/part",
+                int producerTaskId = outputId++;
+                OutputInfo output = new OutputInfo(outputBase + producerTaskId + "/part",
                         shuffleInfo == null ? InputStorageInfo : ShuffleStorageInfo, true);
                 output.setShuffleInfo(shuffleInfo);
                 partitionInput.setOutput(output);
+                partitionInput.setProducerTaskId(producerTaskId);
             }
             int[] newKeyColumnIds = rewriteColumnIdsForPartitionedJoin(keyColumnIds, partitionProjection);
             partitionInput.setPartitionInfo(new PartitionInfo(newKeyColumnIds, numPartition));

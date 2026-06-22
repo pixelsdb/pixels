@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.worker.common;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
@@ -587,6 +588,40 @@ public class WorkerCommon
             writer = builder.build();
         }
         return writer;
+    }
+
+    /**
+     * Build a Pixels writer on top of an already-created physical writer.
+     *
+     * This is used by S3QS shuffle producers because the S3 object writer is
+     * created by S3QS.offer() together with the queue message that will be sent
+     * when the physical writer is closed.
+     */
+    public static PixelsWriter getWriter(TypeDescription schema, Storage storage, String filePath,
+                                         PhysicalWriter physicalWriter, boolean isPartitioned,
+                                         List<Integer> keyColumnIds)
+    {
+        requireNonNull(schema, "schema is null");
+        requireNonNull(filePath, "fileName is null");
+        requireNonNull(storage, "storage is null");
+        requireNonNull(physicalWriter, "physicalWriter is null");
+        checkArgument(!isPartitioned || keyColumnIds != null,
+                "keyColumnIds is null whereas isPartitioned is true");
+        PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder()
+                .setSchema(schema)
+                .setPixelStride(pixelStride)
+                .setRowGroupSize(rowGroupSize)
+                .setStorage(storage)
+                .setPath(filePath)
+                .setPhysicalWriter(physicalWriter)
+                .setOverwrite(true)
+                .setEncodingLevel(EncodingLevel.EL2)
+                .setPartitioned(isPartitioned);
+        if (isPartitioned)
+        {
+            builder.setPartKeyColumnIds(keyColumnIds);
+        }
+        return builder.build();
     }
 
     /**

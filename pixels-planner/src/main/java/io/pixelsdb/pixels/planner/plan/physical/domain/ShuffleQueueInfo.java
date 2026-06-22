@@ -22,7 +22,7 @@ package io.pixelsdb.pixels.planner.plan.physical.domain;
 /**
  * The queue endpoint for one hash partition in a shuffle.
  *
- * @author yanhaoting
+ * @author Haoting Yan
  * @create 2026-06-17
  */
 public class ShuffleQueueInfo
