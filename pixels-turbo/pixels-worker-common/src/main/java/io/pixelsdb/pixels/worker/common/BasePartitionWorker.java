@@ -202,11 +202,30 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         }
     }
 
-    private static boolean isS3QSShuffle(ShuffleInfo shuffleInfo)
+    static boolean isS3QSShuffle(ShuffleInfo shuffleInfo)
     {
         return shuffleInfo != null &&
                 shuffleInfo.getStorageInfo() != null &&
                 shuffleInfo.getStorageInfo().getScheme() == Storage.Scheme.s3qs;
+    }
+
+    static S3QueueMessage createS3QSDataMessage(ShuffleInfo shuffleInfo, int partitionId,
+                                                int producerTaskId, int producerAttemptId,
+                                                long sequenceId, TypeDescription writerSchema)
+    {
+        return S3QueueMessage.data(shuffleInfo.getShuffleId(), partitionId,
+                producerTaskId, producerAttemptId, sequenceId,
+                shuffleInfo.getObjectPathPrefix())
+                .setMetadata(writerSchema.toString());
+    }
+
+    static S3QueueMessage createS3QSProducerEndMessage(ShuffleInfo shuffleInfo, int partitionId,
+                                                       int producerTaskId, int producerAttemptId,
+                                                       long sequenceId, TypeDescription writerSchema)
+    {
+        return S3QueueMessage.producerEnd(shuffleInfo.getShuffleId(), partitionId,
+                producerTaskId, producerAttemptId, sequenceId)
+                .setMetadata(writerSchema.toString());
     }
 
     /**
@@ -240,9 +259,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(partitionId);
             if (!batches.isEmpty())
             {
-                S3QueueMessage dataMessage = S3QueueMessage.data(shuffleInfo.getShuffleId(), partitionId,
-                        producerTaskId, producerAttemptId, sequenceIds[partitionId]++,
-                        shuffleInfo.getObjectPathPrefix());
+                S3QueueMessage dataMessage = createS3QSDataMessage(shuffleInfo, partitionId,
+                        producerTaskId, producerAttemptId, sequenceIds[partitionId]++, writerSchema);
                 PhysicalWriter physicalWriter = s3qs.offer(dataMessage);
                 PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema, storage,
                         physicalWriter.getPath(), physicalWriter, false, null);
@@ -265,8 +283,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 
         for (int partitionId = 0; partitionId < partitioned.size(); ++partitionId)
         {
-            s3qs.publish(S3QueueMessage.producerEnd(shuffleInfo.getShuffleId(), partitionId,
-                    producerTaskId, producerAttemptId, sequenceIds[partitionId]++));
+            s3qs.publish(createS3QSProducerEndMessage(shuffleInfo, partitionId,
+                    producerTaskId, producerAttemptId, sequenceIds[partitionId]++, writerSchema));
         }
     }
 
