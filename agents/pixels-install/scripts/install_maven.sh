@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/shell_env.sh
+source "$SCRIPT_DIR/lib/shell_env.sh"
+# Picks up JAVA_HOME from a previous, separately invoked install_jdk.sh run
+# even if the calling agent never re-sourced the shell profile in between.
+load_toolchain_env
+
 MIN_MAVEN_VERSION="${MIN_MAVEN_VERSION:-3.8.0}"
-MAVEN_VERSION="${MAVEN_VERSION:-3.9.9}"
+# 3.9.8 is our default pinned version; override with MAVEN_VERSION if the
+# user explicitly asks for a different one.
+MAVEN_VERSION="${MAVEN_VERSION:-3.9.8}"
 MAVEN_BASE_URL="${MAVEN_BASE_URL:-https://archive.apache.org/dist/maven/maven-3}"
-MAVEN_INSTALL_DIR="${MAVEN_INSTALL_DIR:-/opt/apache-maven-$MAVEN_VERSION}"
-MAVEN_HOME_LINK="${MAVEN_HOME_LINK:-/opt/maven}"
-PROFILE_FILE="${PROFILE_FILE:-$HOME/.bashrc}"
+# Installed under the current user's home (never /opt): the user running this
+# agent is not necessarily a "pixels" or "ubuntu" account, so everything is
+# anchored on $HOME, exactly like the Pixels and etcd installs.
+MAVEN_INSTALL_PARENT="${MAVEN_INSTALL_PARENT:-$HOME/opt}"
+MAVEN_INSTALL_DIR="${MAVEN_INSTALL_DIR:-$MAVEN_INSTALL_PARENT/apache-maven-$MAVEN_VERSION}"
+MAVEN_HOME_LINK="${MAVEN_HOME_LINK:-$MAVEN_INSTALL_PARENT/maven}"
 TMP_DIR="${TMP_DIR:-/tmp}"
 
 log() {
@@ -16,16 +28,6 @@ log() {
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
-}
-
-sudo_cmd() {
-  if [[ "$(id -u)" -eq 0 ]]; then
-    "$@"
-  elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-    sudo -n "$@"
-  else
-    fail "run as root or configure passwordless sudo for this user"
-  fi
 }
 
 version_ge() {
@@ -49,6 +51,16 @@ maven_satisfies_requirement() {
 }
 
 require_java() {
+  local derived_home
+
+  if [[ -z "${JAVA_HOME:-}" || ! -x "${JAVA_HOME:-}/bin/java" ]]; then
+    derived_home="$(locate_existing_java_home || true)"
+    if [[ -n "$derived_home" ]]; then
+      log "JAVA_HOME was not set (or invalid); derived it from java on PATH: $derived_home"
+      export JAVA_HOME="$derived_home"
+    fi
+  fi
+
   command -v java >/dev/null 2>&1 || fail "java command not found; install or select a JDK according to docs/INSTALL.md first"
   [[ -n "${JAVA_HOME:-}" ]] || fail "JAVA_HOME is not set; configure JAVA_HOME for the selected JDK first"
   [[ -x "$JAVA_HOME/bin/java" ]] || fail "JAVA_HOME does not contain bin/java: $JAVA_HOME"
@@ -63,31 +75,34 @@ install_maven() {
   archive="$TMP_DIR/apache-maven-$MAVEN_VERSION-bin.tar.gz"
   url="$MAVEN_BASE_URL/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.tar.gz"
 
+  mkdir -p "$MAVEN_INSTALL_PARENT"
+
   if [[ ! -d "$MAVEN_INSTALL_DIR" ]]; then
-    log "downloading Maven $MAVEN_VERSION"
+    log "downloading Maven $MAVEN_VERSION from the Apache archive"
     curl -fsSL "$url" -o "$archive"
 
     log "installing Maven to $MAVEN_INSTALL_DIR"
-    sudo_cmd tar -xzf "$archive" -C /opt
+    tar -xzf "$archive" -C "$MAVEN_INSTALL_PARENT"
   else
     log "Maven install directory already exists: $MAVEN_INSTALL_DIR"
   fi
 
-  sudo_cmd ln -sfn "$MAVEN_INSTALL_DIR" "$MAVEN_HOME_LINK"
+  ln -sfn "$MAVEN_INSTALL_DIR" "$MAVEN_HOME_LINK"
 }
 
 persist_environment() {
-  local line_home line_path
+  local maven_home="$1"
+  local profile_file line_path
 
-  line_home="export MAVEN_HOME=$MAVEN_HOME_LINK"
+  profile_file="$(detect_profile_file)"
   line_path='export PATH=$MAVEN_HOME/bin:$PATH'
 
-  if ! grep -qxF "$line_home" "$PROFILE_FILE" 2>/dev/null; then
-    log "persisting MAVEN_HOME in $PROFILE_FILE"
-    printf '\n%s\n%s\n' "$line_home" "$line_path" >> "$PROFILE_FILE"
-  fi
+  log "persisting MAVEN_HOME=$maven_home in $profile_file"
+  persist_export "$profile_file" MAVEN_HOME "$maven_home"
+  persist_line "$profile_file" "$line_path"
+  persist_toolchain_var MAVEN_HOME "$maven_home"
 
-  export MAVEN_HOME="$MAVEN_HOME_LINK"
+  export MAVEN_HOME="$maven_home"
   export PATH="$MAVEN_HOME/bin:$PATH"
 }
 
@@ -109,13 +124,24 @@ verify_maven() {
 main() {
   require_java
 
+  local maven_home_to_persist
+
   if maven_satisfies_requirement; then
-    log "existing Maven satisfies requirement: version=$(maven_version)"
+    maven_home_to_persist="$(locate_existing_maven_home || true)"
+    if [[ -n "$maven_home_to_persist" ]]; then
+      log "existing Maven satisfies requirement: version=$(maven_version), home=$maven_home_to_persist; skipping download and just persisting MAVEN_HOME"
+    else
+      log "existing Maven satisfies requirement: version=$(maven_version), but its home directory could not be determined; leaving MAVEN_HOME untouched"
+    fi
   else
     install_maven
+    maven_home_to_persist="$MAVEN_HOME_LINK"
   fi
 
-  persist_environment
+  if [[ -n "$maven_home_to_persist" ]]; then
+    persist_environment "$maven_home_to_persist"
+  fi
+
   verify_maven
 }
 

@@ -13,6 +13,7 @@
 - `agents/scripts/`: Shared runtime scripts that can be reused by multiple agents.
 - `agents/<agent-name>/skills/`: Private skills used only by that agent.
 - `agents/<agent-name>/scripts/`: Private runtime scripts used only by that agent.
+- `agents/<agent-name>/scripts/lib/`: Shared shell functions `source`d by that agent's own scripts (not meant to be executed directly, so files here are not marked executable).
 - `agents/scripts/`: Helper scripts used internally by the installer.
 
 ### Commands

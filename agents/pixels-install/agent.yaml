@@ -7,12 +7,20 @@ entrypoints:
 scripts:
   prepare: scripts/prepare_deployment.sh
   check: scripts/check_prerequisites.sh
+  jdk: scripts/install_jdk.sh
   maven: scripts/install_maven.sh
+  mysql: scripts/install_mysql.sh
   etcd: scripts/install_etcd.sh
   pixels: scripts/build_install_pixels.sh
   configure: scripts/configure_pixels.sh
+  shell_helpers: scripts/install_shell_helpers.sh
   smoke_test: scripts/smoke_test.sh
+  progress: scripts/progress.sh
   cluster_ssh: ../scripts/setup_cluster.sh
+  trino_prepare: scripts/prepare_trino_cluster.sh
+  trino_install: scripts/install_trino.sh
+  trino_install_cluster: scripts/install_trino_cluster.sh
+  trino_shell_helpers: scripts/install_trino_shell_helpers.sh
 phases:
   - discover_install_target
   - check_prerequisites
@@ -24,5 +32,7 @@ phases:
   - build_install_pixels
   - configure_pixels
   - start_pixels_optional
+  - install_shell_helpers_optional
   - smoke_test
-  - optional_trino_or_hadoop_or_monitoring
+  - optional_trino_install
+  - optional_hadoop_or_monitoring
