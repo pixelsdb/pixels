@@ -1,0 +1,28 @@
+name: pixels-install
+description: Guide, execute, and verify a basic Pixels deployment from docs/INSTALL.md using selective helper scripts.
+version: 1.0.0
+entrypoints:
+  claude: claude.md
+  codex: codex.md
+scripts:
+  prepare: scripts/prepare_deployment.sh
+  check: scripts/check_prerequisites.sh
+  maven: scripts/install_maven.sh
+  etcd: scripts/install_etcd.sh
+  pixels: scripts/build_install_pixels.sh
+  configure: scripts/configure_pixels.sh
+  smoke_test: scripts/smoke_test.sh
+  cluster_ssh: ../scripts/setup_cluster.sh
+phases:
+  - discover_install_target
+  - check_prerequisites
+  - prepare_deployment_config
+  - install_or_verify_jdk
+  - install_or_verify_maven
+  - install_or_verify_mysql
+  - install_or_verify_etcd
+  - build_install_pixels
+  - configure_pixels
+  - start_pixels_optional
+  - smoke_test
+  - optional_trino_or_hadoop_or_monitoring
