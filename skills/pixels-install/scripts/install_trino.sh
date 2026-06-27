@@ -16,7 +16,13 @@ load_toolchain_env
 
 SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
 STATE_DIR="${STATE_DIR:-$(state_dir)}"
-REPO_ROOT="${REPO_ROOT:-$(require_repo_root)}"
+if [[ -z "${REPO_ROOT:-}" ]]; then
+  if [[ -n "${PIXELS_TRINO_CONNECTOR_ZIP:-}" ]]; then
+    REPO_ROOT="$PWD"
+  else
+    REPO_ROOT="$(require_repo_root)"
+  fi
+fi
 
 # Picks up the cluster topology written by prepare_trino_cluster.sh, if any.
 # Explicit env vars passed to this script still take precedence.
@@ -51,16 +57,33 @@ TRINO_COORDINATOR_HOST="${TRINO_COORDINATOR_HOST:-}"
 TRINO_COORDINATOR_IS_WORKER="${TRINO_COORDINATOR_IS_WORKER:-false}"
 
 PIXELS_HOME="${PIXELS_HOME:-$HOME/opt/pixels}"
+TRINO_PIXELS_HOME="${TRINO_PIXELS_HOME:-$PIXELS_HOME}"
+TRINO_PIXELS_CONFIG="${TRINO_PIXELS_CONFIG:-$TRINO_PIXELS_HOME/etc/pixels.properties}"
+TRINO_PIXELS_CONFIG_SOURCE="${TRINO_PIXELS_CONFIG_SOURCE:-${PIXELS_CONFIG:-}}"
+TRINO_PIXELS_ENV_FILE="${TRINO_PIXELS_ENV_FILE:-$HOME/.pixels-trino-env.sh}"
+TRINO_PIXELS_SERVICE_HOST="${TRINO_PIXELS_SERVICE_HOST:-${PIXELS_SERVICE_HOST:-}}"
+TRINO_PIXELS_METADATA_SERVER_HOST="${TRINO_PIXELS_METADATA_SERVER_HOST:-${METADATA_SERVER_HOST:-$TRINO_PIXELS_SERVICE_HOST}}"
+TRINO_PIXELS_TRANS_SERVER_HOST="${TRINO_PIXELS_TRANS_SERVER_HOST:-${TRANS_SERVER_HOST:-$TRINO_PIXELS_SERVICE_HOST}}"
+TRINO_PIXELS_QUERY_SCHEDULE_SERVER_HOST="${TRINO_PIXELS_QUERY_SCHEDULE_SERVER_HOST:-${QUERY_SCHEDULE_SERVER_HOST:-$TRINO_PIXELS_SERVICE_HOST}}"
+TRINO_PIXELS_ETCD_HOSTS="${TRINO_PIXELS_ETCD_HOSTS:-${ETCD_HOSTS:-$TRINO_PIXELS_SERVICE_HOST}}"
+TRINO_PIXELS_METADATA_SERVER_PORT="${TRINO_PIXELS_METADATA_SERVER_PORT:-${METADATA_SERVER_PORT:-18888}}"
+TRINO_PIXELS_TRANS_SERVER_PORT="${TRINO_PIXELS_TRANS_SERVER_PORT:-${TRANS_SERVER_PORT:-18889}}"
+TRINO_PIXELS_QUERY_SCHEDULE_SERVER_PORT="${TRINO_PIXELS_QUERY_SCHEDULE_SERVER_PORT:-${QUERY_SCHEDULE_SERVER_PORT:-18893}}"
+TRINO_PIXELS_ETCD_PORT="${TRINO_PIXELS_ETCD_PORT:-${ETCD_PORT:-2379}}"
 PIXELS_TRINO_DIR="${PIXELS_TRINO_DIR:-$HOME/pixels-trino}"
 PIXELS_TRINO_REPO_URL="${PIXELS_TRINO_REPO_URL:-https://github.com/pixelsdb/pixels-trino.git}"
+PIXELS_TRINO_CONNECTOR_ZIP="${PIXELS_TRINO_CONNECTOR_ZIP:-}"
+PIXELS_TRINO_LISTENER_ZIP="${PIXELS_TRINO_LISTENER_ZIP:-}"
 INSTALL_PIXELS_TRINO_PLUGIN="${INSTALL_PIXELS_TRINO_PLUGIN:-true}"
 # cloud.function.switch in etc/catalog/pixels.properties: off/on/auto/session.
 # Pixels-Turbo (serverless pushdown) is out of this skill's scope, so this
 # stays "off" unless the user explicitly asks for Pixels Turbo.
 CLOUD_FUNCTION_SWITCH="${CLOUD_FUNCTION_SWITCH:-off}"
-# The event listener is explicitly marked optional ("*") in pixels-trino's
-# README; default it off.
-INSTALL_PIXELS_TRINO_LISTENER="${INSTALL_PIXELS_TRINO_LISTENER:-false}"
+# Install both pixels-trino artifacts documented by pixelsdb/pixels-trino:
+# connector + event listener. Set this false only when the listener is
+# intentionally out of scope.
+INSTALL_PIXELS_TRINO_LISTENER="${INSTALL_PIXELS_TRINO_LISTENER:-true}"
+PIXELS_TRINO_LISTENER_LOG_DIR="${PIXELS_TRINO_LISTENER_LOG_DIR:-$TRINO_INSTALL_PARENT/pixels-listener}"
 INSTALL_TRINO_CLI="${INSTALL_TRINO_CLI:-true}"
 TRINO_CLI_DOWNLOAD_URL="${TRINO_CLI_DOWNLOAD_URL:-https://repo1.maven.org/maven2/io/trino/trino-cli/$TRINO_VERSION/trino-cli-$TRINO_VERSION-executable.jar}"
 ASSUME_YES="${ASSUME_YES:-false}"
@@ -170,7 +193,10 @@ confirm_trino_install() {
   printf '  install_dir: %s\n' "$TRINO_INSTALL_DIR"
   printf '  home_link: %s\n' "$TRINO_HOME_LINK"
   printf '  data_dir: %s\n' "$TRINO_DATA_DIR"
+  printf '  trino_pixels_home: %s\n' "$TRINO_PIXELS_HOME"
+  printf '  trino_pixels_config: %s\n' "$TRINO_PIXELS_CONFIG"
   printf '  pixels_trino_source: %s\n\n' "$PIXELS_TRINO_DIR"
+  printf '  install_pixels_trino_listener: %s\n' "$INSTALL_PIXELS_TRINO_LISTENER"
 
   [[ -t 0 ]] || fail "Trino install paths and role must be confirmed; set CONFIRM_TRINO_INSTALL=true after reviewing them"
   read -r -p "Install/configure Trino with these settings on this node? [y/N]: " reply
@@ -250,9 +276,9 @@ EOF
 
   # Required by the pixels-trino connector (Java 9+ reflection access),
   # per https://github.com/pixelsdb/pixels-trino's README.
-  grep -qxF '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED' "$file" ||
+  grep -qxF -- '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED' "$file" ||
     printf '%s\n' '--add-opens=java.base/sun.nio.ch=ALL-UNNAMED' >> "$file"
-  grep -qxF '--add-opens=java.base/java.nio=ALL-UNNAMED' "$file" ||
+  grep -qxF -- '--add-opens=java.base/java.nio=ALL-UNNAMED' "$file" ||
     printf '%s\n' '--add-opens=java.base/java.nio=ALL-UNNAMED' >> "$file"
 }
 
@@ -288,6 +314,129 @@ write_log_properties() {
   set_properties_property "$file" io.trino INFO
 }
 
+same_path() {
+  local left="$1"
+  local right="$2"
+
+  [[ -e "$left" && -e "$right" ]] || return 1
+  [[ "$(readlink -f "$left" 2>/dev/null || printf '%s' "$left")" == "$(readlink -f "$right" 2>/dev/null || printf '%s' "$right")" ]]
+}
+
+find_trino_pixels_config_source() {
+  local candidate
+  local -a candidates=()
+
+  [[ -n "$TRINO_PIXELS_CONFIG_SOURCE" ]] && candidates+=("$TRINO_PIXELS_CONFIG_SOURCE")
+  [[ -n "${PIXELS_CONFIG:-}" ]] && candidates+=("$PIXELS_CONFIG")
+  [[ -n "${PIXELS_HOME:-}" ]] && candidates+=("$PIXELS_HOME/etc/pixels.properties")
+  [[ -n "${REPO_ROOT:-}" ]] && candidates+=("$REPO_ROOT/pixels-common/src/main/resources/pixels.properties")
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+set_properties_property_if_set() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  [[ -n "$value" ]] || return 0
+  set_properties_property "$file" "$key" "$value"
+}
+
+write_trino_pixels_env() {
+  local profile_file source_line
+
+  mkdir -p "$(dirname "$TRINO_PIXELS_ENV_FILE")"
+  cat > "$TRINO_PIXELS_ENV_FILE" <<EOF
+# Generated by pixels-install for pixels-trino on this Trino node.
+export PIXELS_HOME="$TRINO_PIXELS_HOME"
+export PIXELS_CONFIG="$TRINO_PIXELS_CONFIG"
+EOF
+
+  if [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME:-}/bin/java" ]]; then
+    cat >> "$TRINO_PIXELS_ENV_FILE" <<EOF
+export JAVA_HOME="$JAVA_HOME"
+case ":\$PATH:" in
+  *:"$JAVA_HOME/bin":*) ;;
+  *) export PATH="$JAVA_HOME/bin:\$PATH" ;;
+esac
+EOF
+  fi
+
+  chmod 644 "$TRINO_PIXELS_ENV_FILE"
+  profile_file="$(detect_profile_file)"
+  source_line="[ -f \"$TRINO_PIXELS_ENV_FILE\" ] && source \"$TRINO_PIXELS_ENV_FILE\""
+  persist_line "$profile_file" "$source_line"
+  log "wrote Trino-side Pixels environment: $TRINO_PIXELS_ENV_FILE"
+  log "persisted source line in $profile_file"
+}
+
+configure_trino_pixels_client() {
+  local source_config=""
+
+  [[ "$INSTALL_PIXELS_TRINO_PLUGIN" == "true" ]] || return 0
+
+  mkdir -p "$TRINO_PIXELS_HOME/etc" "$TRINO_PIXELS_HOME/logs"
+  source_config="$(find_trino_pixels_config_source || true)"
+
+  if [[ -n "$source_config" ]]; then
+    if ! same_path "$source_config" "$TRINO_PIXELS_CONFIG"; then
+      log "copying Pixels client config for Trino: $source_config -> $TRINO_PIXELS_CONFIG"
+      cp "$source_config" "$TRINO_PIXELS_CONFIG"
+    else
+      log "reusing existing Trino-side Pixels config: $TRINO_PIXELS_CONFIG"
+    fi
+  elif [[ -f "$TRINO_PIXELS_CONFIG" ]]; then
+    log "reusing existing Trino-side Pixels config: $TRINO_PIXELS_CONFIG"
+  else
+    fail "could not find a Pixels config for Trino; set TRINO_PIXELS_CONFIG_SOURCE=/path/to/pixels.properties"
+  fi
+
+  set_properties_property_if_set "$TRINO_PIXELS_CONFIG" metadata.server.host "$TRINO_PIXELS_METADATA_SERVER_HOST"
+  set_properties_property "$TRINO_PIXELS_CONFIG" metadata.server.port "$TRINO_PIXELS_METADATA_SERVER_PORT"
+  set_properties_property_if_set "$TRINO_PIXELS_CONFIG" trans.server.host "$TRINO_PIXELS_TRANS_SERVER_HOST"
+  set_properties_property "$TRINO_PIXELS_CONFIG" trans.server.port "$TRINO_PIXELS_TRANS_SERVER_PORT"
+  set_properties_property_if_set "$TRINO_PIXELS_CONFIG" query.schedule.server.host "$TRINO_PIXELS_QUERY_SCHEDULE_SERVER_HOST"
+  set_properties_property "$TRINO_PIXELS_CONFIG" query.schedule.server.port "$TRINO_PIXELS_QUERY_SCHEDULE_SERVER_PORT"
+  set_properties_property_if_set "$TRINO_PIXELS_CONFIG" etcd.hosts "$TRINO_PIXELS_ETCD_HOSTS"
+  set_properties_property "$TRINO_PIXELS_CONFIG" etcd.port "$TRINO_PIXELS_ETCD_PORT"
+
+  export PIXELS_HOME="$TRINO_PIXELS_HOME"
+  export PIXELS_CONFIG="$TRINO_PIXELS_CONFIG"
+  write_trino_pixels_env
+}
+
+install_plugin_zip() {
+  local zip_file="$1"
+  local plugin_dir="$2"
+  local plugin_name_glob="$3"
+  local tmp_dir top_dir top_name
+
+  require_command unzip
+  tmp_dir="$(mktemp -d "${TMP_DIR%/}/pixels-trino-plugin.XXXXXX")"
+  unzip -oq "$zip_file" -d "$tmp_dir"
+
+  top_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+  [[ -n "$top_dir" ]] || {
+    rm -rf "$tmp_dir"
+    fail "plugin zip has no top-level directory: $zip_file"
+  }
+
+  top_name="$(basename "$top_dir")"
+  mkdir -p "$plugin_dir"
+  find "$plugin_dir" -mindepth 1 -maxdepth 1 -type d -name "$plugin_name_glob" -exec rm -rf {} +
+  unzip -oq "$zip_file" -d "$plugin_dir"
+  rm -rf "$tmp_dir"
+  log "installed plugin directory: $plugin_dir/$top_name"
+}
+
 build_pixels_trino_plugin() {
   local connector_zip listener_zip plugin_dir="$TRINO_HOME_LINK/plugin"
 
@@ -297,44 +446,53 @@ build_pixels_trino_plugin() {
   }
 
   require_java
-  require_command mvn
 
-  if [[ ! -d "$PIXELS_TRINO_DIR/.git" ]]; then
-    require_command git
-    log "cloning pixels-trino into $PIXELS_TRINO_DIR"
-    git clone "$PIXELS_TRINO_REPO_URL" "$PIXELS_TRINO_DIR"
+  if [[ -n "$PIXELS_TRINO_CONNECTOR_ZIP" || -n "$PIXELS_TRINO_LISTENER_ZIP" ]]; then
+    connector_zip="$PIXELS_TRINO_CONNECTOR_ZIP"
+    listener_zip="$PIXELS_TRINO_LISTENER_ZIP"
+    log "using prebuilt pixels-trino artifacts"
+  else
+    require_command mvn
+
+    if [[ ! -d "$PIXELS_TRINO_DIR/.git" ]]; then
+      require_command git
+      log "cloning pixels-trino into $PIXELS_TRINO_DIR"
+      git clone "$PIXELS_TRINO_REPO_URL" "$PIXELS_TRINO_DIR"
+    fi
+
+    log "building pixels-trino locally (requires Pixels itself to already be 'mvn install'ed locally)"
+    (cd "$PIXELS_TRINO_DIR" && mvn clean install) || fail "pixels-trino build failed"
+
+    connector_zip="$(find "$PIXELS_TRINO_DIR/connector/target" -maxdepth 1 -name 'pixels-trino-connector-*.zip' -print -quit 2>/dev/null || true)"
+    listener_zip="$(find "$PIXELS_TRINO_DIR/listener/target" -maxdepth 1 -name 'pixels-trino-listener-*.zip' -print -quit 2>/dev/null || true)"
   fi
 
-  log "building pixels-trino (requires Pixels itself to already be 'mvn install'ed locally)"
-  (cd "$PIXELS_TRINO_DIR" && mvn clean install) || fail "pixels-trino build failed"
-
-  connector_zip="$(find "$PIXELS_TRINO_DIR/connector/target" -maxdepth 1 -name 'pixels-trino-connector-*.zip' -print -quit 2>/dev/null || true)"
-  listener_zip="$(find "$PIXELS_TRINO_DIR/listener/target" -maxdepth 1 -name 'pixels-trino-listener-*.zip' -print -quit 2>/dev/null || true)"
   [[ -n "$connector_zip" ]] || fail "pixels-trino-connector-*.zip not found under $PIXELS_TRINO_DIR/connector/target"
+  [[ -f "$connector_zip" ]] || fail "pixels-trino connector zip does not exist: $connector_zip"
 
-  require_command unzip
   mkdir -p "$plugin_dir"
-  rm -rf "$plugin_dir/pixels-trino-connector"
   log "installing pixels-trino connector: $connector_zip"
-  unzip -oq "$connector_zip" -d "$plugin_dir"
+  install_plugin_zip "$connector_zip" "$plugin_dir" "pixels-trino-connector*"
 
+  # This is Trino's catalog config for the Pixels connector. It is not the
+  # Pixels runtime config file ($PIXELS_HOME/etc/pixels.properties).
   set_properties_property "$TRINO_HOME_LINK/etc/catalog/pixels.properties" connector.name pixels
   set_properties_property "$TRINO_HOME_LINK/etc/catalog/pixels.properties" cloud.function.switch "$CLOUD_FUNCTION_SWITCH"
   set_properties_property "$TRINO_HOME_LINK/etc/catalog/pixels.properties" clean.intermediate.result true
 
   if [[ "$INSTALL_PIXELS_TRINO_LISTENER" == "true" ]]; then
     [[ -n "$listener_zip" ]] || fail "pixels-trino-listener-*.zip not found under $PIXELS_TRINO_DIR/listener/target"
-    rm -rf "$plugin_dir/pixels-trino-listener"
+    [[ -f "$listener_zip" ]] || fail "pixels-trino listener zip does not exist: $listener_zip"
     log "installing pixels-trino event listener: $listener_zip"
-    unzip -oq "$listener_zip" -d "$plugin_dir"
+    install_plugin_zip "$listener_zip" "$plugin_dir" "pixels-trino-listener*"
 
-    mkdir -p "$PIXELS_HOME/listener"
+    mkdir -p "$PIXELS_TRINO_LISTENER_LOG_DIR"
     set_properties_property "$TRINO_HOME_LINK/etc/event-listener.properties" event-listener.name pixels-event-listener
     set_properties_property "$TRINO_HOME_LINK/etc/event-listener.properties" enabled true
     set_properties_property "$TRINO_HOME_LINK/etc/event-listener.properties" listened.user.prefix none
     set_properties_property "$TRINO_HOME_LINK/etc/event-listener.properties" listened.schema pixels
     set_properties_property "$TRINO_HOME_LINK/etc/event-listener.properties" listened.query.type SELECT
-    set_properties_property "$TRINO_HOME_LINK/etc/event-listener.properties" log.dir "$PIXELS_HOME/listener/"
+    set_properties_property "$TRINO_HOME_LINK/etc/event-listener.properties" log.dir "$PIXELS_TRINO_LISTENER_LOG_DIR/"
   else
     log "INSTALL_PIXELS_TRINO_LISTENER=false; skipping the optional pixels-trino event listener"
   fi
@@ -364,8 +522,16 @@ verify_install() {
   [[ -d "$TRINO_DATA_DIR" ]] || fail "missing data dir $TRINO_DATA_DIR"
 
   if [[ "$INSTALL_PIXELS_TRINO_PLUGIN" == "true" ]]; then
-    [[ -d "$TRINO_HOME_LINK/plugin/pixels-trino-connector" ]] || fail "pixels-trino connector not installed under $TRINO_HOME_LINK/plugin"
+    find "$TRINO_HOME_LINK/plugin" -mindepth 1 -maxdepth 1 -type d -name 'pixels-trino-connector*' -print -quit | grep -q . ||
+      fail "pixels-trino connector not installed under $TRINO_HOME_LINK/plugin"
     [[ -f "$TRINO_HOME_LINK/etc/catalog/pixels.properties" ]] || fail "pixels catalog config not written under $TRINO_HOME_LINK/etc/catalog"
+    [[ -f "$TRINO_PIXELS_CONFIG" ]] || fail "Trino-side Pixels client config not written: $TRINO_PIXELS_CONFIG"
+    [[ -f "$TRINO_PIXELS_ENV_FILE" ]] || fail "Trino-side Pixels env file not written: $TRINO_PIXELS_ENV_FILE"
+    if [[ "$INSTALL_PIXELS_TRINO_LISTENER" == "true" ]]; then
+      find "$TRINO_HOME_LINK/plugin" -mindepth 1 -maxdepth 1 -type d -name 'pixels-trino-listener*' -print -quit | grep -q . ||
+        fail "pixels-trino listener not installed under $TRINO_HOME_LINK/plugin"
+      [[ -f "$TRINO_HOME_LINK/etc/event-listener.properties" ]] || fail "pixels event listener config not written under $TRINO_HOME_LINK/etc"
+    fi
   fi
 
   log "Trino installation verified at $TRINO_HOME_LINK ($TRINO_INSTALL_DIR)"
@@ -380,6 +546,7 @@ main() {
   write_jvm_config
   write_config_properties
   write_log_properties
+  configure_trino_pixels_client
   build_pixels_trino_plugin
   install_trino_cli
   verify_install

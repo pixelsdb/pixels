@@ -18,6 +18,7 @@ scripts:
   progress: scripts/progress.sh
   cluster_ssh: shared-scripts/setup_cluster.sh
   trino_prepare: scripts/prepare_trino_cluster.sh
+  trino_artifacts: scripts/build_pixels_trino_artifacts.sh
   trino_install: scripts/install_trino.sh
   trino_install_cluster: scripts/install_trino_cluster.sh
   trino_shell_helpers: scripts/install_trino_shell_helpers.sh

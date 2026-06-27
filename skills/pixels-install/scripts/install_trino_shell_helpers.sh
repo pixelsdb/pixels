@@ -3,9 +3,10 @@ set -euo pipefail
 
 # Optional convenience step (asks before doing anything - see below):
 # writes start_trino_cluster/stop_trino_cluster/restart_trino_cluster/
-# change_trino_version/trino_cli shell functions, driven by the cluster
-# topology written by prepare_trino_cluster.sh. The coordinator is operated
-# locally; every worker is operated over the passwordless SSH that
+# change_trino_version/trino_cli/trino_show_schemas/redeploy_trino_cluster
+# shell functions, driven by the cluster topology written by
+# prepare_trino_cluster.sh. The coordinator is operated locally; every worker
+# is operated over the passwordless SSH that
 # prepare_trino_cluster.sh (via shared-scripts/setup_cluster.sh) already set
 # up between cluster nodes.
 #
@@ -22,6 +23,10 @@ source "$SCRIPT_DIR/lib/shell_env.sh"
 SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
 STATE_DIR="${STATE_DIR:-$(state_dir)}"
 TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$STATE_DIR/trino-deployment.env}"
+SSH_USER_WAS_SET=false
+SSH_PORT_WAS_SET=false
+[[ -n "${SSH_USER+x}" ]] && SSH_USER_WAS_SET=true
+[[ -n "${SSH_PORT+x}" ]] && SSH_PORT_WAS_SET=true
 if [[ -f "$TRINO_DEPLOYMENT_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -29,9 +34,20 @@ if [[ -f "$TRINO_DEPLOYMENT_FILE" ]]; then
   set +a
 fi
 
-SSH_USER="${SSH_USER:-root}"
+if [[ "$SSH_USER_WAS_SET" == "false" ]]; then
+  SSH_USER="${TRINO_SSH_USER:-root}"
+else
+  SSH_USER="${SSH_USER:-}"
+fi
+if [[ "$SSH_PORT_WAS_SET" == "false" ]]; then
+  SSH_PORT="${TRINO_SSH_PORT:-}"
+else
+  SSH_PORT="${SSH_PORT:-}"
+fi
 TRINO_HTTP_PORT="${TRINO_HTTP_PORT:-8080}"
 TRINO_FUNCTIONS_FILE="${TRINO_FUNCTIONS_FILE:-$HOME/.trino-shell-helpers.sh}"
+TRINO_PIXELS_ENV_FILE="${TRINO_PIXELS_ENV_FILE:-$HOME/.pixels-trino-env.sh}"
+TRINO_INSTALL_SKILL_DIR="${TRINO_INSTALL_SKILL_DIR:-$SKILL_DIR}"
 ASSUME_YES="${ASSUME_YES:-false}"
 INSTALL_TRINO_SHELL_HELPERS="${INSTALL_TRINO_SHELL_HELPERS:-}"
 
@@ -60,7 +76,7 @@ confirm_install() {
     return 1
   fi
 
-  read -r -p "Install start_trino_cluster/stop_trino_cluster/restart_trino_cluster/change_trino_version/trino_cli shell functions for this cluster (writes $TRINO_FUNCTIONS_FILE)? [y/N]: " reply
+  read -r -p "Install start_trino_cluster/stop_trino_cluster/restart_trino_cluster/change_trino_version/trino_cli/trino_show_schemas/redeploy_trino_cluster shell functions for this cluster (writes $TRINO_FUNCTIONS_FILE)? [y/N]: " reply
   [[ "$reply" =~ ^[Yy]$ ]]
 }
 
@@ -108,8 +124,34 @@ write_functions_file() {
 TRINO_NODES=(
 $nodes_literal)
 
+TRINO_REMOTE_HOME_LINK="\${TRINO_REMOTE_HOME_LINK:-${TRINO_HOME_LINK:-$HOME/opt/trino-server}}"
+TRINO_INSTALL_SKILL_DIR="\${TRINO_INSTALL_SKILL_DIR:-$TRINO_INSTALL_SKILL_DIR}"
+
 _trino_home() {
   printf '%s\n' "\${TRINO_HOME_LINK:-\$HOME/opt/trino-server}"
+}
+
+_pixels_trino_env() {
+  printf '%s\n' "\${TRINO_PIXELS_ENV_FILE:-$TRINO_PIXELS_ENV_FILE}"
+}
+
+_source_pixels_trino_env() {
+  local env_file
+  env_file="\$(_pixels_trino_env)"
+  if [[ -f "\$env_file" ]]; then
+    # shellcheck disable=SC1090
+    source "\$env_file"
+  fi
+}
+
+_trino_remote_launcher() {
+  printf '%s/bin/launcher' "\$TRINO_REMOTE_HOME_LINK"
+}
+
+_trino_remote_run() {
+  local node="\$1"
+  local action="\$2"
+  ssh -n "\$node" "[ -f ~/.pixels-trino-env.sh ] && . ~/.pixels-trino-env.sh; \\"\$(_trino_remote_launcher)\\" \$action"
 }
 
 start_trino_cluster() {
@@ -118,11 +160,12 @@ start_trino_cluster() {
   for node in "\${TRINO_NODES[@]}"; do
     if [[ "\$first" == "true" ]]; then
       echo "starting trino on \$node (coordinator, local)"
+      _source_pixels_trino_env
       "\$(_trino_home)/bin/launcher" start || { echo "failed to start coordinator \$node" >&2; return 1; }
       first=false
     else
       echo "starting trino on \$node (worker, remote)"
-      ssh -n "\$node" '~/opt/trino-server/bin/launcher start' || { echo "failed to start worker \$node" >&2; return 1; }
+      _trino_remote_run "\$node" start || { echo "failed to start worker \$node" >&2; return 1; }
     fi
   done
 
@@ -130,16 +173,17 @@ start_trino_cluster() {
 }
 
 stop_trino_cluster() {
-  local node first=true
+  local idx node
 
-  for node in "\${TRINO_NODES[@]}"; do
-    if [[ "\$first" == "true" ]]; then
-      echo "stopping trino on \$node (coordinator, local)"
-      "\$(_trino_home)/bin/launcher" stop || { echo "failed to stop coordinator \$node" >&2; return 1; }
-      first=false
-    else
+  for ((idx = \${#TRINO_NODES[@]} - 1; idx >= 0; idx--)); do
+    node="\${TRINO_NODES[\$idx]}"
+    if (( idx > 0 )); then
       echo "stopping trino on \$node (worker, remote)"
-      ssh -n "\$node" '~/opt/trino-server/bin/launcher stop' || { echo "failed to stop worker \$node" >&2; return 1; }
+      _trino_remote_run "\$node" stop || { echo "failed to stop worker \$node" >&2; return 1; }
+    else
+      echo "stopping trino on \$node (coordinator, local)"
+      _source_pixels_trino_env
+      "\$(_trino_home)/bin/launcher" stop || { echo "failed to stop coordinator \$node" >&2; return 1; }
     fi
   done
 
@@ -147,19 +191,8 @@ stop_trino_cluster() {
 }
 
 restart_trino_cluster() {
-  local node first=true
-
-  for node in "\${TRINO_NODES[@]}"; do
-    if [[ "\$first" == "true" ]]; then
-      echo "restarting trino on \$node (coordinator, local)"
-      "\$(_trino_home)/bin/launcher" restart || { echo "failed to restart coordinator \$node" >&2; return 1; }
-      first=false
-    else
-      echo "restarting trino on \$node (worker, remote)"
-      ssh -n "\$node" '~/opt/trino-server/bin/launcher restart' || { echo "failed to restart worker \$node" >&2; return 1; }
-    fi
-  done
-
+  stop_trino_cluster || return 1
+  start_trino_cluster || return 1
   echo "trino cluster restarted"
 }
 
@@ -184,7 +217,22 @@ change_trino_version() {
 
 trino_cli() {
   local catalog="\${1:-pixels}"
+  _source_pixels_trino_env
   "\$(_trino_home)/bin/trino" --server "localhost:\${TRINO_HTTP_PORT:-$TRINO_HTTP_PORT}" --catalog "\$catalog"
+}
+
+trino_show_schemas() {
+  local catalog="\${1:-pixels}"
+  _source_pixels_trino_env
+  "\$(_trino_home)/bin/trino" --server "localhost:\${TRINO_HTTP_PORT:-$TRINO_HTTP_PORT}" --catalog "\$catalog" --execute "SHOW SCHEMAS"
+}
+
+redeploy_trino_cluster() {
+  if [[ ! -x "\$TRINO_INSTALL_SKILL_DIR/scripts/install_trino_cluster.sh" ]]; then
+    echo "install_trino_cluster.sh not found under \$TRINO_INSTALL_SKILL_DIR" >&2
+    return 1
+  fi
+  "\$TRINO_INSTALL_SKILL_DIR/scripts/install_trino_cluster.sh"
 }
 EOF
 
@@ -212,7 +260,7 @@ main() {
   bash -n "$TRINO_FUNCTIONS_FILE" || fail "generated functions file has a syntax error: $TRINO_FUNCTIONS_FILE"
   persist_source_line
 
-  log "trino shell helpers installed: start_trino_cluster, stop_trino_cluster, restart_trino_cluster, change_trino_version, trino_cli"
+  log "trino shell helpers installed: start_trino_cluster, stop_trino_cluster, restart_trino_cluster, change_trino_version, trino_cli, trino_show_schemas, redeploy_trino_cluster"
   log "open a new terminal (or run: source $(detect_profile_file)) to use them"
 }
 

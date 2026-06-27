@@ -393,6 +393,8 @@ TRINO_WORKER_SSH_TARGETS=$(shell_quote "$(join_by_space "${worker_ssh_targets[@]
 TRINO_WORKER_HOSTS=$(shell_quote "$(join_by_space "${worker_hosts[@]}")")
 TRINO_WORKER_NAMES=$(shell_quote "$(join_by_space "${worker_names[@]}")")
 TRINO_ALL_NODE_NAMES=$(shell_quote "$(join_by_space "${all_names[@]}")")
+TRINO_SSH_USER=$(shell_quote "$SSH_USER")
+TRINO_SSH_PORT=$(shell_quote "$SSH_PORT")
 EOF
 
   log "trino deployment config written: $OUTPUT_FILE"
