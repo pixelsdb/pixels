@@ -4,7 +4,7 @@ set -uo pipefail
 # Verifies the installed layout, configuration, metadata access, etcd
 # health, and basic CLI behavior when applicable. Runs every check and
 # reports a structured summary at the end instead of stopping at the first
-# failure (no `set -e`/hard `exit` inside individual checks), so the agent
+# failure (no `set -e`/hard `exit` inside individual checks), so the skill
 # can see every problem in one pass - e.g. "etcd is down AND the metadata
 # DB url is missing" - instead of fixing one, re-running, and discovering
 # the next.
@@ -14,9 +14,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/shell_env.sh"
 load_toolchain_env
 
-AGENT_DIR="${AGENT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-$AGENT_DIR/deployment.env}"
-TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$AGENT_DIR/trino-deployment.env}"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-$STATE_DIR/deployment.env}"
+TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$STATE_DIR/trino-deployment.env}"
 if [[ -f "$DEPLOYMENT_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090

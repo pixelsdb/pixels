@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AGENT_DIR="${AGENT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-REPO_ROOT="${REPO_ROOT:-$(cd "$AGENT_DIR/../.." && pwd)}"
-SHARED_SETUP_CLUSTER="${SHARED_SETUP_CLUSTER:-$REPO_ROOT/agents/scripts/setup_cluster.sh}"
-OUTPUT_FILE="${OUTPUT_FILE:-$AGENT_DIR/deployment.env}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/shell_env.sh
+source "$SCRIPT_DIR/lib/shell_env.sh"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+SHARED_SETUP_CLUSTER="${SHARED_SETUP_CLUSTER:-$SKILL_DIR/shared-scripts/setup_cluster.sh}"
+OUTPUT_FILE="${OUTPUT_FILE:-$STATE_DIR/deployment.env}"
 PIXELS_HOME="${PIXELS_HOME:-$HOME/opt/pixels}"
 PIXELS_DEPLOYMENT_MODE="${PIXELS_DEPLOYMENT_MODE:-}"
 PIXELS_COORDINATOR_IS_WORKER="${PIXELS_COORDINATOR_IS_WORKER:-true}"
@@ -59,14 +62,14 @@ Options:
       Shared SSH port used by the local machine. Leave empty for SSH defaults.
 
   --setup-ssh <true|false>
-      Run agents/scripts/setup_cluster.sh after writing deployment.env.
+      Run shared-scripts/setup_cluster.sh after writing deployment.env.
       Default: false
 
   --verify-remote-login <true|false>
       Passed to setup_cluster.sh when --setup-ssh true. Default: true
 
   --output <file>
-      Deployment env file path. Default: $AGENT_DIR/deployment.env
+      Deployment env file path. Default: $STATE_DIR/deployment.env
 
   -h, --help
       Show this help message.

@@ -5,9 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/shell_env.sh
 source "$SCRIPT_DIR/lib/shell_env.sh"
 
-REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
-AGENT_DIR="${AGENT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-$AGENT_DIR/deployment.env}"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+REPO_ROOT="${REPO_ROOT:-$(require_repo_root)}"
+DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-$STATE_DIR/deployment.env}"
 USE_DEPLOYMENT_FILE="${USE_DEPLOYMENT_FILE:-true}"
 if [[ "$USE_DEPLOYMENT_FILE" == "true" && -f "$DEPLOYMENT_FILE" ]]; then
   set -a
@@ -79,18 +80,18 @@ run_pixels_install() {
   require_command mvn
 
   # install.sh only prompts about overwriting $PIXELS_HOME/bin|sbin|etc when
-  # they are non-empty (safe to auto-confirm per CLAUDE.md - those are
+  # they are non-empty (safe to auto-confirm per the pixels-install skill -
   # generated runtime artifacts). But when pixels.properties or
   # pixels-cpp.properties already exist, it also prompts to add new config
   # options, remove deprecated ones, or overwrite pixels-cpp.properties
-  # outright - CLAUDE.md/AGENTS.md explicitly say not to do any of that
+  # outright - the skill instructions explicitly say not to do any of that
   # without the user's say-so. `yes y` cannot answer some prompts and not
   # others, so on a re-install over an existing PIXELS_HOME we force the
   # interactive path so a human reviews every prompt instead of silently
   # touching user config.
   if [[ "$auto_confirm" == "true" ]] &&
      { [[ -f "$PIXELS_HOME/etc/pixels.properties" ]] || [[ -f "$PIXELS_HOME/etc/pixels-cpp.properties" ]]; }; then
-    log "existing config found under $PIXELS_HOME/etc; install.sh would prompt about modifying pixels.properties/pixels-cpp.properties, so running it interactively instead of auto-confirming (see CLAUDE.md: preserve user configuration by default)"
+    log "existing config found under $PIXELS_HOME/etc; install.sh would prompt about modifying pixels.properties/pixels-cpp.properties, so running it interactively instead of auto-confirming"
     auto_confirm="false"
   fi
 

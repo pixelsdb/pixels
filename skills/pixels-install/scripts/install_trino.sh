@@ -14,12 +14,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/shell_env.sh"
 load_toolchain_env
 
-AGENT_DIR="${AGENT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-REPO_ROOT="${REPO_ROOT:-$(cd "$AGENT_DIR/../.." && pwd)}"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+REPO_ROOT="${REPO_ROOT:-$(require_repo_root)}"
 
 # Picks up the cluster topology written by prepare_trino_cluster.sh, if any.
 # Explicit env vars passed to this script still take precedence.
-TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$AGENT_DIR/trino-deployment.env}"
+TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$STATE_DIR/trino-deployment.env}"
 if [[ -f "$TRINO_DEPLOYMENT_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -54,7 +55,7 @@ PIXELS_TRINO_DIR="${PIXELS_TRINO_DIR:-$HOME/pixels-trino}"
 PIXELS_TRINO_REPO_URL="${PIXELS_TRINO_REPO_URL:-https://github.com/pixelsdb/pixels-trino.git}"
 INSTALL_PIXELS_TRINO_PLUGIN="${INSTALL_PIXELS_TRINO_PLUGIN:-true}"
 # cloud.function.switch in etc/catalog/pixels.properties: off/on/auto/session.
-# Pixels-Turbo (serverless pushdown) is out of this agent's scope, so this
+# Pixels-Turbo (serverless pushdown) is out of this skill's scope, so this
 # stays "off" unless the user explicitly asks for Pixels Turbo.
 CLOUD_FUNCTION_SWITCH="${CLOUD_FUNCTION_SWITCH:-off}"
 # The event listener is explicitly marked optional ("*") in pixels-trino's

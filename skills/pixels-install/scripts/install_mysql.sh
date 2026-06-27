@@ -10,14 +10,17 @@ set -euo pipefail
 # non-interactively; it only sets the root password and creates the
 # application database/user via direct SQL.
 #
-# On success it writes agents/pixels-install/deployment.secrets.env (mode
-# 600, untracked by git) so configure_pixels.sh can pick up the same
+# On success it writes STATE_DIR/deployment.secrets.env (mode 600) so
+# configure_pixels.sh can pick up the same
 # shell-quoted METADATA_DB_USER/METADATA_DB_PASSWORD without the caller
 # re-typing them.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENT_DIR="${AGENT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-REPO_ROOT="${REPO_ROOT:-$(cd "$AGENT_DIR/../.." && pwd)}"
+# shellcheck source=lib/shell_env.sh
+source "$SCRIPT_DIR/lib/shell_env.sh"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+REPO_ROOT="${REPO_ROOT:-$(require_repo_root)}"
 
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
 METADATA_DB_USER="${METADATA_DB_USER:-pixels}"
@@ -27,7 +30,7 @@ METADATA_DB_NAME="${METADATA_DB_NAME:-pixels_metadata}"
 # for a single-node deployment with no remote metadata access.
 METADATA_DB_USER_HOST="${METADATA_DB_USER_HOST:-%}"
 SCHEMA_FILE="${SCHEMA_FILE:-$REPO_ROOT/scripts/sql/metadata_schema.sql}"
-SECRETS_FILE="${SECRETS_FILE:-$AGENT_DIR/deployment.secrets.env}"
+SECRETS_FILE="${SECRETS_FILE:-$STATE_DIR/deployment.secrets.env}"
 ASSUME_YES="${ASSUME_YES:-false}"
 DEFAULT_PASSWORD="password"
 MYSQL_ROOT_OPTION_FILE=""

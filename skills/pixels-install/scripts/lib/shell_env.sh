@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Shared helpers for the pixels-install agent scripts.
+# Shared helpers for the pixels-install skill scripts.
 #
-# All environment variables installed by this agent (JAVA_HOME, MAVEN_HOME,
+# All environment variables installed by this skill (JAVA_HOME, MAVEN_HOME,
 # ETCD, PIXELS_HOME, ...) must be persisted into the *current user's* shell
 # profile only - never into a global file such as /etc/environment or
 # /etc/profile.d, and never assuming bash when the user's login shell is zsh.
@@ -21,10 +21,87 @@
 # install_*.sh script also mirrors the same variable into a small, plain
 # `toolchain.env` file with no such guard, and sources that file at startup.
 # This lets each step pick up JAVA_HOME/MAVEN_HOME/ETCD/PIXELS_HOME from a
-# prior step even when the agent invokes each script as a separate process.
+# prior step even when the skill invokes each script as a separate process.
 
 _SHELL_ENV_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_TOOLCHAIN_ENV_FILE="$(cd "$_SHELL_ENV_LIB_DIR/../.." && pwd)/toolchain.env"
+DEFAULT_SKILL_DIR="$(cd "$_SHELL_ENV_LIB_DIR/../.." && pwd)"
+DEFAULT_SKILL_NAME="$(basename "$DEFAULT_SKILL_DIR")"
+
+skill_dir() {
+  printf '%s\n' "${SKILL_DIR:-$DEFAULT_SKILL_DIR}"
+}
+
+find_repo_root() {
+  if [[ -n "${REPO_ROOT:-}" ]]; then
+    if [[ -d "$REPO_ROOT" ]]; then
+      (cd "$REPO_ROOT" && pwd)
+      return 0
+    fi
+    return 1
+  fi
+
+  local git_root
+  git_root="$(git -C "${PWD:-.}" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$git_root" && -d "$git_root" ]]; then
+    printf '%s\n' "$git_root"
+    return 0
+  fi
+
+  local dir="${PWD:-.}"
+  dir="$(cd "$dir" 2>/dev/null && pwd || printf '%s' "$dir")"
+  while [[ "$dir" != "/" ]]; do
+    if [[ -d "$dir/.git" ]]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+
+  return 1
+}
+
+require_repo_root() {
+  local root
+  root="$(find_repo_root || true)"
+  if [[ -z "$root" ]]; then
+    printf 'ERROR: could not find Pixels repository root; run from a Pixels checkout or set REPO_ROOT=/path/to/pixels\n' >&2
+    return 1
+  fi
+  printf '%s\n' "$root"
+}
+
+state_dir() {
+  if [[ -n "${STATE_DIR:-}" ]]; then
+    printf '%s\n' "$STATE_DIR"
+    return 0
+  fi
+
+  local current_skill_dir
+  current_skill_dir="$(skill_dir)"
+
+  case "$current_skill_dir" in
+    "$HOME/.agents/skills/"*)
+      printf '%s/.agents/state/%s\n' "$HOME" "$DEFAULT_SKILL_NAME"
+      return 0
+      ;;
+    */.agents/skills/*)
+      printf '%s/.agents/state/%s\n' "${current_skill_dir%%/.agents/skills/*}" "$DEFAULT_SKILL_NAME"
+      return 0
+      ;;
+  esac
+
+  local root
+  root="$(find_repo_root || true)"
+  if [[ -n "$root" ]]; then
+    printf '%s/.agents/state/%s\n' "$root" "$DEFAULT_SKILL_NAME"
+    return 0
+  fi
+
+  printf '%s/.agents/state/%s\n' "$HOME" "$DEFAULT_SKILL_NAME"
+}
+
+DEFAULT_STATE_DIR="$(state_dir)"
+DEFAULT_TOOLCHAIN_ENV_FILE="$DEFAULT_STATE_DIR/toolchain.env"
 
 # Print the profile file that should receive persisted exports.
 # Honors an explicit PROFILE_FILE override; otherwise picks the rc file
@@ -188,10 +265,10 @@ load_toolchain_env() {
 # Diagnostic scripts (check_prerequisites.sh, smoke_test.sh, ...) run many
 # independent checks. Bailing out on the first failure (the old behavior,
 # relying on `set -e` + a `fail()` that calls `exit 1`) hides every other
-# check's result from whoever - human or agent - has to decide what to do
+# check's result from whoever - human or skill - has to decide what to do
 # next. These helpers let a script run every check, record an ok/warn/fail/
 # skip status with a short detail string for each, and emit one
-# machine-parsable summary block at the end, so the agent reasons from a
+# machine-parsable summary block at the end, so the skill reasons from a
 # complete picture instead of re-running the script repeatedly to find each
 # failure one at a time, and doesn't have to scrape prose log lines to do it.
 declare -a _RESULT_NAMES=()
@@ -261,16 +338,16 @@ result_emit_summary() {
 }
 
 # --- Phase checkpointing -----------------------------------------------------
-# A full install walks ~13 phases (see agent.yaml) across many separate tool
+# A full install walks ~13 phases (see skill.yaml) across many separate tool
 # calls; a long-running session can be interrupted partway through (dropped
 # SSH session, context compaction, the user stepping away). Without a
 # checkpoint, resuming means either re-reading the whole conversation to
 # guess what already happened, or re-running steps that already succeeded.
 # scripts/progress.sh is the only thing that writes this file - it is a thin
-# CLI over the functions below so the agent can call `progress.sh mark
+# CLI over the functions below so the skill can call `progress.sh mark
 # <phase>` / `progress.sh show` directly instead of every install_*.sh script
 # needing to know about phase names.
-DEFAULT_PROGRESS_FILE="$(cd "$_SHELL_ENV_LIB_DIR/../.." && pwd)/progress.env"
+DEFAULT_PROGRESS_FILE="$DEFAULT_STATE_DIR/progress.env"
 
 progress_file() {
   printf '%s\n' "${PROGRESS_FILE:-$DEFAULT_PROGRESS_FILE}"

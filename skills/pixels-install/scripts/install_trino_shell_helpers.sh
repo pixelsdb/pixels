@@ -6,7 +6,7 @@ set -euo pipefail
 # change_trino_version/trino_cli shell functions, driven by the cluster
 # topology written by prepare_trino_cluster.sh. The coordinator is operated
 # locally; every worker is operated over the passwordless SSH that
-# prepare_trino_cluster.sh (via agents/scripts/setup_cluster.sh) already set
+# prepare_trino_cluster.sh (via shared-scripts/setup_cluster.sh) already set
 # up between cluster nodes.
 #
 # Unlike install_shell_helpers.sh's pixels start/stop/restart (purely local,
@@ -19,8 +19,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/shell_env.sh
 source "$SCRIPT_DIR/lib/shell_env.sh"
 
-AGENT_DIR="${AGENT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$AGENT_DIR/trino-deployment.env}"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$STATE_DIR/trino-deployment.env}"
 if [[ -f "$TRINO_DEPLOYMENT_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090

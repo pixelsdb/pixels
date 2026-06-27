@@ -42,3 +42,5 @@
 - For storage- or index-related changes, update the matching pluggable module instead of hard-coding backend-specific logic in shared modules.
 - For serverless changes, ensure planner/invoker/worker settings remain consistent (input/intermediate/output storage schemes in `pixels-turbo/README.md`).
 
+## Optional skills
+- For guided Pixels deployment, install and use the `pixels-install` skill from `skills/pixels-install`.

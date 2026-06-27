@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/shell_env.sh
 source "$SCRIPT_DIR/lib/shell_env.sh"
 # Picks up JAVA_HOME from a previous, separately invoked install_jdk.sh run
-# even if the calling agent never re-sourced the shell profile in between.
+# even if the calling skill never re-sourced the shell profile in between.
 load_toolchain_env
 
 MIN_MAVEN_VERSION="${MIN_MAVEN_VERSION:-3.8.0}"
@@ -14,7 +14,7 @@ MIN_MAVEN_VERSION="${MIN_MAVEN_VERSION:-3.8.0}"
 MAVEN_VERSION="${MAVEN_VERSION:-3.9.8}"
 MAVEN_BASE_URL="${MAVEN_BASE_URL:-https://archive.apache.org/dist/maven/maven-3}"
 # Installed under the current user's home (never /opt): the user running this
-# agent is not necessarily a "pixels" or "ubuntu" account, so everything is
+# skill user is not necessarily a "pixels" or "ubuntu" account, so everything is
 # anchored on $HOME, exactly like the Pixels and etcd installs.
 MAVEN_INSTALL_PARENT="${MAVEN_INSTALL_PARENT:-$HOME/opt}"
 MAVEN_INSTALL_DIR="${MAVEN_INSTALL_DIR:-$MAVEN_INSTALL_PARENT/apache-maven-$MAVEN_VERSION}"

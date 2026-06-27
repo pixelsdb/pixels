@@ -8,7 +8,7 @@ set -euo pipefail
 # this does not need an explicit confirmation prompt.
 #
 # Trino is out of pixels-install's scope (see docs/INSTALL.md and this
-# agent's "Optional Components"), so these functions never install or
+# skill's "Optional Components"), so these functions never install or
 # require Trino: they only touch it if the user's shell already has
 # TRINO_HOME pointing at a real Trino install, and skip that step
 # (without failing) otherwise.

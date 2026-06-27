@@ -4,7 +4,7 @@ set -uo pipefail
 # Validates OS, architecture, memory, disk, ports, host resolution,
 # privilege, and optional SSH reachability. Runs every check and reports a
 # structured summary at the end instead of stopping at the first failure
-# (no `set -e`/hard `exit` inside individual checks), so the agent can see
+# (no `set -e`/hard `exit` inside individual checks), so the skill can see
 # every problem in one pass and decide what to fix, instead of re-running
 # this script once per failure to discover them one at a time.
 

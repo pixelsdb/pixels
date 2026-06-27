@@ -2,8 +2,8 @@ name: pixels-install
 description: Guide, execute, and verify a basic Pixels deployment from docs/INSTALL.md using selective helper scripts.
 version: 1.0.0
 entrypoints:
-  claude: claude.md
-  codex: codex.md
+  claude: claude/agent.md
+  codex: codex/SKILL.md
 scripts:
   prepare: scripts/prepare_deployment.sh
   check: scripts/check_prerequisites.sh
@@ -16,7 +16,7 @@ scripts:
   shell_helpers: scripts/install_shell_helpers.sh
   smoke_test: scripts/smoke_test.sh
   progress: scripts/progress.sh
-  cluster_ssh: ../scripts/setup_cluster.sh
+  cluster_ssh: shared-scripts/setup_cluster.sh
   trino_prepare: scripts/prepare_trino_cluster.sh
   trino_install: scripts/install_trino.sh
   trino_install_cluster: scripts/install_trino_cluster.sh

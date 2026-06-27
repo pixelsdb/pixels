@@ -5,15 +5,18 @@ set -euo pipefail
 # workers) the same way prepare_deployment.sh does for Pixels, writes it to
 # trino-deployment.env for install_trino.sh and install_trino_shell_helpers.sh
 # to read, and optionally delegates passwordless-SSH bootstrap across every
-# node to the shared agents/scripts/setup_cluster.sh - per
+# node to the shared shared-scripts/setup_cluster.sh - per
 # https://trino.io/docs/466/installation/deployment.html, every node in a
 # Trino cluster needs to be reachable, and start_trino_cluster()-style
 # helpers SSH from the coordinator into each worker.
 
-AGENT_DIR="${AGENT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-REPO_ROOT="${REPO_ROOT:-$(cd "$AGENT_DIR/../.." && pwd)}"
-SHARED_SETUP_CLUSTER="${SHARED_SETUP_CLUSTER:-$REPO_ROOT/agents/scripts/setup_cluster.sh}"
-OUTPUT_FILE="${OUTPUT_FILE:-$AGENT_DIR/trino-deployment.env}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/shell_env.sh
+source "$SCRIPT_DIR/lib/shell_env.sh"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+SHARED_SETUP_CLUSTER="${SHARED_SETUP_CLUSTER:-$SKILL_DIR/shared-scripts/setup_cluster.sh}"
+OUTPUT_FILE="${OUTPUT_FILE:-$STATE_DIR/trino-deployment.env}"
 
 TRINO_VERSION="${TRINO_VERSION:-466}"
 TRINO_HTTP_PORT="${TRINO_HTTP_PORT:-8080}"
@@ -76,7 +79,7 @@ Options:
       Shared SSH port used by the local machine. Leave empty for SSH defaults.
 
   --setup-ssh <true|false>
-      Run agents/scripts/setup_cluster.sh after writing trino-deployment.env,
+      Run shared-scripts/setup_cluster.sh after writing trino-deployment.env,
       so the coordinator and every worker can passwordlessly SSH into each
       other (required by start_trino_cluster()-style helpers). Default: false
 
@@ -84,7 +87,7 @@ Options:
       Passed to setup_cluster.sh when --setup-ssh true. Default: true
 
   --output <file>
-      Deployment env file path. Default: $AGENT_DIR/trino-deployment.env
+      Deployment env file path. Default: $STATE_DIR/trino-deployment.env
 
   -h, --help
       Show this help message.

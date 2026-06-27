@@ -5,7 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/shell_env.sh
 source "$SCRIPT_DIR/lib/shell_env.sh"
 
-REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+REPO_ROOT="${REPO_ROOT:-$(require_repo_root)}"
 ETCD_VERSION="${ETCD_VERSION:-3.3.4}"
 ETCD_ARCHIVE="${ETCD_ARCHIVE:-$REPO_ROOT/scripts/tars/etcd-v$ETCD_VERSION-linux-amd64.tar.xz}"
 ETCD_INSTALL_PARENT="${ETCD_INSTALL_PARENT:-$HOME/opt}"
@@ -33,7 +35,7 @@ ETCD_ENDPOINT="${ETCD_ENDPOINT:-http://127.0.0.1:$ETCD_CLIENT_PORT}"
 # service, so - like changing MySQL root authentication or enabling remote
 # DB access - we never do it silently: leave INSTALL_ETCD_SYSTEMD_SERVICE
 # unset to be asked interactively, or set it to "true"/"false" to skip the
-# prompt (e.g. from a non-interactive agent run that already has the user's
+# prompt (e.g. from a non-interactive skill run that already has the user's
 # go-ahead). ASSUME_YES=true also answers the prompt without a TTY.
 INSTALL_ETCD_SYSTEMD_SERVICE="${INSTALL_ETCD_SYSTEMD_SERVICE:-}"
 ASSUME_YES="${ASSUME_YES:-false}"

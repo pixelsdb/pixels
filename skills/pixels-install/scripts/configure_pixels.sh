@@ -13,8 +13,9 @@ load_toolchain_env
 # install_mysql.sh, so the MySQL credentials confirmed interactively there
 # are the same ones written into pixels.properties below. Explicit env vars
 # passed to this script still take precedence over the secrets file.
-AGENT_DIR="${AGENT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-$AGENT_DIR/deployment.env}"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-$STATE_DIR/deployment.env}"
 USE_DEPLOYMENT_FILE="${USE_DEPLOYMENT_FILE:-true}"
 if [[ "$USE_DEPLOYMENT_FILE" == "true" && -f "$DEPLOYMENT_FILE" ]]; then
   set -a
@@ -25,7 +26,7 @@ fi
 PIXELS_HOME="${PIXELS_HOME:-$HOME/opt/pixels}"
 CONFIG_FILE="${PIXELS_CONFIG_FILE:-$PIXELS_HOME/etc/pixels.properties}"
 BACKUP_FILE="${BACKUP_FILE:-$CONFIG_FILE.bak.$(date '+%Y%m%d%H%M%S')}"
-SECRETS_FILE="${SECRETS_FILE:-$AGENT_DIR/deployment.secrets.env}"
+SECRETS_FILE="${SECRETS_FILE:-$STATE_DIR/deployment.secrets.env}"
 METADATA_DB_PASSWORD_SET_BEFORE_SECRETS=false
 [[ -n "${METADATA_DB_PASSWORD+x}" ]] && METADATA_DB_PASSWORD_SET_BEFORE_SECRETS=true
 if [[ -f "$SECRETS_FILE" ]]; then

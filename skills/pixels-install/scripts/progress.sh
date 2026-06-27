@@ -2,14 +2,14 @@
 set -euo pipefail
 
 # Thin CLI over the phase-checkpoint helpers in lib/shell_env.sh. A full
-# install walks the phases listed in agent.yaml across many separate tool
+# install walks the phases listed in skill.yaml across many separate tool
 # calls; if the session is interrupted partway through (dropped SSH
 # session, context compaction, the user stepping away), resuming without
 # this would mean either re-reading the whole conversation to guess what
 # already happened, or blindly re-running steps that already succeeded.
 #
-# The agent should run `progress.sh mark <phase>` right after a phase from
-# agent.yaml's `phases` list actually succeeds, and `progress.sh show` at
+# The skill should run `progress.sh mark <phase>` right after a phase from
+# skill.yaml's `phases` list actually succeeds, and `progress.sh show` at
 # the start of a session (or after a long gap) to see what is already done
 # before deciding what to do next. This script does not run any install
 # step itself - it only records/reports state.
@@ -21,7 +21,7 @@ source "$SCRIPT_DIR/lib/shell_env.sh"
 usage() {
   cat <<EOF
 Usage:
-  $0 mark <phase> [note]   Record <phase> (one of agent.yaml's phases) as done.
+  $0 mark <phase> [note]   Record <phase> (one of skill.yaml's phases) as done.
   $0 show                  Print every phase recorded as done so far.
   $0 is-done <phase>       Exit 0 if <phase> is already recorded as done, 1 otherwise.
   $0 reset                 Remove the progress file (start a fresh install run).

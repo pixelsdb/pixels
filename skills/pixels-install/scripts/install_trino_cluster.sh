@@ -2,11 +2,11 @@
 set -uo pipefail
 
 # Fans out install_trino.sh across the whole cluster described by
-# trino-deployment.env, instead of requiring the agent/user to copy the same
+# trino-deployment.env, instead of requiring the skill/user to copy the same
 # command and run it by hand once per node. Run this ON THE COORDINATOR: it
 # installs Trino locally for the coordinator's own role, then runs
 # install_trino.sh on every worker over the passwordless SSH that
-# prepare_trino_cluster.sh (via agents/scripts/setup_cluster.sh) already set
+# prepare_trino_cluster.sh (via shared-scripts/setup_cluster.sh) already set
 # up coordinator -> worker - the same trust relationship
 # install_trino_shell_helpers.sh's generated start/stop/restart functions
 # rely on.
@@ -22,12 +22,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/shell_env.sh
 source "$SCRIPT_DIR/lib/shell_env.sh"
 
-AGENT_DIR="${AGENT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
-REPO_ROOT="${REPO_ROOT:-$(cd "$AGENT_DIR/../.." && pwd)}"
+SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+REPO_ROOT="${REPO_ROOT:-$(require_repo_root)}"
 REMOTE_REPO_ROOT="${REMOTE_REPO_ROOT:-$REPO_ROOT}"
+REMOTE_STATE_DIR="${REMOTE_STATE_DIR:-$REMOTE_REPO_ROOT/.agents/state/pixels-install}"
+REMOTE_SKILL_SCRIPT="${REMOTE_SKILL_SCRIPT:-$REMOTE_REPO_ROOT/.agents/skills/pixels-install/scripts/install_trino.sh}"
+REMOTE_DEV_SCRIPT="${REMOTE_DEV_SCRIPT:-$REMOTE_REPO_ROOT/skills/pixels-install/scripts/install_trino.sh}"
 
-TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$AGENT_DIR/trino-deployment.env}"
-LOG_DIR="${LOG_DIR:-$AGENT_DIR/logs}"
+TRINO_DEPLOYMENT_FILE="${TRINO_DEPLOYMENT_FILE:-$STATE_DIR/trino-deployment.env}"
+LOG_DIR="${LOG_DIR:-$STATE_DIR/logs}"
 
 SSH_USER="${SSH_USER:-root}"
 SSH_PORT="${SSH_PORT:-}"
@@ -113,7 +117,7 @@ launch_worker() {
   local ssh_target="$1"
   local name="$2"
   local -a scp_opts=() ssh_args=()
-  local log_file marker_file remote_deployment_file
+  local log_file marker_file remote_deployment_file remote_command
 
   mkdir -p "$LOG_DIR"
   log_file="$LOG_DIR/trino_install_${name}.log"
@@ -124,15 +128,17 @@ launch_worker() {
   [[ -n "$SSH_PORT" ]] && scp_opts+=(-P "$SSH_PORT")
   scp_opts+=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
-  remote_deployment_file="$REMOTE_REPO_ROOT/agents/pixels-install/trino-deployment.env"
+  remote_deployment_file="$REMOTE_STATE_DIR/trino-deployment.env"
+  remote_command="cd '$REMOTE_REPO_ROOT' && mkdir -p '$REMOTE_STATE_DIR' && if [ -x '$REMOTE_SKILL_SCRIPT' ]; then script='$REMOTE_SKILL_SCRIPT'; elif [ -x '$REMOTE_DEV_SCRIPT' ]; then script='$REMOTE_DEV_SCRIPT'; else echo 'install_trino.sh not found; install the pixels-install skill or set REMOTE_SKILL_SCRIPT' >&2; exit 1; fi; STATE_DIR='$REMOTE_STATE_DIR' REPO_ROOT='$REMOTE_REPO_ROOT' TRINO_ROLE=worker CONFIRM_TRINO_INSTALL=true \"\$script\""
 
   (
     {
+      echo "--- preparing remote state dir on $name ($ssh_target) ---"
+      ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "mkdir -p '$REMOTE_STATE_DIR'" &&
       echo "--- copying trino-deployment.env to $name ($ssh_target) ---"
       scp "${scp_opts[@]}" "$TRINO_DEPLOYMENT_FILE" "$(remote_spec "$ssh_target"):$remote_deployment_file" &&
       echo "--- running install_trino.sh on $name ($ssh_target) ---" &&
-      ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" \
-        "cd '$REMOTE_REPO_ROOT' && TRINO_ROLE=worker CONFIRM_TRINO_INSTALL=true ./agents/pixels-install/scripts/install_trino.sh"
+      ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "$remote_command"
     } >"$log_file" 2>&1
     echo "$?" > "$marker_file"
   ) &
