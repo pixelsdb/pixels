@@ -2,7 +2,7 @@
 # Shared helpers for the pixels-install skill scripts.
 #
 # All environment variables installed by this skill (JAVA_HOME, MAVEN_HOME,
-# ETCD, PIXELS_HOME, ...) must be persisted into the *current user's* shell
+# ETCD, PIXELS_HOME, PIXELS_CONFIG, ...) must be persisted into the *current user's* shell
 # profile only - never into a global file such as /etc/environment or
 # /etc/profile.d, and never assuming bash when the user's login shell is zsh.
 #
@@ -20,7 +20,7 @@
 # future interactive sessions, per the user's explicit request), every
 # install_*.sh script also mirrors the same variable into a small, plain
 # `toolchain.env` file with no such guard, and sources that file at startup.
-# This lets each step pick up JAVA_HOME/MAVEN_HOME/ETCD/PIXELS_HOME from a
+# This lets each step pick up JAVA_HOME/MAVEN_HOME/ETCD/PIXELS_HOME/PIXELS_CONFIG from a
 # prior step even when the skill invokes each script as a separate process.
 
 _SHELL_ENV_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -224,6 +224,7 @@ load_toolchain_env() {
   local maven_home_was_set=false maven_home_value=""
   local etc_was_set=false etc_value=""
   local pixels_home_was_set=false pixels_home_value=""
+  local pixels_config_was_set=false pixels_config_value=""
 
   [[ -f "$file" ]] || return 0
   if [[ -n "${JAVA_HOME+x}" ]]; then
@@ -242,6 +243,10 @@ load_toolchain_env() {
     pixels_home_was_set=true
     pixels_home_value="$PIXELS_HOME"
   fi
+  if [[ -n "${PIXELS_CONFIG+x}" ]]; then
+    pixels_config_was_set=true
+    pixels_config_value="$PIXELS_CONFIG"
+  fi
 
   # shellcheck disable=SC1090
   source "$file"
@@ -249,6 +254,7 @@ load_toolchain_env() {
   [[ "$maven_home_was_set" == "true" ]] && export MAVEN_HOME="$maven_home_value"
   [[ "$etc_was_set" == "true" ]] && export ETCD="$etc_value"
   [[ "$pixels_home_was_set" == "true" ]] && export PIXELS_HOME="$pixels_home_value"
+  [[ "$pixels_config_was_set" == "true" ]] && export PIXELS_CONFIG="$pixels_config_value"
 
   if [[ -n "${JAVA_HOME:-}" && -x "$JAVA_HOME/bin/java" ]]; then
     export PATH="$JAVA_HOME/bin:$PATH"

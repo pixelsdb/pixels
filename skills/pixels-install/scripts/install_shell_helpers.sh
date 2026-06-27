@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Installs Pixels shell functions for day-to-day operation. This is a
-# user-scoped convenience (only the current user's shell profile is edited),
-# but it still asks first because it changes the user's interactive shell and
-# may bake the current skill/state paths into a redeploy helper.
+# Installs Pixels shell functions for day-to-day operation. By default the
+# functions are installed on the Pixels coordinator recorded in deployment.env,
+# because start-pixels.sh/stop-pixels.sh are cluster-level commands. Set
+# PIXELS_SHELL_HELPERS_TARGET=local only when intentionally installing on the
+# current host.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/shell_env.sh
@@ -12,9 +13,32 @@ source "$SCRIPT_DIR/lib/shell_env.sh"
 load_toolchain_env
 
 SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
+STATE_DIR="${STATE_DIR:-$(state_dir)}"
+DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-$STATE_DIR/deployment.env}"
+
+PIXELS_HOME_WAS_SET=false
+PIXELS_HOME_VALUE=""
+if [[ -n "${PIXELS_HOME+x}" ]]; then
+  PIXELS_HOME_WAS_SET=true
+  PIXELS_HOME_VALUE="$PIXELS_HOME"
+fi
+if [[ -f "$DEPLOYMENT_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$DEPLOYMENT_FILE"
+  set +a
+fi
+if [[ "$PIXELS_HOME_WAS_SET" == "true" ]]; then
+  PIXELS_HOME="$PIXELS_HOME_VALUE"
+fi
+
 PIXELS_HOME="${PIXELS_HOME:-$HOME/opt/pixels}"
-PIXELS_FUNCTIONS_FILE="${PIXELS_FUNCTIONS_FILE:-$HOME/.pixels-shell-helpers.sh}"
-PIXELS_INSTALL_SKILL_DIR="${PIXELS_INSTALL_SKILL_DIR:-$SKILL_DIR}"
+PIXELS_FUNCTIONS_FILE="${PIXELS_FUNCTIONS_FILE:-}"
+PIXELS_SHELL_HELPERS_TARGET="${PIXELS_SHELL_HELPERS_TARGET:-coordinator}"
+SSH_USER="${PIXELS_SSH_USER:-${SSH_USER:-root}}"
+SSH_PORT="${PIXELS_SSH_PORT:-${SSH_PORT:-}}"
+REMOTE_STATE_DIR="${REMOTE_STATE_DIR:-.agents/state/pixels-install}"
+REMOTE_SCRIPT_DIR="${REMOTE_SCRIPT_DIR:-.agents/skills/pixels-install/scripts}"
 ASSUME_YES="${ASSUME_YES:-false}"
 INSTALL_PIXELS_SHELL_HELPERS="${INSTALL_PIXELS_SHELL_HELPERS:-}"
 
@@ -27,8 +51,77 @@ fail() {
   exit 1
 }
 
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+remote_spec() {
+  local target="$1"
+  if [[ -n "$SSH_USER" && "$target" != *@* ]]; then
+    printf '%s@%s' "$SSH_USER" "$target"
+  else
+    printf '%s' "$target"
+  fi
+}
+
+ssh_host_part() {
+  local target="$1"
+  target="${target#*@}"
+  target="${target%%:*}"
+  printf '%s\n' "$target"
+}
+
+current_host_tokens() {
+  {
+    hostname 2>/dev/null || true
+    hostname -f 2>/dev/null || true
+    hostname -s 2>/dev/null || true
+    hostname -I 2>/dev/null | tr ' ' '\n' || true
+    printf 'localhost\n127.0.0.1\n::1\n'
+  } | awk 'NF && !seen[$0]++'
+}
+
+is_current_host() {
+  local candidate token
+  for candidate in "$@"; do
+    [[ -n "${candidate:-}" ]] || continue
+    candidate="$(ssh_host_part "$candidate")"
+    while IFS= read -r token; do
+      [[ "$candidate" == "$token" ]] && return 0
+    done < <(current_host_tokens)
+  done
+  return 1
+}
+
+coordinator_target() {
+  local target="${PIXELS_COORDINATOR_SSH_TARGET:-${COORDINATOR_SSH_TARGET:-}}"
+  [[ -n "$target" ]] ||
+    fail "Pixels coordinator is unknown; run prepare_deployment.sh first, set DEPLOYMENT_FILE, or set PIXELS_COORDINATOR_SSH_TARGET"
+  printf '%s\n' "$target"
+}
+
+target_is_local() {
+  local target
+  case "$PIXELS_SHELL_HELPERS_TARGET" in
+    local) return 0 ;;
+    coordinator) ;;
+    *) fail "PIXELS_SHELL_HELPERS_TARGET must be coordinator or local, got: $PIXELS_SHELL_HELPERS_TARGET" ;;
+  esac
+
+  target="$(coordinator_target)"
+  is_current_host "$target" "${PIXELS_COORDINATOR_HOST:-}" "${PIXELS_COORDINATOR_NAME:-}"
+}
+
+target_description() {
+  if [[ "$PIXELS_SHELL_HELPERS_TARGET" == "local" ]]; then
+    printf 'current host'
+  else
+    printf 'Pixels coordinator %s' "$(coordinator_target)"
+  fi
+}
+
 confirm_install() {
-  local reply
+  local reply target
 
   case "$INSTALL_PIXELS_SHELL_HELPERS" in
     true) return 0 ;;
@@ -37,43 +130,32 @@ confirm_install() {
 
   [[ "$ASSUME_YES" == "true" ]] && return 0
 
+  target="$(target_description)"
   if [[ ! -t 0 ]]; then
-    log "not running interactively and INSTALL_PIXELS_SHELL_HELPERS/ASSUME_YES not set; skipping the Pixels shell helpers. Set INSTALL_PIXELS_SHELL_HELPERS=true once the user has agreed."
+    log "not running interactively and INSTALL_PIXELS_SHELL_HELPERS/ASSUME_YES not set; skipping the Pixels shell helpers for $target. Set INSTALL_PIXELS_SHELL_HELPERS=true once the user has agreed."
     return 1
   fi
 
-  read -r -p "Install start/stop/restart/redeploy Pixels shell functions (writes $PIXELS_FUNCTIONS_FILE)? [y/N]: " reply
+  read -r -p "Install start_pixels/stop_pixels/restart_pixels shell functions on $target? [y/N]: " reply
   [[ "$reply" =~ ^[Yy]$ ]]
 }
 
-write_functions_file() {
-  log "writing start_pixels/stop_pixels/restart_pixels to $PIXELS_FUNCTIONS_FILE"
+local_functions_file() {
+  printf '%s\n' "${PIXELS_FUNCTIONS_FILE:-$HOME/.pixels-shell-helpers.sh}"
+}
 
-  cat > "$PIXELS_FUNCTIONS_FILE" <<EOF
+write_functions_file() {
+  local functions_file="$1"
+
+  log "writing start_pixels/stop_pixels/restart_pixels to $functions_file"
+  mkdir -p "$(dirname "$functions_file")"
+
+  cat > "$functions_file" <<EOF
 # Generated by pixels-install/scripts/install_shell_helpers.sh
-# Provides Pixels local helpers plus optional stack helpers that call Trino
-# helpers when start_trino_cluster/stop_trino_cluster/restart_trino_cluster
-# are installed in the current shell.
+# Provides Pixels local helpers backed by the official Pixels cluster scripts.
 
 _pixels_home() {
   printf '%s\n' "\${PIXELS_HOME:-$PIXELS_HOME}"
-}
-
-_pixels_install_skill_dir() {
-  printf '%s\n' "\${PIXELS_INSTALL_SKILL_DIR:-$PIXELS_INSTALL_SKILL_DIR}"
-}
-
-_pixels_has_function() {
-  declare -F "\$1" >/dev/null 2>&1
-}
-
-_pixels_call_trino_helper() {
-  local fn="\$1"
-  if _pixels_has_function "\$fn"; then
-    "\$fn"
-  else
-    echo "\$fn is not defined; skipping Trino cluster operation"
-  fi
 }
 
 start_pixels() {
@@ -97,61 +179,78 @@ restart_pixels() {
   start_pixels || return 1
   echo "pixels restarted"
 }
-
-redeploy_pixels() {
-  local skill_dir
-
-  skill_dir="\$(_pixels_install_skill_dir)"
-  if [[ ! -x "\$skill_dir/scripts/build_install_pixels.sh" || ! -x "\$skill_dir/scripts/configure_pixels.sh" ]]; then
-    echo "pixels-install scripts not found under \$skill_dir" >&2
-    return 1
-  fi
-
-  "\$skill_dir/scripts/build_install_pixels.sh" || return 1
-  "\$skill_dir/scripts/configure_pixels.sh" || return 1
-}
-
-start_pixels_stack() {
-  start_pixels || return 1
-  _pixels_call_trino_helper start_trino_cluster || return 1
-}
-
-stop_pixels_stack() {
-  _pixels_call_trino_helper stop_trino_cluster || return 1
-  stop_pixels || return 1
-}
-
-restart_pixels_stack() {
-  stop_pixels_stack || return 1
-  start_pixels_stack || return 1
-}
-
-redeploy_pixels_stack() {
-  _pixels_call_trino_helper stop_trino_cluster || return 1
-  redeploy_pixels || return 1
-  _pixels_call_trino_helper start_trino_cluster || return 1
-}
 EOF
 
-  chmod 644 "$PIXELS_FUNCTIONS_FILE"
+  chmod 644 "$functions_file"
 }
 
 persist_source_line() {
+  local functions_file="$1"
   local profile_file line
 
   profile_file="$(detect_profile_file)"
-  line="[ -f \"$PIXELS_FUNCTIONS_FILE\" ] && source \"$PIXELS_FUNCTIONS_FILE\""
+  line="[ -f \"$functions_file\" ] && source \"$functions_file\""
 
-  log "persisting source line for $PIXELS_FUNCTIONS_FILE in $profile_file"
+  log "persisting source line for $functions_file in $profile_file"
   persist_line "$profile_file" "$line"
 }
 
 verify_functions_file() {
-  bash -n "$PIXELS_FUNCTIONS_FILE" || fail "generated functions file has a syntax error: $PIXELS_FUNCTIONS_FILE"
+  local functions_file="$1"
+
+  bash -n "$functions_file" || fail "generated functions file has a syntax error: $functions_file"
 
   if [[ ! -x "$PIXELS_HOME/sbin/start-pixels.sh" ]]; then
     log "note: $PIXELS_HOME/sbin/start-pixels.sh not found yet; the functions are installed but will fail until Pixels itself is installed there"
   fi
+}
+
+install_local() {
+  local functions_file
+
+  functions_file="$(local_functions_file)"
+  write_functions_file "$functions_file"
+  verify_functions_file "$functions_file"
+  persist_source_line "$functions_file"
+
+  log "shell helpers installed on current host: start_pixels, stop_pixels, restart_pixels"
+  log "open a new terminal (or run: source $(detect_profile_file)) to use them"
+}
+
+install_remote_coordinator() {
+  local target remote ssh_target
+  local -a ssh_args scp_args remote_env
+
+  target="$(coordinator_target)"
+  remote="$(remote_spec "$target")"
+
+  ssh_args=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
+  scp_args=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
+  if [[ -n "$SSH_PORT" ]]; then
+    ssh_args+=(-p "$SSH_PORT")
+    scp_args+=(-P "$SSH_PORT")
+  fi
+
+  log "installing Pixels shell helpers on coordinator $remote"
+  ssh "${ssh_args[@]}" "$remote" "mkdir -p $(shell_quote "$REMOTE_SCRIPT_DIR/lib") $(shell_quote "$REMOTE_STATE_DIR")"
+  scp "${scp_args[@]}" "$0" "$remote:$REMOTE_SCRIPT_DIR/install_shell_helpers.sh"
+  scp "${scp_args[@]}" "$SCRIPT_DIR/lib/shell_env.sh" "$remote:$REMOTE_SCRIPT_DIR/lib/shell_env.sh"
+  if [[ -f "$DEPLOYMENT_FILE" ]]; then
+    scp "${scp_args[@]}" "$DEPLOYMENT_FILE" "$remote:$REMOTE_STATE_DIR/deployment.env"
+  fi
+
+  remote_env=(
+    "INSTALL_PIXELS_SHELL_HELPERS=true"
+    "PIXELS_SHELL_HELPERS_TARGET=local"
+    "STATE_DIR=$(shell_quote "$REMOTE_STATE_DIR")"
+    "PIXELS_HOME=$(shell_quote "$PIXELS_HOME")"
+  )
+  if [[ -n "$PIXELS_FUNCTIONS_FILE" ]]; then
+    remote_env+=("PIXELS_FUNCTIONS_FILE=$(shell_quote "$PIXELS_FUNCTIONS_FILE")")
+  fi
+
+  ssh_target="$(printf '%s ' "${remote_env[@]}")"
+  ssh "${ssh_args[@]}" "$remote" "chmod +x $(shell_quote "$REMOTE_SCRIPT_DIR/install_shell_helpers.sh") && env $ssh_target $(shell_quote "$REMOTE_SCRIPT_DIR/install_shell_helpers.sh")"
 }
 
 main() {
@@ -160,12 +259,11 @@ main() {
     return 0
   fi
 
-  write_functions_file
-  verify_functions_file
-  persist_source_line
-
-  log "shell helpers installed: start_pixels, stop_pixels, restart_pixels, redeploy_pixels, start_pixels_stack, stop_pixels_stack, restart_pixels_stack, redeploy_pixels_stack"
-  log "open a new terminal (or run: source $(detect_profile_file)) to use them"
+  if target_is_local; then
+    install_local
+  else
+    install_remote_coordinator
+  fi
 }
 
 main "$@"

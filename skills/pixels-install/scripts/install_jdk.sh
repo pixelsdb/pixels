@@ -144,7 +144,9 @@ install_jdk() {
   curl -fsSL "$url" -o "$archive"
 
   require_command tar
+  set +o pipefail
   top_level_dir="$(tar -tzf "$archive" | head -n1 | cut -d/ -f1)"
+  set -o pipefail
   [[ -n "$top_level_dir" ]] || fail "could not determine top-level directory inside $archive"
   extracted_dir="$JDK_INSTALL_PARENT/$top_level_dir"
 

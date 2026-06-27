@@ -169,7 +169,24 @@ install_mysql_server() {
     sudo_cmd env DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server
   fi
 
-  sudo_cmd systemctl enable --now mysql 2>/dev/null || sudo_cmd service mysql start
+  if command -v mysqladmin >/dev/null 2>&1 && mysqladmin ping --silent >/dev/null 2>&1; then
+    log "MySQL server is already running"
+    return
+  fi
+  if pgrep -x mysqld >/dev/null 2>&1; then
+    log "mysqld process is already running"
+    return
+  fi
+
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-units >/dev/null 2>&1; then
+    sudo_cmd systemctl enable --now mysql 2>/dev/null ||
+      sudo_cmd systemctl enable --now mysqld 2>/dev/null ||
+      fail "could not start MySQL via systemd (tried mysql and mysqld)"
+  else
+    sudo_cmd service mysql start 2>/dev/null ||
+      sudo_cmd service mysqld start 2>/dev/null ||
+      fail "could not start MySQL via service (tried mysql and mysqld)"
+  fi
 }
 
 # Fresh Ubuntu mysql-server installs use auth_socket for root, so root@localhost

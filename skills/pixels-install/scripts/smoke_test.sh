@@ -34,15 +34,18 @@ fi
 PIXELS_HOME="${PIXELS_HOME:-$HOME/opt/pixels}"
 CONFIG_FILE="${PIXELS_CONFIG_FILE:-${PIXELS_CONFIG:-$PIXELS_HOME/etc/pixels.properties}}"
 SMOKE_TIMEOUT_SECONDS="${SMOKE_TIMEOUT_SECONDS:-30}"
+TRINO_INSTALL_PARENT="${TRINO_INSTALL_PARENT:-$HOME/opt}"
 TRINO_HOME_LINK="${TRINO_HOME_LINK:-$HOME/opt/trino-server}"
+TRINO_DATA_DIR="${TRINO_DATA_DIR:-$TRINO_INSTALL_PARENT/var/trino/data}"
 TRINO_HTTP_PORT="${TRINO_HTTP_PORT:-8080}"
 TRINO_PIXELS_HOME="${TRINO_PIXELS_HOME:-${PIXELS_HOME:-$HOME/opt/pixels}}"
 TRINO_PIXELS_CONFIG="${TRINO_PIXELS_CONFIG:-${PIXELS_CONFIG:-$TRINO_PIXELS_HOME/etc/pixels.properties}}"
-TRINO_PIXELS_ENV_FILE="${TRINO_PIXELS_ENV_FILE:-$HOME/.pixels-trino-env.sh}"
 PIXELS_LOG_DIR="${PIXELS_LOG_DIR:-$PIXELS_HOME/logs}"
 PIXELS_LOG_ERROR_PATTERN="${PIXELS_LOG_ERROR_PATTERN:-ERROR|FATAL|Exception|OutOfMemoryError}"
 PIXELS_LOG_IGNORE_PATTERN="${PIXELS_LOG_IGNORE_PATTERN:-}"
 PIXELS_LOG_MAX_MATCHES="${PIXELS_LOG_MAX_MATCHES:-20}"
+TRINO_LOG_FALLBACK_PATTERN="${TRINO_LOG_FALLBACK_PATTERN:-neither PIXELS_CONFIG nor PIXELS_HOME exists|using pixels.properties under CLASS_PATH}"
+TRINO_LOG_MAX_MATCHES="${TRINO_LOG_MAX_MATCHES:-20}"
 TRINO_CATALOG="${TRINO_CATALOG:-pixels}"
 TRINO_CLI_QUERY="${TRINO_CLI_QUERY:-SHOW SCHEMAS}"
 TRINO_CLI_TIMEOUT_SECONDS="${TRINO_CLI_TIMEOUT_SECONDS:-30}"
@@ -67,6 +70,8 @@ CHECK_TRINO="${CHECK_TRINO:-false}"
 CHECK_PIXELS_LAYOUT="${CHECK_PIXELS_LAYOUT:-true}"
 CHECK_TRINO_PIXELS_CLIENT="${CHECK_TRINO_PIXELS_CLIENT:-$CHECK_TRINO}"
 CHECK_PIXELS_LOGS="${CHECK_PIXELS_LOGS:-true}"
+CHECK_TRINO_LOGS="${CHECK_TRINO_LOGS:-$CHECK_TRINO}"
+CHECK_TRINO_READY="${CHECK_TRINO_READY:-$CHECK_TRINO_CLI}"
 CHECK_TRINO_CLUSTER_STATUS="${CHECK_TRINO_CLUSTER_STATUS:-$CHECK_TRINO}"
 CHECK_TRINO_CLI="${CHECK_TRINO_CLI:-$CHECK_TRINO}"
 
@@ -418,7 +423,7 @@ verify_trino_pixels_client() {
     return
   fi
 
-  local key value
+  local key value profile_file
   local -a required_keys=(
     metadata.server.host
     metadata.server.port
@@ -450,16 +455,17 @@ verify_trino_pixels_client() {
     return
   fi
 
-  if [[ -f "$TRINO_PIXELS_ENV_FILE" ]]; then
-    result_record trino_pixels_env ok "$TRINO_PIXELS_ENV_FILE"
-    if grep -qE '^export PIXELS_HOME=' "$TRINO_PIXELS_ENV_FILE" &&
-       grep -qE '^export PIXELS_CONFIG=' "$TRINO_PIXELS_ENV_FILE"; then
-      result_record trino_pixels_env_exports ok "PIXELS_HOME and PIXELS_CONFIG are exported"
+  profile_file="$(detect_profile_file)"
+  if [[ -f "$profile_file" ]]; then
+    result_record trino_pixels_profile ok "$profile_file"
+    if grep -qE '^export PIXELS_HOME=' "$profile_file" &&
+       grep -qE '^export PIXELS_CONFIG=' "$profile_file"; then
+      result_record trino_pixels_profile_exports ok "PIXELS_HOME and PIXELS_CONFIG are exported"
     else
-      result_record trino_pixels_env_exports fail "missing PIXELS_HOME or PIXELS_CONFIG export in $TRINO_PIXELS_ENV_FILE"
+      result_record trino_pixels_profile_exports fail "missing PIXELS_HOME or PIXELS_CONFIG export in $profile_file"
     fi
   else
-    result_record trino_pixels_env warn "missing $TRINO_PIXELS_ENV_FILE; direct launcher use may not inherit PIXELS_HOME/PIXELS_CONFIG"
+    result_record trino_pixels_profile_exports fail "profile file not found; install_trino.sh should write PIXELS_HOME/PIXELS_CONFIG to $(detect_profile_file)"
   fi
 
   for key in "${required_keys[@]}"; do
@@ -477,6 +483,65 @@ verify_trino_pixels_client() {
       result_record "trino_pixels_config:$key" fail "missing or empty config property"
     fi
   done
+}
+
+verify_trino_logs() {
+  if [[ "$CHECK_TRINO_LOGS" != "true" ]]; then
+    result_record trino_logs skip "set CHECK_TRINO_LOGS=true to enable"
+    return
+  fi
+
+  local matches dir
+  local -a log_dirs=()
+  for dir in "$TRINO_HOME_LINK/var/log" "$TRINO_DATA_DIR/var/log" "$TRINO_DATA_DIR"; do
+    [[ -d "$dir" ]] && log_dirs+=("$dir")
+  done
+
+  if [[ "${#log_dirs[@]}" -eq 0 ]]; then
+    result_record trino_logs warn "no Trino log directory found under $TRINO_HOME_LINK/var/log or $TRINO_DATA_DIR"
+    return
+  fi
+
+  matches="$(
+    find "${log_dirs[@]}" -maxdepth 3 -type f \( -name '*.log' -o -name 'server.log' -o -name 'launcher.log' \) -print 2>/dev/null |
+      xargs -r grep -IEn "$TRINO_LOG_FALLBACK_PATTERN" 2>/dev/null |
+      head -n "$TRINO_LOG_MAX_MATCHES" || true
+  )"
+
+  if [[ -n "$matches" ]]; then
+    result_record trino_logs fail "Trino logs show pixels-trino did not inherit PIXELS_HOME/PIXELS_CONFIG (first matches: $(printf '%s\n' "$matches" | paste -sd ' ' -))"
+  else
+    result_record trino_logs ok "no matches for /$TRINO_LOG_FALLBACK_PATTERN/ under Trino log paths"
+  fi
+}
+
+verify_trino_ready() {
+  if [[ "$CHECK_TRINO_READY" != "true" ]]; then
+    result_record trino_ready skip "set CHECK_TRINO_READY=true to enable"
+    return
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    result_record trino_ready fail "curl command not found; cannot check /v1/info"
+    return
+  fi
+
+  local deadline body
+  deadline=$((SECONDS + SMOKE_TIMEOUT_SECONDS))
+  while (( SECONDS < deadline )); do
+    body="$(curl -fsS "http://localhost:$TRINO_HTTP_PORT/v1/info" 2>/dev/null || true)"
+    if printf '%s\n' "$body" | grep -qE '"starting"[[:space:]]*:[[:space:]]*false'; then
+      result_record trino_ready ok "/v1/info reports starting=false"
+      return
+    fi
+    sleep 2
+  done
+
+  if [[ -n "${body:-}" ]]; then
+    result_record trino_ready fail "/v1/info did not reach starting=false within ${SMOKE_TIMEOUT_SECONDS}s (last response: $body)"
+  else
+    result_record trino_ready fail "Trino /v1/info not reachable at localhost:$TRINO_HTTP_PORT within ${SMOKE_TIMEOUT_SECONDS}s"
+  fi
 }
 
 verify_trino() {
@@ -550,7 +615,7 @@ verify_trino_cluster_status() {
 
   if [[ ! -x "$TRINO_HOME_LINK/bin/launcher" ]]; then
     result_record trino_status:${TRINO_COORDINATOR_NAME:-coordinator} fail "missing local launcher: $TRINO_HOME_LINK/bin/launcher"
-  elif "$TRINO_HOME_LINK/bin/launcher" status >/dev/null 2>&1; then
+  elif PIXELS_HOME="$TRINO_PIXELS_HOME" PIXELS_CONFIG="$TRINO_PIXELS_CONFIG" "$TRINO_HOME_LINK/bin/launcher" status >/dev/null 2>&1; then
     result_record trino_status:${TRINO_COORDINATOR_NAME:-coordinator} ok "local launcher reports running"
   else
     result_record trino_status:${TRINO_COORDINATOR_NAME:-coordinator} fail "local launcher status failed"
@@ -572,7 +637,7 @@ verify_trino_cluster_status() {
   for ((i = 0; i < ${#targets[@]}; i++)); do
     target="${targets[$i]}"
     name="${names[$i]:-worker-$i}"
-    if output="$(ssh "${ssh_args[@]}" "$(remote_spec "$target")" "[ -f ~/.pixels-trino-env.sh ] && . ~/.pixels-trino-env.sh; '$TRINO_HOME_LINK/bin/launcher' status" 2>&1)"; then
+    if output="$(ssh "${ssh_args[@]}" "$(remote_spec "$target")" "export PIXELS_HOME='$TRINO_PIXELS_HOME'; export PIXELS_CONFIG='$TRINO_PIXELS_CONFIG'; '$TRINO_HOME_LINK/bin/launcher' status" 2>&1)"; then
       result_record "trino_status:$name" ok "remote launcher reports running"
     else
       result_record "trino_status:$name" fail "remote launcher status failed on $target: $(printf '%s' "$output" | tail -n 1)"
@@ -593,7 +658,8 @@ verify_trino_cli_show_schemas() {
 
   mkdir -p "$(dirname "$TRINO_CLI_OUTPUT_FILE")"
   if (
-    [[ -f "$TRINO_PIXELS_ENV_FILE" ]] && source "$TRINO_PIXELS_ENV_FILE"
+    export PIXELS_HOME="$TRINO_PIXELS_HOME"
+    export PIXELS_CONFIG="$TRINO_PIXELS_CONFIG"
     if command -v timeout >/dev/null 2>&1; then
       timeout "${TRINO_CLI_TIMEOUT_SECONDS}s" "$TRINO_HOME_LINK/bin/trino" \
         --server "localhost:$TRINO_HTTP_PORT" \
@@ -614,6 +680,7 @@ verify_trino_cli_show_schemas() {
 
 main() {
   export PIXELS_HOME
+  export PIXELS_CONFIG="$TRINO_PIXELS_CONFIG"
   result_reset
 
   verify_filesystem
@@ -627,7 +694,9 @@ main() {
   verify_pixels_logs
   verify_trino_pixels_client
   verify_trino
+  verify_trino_logs
   verify_trino_cluster_status
+  verify_trino_ready
   verify_trino_cli_show_schemas
 
   result_emit_summary smoke_test

@@ -114,8 +114,8 @@ verify_maven() {
   [[ -n "$version" ]] || fail "could not parse Maven version"
   version_ge "$version" "$MIN_MAVEN_VERSION" || fail "Maven version is $version, expected at least $MIN_MAVEN_VERSION"
 
-  mvn_java_home="$(mvn -v | awk -F': ' '/Java home/ { print $2; exit }')"
-  [[ -n "$mvn_java_home" ]] || fail "could not read Java home from mvn -v"
+  mvn_java_home="$(mvn -v | awk -F': ' '/Java home/ { print $2; exit } /runtime/ { sub(/^.*runtime: /, ""); print; exit }')"
+  [[ -n "$mvn_java_home" ]] || fail "could not read Java home/runtime from mvn -v"
 
   log "Maven verification passed: version=$version, java_home=$mvn_java_home"
   mvn -v

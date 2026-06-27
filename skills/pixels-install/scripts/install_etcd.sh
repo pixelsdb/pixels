@@ -317,6 +317,26 @@ start_etcd() {
     return
   fi
 
+  stop_existing_etcd_processes() {
+    pkill -f "$ETCD_HOME_LINK/etcd" 2>/dev/null || true
+    pkill -f "$ETCD_INSTALL_DIR/etcd" 2>/dev/null || true
+    pkill -f "etcd --config-file=$ETCD_HOME_LINK/conf.yml" 2>/dev/null || true
+    pkill -f "etcd --config-file=$ETCD_INSTALL_DIR/conf.yml" 2>/dev/null || true
+    sleep 1
+  }
+
+  start_detached() {
+    local work_dir="$1"
+    shift
+
+    if command -v setsid >/dev/null 2>&1; then
+      (cd "$work_dir" && setsid -f "$@" >/tmp/pixels-etcd.log 2>&1 </dev/null)
+    else
+      warn "setsid not found; falling back to nohup background startup"
+      (cd "$work_dir" && nohup "$@" >/tmp/pixels-etcd.log 2>&1 </dev/null &)
+    fi
+  }
+
   # No systemd unit available (e.g. containers without systemd, or
   # INSTALL_ETCD_SYSTEMD_SERVICE=false) - fall back to a manually
   # backgrounded process. start-etcd.sh itself just runs `etcd
@@ -328,18 +348,15 @@ start_etcd() {
     return
   fi
 
-  if [[ "$ETCD_CONFIG_CHANGED" == "true" ]]; then
-    log "etcd config changed; stopping any previously started etcd process before restarting"
-    pkill -f "$ETCD_INSTALL_DIR/etcd " 2>/dev/null || true
-    sleep 1
-  fi
+  log "stopping any previously started etcd process before direct startup"
+  stop_existing_etcd_processes
 
   if [[ -x "$ETCD_HOME_LINK/start-etcd.sh" ]]; then
     log "starting etcd with $ETCD_HOME_LINK/start-etcd.sh"
-    (cd "$ETCD_HOME_LINK" && nohup ./start-etcd.sh >/tmp/pixels-etcd.log 2>&1 &)
+    start_detached "$ETCD_HOME_LINK" ./start-etcd.sh
   else
     log "start-etcd.sh not found; starting etcd directly"
-    nohup "$ETCD_INSTALL_DIR/etcd" --config-file "$ETCD_INSTALL_DIR/conf.yml" >/tmp/pixels-etcd.log 2>&1 &
+    start_detached "$ETCD_INSTALL_DIR" "$ETCD_INSTALL_DIR/etcd" --config-file "$ETCD_INSTALL_DIR/conf.yml"
   fi
 }
 
