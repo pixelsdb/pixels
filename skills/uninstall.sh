@@ -33,6 +33,12 @@ fail_with_usage() {
   exit 1
 }
 
+validate_skill_name() {
+  if [[ "$SKILL" == */* || "$SKILL" == *".."* || ! "$SKILL" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    ERRORS+=("--skill must be a simple directory name (letters, numbers, '.', '_', '-'), got: $SKILL")
+  fi
+}
+
 parse_args() {
   SKILL=""
   TOOL=""
@@ -82,6 +88,10 @@ parse_args() {
   [ -n "$SKILL" ] || ERRORS+=("missing --skill <name>")
   [ -n "$TOOL" ] || ERRORS+=("missing --tool <codex|claude>")
   [ -n "$SCOPE" ] || ERRORS+=("missing --scope <project|global>")
+
+  if [ -n "$SKILL" ]; then
+    validate_skill_name
+  fi
 
   if [ -n "$TOOL" ]; then
     case "$TOOL" in

@@ -70,13 +70,17 @@ fail() {
   exit 1
 }
 
+escape_ere() {
+  printf '%s' "$1" | sed 's/[][\\.^$*+?{}()|]/\\&/g'
+}
+
 set_property() {
   local key="$1"
   local value="$2"
   local escaped_key
   local escaped_value
 
-  escaped_key="$(printf '%s' "$key" | sed 's/[.[\\*^$()+?{}|]/\\&/g')"
+  escaped_key="$(escape_ere "$key")"
   escaped_value="$(printf '%s' "$value" | sed 's/[\\&]/\\&/g')"
 
   if grep -qE "^[[:space:]]*${escaped_key}=" "$CONFIG_FILE"; then
@@ -158,9 +162,11 @@ configure_workers_file() {
 verify_property() {
   local key="$1"
   local expected="$2"
+  local escaped_key
   local actual
 
-  actual="$(grep -E "^[[:space:]]*${key}=" "$CONFIG_FILE" | tail -n 1 | cut -d= -f2-)"
+  escaped_key="$(escape_ere "$key")"
+  actual="$(grep -E "^[[:space:]]*${escaped_key}=" "$CONFIG_FILE" | tail -n 1 | cut -d= -f2-)"
   [[ "$actual" == "$expected" ]] || fail "$key expected '$expected' but found '$actual'"
 }
 
