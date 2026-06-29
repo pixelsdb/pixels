@@ -60,6 +60,10 @@ public class TaskQueue<E extends Task>
     public boolean offerAllPending(Collection<E> tasks)
     {
         checkPendingTasks(tasks);
+        synchronized (this.allTasks)
+        {
+            this.allTasks.addAll(tasks);
+        }
         return this.pendingQueue.addAll(tasks);
     }
 
@@ -80,6 +84,11 @@ public class TaskQueue<E extends Task>
      */
     public boolean offerPending(E task)
     {
+        checkPendingTasks(Collections.singletonList(task));
+        synchronized (this.allTasks)
+        {
+            this.allTasks.add(task);
+        }
         return this.pendingQueue.offer(task);
     }
 
@@ -150,6 +159,53 @@ public class TaskQueue<E extends Task>
 
     public List<E> getAllTasks()
     {
-        return ImmutableList.copyOf(this.allTasks);
+        synchronized (this.allTasks)
+        {
+            return ImmutableList.copyOf(this.allTasks);
+        }
+    }
+
+    public int getTotalTaskCount()
+    {
+        synchronized (this.allTasks)
+        {
+            return this.allTasks.size();
+        }
+    }
+
+    public int getPendingTaskCount()
+    {
+        return this.pendingQueue.size();
+    }
+
+    public int getRunningTaskCount()
+    {
+        return this.runningTasks.size();
+    }
+
+    public int getCompletedTaskCount()
+    {
+        return getTaskStatusCount(Task.Status.COMPLETE);
+    }
+
+    public int getFailedTaskCount()
+    {
+        return getTaskStatusCount(Task.Status.FAILED);
+    }
+
+    public int getTaskStatusCount(Task.Status status)
+    {
+        synchronized (this.allTasks)
+        {
+            int count = 0;
+            for (E task : this.allTasks)
+            {
+                if (task.getStatus() == status)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
     }
 }

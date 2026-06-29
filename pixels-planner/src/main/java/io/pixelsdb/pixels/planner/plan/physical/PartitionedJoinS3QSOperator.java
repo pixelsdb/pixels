@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionedTableInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleQueueInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedChainJoinInput;
@@ -33,7 +34,9 @@ import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -160,10 +163,64 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
     {
         for (PartitionInput partitionInput : partitionInputs)
         {
-            checkArgument(partitionInput.getOutput() != null &&
-                            isS3QSShuffle(partitionInput.getOutput().getShuffleInfo()),
-                    "%s partition input is not an explicit S3QS shuffle", side);
+            checkArgument(partitionInput.getOutput() != null,
+                    "%s partition input does not have output info", side);
+            checkS3QSShuffleInfo(partitionInput.getOutput().getShuffleInfo(), side + " partition input");
+            checkArgument(partitionInput.getProducerTaskId() >= 0,
+                    "%s partition input does not have producerTaskId", side);
         }
+    }
+
+    static void checkS3QSShuffleInfo(ShuffleInfo shuffleInfo, String source)
+    {
+        checkArgument(isS3QSShuffle(shuffleInfo),
+                "%s is not an explicit S3QS shuffle", source);
+        checkArgument(!isNullOrEmpty(shuffleInfo.getShuffleId()),
+                "%s does not have shuffleId", source);
+        checkArgument(!isNullOrEmpty(shuffleInfo.getObjectPathPrefix()),
+                "%s does not have objectPathPrefix", source);
+        checkArgument(shuffleInfo.getNumPartitions() > 0,
+                "%s does not have positive numPartitions", source);
+        checkArgument(shuffleInfo.getProducerCount() > 0,
+                "%s does not have positive producerCount", source);
+        checkArgument(shuffleInfo.getConsumerCount() > 0,
+                "%s does not have positive consumerCount", source);
+        checkArgument(shuffleInfo.getPollTimeoutSeconds() > 0,
+                "%s does not have positive pollTimeoutSeconds", source);
+        checkArgument(shuffleInfo.getQueues() != null,
+                "%s does not have partition queues", source);
+        checkArgument(shuffleInfo.getQueues().size() == shuffleInfo.getNumPartitions(),
+                "%s queue count does not match numPartitions", source);
+
+        Set<Integer> partitionIds = new HashSet<>();
+        for (ShuffleQueueInfo queue : shuffleInfo.getQueues())
+        {
+            checkArgument(queue != null, "%s has null queue info", source);
+            int partitionId = queue.getPartitionId();
+            checkArgument(partitionId >= 0 && partitionId < shuffleInfo.getNumPartitions(),
+                    "%s has out-of-range queue partitionId %s", source, partitionId);
+            checkArgument(partitionIds.add(partitionId),
+                    "%s has duplicate queue partitionId %s", source, partitionId);
+            checkArgument(!isNullOrEmpty(queue.getQueueName()) || !isNullOrEmpty(queue.getQueueUrl()),
+                    "%s partition %s does not have queueName or queueUrl", source, partitionId);
+        }
+    }
+
+    private static boolean isNullOrEmpty(String value)
+    {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private static boolean isS3QSShuffle(ShuffleInfo shuffleInfo)
+    {
+        return shuffleInfo != null && shuffleInfo.getStorageInfo() != null &&
+                shuffleInfo.getStorageInfo().getScheme() == Storage.Scheme.s3qs;
+    }
+
+    private void checkS3QSTable(PartitionedTableInfo tableInfo, String side)
+    {
+        checkArgument(tableInfo != null, "%s join table is null", side);
+        checkS3QSShuffleInfo(tableInfo.getShuffleInfo(), side + " join table");
     }
 
     private void validateJoinInputs()
@@ -185,15 +242,4 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
         }
     }
 
-    private void checkS3QSTable(PartitionedTableInfo tableInfo, String side)
-    {
-        checkArgument(tableInfo != null && isS3QSShuffle(tableInfo.getShuffleInfo()),
-                "%s join table is not an explicit S3QS shuffle", side);
-    }
-
-    private boolean isS3QSShuffle(ShuffleInfo shuffleInfo)
-    {
-        return shuffleInfo != null && shuffleInfo.getStorageInfo() != null &&
-                shuffleInfo.getStorageInfo().getScheme() == Storage.Scheme.s3qs;
-    }
 }

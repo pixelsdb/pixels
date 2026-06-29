@@ -333,9 +333,54 @@ public class StageCoordinator
         return this.stageId;
     }
 
+    public boolean isQueued()
+    {
+        return this.isQueued;
+    }
+
     public List<Worker<CFWorkerInfo>> getWorkers()
     {
         return this.workers;
+    }
+
+    public int getRegisteredWorkerCount()
+    {
+        return this.workers.size();
+    }
+
+    public int getTotalTaskCount()
+    {
+        checkArgument(this.isQueued && this.taskQueue != null,
+                "non-queued stage does not have task queue");
+        return this.taskQueue.getTotalTaskCount();
+    }
+
+    public int getPendingTaskCount()
+    {
+        checkArgument(this.isQueued && this.taskQueue != null,
+                "non-queued stage does not have task queue");
+        return this.taskQueue.getPendingTaskCount();
+    }
+
+    public int getRunningTaskCount()
+    {
+        checkArgument(this.isQueued && this.taskQueue != null,
+                "non-queued stage does not have task queue");
+        return this.taskQueue.getRunningTaskCount();
+    }
+
+    public int getCompletedTaskCount()
+    {
+        checkArgument(this.isQueued && this.taskQueue != null,
+                "non-queued stage does not have task queue");
+        return this.taskQueue.getCompletedTaskCount();
+    }
+
+    public int getFailedTaskCount()
+    {
+        checkArgument(this.isQueued && this.taskQueue != null,
+                "non-queued stage does not have task queue");
+        return this.taskQueue.getFailedTaskCount();
     }
 
     public void setDownStreamWorkerNum(int downStreamWorkerNum)

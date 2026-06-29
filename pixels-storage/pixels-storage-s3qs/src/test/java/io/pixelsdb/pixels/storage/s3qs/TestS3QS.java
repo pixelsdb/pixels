@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.storage.s3qs;
 
+import io.pixelsdb.pixels.common.physical.PhysicalReader;
+import io.pixelsdb.pixels.common.physical.PhysicalReaderUtil;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.sqs.SqsClient;
@@ -32,13 +35,17 @@ import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -217,6 +224,72 @@ public class TestS3QS
         s3qs.publish(S3QueueMessage.producerEnd("shuffle-6", 12, 1, 0, 1L));
     }
 
+    @Test
+    public void testAwsS3QSOfferPollReadAckAndCleanupIntegration() throws Exception
+    {
+        String bucket = System.getenv("PIXELS_S3QS_IT_BUCKET");
+        String prefix = trimSlashes(System.getenv("PIXELS_S3QS_IT_PREFIX"));
+        String queuePrefix = System.getenv("PIXELS_S3QS_IT_QUEUE_PREFIX");
+        assumeTrue("set PIXELS_S3QS_IT_BUCKET to run the AWS S3QS integration test",
+                bucket != null && !bucket.trim().isEmpty());
+        assumeTrue("set PIXELS_S3QS_IT_QUEUE_PREFIX to run the AWS S3QS integration test",
+                queuePrefix != null && !queuePrefix.trim().isEmpty());
+
+        String suffix = UUID.randomUUID().toString().replace("-", "");
+        String shuffleId = "it-" + suffix;
+        String queueUrl = null;
+        String objectRoot = bucket + "/" + (prefix.isEmpty() ? "" : prefix + "/") + shuffleId + "/";
+        S3QS s3qs = new S3QS(30);
+
+        try
+        {
+            queueUrl = s3qs.registerQueue(0, queuePrefix + "-" + suffix, null);
+            byte[] payload = ("payload-" + suffix).getBytes(StandardCharsets.UTF_8);
+            S3QueueMessage dataMessage = S3QueueMessage.data(shuffleId, 0, 3, 0, 0L, objectRoot)
+                    .setMetadata("schema=raw-bytes");
+
+            PhysicalWriter writer = s3qs.offer(dataMessage);
+            writer.append(payload);
+            writer.close();
+
+            S3QueuePollResult dataResult = pollUntilMessage(s3qs, 0, 5);
+            assertNotNull(dataResult);
+            assertTrue(dataResult.getMessage().isData());
+            assertEquals(shuffleId, dataResult.getMessage().getShuffleId());
+            assertEquals(0, dataResult.getMessage().getPartitionId());
+            assertEquals(3, dataResult.getMessage().getProducerId());
+            assertEquals("schema=raw-bytes", dataResult.getMessage().getMetadata());
+
+            PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(s3qs,
+                    dataResult.getMessage().getObjectPath());
+            ByteBuffer buffer = reader.readFully(payload.length);
+            byte[] actual = new byte[payload.length];
+            buffer.get(actual);
+            reader.close();
+            assertEquals(new String(payload, StandardCharsets.UTF_8),
+                    new String(actual, StandardCharsets.UTF_8));
+
+            dataResult.getMessage().setReceiptHandle(dataResult.getReceiptHandle());
+            assertEquals(0, s3qs.finishWork(dataResult.getMessage()));
+
+            S3QueueMessage endMessage = S3QueueMessage.producerEnd(shuffleId, 0, 3, 0, 1L);
+            s3qs.publish(endMessage);
+            S3QueuePollResult endResult = pollUntilMessage(s3qs, 0, 5);
+            assertNotNull(endResult);
+            assertTrue(endResult.getMessage().isProducerEnd());
+            endResult.getMessage().setReceiptHandle(endResult.getReceiptHandle());
+            assertEquals(0, s3qs.finishWork(endResult.getMessage()));
+        }
+        finally
+        {
+            if (queueUrl != null)
+            {
+                s3qs.deleteQueue(queueUrl);
+            }
+            s3qs.delete(objectRoot, true);
+        }
+    }
+
     private static S3QS newS3QS(SqsClient sqs) throws Exception
     {
         S3QS s3qs = new S3QS(30);
@@ -229,5 +302,37 @@ public class TestS3QS
     private static Map<MessageSystemAttributeName, String> receiveCount(int count)
     {
         return Collections.singletonMap(APPROXIMATE_RECEIVE_COUNT, String.valueOf(count));
+    }
+
+    private static S3QueuePollResult pollUntilMessage(S3QS s3qs, int partitionId, int attempts) throws IOException
+    {
+        S3QueueMessage request = new S3QueueMessage().setPartitionId(partitionId);
+        for (int i = 0; i < attempts; ++i)
+        {
+            S3QueuePollResult result = s3qs.pollMessage(request, 1);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    private static String trimSlashes(String value)
+    {
+        if (value == null)
+        {
+            return "";
+        }
+        String result = value.trim();
+        while (result.startsWith("/"))
+        {
+            result = result.substring(1);
+        }
+        while (result.endsWith("/"))
+        {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
     }
 }
