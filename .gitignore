@@ -32,6 +32,7 @@ resources/*.xml
 cpp/pixels-retina/third_party/
 
 # AI tools
+.agents/
 .codex
 .claude/
 .cursor/
