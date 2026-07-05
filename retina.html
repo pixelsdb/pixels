@@ -1,0 +1,3918 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Retina Animation Demo</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-elevated: #fbfdff;
+      --surface-muted: #eef3f8;
+      --surface-subtle: #f7f9fc;
+      --text: #122033;
+      --muted: #667386;
+      --border: #cbd5e1;
+      --border-soft: #dde5ee;
+      --primary: #315fcb;
+       --primary-hover: #254ead;
+      --primary-soft: #eaf0ff;
+      --cdc-path: #c96a1a;
+      --replay-path: #168a52;
+      --query-path: #0e7490;
+      --index-path: #2867c7;
+      --metadata-path: #6d5bd0;
+      --gc-path: #b7791f;
+      --danger: #c2413d;
+      --shadow-sm: 0 2px 8px rgba(15, 23, 42, .06);
+      --shadow-md: 0 10px 28px rgba(15, 23, 42, .10);
+      --shadow-lg: 0 18px 44px rgba(15, 23, 42, .12);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --transition: 160ms ease;
+      --content-max: 1960px;
+      --page-pad: clamp(6px, .75vw, 12px);
+      --frame-pad: clamp(6px, .65vw, 10px);
+      --gap: clamp(5px, .45vw, 8px);
+      --rail-w: clamp(54px, 4.2vw, 64px);
+      --rail-btn: clamp(38px, 3vw, 44px);
+      --top-btn: clamp(30px, 2.2vw, 34px);
+      --panel: var(--surface);
+      --panel-2: var(--surface-muted);
+      --panel-3: #e4ebf3;
+      --accent: var(--primary);
+      --accent-2: var(--replay-path);
+      --button: var(--primary);
+      --button-hover: var(--primary-hover);
+      --shadow: rgba(15, 23, 42, .12);
+    }
+
+    html[data-theme="dark"] {
+      --bg: #0f151e;
+      --surface: #171f2a;
+      --surface-elevated: #1c2633;
+      --surface-muted: #222d3b;
+      --surface-subtle: #141b24;
+      --text: #edf2f7;
+      --muted: #9aa8b8;
+      --border: #344256;
+      --border-soft: #2a3546;
+      --primary: #6ea8ff;
+      --primary-hover: #8bbcff;
+      --primary-soft: #1d3358;
+      --cdc-path: #f59e54;
+      --replay-path: #48c78e;
+      --query-path: #38bdf8;
+      --index-path: #7aa7ff;
+      --metadata-path: #a78bfa;
+      --gc-path: #f0b35a;
+      --danger: #f87171;
+      --shadow-sm: 0 2px 10px rgba(0, 0, 0, .20);
+      --shadow-md: 0 10px 30px rgba(0, 0, 0, .30);
+      --shadow-lg: 0 18px 46px rgba(0, 0, 0, .38);
+      --panel: var(--surface);
+      --panel-2: var(--surface-muted);
+      --panel-3: #2a3546;
+      --accent: var(--primary);
+      --accent-2: var(--replay-path);
+      --button: #3b73d9;
+      --button-hover: #5f91ee;
+      --shadow: rgba(0, 0, 0, .34);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 50% -18%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 38%),
+        linear-gradient(180deg, color-mix(in srgb, var(--bg) 92%, #fff) 0%, var(--bg) 46%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button {
+      border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
+      background: linear-gradient(180deg, color-mix(in srgb, var(--button) 92%, #fff), var(--button));
+      color: #fff;
+      border-radius: var(--radius-sm);
+      padding: 7px 9px;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      min-height: 34px;
+      transition: transform var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition);
+    }
+
+    button:hover {
+      background: linear-gradient(180deg, color-mix(in srgb, var(--button-hover) 90%, #fff), var(--button-hover));
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+    button:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 24%, transparent); outline-offset: 2px; }
+
+    button.secondary,
+    button.scene-btn {
+      color: var(--text);
+      background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+      border-color: var(--border-soft);
+      box-shadow: none;
+    }
+
+    button.secondary:hover,
+    button.scene-btn:hover {
+      background: var(--surface);
+      border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+      box-shadow: var(--shadow-sm);
+    }
+
+    button.active,
+    button.scene-btn.active {
+      color: #fff;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 92%, #fff), var(--primary));
+      border-color: color-mix(in srgb, var(--primary) 86%, var(--border));
+      box-shadow: var(--shadow-sm);
+    }
+
+    button.scene-btn.active {
+      background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 88%, #fff), color-mix(in srgb, var(--primary) 92%, #111827));
+    }
+
+    button.icon-btn {
+      width: var(--top-btn);
+      height: var(--top-btn);
+      min-width: var(--top-btn);
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    button.icon-btn svg { pointer-events: none; }
+
+    .shell {
+      width: 100%;
+      min-height: 100dvh;
+      padding: var(--page-pad);
+    }
+
+    .app-frame {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      display: grid;
+      grid-template-rows: auto auto auto;
+      align-content: start;
+      gap: var(--gap);
+    }
+
+    .hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: clamp(10px, 1vw, 16px);
+      margin: 0;
+      width: 100%;
+      padding: clamp(7px, .7vw, 10px) clamp(9px, .9vw, 12px);
+      background: color-mix(in srgb, var(--surface-elevated) 42%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border-soft) 58%, transparent);
+      border-radius: 14px;
+      backdrop-filter: blur(10px);
+    }
+
+    .title {
+      min-width: 0;
+    }
+
+    .title h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.16;
+      letter-spacing: -.02em;
+    }
+
+    .title p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel) 82%, transparent);
+      padding: 6px 10px;
+    }
+
+    .view-actions {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: clamp(4px, .45vw, 6px);
+      padding: 4px;
+      background: color-mix(in srgb, var(--surface) 72%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border-soft) 88%, transparent);
+      border-radius: 14px;
+      box-shadow: none;
+      backdrop-filter: blur(10px);
+      flex: 0 0 auto;
+    }
+
+    .view-actions .icon-btn {
+      background: transparent;
+      color: var(--text);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    .view-actions .icon-btn:hover {
+      background: var(--primary-soft);
+      color: var(--primary);
+      border-color: color-mix(in srgb, var(--primary) 26%, transparent);
+    }
+
+    .demo-layout {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      display: grid;
+      grid-template-columns: var(--rail-w) minmax(0, 1fr);
+      gap: var(--gap);
+      align-items: stretch;
+      min-height: calc(100dvh - var(--page-pad) * 2);
+      padding: 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .control-rail {
+      width: var(--rail-w);
+      padding: clamp(6px, .6vw, 8px);
+      min-height: 0;
+      align-self: center;
+      position: relative;
+      z-index: 15;
+      overflow: visible;
+      background: color-mix(in srgb, var(--surface-elevated) 66%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border-soft) 72%, transparent);
+      border-radius: var(--radius-lg);
+      box-shadow: none;
+      backdrop-filter: blur(12px);
+    }
+
+    .control-section + .control-section {
+      margin-top: var(--gap);
+      padding-top: var(--gap);
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .section-title {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .playback-grid,
+    .scene-list {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(6px, .6vw, 8px);
+    }
+
+    .control-rail .icon-btn,
+    .control-rail .scene-btn {
+      width: var(--rail-btn);
+      height: var(--rail-btn);
+      min-width: var(--rail-btn);
+      min-height: var(--rail-btn);
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: clamp(12px, .95vw, 14px);
+      position: relative;
+      overflow: visible;
+      background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+      color: var(--text);
+      border-color: var(--border-soft);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 46%, transparent);
+    }
+
+    .control-rail .icon-btn svg,
+    .scene-glyph svg {
+      width: clamp(18px, 1.35vw, 20px);
+      height: clamp(18px, 1.35vw, 20px);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .scene-glyph {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .control-rail button::before,
+    .control-rail button::after {
+      position: absolute;
+      left: calc(100% + 10px);
+      top: 50%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--transition), transform var(--transition);
+      z-index: 40;
+    }
+
+    .control-rail button::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: color-mix(in srgb, var(--surface-elevated) 96%, transparent);
+      border-left: 1px solid var(--border-soft);
+      border-bottom: 1px solid var(--border-soft);
+      transform: translate(-5px, -50%) rotate(45deg);
+    }
+
+    .control-rail button::after {
+      content: attr(data-label);
+      transform: translateY(-50%) translateX(-4px);
+      white-space: nowrap;
+      padding: 7px 10px;
+      border: 1px solid var(--border-soft);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--surface-elevated) 96%, transparent);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .01em;
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(10px);
+    }
+
+    .control-rail button:hover {
+      transform: translateX(3px) scale(1.08);
+      background: var(--surface);
+      border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+      color: var(--primary);
+      box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 16%, transparent);
+    }
+
+    .control-rail button:hover::before,
+    .control-rail button:hover::after,
+    .control-rail button:focus-visible::before,
+    .control-rail button:focus-visible::after {
+      opacity: 1;
+    }
+
+    .control-rail button:hover::after,
+    .control-rail button:focus-visible::after {
+      transform: translateY(-50%) translateX(0);
+    }
+
+    .control-rail button:hover::before,
+    .control-rail button:focus-visible::before {
+      transform: translate(-5px, -50%) rotate(45deg) translateX(0);
+    }
+
+    .control-rail button.active,
+    .control-rail button.scene-btn.active {
+      color: #fff;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 88%, #fff), color-mix(in srgb, var(--primary) 92%, #111827));
+      border-color: color-mix(in srgb, var(--primary) 82%, var(--border));
+      box-shadow:
+        0 10px 24px color-mix(in srgb, var(--primary) 28%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--primary) 12%, transparent);
+    }
+
+    .control-rail button.active:hover,
+    .control-rail button.scene-btn.active:hover {
+      color: #fff;
+    }
+
+    .canvas-card {
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      min-height: calc(100dvh - var(--page-pad) * 2);
+      min-width: 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      border-radius: clamp(8px, .8vw, 14px);
+    }
+
+    @media (max-width: 1180px) {
+      :root {
+        --rail-w: clamp(54px, 4.2vw, 64px);
+      }
+    }
+
+    @media (max-width: 980px) {
+      .shell { padding: 8px; }
+      .demo-layout { grid-template-columns: 1fr; align-items: start; }
+      .control-rail {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        overflow: visible;
+      }
+      .control-section + .control-section { margin-top: 0; padding-top: 0; padding-left: 10px; border-top: 0; border-left: 1px solid var(--border-soft); }
+      .playback-grid, .scene-list { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+      .control-rail .icon-btn, .control-rail .scene-btn { width: var(--rail-btn); min-width: var(--rail-btn); justify-content: center; padding: 0; }
+      .control-rail button::after { display: none; }
+    }
+
+    @media (max-width: 700px) {}
+
+    /* Fullscreen layout is disabled while fullscreen controls are commented out. */
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="app-frame">
+      <!-- Header and view toggles are temporarily disabled to give the canvas the full page height.
+      <header class="hero">
+        <div class="title">
+          <h1>Retina: Transactional CDC Replay for Real-Time Lakehouse Analytics</h1>
+        </div>
+        <div class="view-actions" aria-label="View controls">
+          <button id="fsBtn" class="secondary icon-btn" title="Fullscreen" aria-label="Fullscreen"></button>
+          <button id="themeBtn" class="secondary icon-btn" title="Toggle Theme" aria-label="Toggle Theme"></button>
+        </div>
+      </header>
+      -->
+
+      <section class="demo-layout">
+        <aside class="control-rail" aria-label="Retina demo controls">
+        <section class="control-section">
+          <div class="section-title"><h2>Run control</h2><span id="modeLabel">Playing</span></div>
+          <div class="playback-grid">
+            <button id="pauseBtn" class="icon-btn" data-label="Pause / Resume" title="Pause / Resume" aria-label="Pause / Resume"></button>
+            <button id="autoBtn" class="icon-btn active" data-label="Auto Replay" title="Auto Replay" aria-label="Auto Replay"></button>
+            <button id="speedBtn" class="icon-btn" data-label="Speed 1x" title="Speed 1x" aria-label="Speed 1x"></button>
+          </div>
+        </section>
+
+        <section class="control-section">
+          <div class="section-title"><h2>Mechanism scenes</h2></div>
+          <div class="scene-list">
+            <button class="scene-btn" data-scene="insert" data-label="Insert Replay" title="Insert Replay" aria-label="Insert Replay">
+              <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3c1.075 0 2.1 -.08 3.037 -.224"/><path d="M20 12v-6"/><path d="M4 12v6c0 1.657 3.582 3 8 3c.166 0 .331 -.002 .495 -.006"/><path d="M16 19h6"/><path d="M19 16v6"/></svg></span>
+            </button>
+            <button class="scene-btn" data-scene="delete" data-label="Delete Replay" title="Delete Replay" aria-label="Delete Replay">
+              <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3c.537 0 1.062 -.02 1.57 -.058"/><path d="M20 13.5v-7.5"/><path d="M4 12v6c0 1.657 3.582 3 8 3c.384 0 .762 -.01 1.132 -.03"/><path d="M22 22l-5 -5"/><path d="M17 22l5 -5"/></svg></span>
+            </button>
+            <button class="scene-btn" data-scene="update" data-label="Update Replay" title="Update Replay" aria-label="Update Replay">
+              <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3c.478 0 .947 -.016 1.402 -.046"/><path d="M20 12v-6"/><path d="M4 12v6c0 1.526 3.04 2.786 6.972 2.975"/><path d="M18.42 15.61a2.1 2.1 0 0 1 2.97 2.97l-3.39 3.42h-3v-3l3.42 -3.39"/></svg></span>
+            </button>
+            <button class="scene-btn" data-scene="query" data-label="Query Path" title="Query Path" aria-label="Query Path">
+              <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3m8 -3.5v-5.5"/><path d="M4 12v6c0 1.657 3.582 3 8 3"/><path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M20.2 20.2l1.8 1.8"/></svg></span>
+            </button>
+            <button class="scene-btn" data-scene="gc" data-label="Garbage Collection" title="Garbage Collection" aria-label="Garbage Collection">
+              <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17l-2 2l2 2"/><path d="M10 19h9a2 2 0 0 0 1.75 -2.75l-.55 -1"/><path d="M8.536 11l-.732 -2.732l-2.732 .732"/><path d="M7.804 8.268l-4.5 7.794a2 2 0 0 0 1.506 2.89l1.141 .024"/><path d="M15.464 11l2.732 .732l.732 -2.732"/><path d="M18.196 11.732l-4.5 -7.794a2 2 0 0 0 -3.256 -.14l-.591 .976"/></svg></span>
+            </button>
+          </div>
+        </section>
+
+        </aside>
+
+        <section class="canvas-card">
+          <canvas id="retinaCanvas" aria-label="Retina architecture animation canvas"></canvas>
+        </section>
+      </section>
+
+    </section>
+  </main>
+
+<script>
+(() => {
+  const canvas = document.getElementById('retinaCanvas');
+  const ctx = canvas.getContext('2d');
+  const root = document.documentElement;
+  const buttons = {
+    pause: document.getElementById('pauseBtn'),
+    auto: document.getElementById('autoBtn'),
+    speed: document.getElementById('speedBtn'),
+    fs: null,
+    theme: null
+  };
+  const dom = {
+    modeLabel: document.getElementById('modeLabel')
+  };
+  const sceneButtons = Array.from(document.querySelectorAll('[data-scene]'));
+
+  const svgPause = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/><path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"/></svg>';
+  const svgPlay = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16l13 -8z"/></svg>';
+  const svgFastFwd = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v14l8 -7z"/><path d="M13 5v14l8 -7z"/></svg>';
+  const svgGauge = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4 -4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/><path d="M5 19h14"/></svg>';
+  const svgMaxim = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/></svg>';
+  const svgMinim = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l4 0l0 -4"/><path d="M3 3l6 6"/><path d="M5 15l4 0l0 4"/><path d="M3 21l6 -6"/><path d="M19 9l-4 0l0 -4"/><path d="M15 9l6 -6"/><path d="M19 15l-4 0l0 4"/><path d="M15 15l6 6"/></svg>';
+  const svgSun = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1"/><path d="M12 3v1"/><path d="M20 12h1"/><path d="M12 20v1"/><path d="M5.6 5.6l.7 .7"/><path d="M18.4 5.6l-.7 .7"/><path d="M17.7 17.7l.7 .7"/><path d="M6.3 17.7l-.7 .7"/></svg>';
+  const svgMoon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.132 0 .263 .003 .393 .008a7.5 7.5 0 0 0 7.92 10.564a9 9 0 1 1 -8.313 -10.572z"/></svg>';
+
+  buttons.pause.innerHTML = svgPause;
+  buttons.auto.innerHTML = svgFastFwd;
+  buttons.speed.innerHTML = svgGauge;
+  // Fullscreen and theme controls are temporarily disabled with the header.
+  // buttons.fs.innerHTML = svgMaxim;
+  // buttons.theme.innerHTML = svgMoon;
+
+  const W = 1800;
+  const H = 1080;
+  const ASPECT = W / H;
+  const CANVAS_Y_SHIFT = 64;
+  const sy = y => y - CANVAS_Y_SHIFT;
+
+  const AUTO_START_SCENE = 'cdc';
+  const autoSceneOrder = ['cdc'];
+  const sceneOrder = ['insert', 'delete', 'update', 'query', 'gc'];
+  const sceneMeta = {
+    cdc: { label: 'CDC Mirror Transaction', type: 'pixels-sink flow', summary: 'Pixels Sink reads the ordered CDC log, reconstructs one mirror transaction, begins it in Retina, replays row changes, and commits only after replay OK.' },
+    routing: { label: 'Mirror Row Replay', type: 'sink write path', summary: 'Pixels Sink sends row changes from a mirror transaction to Retina replayers; single-operation scenes keep the replay behavior easy to inspect.' },
+    insert: { label: 'Insert Replay', type: 'write path', summary: 'Insert row changes arrive through a mirror transaction, append to the write buffer, then sealed memtables flush to object entries.' },
+    delete: { label: 'Delete Replay', type: 'visibility path', summary: 'Delete unfolds Index Service lookup and RGVisibility metadata: deletePrimaryIndexEntries returns the old RowLocation, then delete timestamp entries update visibility without rewriting columnar files.' },
+    update: { label: 'Update Replay', type: 'MVCC versioning', summary: 'Update inserts the new tuple version first, updates the primary index, then deletes the old tuple version under one timestamp.' },
+    query: { label: 'Query Path', type: 'parallel VFoR read path', summary: 'Query plans source splits for regular files, active memtables, and flushed objects in parallel; returned batches merge through one VFoR visibility gate before operators consume visible rows.' },
+    gc: { label: 'Garbage Collection', type: 'background function', summary: 'GC is shown as Retina bitmap folding plus Storage GC rewriting regular files, retiring old files in metadata, and deleting them after cleanupAt.' }
+  };
+
+  const flow = {
+    cdc: '#c96a1a',
+    replay: '#168a52',
+    query: '#0e7490',
+    visibility: '#6d5bd0',
+    metadata: '#7c3aed',
+    gc: '#b7791f',
+    tx: '#315fcb',
+    storage: '#0f766e',
+    index: '#2867c7',
+    delete: '#c2413d'
+  };
+
+  const TYPE = {
+    moduleTitle: 16,
+    subTitle: 14,
+    text: 12
+  };
+  const MODULE_TITLE_X = 16;
+  const MODULE_TITLE_Y = 32;
+  const MODULE_CONTENT_GAP = 20;
+  const MODULE_CONTENT_PAD = 20;
+  const PANEL_TITLE_X = 12;
+  const PANEL_TITLE_Y = 25;
+
+  const STANDARD_STEP_UNITS = 3.8;
+  const ANIMATION_BEAT_SECONDS = 2;
+  const STREAM_CYCLE_RATE = 1 / ANIMATION_BEAT_SECONDS;
+  const PLAYBACK_RATES = [1, 2, 3, .5];
+  const DEFAULT_HWM = 1290;
+  const DEFAULT_LWM = 1281;
+  const DEFAULT_QUERY_TS = DEFAULT_HWM - 1;
+  const DEFAULT_GC_SAFE_TS = DEFAULT_HWM - 1;
+
+  function typeFont(size, weight = 800, family = 'Inter, system-ui, sans-serif') {
+    const prefix = weight ? `${weight} ` : '';
+    return `${prefix}${size}px ${family}`;
+  }
+
+  function monoFont(size, weight = 800) {
+    return typeFont(size, weight, 'monospace, Inter, system-ui');
+  }
+
+  function pillTypeSize(fs) {
+    return TYPE.text;
+  }
+
+  const MIDDLE_TOP = sy(74);
+  const MIDDLE_BOTTOM = H - 10;
+  const MIDDLE_H = MIDDLE_BOTTOM - MIDDLE_TOP;
+  const SERVICE_Y = MIDDLE_TOP;
+  const SERVICE_H = 174;
+  const TX_SERVICE_H = 144;
+  const TOP_RUNTIME_GAP = 14;
+  const RUNTIME_Y = SERVICE_Y + SERVICE_H + TOP_RUNTIME_GAP;
+  const RUNTIME_H = MIDDLE_BOTTOM - RUNTIME_Y;
+  const LEFT_PANEL_X = 44;
+  const LEFT_PANEL_W = 390;
+  const SERVICE_X = LEFT_PANEL_X + LEFT_PANEL_W + 10;
+  const SERVICE_RIGHT = 1424;
+  const SERVICE_GAP = 18;
+  const RUNTIME_STORAGE_GAP = 18;
+  const RUNTIME_W = Math.round((SERVICE_RIGHT - SERVICE_X - RUNTIME_STORAGE_GAP) * .50);
+  const STORAGE_X = SERVICE_X + RUNTIME_W + RUNTIME_STORAGE_GAP;
+  const STORAGE_W = SERVICE_RIGHT - STORAGE_X;
+  const TOP_SERVICE_W = Math.round((SERVICE_RIGHT - SERVICE_X - SERVICE_GAP * 2) / 3);
+  const INDEX_W = SERVICE_RIGHT - (SERVICE_X + (TOP_SERVICE_W + SERVICE_GAP) * 2);
+  const CDC_STREAM_H = 116;
+  const CDC_STREAM_ROW_RECORDS = 3;
+  const CDC_STREAM_RECORD_COUNT = CDC_STREAM_ROW_RECORDS + 2;
+  const CDC_STREAM_RAIL_MARGIN_P = .08;
+  const CDC_STREAM_SINGLE_OP_RAIL_MARGIN_P = .20;
+  const CDC_STREAM_RECORD_GAP_UNITS = 1;
+  const CDC_TO_SINK_GAP = 100;
+  const INGRESS_Y = MIDDLE_TOP + CDC_STREAM_H + CDC_TO_SINK_GAP;
+  const PIXELS_SINK_W = 285;
+  const PIXELS_SINK_H = 394;
+  const MIRROR_ROW_CARD_W = 163;
+  const MIRROR_BEGIN_STACK_GAP = 12;
+  const MIRROR_STACK_COMMIT_GAP = 10;
+  const PIXELS_SINK_X = LEFT_PANEL_X + (LEFT_PANEL_W - PIXELS_SINK_W) / 2;
+  const rects = {
+    cdcStream: { x: LEFT_PANEL_X, y: MIDDLE_TOP, w: LEFT_PANEL_W, h: CDC_STREAM_H, title: 'CDC stream', sub: 'row changes + commit marker' },
+    ingress: { x: PIXELS_SINK_X, y: INGRESS_Y, w: PIXELS_SINK_W, h: PIXELS_SINK_H, title: 'Pixels Sink', sub: 'mirror transaction -> replay RPC' },
+    sink: { x: PIXELS_SINK_X + 14, y: INGRESS_Y + 292, w: PIXELS_SINK_W - 28, h: 96, title: 'Pixels Sink replay', sub: 'replay path anchors' },
+
+    tx: { x: SERVICE_X, y: SERVICE_Y, w: TOP_SERVICE_W, h: TX_SERVICE_H, title: 'Transaction Service', sub: 'MVCC time boundary: HWM / LWM' },
+    catalog: { x: SERVICE_X + TOP_SERVICE_W + SERVICE_GAP, y: SERVICE_Y, w: TOP_SERVICE_W, h: SERVICE_H, title: 'Metadata Service', sub: 'schema, stats, visible file list' },
+    index: { x: SERVICE_X + (TOP_SERVICE_W + SERVICE_GAP) * 2, y: SERVICE_Y, w: INDEX_W, h: SERVICE_H, title: 'Index Service', sub: 'primaryKey→rowId + rowId→RowLocation' },
+    runtime: { x: SERVICE_X, y: RUNTIME_Y, w: RUNTIME_W, h: RUNTIME_H, title: 'Retina replayer', sub: 'RetinaWorkerService RPC + write / visibility state' },
+    storage: { x: STORAGE_X, y: RUNTIME_Y, w: STORAGE_W, h: RUNTIME_H, title: 'Storage', sub: 'flushed immutable memtable + regular columnar files' },
+
+    query: { x: 1450, y: MIDDLE_TOP, w: 316, h: MIDDLE_H, title: 'Query Engine', sub: 'parallel splits → VFoR gate → visible batches' }
+  };
+
+  const DETAIL_REPLAY_ID = 1;
+
+  const info = {
+    cdcStream: ['CDC stream', 'External ordered row-change stream. It carries row records plus a commit marker for one source transaction.'],
+    ingress: ['Pixels Sink', 'Consumes the external CDC stream, reconstructs mirror transactions, sends replay RPCs, and commits after replay OK.'],
+    sink: ['Pixels Sink replay anchor', 'Invisible anchor region for replay paths.'],
+    runtime: ['Retina replayer', 'RetinaServerImpl handles RetinaWorkerService RPCs and keeps write-buffer and visibility state.'],
+    tx: ['Transaction Service', 'Exposes MVCC time boundaries. Callers get snapshot or safeTs on demand; the panel stays focused on HWM and LWM.'],
+    index: ['Index Service', 'Maps primary keys to rowIds and physical row locations; delete/update use this map before touching visibility metadata.'],
+    storage: ['Storage', 'Stores flushed immutable memtables as object entries plus regular columnar files. Storage GC rewrites visible rows into a new regular file and retires old files through metadata.'],
+    catalog: ['Metadata Service', 'Publishes schema, statistics, and visible-file metadata for queries and storage rewrite switches.'],
+    query: ['Query Engine', 'Schedules regular file scans, active memtable RPC, and flushed-object reads as parallel split-like tasks; all returned batches pass through the same VFoR visibility gate.'],
+    lane0: ['Retina replayer', 'Current operation, write buffer, and visibility structure.'],
+    lane1: ['Retina replayer', 'Current operation, write buffer, and visibility structure.'],
+    lane2: ['Retina replayer', 'Current operation, write buffer, and visibility structure.']
+  };
+
+  const state = {
+    scene: 'cdc',
+    stepIndex: 0,
+    stepClock: 0,
+    autoPlay: true,
+    paused: false,
+    manualRun: false,
+    playbackRateIndex: 0,
+    last: performance.now(),
+    dpr: 1,
+    hoverKey: null,
+    mouse: { x: 0, y: 0 },
+    flash: 0,
+    detailFocus: 'overview',
+    activeChannels: []
+  };
+
+  function baseModel() {
+    return {
+      tx: {
+        hwm: DEFAULT_HWM,
+        lwm: DEFAULT_LWM
+      },
+      sink: {
+        mirrorTx: 'tx1287',
+        rowChanges: ['pk160', 'pk132', 'pk208'],
+        mirrorOps: ['insert', 'delete', 'update'],
+        sinkStep: null,
+        cdcTx: 1208,
+        changeCount: 72410,
+        cdcLog: 'TXN or ROW record',
+        cdcRecord: 'CDC tx1287',
+        cdcPhase: 'idle',
+        coordState: 'waiting for CDC log',
+        cachedRows: '0 cached',
+        routingRule: 'by row key',
+        writePlan: 'waiting for row changes',
+        rpcBatch: '1 tx per request',
+        transServer: 'ready',
+        requestMode: 'replay RPC',
+        requestState: 'ready',
+        txState: 'Transaction Service ready'
+      },
+      lanes: [
+        laneModel(0, 'I:pk160', 5, 2, ['(2,1276)'], 1266),
+        laneModel(1, 'U:pk132', 7, 3, ['(5,1278)', '(7,1282)'], 1264),
+        laneModel(2, 'D:pk208', 4, 2, ['(1,1279)'], 1267)
+      ],
+      index: {
+        hot: 'pk132',
+        primaryEntries: ['pk132 -> rowId7705', 'pk208 -> rowId8208'],
+        mainEntries: ['rowId7705 -> fileId77/rg1/off5', 'rowId8208 -> file-042/rg0/off7'],
+        operation: 'idle'
+      },
+      storage: {
+        regularFiles: ['file-041.pxl', 'file-042.pxl'],
+        objectEntries: ['obj-77'],
+        staleRatio: 0.31,
+        agingQueue: [],
+        newFile: 'none',
+        newFileState: 'none',
+        cleanup: 'idle'
+      },
+      catalog: {
+        visible: ['file-041.pxl', 'file-042.pxl'],
+        pending: 'none',
+        switchState: 'stable'
+      },
+      query: {
+        id: 'q44',
+        transTs: DEFAULT_QUERY_TS,
+        returnedRows: 18420,
+        active: false,
+        parallelism: 'split fan-out',
+        splits: [
+          { id: 'S0', kind: 'regular', title: 'Regular file split', source: 'file RG ranges', status: 'waiting', progress: .12, batches: 0, visible: 0 },
+          { id: 'S1', kind: 'active', title: 'Active memtable split', source: 'GetWriteBuffer RPC', status: 'waiting', progress: .10, batches: 0, visible: 0 },
+          { id: 'S2', kind: 'flushed', title: 'Flushed object split', source: 'immutable objects', status: 'waiting', progress: .10, batches: 0, visible: 0 }
+        ],
+        gate: {
+          state: 'waiting for source batches',
+          inputBatches: 0,
+          visibleBatches: 0,
+          bitmap: '0010100110',
+          rule: 'ts <= transTs && !deleteBit'
+        },
+        queueState: 'waiting',
+        operatorInput: 'waiting visible batches'
+      }
+    };
+  }
+
+  function laneModel(id, currentOp, activeRows, immutable, deletes, baseTs) {
+    return {
+      id,
+      currentOp,
+      status: 'idle',
+      activeRows,
+      prevActiveRows: activeRows,
+      activeCap: 8,
+      immutable,
+      prevImmutable: immutable,
+      regularFile: `file-04${id}.pxl`,
+      baseTs,
+      baseBitmap: '0000000000000000',
+      deleteTs: deletes,
+      safeTs: null,
+      throughput: 72 + id * 11,
+      highlight: null
+    };
+  }
+
+  let model = baseModel();
+
+  function sceneBase(scene) {
+    const m = baseModel();
+    if (scene === 'cdc') {
+      m.sink.mirrorTx = 'tx8421';
+      m.sink.rowChanges = ['INSERT', 'DELETE', 'UPDATE'];
+      m.sink.mirrorOps = ['insert', 'delete', 'update'];
+      m.sink.sinkStep = 'empty';
+      m.sink.cdcPhase = 'begin';
+      m.sink.cdcLog = 'ordered CDC log';
+      m.sink.cdcRecord = 'BEGIN';
+      m.sink.coordState = 'read CDC log';
+      m.sink.cachedRows = '';
+      m.sink.requestState = 'read CDC log';
+      m.sink.txState = 'await begin';
+    }
+    if (scene === 'routing') {
+      m.sink.mirrorTx = 'tx8503';
+      m.sink.rowChanges = ['customer 1', 'orders 2'];
+      m.sink.mirrorOps = ['insert', 'delete', 'update'];
+      m.sink.sinkStep = 'replay';
+      m.sink.cdcPhase = 'complete';
+      m.sink.cdcLog = 'ROW records ready';
+      m.sink.cdcRecord = 'ROW txn:tx8503 orders before:{pk:208} after:null';
+      m.sink.coordState = 'tx8503 complete';
+      m.sink.cachedRows = '0 cached';
+      m.sink.routingRule = 'after / before / split';
+      m.sink.writePlan = 'rows staged by key image';
+      m.sink.rpcBatch = 'batch open';
+      m.sink.requestState = 'routing rows';
+      m.sink.txState = 'Pixels tx pending';
+    }
+    if (scene === 'insert') {
+      m.sink.mirrorTx = 'tx1290';
+      m.sink.rowChanges = ['orders 3'];
+      m.sink.mirrorOps = ['insert'];
+      m.sink.sinkStep = 'empty';
+      m.sink.cdcPhase = 'begin';
+      m.sink.cdcLog = 'ordered CDC log';
+      m.sink.cdcRecord = 'BEGIN';
+      m.sink.coordState = 'read CDC log';
+      m.sink.routingRule = 'after-image key';
+      m.sink.writePlan = 'pk160, pk174, pk181 queued';
+      m.sink.rpcBatch = 'tx1290 only';
+      m.sink.requestState = 'read CDC log';
+      m.sink.txState = 'tx1290 metadata';
+    }
+    if (scene === 'delete') {
+      m.sink.mirrorTx = 'tx1291';
+      m.sink.rowChanges = ['orders 1'];
+      m.sink.mirrorOps = ['delete'];
+      m.sink.sinkStep = 'empty';
+      m.sink.cdcPhase = 'begin';
+      m.sink.cdcLog = 'ordered CDC log';
+      m.sink.cdcRecord = 'BEGIN';
+      m.sink.coordState = 'read CDC log';
+      m.sink.routingRule = 'before-image key';
+      m.sink.writePlan = 'pk208 queued';
+      m.sink.rpcBatch = 'tx1291 only';
+      m.sink.requestState = 'read CDC log';
+      m.sink.txState = 'tx1291 metadata';
+      m.index.hot = 'pk208';
+      m.index.operation = 'deletePrimaryIndexEntries pk208';
+    }
+    if (scene === 'update') {
+      m.sink.mirrorTx = 'tx1292';
+      m.sink.rowChanges = ['customer 1'];
+      m.sink.mirrorOps = ['update'];
+      m.sink.sinkStep = 'empty';
+      m.sink.cdcPhase = 'begin';
+      m.sink.cdcLog = 'ordered CDC log';
+      m.sink.cdcRecord = 'BEGIN';
+      m.sink.coordState = 'read CDC log';
+      m.sink.routingRule = 'same primary key';
+      m.sink.writePlan = 'pk132 queued';
+      m.sink.rpcBatch = 'tx1292 only';
+      m.sink.requestState = 'read CDC log';
+      m.sink.txState = 'tx1292 metadata';
+      m.index.hot = 'pk132';
+      m.index.operation = 'insert new + update primary';
+    }
+    if (scene === 'query') {
+      m.query.id = 'q45';
+      m.query.active = true;
+      m.query.transTs = DEFAULT_QUERY_TS;
+      m.tx.lwm = DEFAULT_QUERY_TS;
+      m.query.returnedRows = 0;
+      m.query.parallelism = 'IntraWorkerParallelism';
+      m.query.splits.forEach(split => {
+        split.status = 'waiting';
+        split.progress = .08;
+        split.batches = 0;
+        split.visible = 0;
+      });
+      m.query.gate.state = 'waiting for source batches';
+      m.query.gate.inputBatches = 0;
+      m.query.gate.visibleBatches = 0;
+      m.query.queueState = 'waiting';
+      m.query.operatorInput = 'waiting visible batches';
+    }
+    if (scene === 'gc') {
+      m.tx.lwm = DEFAULT_LWM;
+      m.lanes[DETAIL_REPLAY_ID].deleteTs = ['(2,1272)', '(4,1278)', '(7,1283)', '(9,1291)'];
+      m.lanes[DETAIL_REPLAY_ID].baseTs = 1268;
+      m.storage.staleRatio = 0.58;
+      m.storage.agingQueue = ['file-038.pxl', 'file-039.pxl'];
+      m.storage.newFile = 'none';
+      m.storage.newFileState = 'none';
+      m.storage.cleanup = 'await memory phase';
+      m.catalog.pending = 'await storage phase';
+    }
+    return m;
+  }
+
+  const scenes = {
+    cdc: [
+      step('The CDC stream starts with BEGIN on the ordered source log.', cdcStreamPhaseUnits('begin'),
+        ['cdcStream'], [],
+        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'begin'; m.sink.cdcRecord = 'BEGIN'; m.sink.requestState = 'waiting for complete CDC log'; }, 'cdc', ['cdc']),
+      step('Row changes arrive in source-log order: INSERT, DELETE, then UPDATE.', cdcStreamPhaseUnits('rows'),
+        ['cdcStream'], [],
+        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'rows'; m.sink.cdcRecord = 'ROWS'; m.sink.requestState = 'CDC rows streaming'; }, 'cdc', ['cdc']),
+      step('COMMIT closes the CDC stream.', cdcStreamPhaseUnits('commit'),
+        ['cdcStream'], [],
+        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'commit'; m.sink.cdcRecord = 'COMMIT'; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc']),
+      step('The CDC log is complete and is handed to Pixels Sink.', 1.2,
+        ['cdcStream', 'ingress'], [tok('complete log', 'cdcStream.out', 'ingress.top', flow.cdc, .14, .82)],
+        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'complete'; m.sink.cdcRecord = 'COMMIT'; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc']),
+      step('Pixels Sink creates the mirror transaction BEGIN and Transaction Service assigns its timestamp.', 4.0,
+        ['ingress', 'tx'], [tok('begin tx8421', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=1290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=1290'; }, 'mvcc', ['tx']),
+      step('Pixels Sink creates the INSERT row in the mirror transaction and sends its replay RPC.', 3.8,
+        ['ingress', 'runtime'], [tok('INSERT', 'ingress.insertRight', 'runtime.left', flow.replay, .18, .86)],
+        m => { m.sink.sinkStep = 'row1'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay INSERT'; m.sink.rpcBatch = 'INSERT pending'; m.lanes[0].currentOp = 'I:row'; }, 'dispatch', ['dispatch']),
+      step('Pixels Sink creates the DELETE row next and sends its replay RPC after INSERT.', 3.8,
+        ['ingress', 'runtime'], [tok('DELETE', 'ingress.deleteRight', 'runtime.left', flow.delete, .18, .86)],
+        m => { m.sink.sinkStep = 'row2'; m.sink.requestState = 'replay DELETE'; m.sink.rpcBatch = 'DELETE pending'; m.lanes[1].currentOp = 'D:row'; }, 'dispatch', ['dispatch']),
+      step('Pixels Sink creates the UPDATE row last and sends its replay RPC.', 3.8,
+        ['ingress', 'runtime'], [tok('UPDATE', 'ingress.updateRight', 'runtime.left', flow.index, .18, .86)],
+        m => { m.sink.sinkStep = 'row3'; m.sink.requestState = 'replay UPDATE'; m.sink.rpcBatch = 'UPDATE pending'; m.lanes[2].currentOp = 'U:row'; }, 'dispatch', ['dispatch']),
+      step('After every replay RPC returns OK, Pixels Sink can finish the mirror transaction.', 3.6,
+        ['ingress', 'runtime'], [tok('all replay OK', 'runtime.left', 'ingress.replayRight', flow.replay, .16, .84)],
+        m => { m.sink.sinkStep = 'rowsOk'; m.sink.requestState = 'all replay OK'; m.sink.rpcBatch = 'all replay OK'; }, 'mvcc', []),
+      step('Pixels Sink commits tx8421 and Transaction Service advances HWM internally.', 4.2,
+        ['ingress', 'tx'], [tok('commit tx8421', 'ingress.commitRight', 'tx.left', flow.tx, .18, .58)],
+        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'HWM advanced'; m.sink.txState = 'tx8421 committed; HWM=1291'; m.sink.rpcBatch = 'tx8421 replay OK'; m.tx.hwm = 1291; }, 'mvcc', ['tx'])
+    ],
+    routing: [
+      step('Pixels Sink has reconstructed tx43 from the CDC stream and starts replaying its row changes.', 3.8,
+        ['cdcStream', 'ingress'], [tok('tx43 rows', 'cdcStream.out', 'ingress.top', flow.cdc, .08, .78)],
+        m => { m.sink.sinkStep = 'replay'; m.sink.coordState = 'tx43 mirror tx'; m.sink.requestState = 'replay rows'; m.sink.routingRule = 'inspect row image'; }, 'cdc', ['cdc']),
+      step('Insert rows use the after-image primary key, so the new tuple can be staged for replay.', 4.0,
+        ['ingress', 'lane0'], [tok('I:pk160', 'ingress.replayRight', 'lane0.in', flow.replay, .12, .82)],
+        m => { m.sink.routingRule = 'insert: after key'; m.sink.writePlan = 'pk160 queued'; m.lanes[0].currentOp = 'I:pk160'; m.lanes[0].status = 'after key staged'; }, 'dispatch', ['dispatch']),
+      step('Delete rows use the before-image primary key because the current tuple location must be resolved from the old key.', 4.0,
+        ['ingress', 'lane1', 'index'], [tok('D:pk208', 'ingress.replayRight', 'lane1.in', flow.delete, .08, .58), tok('old key lookup', 'lane1.in', 'index.in', flow.index, .52, .92)],
+        m => { m.sink.routingRule = 'delete: before key'; m.sink.writePlan = 'pk208 queued'; m.lanes[1].currentOp = 'D:pk208'; m.index.hot = 'pk208'; m.index.operation = 'resolve before key'; }, 'dispatch', ['dispatch', 'index']),
+      step('If an update changes its primary key, Pixels Sink preserves the delete-old then insert-new order before replay.', 4.4,
+        ['ingress', 'lane1', 'lane2'], [tok('delete old pk132', 'ingress.replayRight', 'lane1.in', flow.delete, .08, .58), tok('insert new pk733', 'ingress.replayRight', 'lane2.in', flow.replay, .40, .92)],
+        m => { m.sink.routingRule = 'pk update: split'; m.sink.writePlan = 'delete old before insert new'; m.sink.rpcBatch = 'tx43 rows staged'; m.lanes[1].currentOp = 'D:pk132'; m.lanes[2].currentOp = 'I:pk733'; }, 'dispatch', ['dispatch']),
+      step('Pixels Sink begins mirror transactions with Transaction Service, then sends replay RPCs to Retina replayers.', 4.6,
+        ['ingress', 'tx', 'runtime'], [tok('tx43 ts1291', 'tx.left', 'ingress.beginRight', flow.tx, .04, .34), tok('tx44 ts1292', 'tx.left', 'ingress.beginRight', flow.tx, .16, .46), tok('tx45 ts1293', 'tx.left', 'ingress.beginRight', flow.tx, .28, .58), tok('replay RPCs', 'ingress.replayRight', 'runtime.left', flow.replay, .58, .96)],
+        m => { m.sink.sinkStep = 'replay'; m.sink.requestMode = 'replay RPC'; m.sink.requestState = '3 mirror tx'; m.sink.rpcBatch = 'tx43 + tx44 + tx45'; m.sink.txState = 'timestamps assigned'; }, 'mvcc', ['tx']),
+      step('Inside Retina, the same RPC applies rows from different transactions while preserving their visibility timestamps.', 4.2,
+        ['ingress', 'lane0', 'lane1', 'lane2'], [tok('tx43 row', 'ingress.replayRight', 'lane0.in', flow.replay, .08, .58), tok('tx44 row', 'ingress.replayRight', 'lane1.in', flow.delete, .22, .74), tok('tx45 row', 'ingress.replayRight', 'lane2.in', flow.replay, .36, .90)],
+        m => { m.sink.requestState = 'apply one RPC'; m.sink.rpcBatch = '3 tx rows'; m.lanes[0].currentOp = 'tx43 I:pk160'; m.lanes[1].currentOp = 'tx44 D:pk208'; m.lanes[2].currentOp = 'tx45 I:pk733'; }, 'dispatch', ['dispatch'])
+    ],
+    insert: [
+      ...singleOpCdcPrelude('insert', 'tx1290'),
+      step('Pixels Sink assembles tx1290 as a mirror transaction with INSERT row changes.', 3.8,
+        ['ingress'], [],
+        m => { m.sink.sinkStep = 'build'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'mirror tx ready'; }, 'cdc', ['cdc']),
+      step('Transaction Service assigns timestamp=1290; Pixels Sink sends the INSERT row changes as replay RPCs.', 3.8,
+        ['ingress', 'tx', 'runtime'], [tok('ts=1290', 'tx.left', 'ingress.beginRight', flow.tx, .12, .58), tok('INSERT replay', 'ingress.replayRight', 'runtime.left', flow.replay, .50, .96)],
+        m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay RPC ready'; m.sink.txState = 'timestamp=1290'; }, 'mvcc', ['tx']),
+      step('Retina replayer processes INSERT row changes against write and visibility state.', 4.0,
+        ['ingress', 'lane0', 'lane1', 'lane2'],
+        [tok('pk160', 'ingress.replayRight', 'lane0.in', flow.replay, .08, .86), tok('pk174', 'ingress.replayRight', 'lane1.in', flow.replay, .14, .92), tok('pk181', 'ingress.replayRight', 'lane2.in', flow.replay, .20, .98)],
+        m => { m.lanes.forEach((l, i) => { l.currentOp = `I:pk${160 + i * 14}`; l.status = 'replay row'; }); }, 'dispatch', ['dispatch']),
+      step('Retina appends the after image to its write buffer. Index Service records key -> rowId and rowId -> RowLocation for the new version.', 4.3,
+        ['lane1', 'index'],
+        [tok('after image', 'lane1.in', 'lane1.active', flow.replay, .05, .55), tok('pk174 -> rowId7807', 'lane1.active', 'index.in', flow.index, .45, .95)],
+        m => { const l = m.lanes[1]; l.activeRows = 8; l.highlight = 'active'; m.index.primaryEntries.unshift('pk174 -> rowId7807'); m.index.mainEntries.unshift('rowId7807 -> fileId78/rg0/off7'); m.index.hot = 'pk174'; m.index.operation = 'putMainIndexEntries + putPrimaryIndexEntries'; }, 'writeBuffer', ['index']),
+      step('When the active memtable fills, it seals into an immutable memtable. Replay continues with a fresh active memtable instead of blocking on storage.', 3.9,
+        ['lane1'], [tok('seal memtable', 'lane1.active', 'lane1.immutable', flow.storage, .10, .82)],
+        m => { const l = m.lanes[1]; l.activeRows = 1; l.immutable += 1; l.highlight = 'immutable'; }, 'writeBuffer', ['flush'], 'seal'),
+      step('A flush process writes the immutable memtable to Storage; the resulting object entry is the flushed immutable memtable representation.', 4.5,
+        ['lane1', 'storage', 'index'],
+        [tok('flushed memtable', 'lane1.immutable', 'storage.memtable', flow.storage, .06, .68), tok('object entry metadata', 'storage.memtable', 'index.in', flow.index, .50, .96)],
+        m => { m.storage.objectEntries.unshift('obj-78'); m.lanes[1].highlight = 'immutable'; m.lanes[1].immutable = Math.max(0, m.lanes[1].immutable - 1); }, 'writeBuffer', ['flush', 'index'], 'flush'),
+      ...commitSequence('tx1290', 1291, 'tx1290 committed; HWM=1291')
+    ],
+    delete: [
+      ...singleOpCdcPrelude('delete', 'tx1291'),
+      step('Delete replay starts after Pixels Sink begins mirror transaction tx1291 with timestamp=1291.', 3.7,
+        ['ingress', 'tx', 'lane1'], [tok('timestamp=1291', 'tx.left', 'ingress.beginRight', flow.tx, .10, .52), tok('DELETE replay', 'ingress.replayRight', 'lane1.in', flow.delete, .50, .96)],
+        m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=1291'; }, 'mvcc', ['cdc', 'tx']),
+      step('Retina receives D:pk208 and calls Index Service deletePrimaryIndexEntries to remove the primary entry and return the current RowLocation.', 4.0,
+        ['ingress', 'lane1', 'index'], [tok('D:pk208', 'ingress.replayRight', 'lane1.in', flow.delete, .05, .48), tok('deletePrimary pk208', 'lane1.in', 'index.in', flow.index, .42, .88)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'D:pk208'; l.status = 'delete primary entry'; m.index.hot = 'pk208'; m.index.operation = 'deletePrimaryIndexEntries pk208'; }, 'index', ['index']),
+      step('Index Service returns RowLocation(fileId, rgId, rowOffset). The old tuple stays in place until visibility says otherwise.', 3.7,
+        ['index', 'lane1'], [tok('file-042 rg0 off7', 'index.out', 'lane1.visibility', flow.index, .08, .80)],
+        m => { m.index.primaryEntries = ['pk208 -> rowId8208', 'pk132 -> rowId7705']; m.index.mainEntries = ['rowId8208 -> file-042/rg0/off7', 'rowId7705 -> fileId77/rg1/off5']; m.index.operation = 'RowLocation returned'; m.lanes[DETAIL_REPLAY_ID].highlight = 'visibility'; }, 'index', ['index']),
+      step('Delete appends (offset, deleteTs) into the tile visibility delete-ts array. Queries see the change through VFoR metadata rather than a file rewrite.', 4.4,
+        ['lane1', 'storage'], [tok('(off7,1291)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .08, .76), tok('metadata only', 'lane1.deleteArray', 'storage.files', flow.visibility, .60, .96)],
+        m => { m.lanes[DETAIL_REPLAY_ID].deleteTs.push('(7,1291)'); m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility']),
+      ...commitSequence('tx1291', 1292, 'delete committed; HWM=1292')
+    ],
+    update: [
+      ...singleOpCdcPrelude('update', 'tx1292'),
+      step('Update replay arrives after Pixels Sink begins mirror transaction tx1292 with timestamp=1292.', 3.8,
+        ['ingress', 'tx', 'lane1'], [tok('timestamp=1292', 'tx.left', 'ingress.beginRight', flow.tx, .10, .52), tok('UPDATE replay', 'ingress.replayRight', 'lane1.in', flow.index, .50, .96)],
+        m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=1292'; }, 'mvcc', ['tx']),
+      step('Retina first inserts the after image into the write buffer and allocates a new rowId plus RowLocation for the new tuple version.', 4.2,
+        ['lane1', 'index'], [tok('after image', 'lane1.in', 'lane1.active', flow.index, .06, .52), tok('new RowLocation', 'lane1.active', 'index.in', flow.index, .48, .94)],
+        m => { m.lanes[1].currentOp = 'U:pk132'; m.lanes[1].activeRows = 6; m.index.mainEntries = ['rowId7806 -> fileId78/rg0/off6', 'rowId7705 -> file-041/rg1/off5', 'rowId8208 -> file-042/rg0/off7']; m.index.hot = 'pk132'; m.index.operation = 'insertRecord -> rowId7806'; m.lanes[1].highlight = 'active'; }, 'writeBuffer', ['index']),
+      step('Index Service updatePrimaryIndexEntries installs the new primary entry and returns prevLocs for the old tuple version.', 4.2,
+        ['lane1', 'index'], [tok('updatePrimary pk132', 'lane1.active', 'index.in', flow.index, .06, .54), tok('prevLoc off5', 'index.out', 'lane1.visibility', flow.index, .46, .94)],
+        m => { m.index.primaryEntries = ['pk132 -> rowId7806', 'pk208 -> rowId8208']; m.index.hot = 'pk132'; m.index.operation = 'updatePrimaryIndexEntries -> prevLocs'; m.lanes[1].highlight = 'visibility'; }, 'index', ['index']),
+      step('Retina then deletes the old data by appending a delete timestamp to RGVisibility for each returned previous RowLocation.', 4.2,
+        ['lane1', 'index'], [tok('delete old off5', 'index.out', 'lane1.deleteArray', flow.delete, .08, .78)],
+        m => { m.lanes[1].deleteTs.push('(5,1292)'); m.index.operation = 'deleteRecord(prevLocs)'; m.lanes[1].highlight = 'visibility'; }, 'visibility', ['index', 'visibility']),
+      step('Multiple versions of the same primary key can coexist. Query transaction timestamp decides whether the old or new version is visible.', 4.0,
+        ['tx', 'query', 'lane1'], [tok(`transTs ${DEFAULT_QUERY_TS} sees old`, 'query.left', 'tx.window', flow.query, .08, .55), tok('transTs 1292 sees new', 'tx.window', 'lane1.visibility', flow.visibility, .48, .94)],
+        m => { m.query.transTs = DEFAULT_QUERY_TS; m.query.active = true; m.tx.lwm = DEFAULT_QUERY_TS; }, 'visibility', ['query', 'visibility']),
+      ...commitSequence('tx1292', 1293, 'update committed; HWM=1293')
+    ],
+    query: [
+      step(`Query begins with transTs=${DEFAULT_QUERY_TS}. All split readers use the same MVCC timestamp, so visibility is decided consistently after batches return.`, 3.8,
+        ['query', 'tx'], [tok('begin q45', 'query.left', 'tx.right', flow.query, .08, .72), tok(`transTs=${DEFAULT_QUERY_TS}`, 'tx.right', 'query.scheduler', flow.tx, .55, .96)],
+        m => { m.query.active = true; m.query.transTs = DEFAULT_QUERY_TS; m.tx.lwm = DEFAULT_QUERY_TS; m.query.gate.state = 'waiting for source batches'; }, 'mvcc', ['query']),
+      step('The planner/worker builds a split graph: regular file scan, active memtable RPC, and flushed-object read are independent source tasks.', 4.2,
+        ['query'], [tok('build split graph', 'query.scheduler', 'query.splitRegular', flow.query, .08, .62), tok('fan-out', 'query.scheduler', 'query.splitActive', flow.query, .16, .74), tok('fan-out', 'query.scheduler', 'query.splitFlushed', flow.query, .24, .86)],
+        m => { m.query.splits.forEach(split => { split.status = 'scheduled'; split.progress = .28; }); m.query.gate.state = 'waiting for parallel splits'; }, 'query', ['query']),
+      step('Source tasks run in parallel: regular RG batches, GetWriteBuffer active rows, and flushed immutable objects are fetched concurrently.', 4.6,
+        ['query', 'storage', 'lane1'], [tok('regular RG batch', 'storage.files', 'query.splitRegular', flow.storage, .08, .78), tok('active rows RPC', 'lane1.active', 'query.splitActive', flow.replay, .08, .70), tok('flushed object', 'storage.memtable', 'query.splitFlushed', flow.storage, .12, .82)],
+        m => { const [regular, active, flushed] = m.query.splits; regular.status = 'running'; regular.progress = .78; regular.batches = 3; active.status = 'fetched'; active.progress = .86; active.batches = 1; flushed.status = 'running'; flushed.progress = .72; flushed.batches = 2; m.query.gate.inputBatches = 0; m.query.gate.state = 'parallel reads running'; m.lanes[DETAIL_REPLAY_ID].highlight = 'active'; }, 'writeBuffer', ['query', 'flush']),
+      step('Returned batches merge at one VFoR gate. Hidden timestamps and delete-bit visibility decide which rows become visible batches.', 4.4,
+        ['query', 'lane1'], [tok('batch', 'query.splitRegular', 'query.gate', flow.query, .08, .58), tok('batch', 'query.splitActive', 'query.gate', flow.query, .12, .62), tok('batch', 'query.splitFlushed', 'query.gate', flow.query, .16, .66), tok('RG visibility', 'lane1.baseBitmap', 'query.gate', flow.visibility, .30, .82)],
+        m => { m.query.splits.forEach((split, i) => { split.status = 'queued'; split.progress = 1; split.visible = [2, 1, 1][i]; }); m.query.gate.inputBatches = 6; m.query.gate.visibleBatches = 4; m.query.gate.state = 'filtering by transTs + deleteBit'; m.query.queueState = 'visible batches queued'; m.lanes[DETAIL_REPLAY_ID].highlight = 'visibility'; }, 'visibility', ['query', 'visibility']),
+      step('Operators consume the merged visible-batch queue. They see a clean scan stream and do not care whether rows came from file, active memtable, or flushed object.', 4.2,
+        ['query'], [tok('visible batches', 'query.gate', 'query.queue', flow.visibility, .08, .55), tok('operator input', 'query.queue', 'query.operators', flow.query, .48, .92)],
+        m => { m.query.gate.state = 'done'; m.query.queueState = '4 visible batches'; m.query.operatorInput = 'visible batches only'; m.query.returnedRows = 18804; }, 'query', ['query'])
+    ],
+    gc: [
+      step(`RetinaResourceManager.runGC asks Transaction Service for safeTs=${DEFAULT_GC_SAFE_TS} (HWM - 1, no running query) and sends it to RGVisibility.garbageCollect(safeTs).`, 3.8,
+        ['tx', 'lane1', 'runtime'], [tok('Memory GC asks', 'runtime.top', 'tx.bottom', flow.gc, .08, .42), tok(`safeTs=${DEFAULT_GC_SAFE_TS}`, 'tx.hwm', 'lane1.visibility', flow.gc, .42, .92)],
+        m => { m.lanes[DETAIL_REPLAY_ID].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[DETAIL_REPLAY_ID].highlight = 'visibility'; m.storage.cleanup = 'waiting for bitmap folding'; }, 'gc', ['visibility']),
+      step('Visibility structure compares safeTs with the delete ts chain and highlights items that are safe to fold.', 4.0,
+        ['lane1', 'runtime'], [tok('safe items', 'lane1.visibility', 'lane1.deleteArray', flow.visibility, .08, .70), tok('<= safeTs', 'lane1.deleteArray', 'lane1.baseBitmap', flow.gc, .55, .94)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(2,1272)', '(4,1278)', '(7,1283)', '(9,1291)']; l.highlight = 'foldEligible'; }, 'gc', ['visibility']),
+      step('garbageCollect(safeTs) folds the highlighted delete items into baseBitmap, advances baseTs, and leaves newer delete items in the chain.', 4.0,
+        ['lane1', 'runtime'], [tok('fold delete items', 'lane1.deleteArray', 'lane1.baseBitmap', flow.gc, .08, .78)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(9,1291)']; l.baseBitmap = '0010100000000000'; l.baseTs = DEFAULT_GC_SAFE_TS; l.highlight = 'baseBitmap'; }, 'gc', ['visibility']),
+      step('After bitmap folding, foreground replay can continue while Retina prepares Storage GC file groups; no running query is holding the GC safe timestamp back.', 4.0,
+        ['lane1', 'lane2', 'runtime'], [tok('folded bitmap', 'lane1.baseBitmap', 'storage.aging', flow.gc, .05, .50), tok('replay continues', 'ingress.replayRight', 'lane2.in', flow.replay, .34, .82)],
+        m => { m.lanes[DETAIL_REPLAY_ID].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[2].status = 'replay continues'; m.query.active = false; }, 'gc', ['dispatch', 'query']),
+      step('Storage GC selects low-valid-ratio regular files. They remain regular columnar files, just highlighted as rewrite candidates.', 4.0,
+        ['runtime', 'storage'], [tok('candidate files', 'runtime.right', 'storage.aging', flow.gc, .08, .76)],
+        m => { m.storage.agingQueue = ['file-038.pxl', 'file-039.pxl']; m.storage.cleanup = 'rewrite candidates'; m.catalog.pending = 'select file-038.pxl'; }, 'storageGc', ['storage']),
+      step('Storage GC rewrites still-visible tuple versions into a new TEMPORARY_GC file inside the regular-files panel.', 4.5,
+        ['storage', 'tx'], [tok(`safeTs=${DEFAULT_GC_SAFE_TS}`, 'tx.hwm', 'storage.files', flow.tx, .08, .48), tok('visible tuples', 'storage.aging', 'storage.newFile', flow.storage, .42, .96)],
+        m => { m.storage.newFile = 'file-043.pxl'; m.storage.newFileState = 'TEMPORARY_GC'; m.storage.cleanup = 'new TEMPORARY_GC'; m.catalog.pending = 'stage file-043.pxl'; }, 'storageGc', ['tx']),
+      step('Before publishing it, Retina registers dual-write, synchronizes visibility, and refreshes main and primary index locations.', 4.6,
+        ['storage', 'index', 'lane2'], [tok('location map', 'storage.newFile', 'index.in', flow.index, .06, .56), tok('sync visibility', 'storage.newFile', 'lane2.in', flow.visibility, .48, .94)],
+        m => { m.index.operation = 'storage GC location map'; m.index.mainEntries = ['rowId6032 -> file-043/rg0/off2', 'rowId6033 -> file-043/rg0/off3']; m.catalog.pending = 'dual-write file-043.pxl'; m.lanes[2].deleteTs.push('(dual,1293)'); m.lanes[2].highlight = 'visibility'; }, 'index', ['index', 'visibility']),
+      step('Metadata Service atomicSwapFiles promotes the new file to REGULAR and marks old regular files RETIRED with cleanupAt.', 4.2,
+        ['catalog', 'storage'], [tok('TEMP -> REGULAR', 'storage.newFile', 'catalog.staging', flow.gc, .08, .46), tok('old -> RETIRED', 'storage.aging', 'catalog.retired', flow.delete, .44, .90)],
+        m => { m.storage.newFileState = 'REGULAR'; m.storage.regularFiles = ['file-041.pxl', 'file-042.pxl', 'file-043.pxl']; m.storage.cleanup = 'old files RETIRED cleanupAt'; m.catalog.pending = 'file-038 -> file-043'; m.catalog.visible = ['file-041.pxl', 'file-042.pxl', 'file-043.pxl']; m.catalog.switchState = 'switching'; }, 'storageGc', ['catalog']),
+      step('After retireDelayMs / cleanupAt, processRetiredFiles reclaims visibility and index state, then physically deletes retired files.', 4.0,
+        ['catalog', 'storage', 'lane2'], [tok('cleanupAt reached', 'catalog.retired', 'storage.aging', flow.gc, .08, .72), tok('reclaim metadata', 'lane2.out', 'runtime.right', flow.gc, .32, .92)],
+        m => { m.storage.staleRatio = 0.18; m.storage.agingQueue = []; m.storage.newFile = 'none'; m.storage.newFileState = 'none'; m.storage.regularFiles = ['file-041.pxl', 'file-042.pxl', 'file-043.pxl']; m.storage.cleanup = 'retired files physically deleted'; m.catalog.switchState = 'stable'; m.catalog.pending = 'none'; m.lanes[2].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[2].highlight = 'baseBitmap'; }, 'gc', ['visibility'])
+    ]
+  };
+
+  function step(caption, duration, highlights, tokens, apply, detail, channels, anim) {
+    // Authored duration keeps path-speed proportions; the beat sets global tempo.
+    const units = Number.isFinite(duration) && duration > 0 ? duration : STANDARD_STEP_UNITS;
+    return { caption, duration: units * ANIMATION_BEAT_SECONDS / STANDARD_STEP_UNITS, highlights, tokens, apply, detail: detail || 'overview', channels: channels || [], anim: anim || null };
+  }
+
+  // Path geometry constraint:
+  // A token path is also the arrow path. Choose anchors by component layout, not by
+  // data semantics. Vertically stacked components must use bottom -> top or top -> bottom.
+  // Side-by-side components must use right -> left or left -> right. Return paths should
+  // enter the side facing the sender. Avoid generic in/out unless the components are
+  // actually laid out left-to-right; otherwise events will appear to ignore the arrow.
+  function tok(label, from, to, color, start, end, via) {
+    return { label, path: via ? [from, ...via, to] : [from, to], color, start, end };
+  }
+
+  function singleOpCdcPrelude(op, txId) {
+    const spec = normalizeMirrorOp(op, 0);
+    const recordCount = cdcStreamRecordCount(1);
+    return [
+      step(`The CDC stream starts ${txId} with BEGIN on the ordered source log.`, cdcStreamPhaseUnits('begin', recordCount),
+        ['cdcStream'], [],
+        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'begin'; m.sink.cdcRecord = 'BEGIN'; m.sink.requestState = 'waiting for CDC row'; }, 'cdc', ['cdc']),
+      step(`The ${spec.label} row change arrives on the CDC stream.`, cdcStreamPhaseUnits('rows', recordCount),
+        ['cdcStream'], [],
+        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'rows'; m.sink.cdcRecord = spec.label; m.sink.requestState = `${spec.label} row streaming`; }, 'cdc', ['cdc']),
+      step(`COMMIT closes the ${txId} CDC stream.`, cdcStreamPhaseUnits('commit', recordCount),
+        ['cdcStream'], [],
+        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'commit'; m.sink.cdcRecord = 'COMMIT'; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc']),
+      step(`The complete ${txId} CDC log is handed to Pixels Sink.`, 1.2,
+        ['cdcStream', 'ingress'], [tok('complete log', 'cdcStream.out', 'ingress.top', flow.cdc, .14, .82)],
+        m => { m.sink.sinkStep = 'build'; m.sink.cdcPhase = 'complete'; m.sink.cdcRecord = 'COMMIT'; m.sink.coordState = `${txId} complete`; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc'])
+    ];
+  }
+
+  function commitSequence(txId, hwm, committedStatus) {
+    return [
+      step(`Pixels Sink waits to commit ${txId} until every replay request for that mirror transaction has returned OK.`, 3.4,
+        ['ingress', 'runtime'], [],
+        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'wait replay OK'; m.sink.txState = `${txId} not committed`; m.sink.rpcBatch = `${txId} replay pending`; }, 'mvcc', [], 'waitCommit'),
+      step(`Retina replayer returns replay OK for all row changes in ${txId}; only now is the mirror transaction eligible to commit.`, 3.4,
+        ['runtime', 'ingress'], [tok(`all replay OK`, 'runtime.left', 'ingress.commitRight', flow.replay, .12, .82)],
+        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'all replay OK'; m.sink.txState = `${txId} commit eligible`; m.sink.rpcBatch = `${txId} replay OK`; }, 'mvcc', []),
+      step(`Pixels Sink asks Transaction Service to commit ${txId}.`, 3.2,
+        ['ingress', 'tx'], [tok(`commit ${txId}`, 'ingress.commitRight', 'tx.left', flow.tx, .12, .82)],
+        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'commit requested'; m.sink.txState = `${txId} commit in flight`; }, 'mvcc', ['tx']),
+      step(`Transaction Service advances HWM internally for later snapshots.`, 2.8,
+        ['tx'], [],
+        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'HWM advanced'; m.sink.txState = committedStatus; m.tx.hwm = hwm; }, 'mvcc', ['tx'])
+    ];
+  }
+
+  function resize() {
+    state.dpr = Math.max(1, window.devicePixelRatio || 1);
+    const card = canvas.parentElement;
+    const shell = document.querySelector('.shell');
+    const frame = card.closest('.app-frame');
+    const viewportH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const cardRect = card.getBoundingClientRect();
+    const shellStyle = shell ? getComputedStyle(shell) : null;
+    const shellBottom = shellStyle ? parseFloat(shellStyle.paddingBottom || 0) || 0 : 0;
+    const availW = Math.max(320, card.clientWidth || cardRect.width);
+    const availH = document.fullscreenElement
+      ? Math.max(320, card.clientHeight || viewportH)
+      : Math.max(300, viewportH - cardRect.top - shellBottom);
+    let cssW = availW;
+    let cssH = cssW / ASPECT;
+    if (cssH > availH) {
+      cssH = availH;
+      cssW = cssH * ASPECT;
+    }
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.width = Math.round(cssW * state.dpr);
+    canvas.height = Math.round(cssH * state.dpr);
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+
+  function scheduleResize() {
+    resize();
+    requestAnimationFrame(() => {
+      resize();
+      requestAnimationFrame(resize);
+    });
+  }
+
+  function palette() {
+    const dark = root.dataset.theme === 'dark';
+    return {
+      dark,
+      bg: dark ? '#0f151e' : '#f5f7fb',
+      panel: dark ? '#171f2a' : '#ffffff',
+      panel2: dark ? '#222d3b' : '#eef3f8',
+      panel3: dark ? '#2a3546' : '#e4ebf3',
+      elevated: dark ? '#1c2633' : '#fbfdff',
+      subtle: dark ? '#141b24' : '#f7f9fc',
+      text: dark ? '#edf2f7' : '#122033',
+      muted: dark ? '#9aa8b8' : '#667386',
+      border: dark ? '#344256' : '#cbd5e1',
+      borderSoft: dark ? '#2a3546' : '#dde5ee',
+      grid: dark ? '#263244' : '#dce5ef',
+      shadow: dark ? 'rgba(0,0,0,.28)' : 'rgba(15,23,42,.10)',
+      accent: dark ? '#6ea8ff' : '#315fcb'
+    };
+  }
+
+  function currentStep() { return scenes[state.scene][state.stepIndex]; }
+
+  function playbackRate() { return PLAYBACK_RATES[state.playbackRateIndex] || 1; }
+
+  function speedLabel() { return `${playbackRate()}x`; }
+
+  function stepProgress(eased = false) {
+    const p = clamp(state.stepClock / Math.max(.001, currentStep().duration), 0, 1);
+    return eased ? ease(p) : p;
+  }
+
+  function streamCycleProgress(offset = 0) {
+    return (state.stepClock * STREAM_CYCLE_RATE + offset) % 1;
+  }
+
+  function gotoScene(scene, opts = {}) {
+    if (!scenes[scene]) return;
+    if (opts.manual) {
+      state.autoPlay = false;
+      state.manualRun = true;
+      state.paused = false;
+      buttons.pause.innerHTML = svgPause;
+    } else {
+      state.manualRun = false;
+    }
+    state.scene = scene;
+    state.stepIndex = 0;
+    state.stepClock = 0;
+    model = sceneBase(scene);
+    enterStep();
+    updateControls();
+  }
+
+  function enterStep() {
+    state.stepClock = 0;
+    const st = currentStep();
+    state.detailFocus = st.detail || 'overview';
+    state.activeChannels = st.channels || [];
+    model.lanes.forEach(l => { l.prevActiveRows = l.activeRows; l.prevImmutable = l.immutable; });
+    if (st.apply) st.apply(model);
+    updateControls();
+  }
+
+  function advanceStep() {
+    const list = scenes[state.scene];
+    if (state.stepIndex < list.length - 1) {
+      state.stepIndex += 1;
+      enterStep();
+      return;
+    }
+    if (state.manualRun) {
+      state.manualRun = false;
+      state.stepClock = currentStep().duration;
+      updateControls();
+      return;
+    }
+    if (!state.autoPlay) {
+      updateControls();
+      return;
+    }
+    const order = autoSceneOrder.length ? autoSceneOrder : [AUTO_START_SCENE];
+    const idx = order.indexOf(state.scene);
+    const nextScene = idx >= 0 ? order[(idx + 1) % order.length] : order[0];
+    gotoScene(nextScene);
+  }
+
+  function togglePause() {
+    state.paused = !state.paused;
+    buttons.pause.innerHTML = state.paused ? svgPlay : svgPause;
+    updateControls();
+  }
+
+  function toggleSpeed() {
+    state.playbackRateIndex = (state.playbackRateIndex + 1) % PLAYBACK_RATES.length;
+    updateControls();
+  }
+
+  function toggleAuto() {
+    if (state.autoPlay) {
+      state.autoPlay = false;
+      state.manualRun = false;
+      updateControls();
+      return;
+    }
+    state.autoPlay = true;
+    state.manualRun = false;
+    state.paused = false;
+    buttons.pause.innerHTML = svgPause;
+    gotoScene(AUTO_START_SCENE);
+  }
+
+  // Theme and fullscreen switching are temporarily disabled with the header controls.
+  // function toggleTheme() {
+  //   const nextDark = root.dataset.theme !== 'dark';
+  //   root.dataset.theme = nextDark ? 'dark' : 'light';
+  //   buttons.theme.innerHTML = nextDark ? svgSun : svgMoon;
+  //   state.flash = 1;
+  // }
+
+  // function toggleFullscreen() {
+  //   if (!document.fullscreenElement) {
+  //     document.documentElement.requestFullscreen().then(resize).catch(() => {});
+  //   } else {
+  //     document.exitFullscreen().then(resize).catch(() => {});
+  //   }
+  // }
+
+  function updateControls() {
+    sceneButtons.forEach(btn => {
+      const active = state.autoPlay && btn.dataset.scene === state.scene;
+      btn.classList.toggle('active', active);
+      btn.toggleAttribute('aria-current', active);
+    });
+    buttons.auto.classList.toggle('active', state.autoPlay);
+    buttons.speed.classList.toggle('active', playbackRate() !== 1);
+    const pauseLabel = state.paused ? 'Resume' : 'Pause';
+    const autoLabel = state.autoPlay ? 'Auto Replay' : 'Manual Replay';
+    const speedText = `Speed ${speedLabel()}`;
+    buttons.pause.dataset.label = pauseLabel;
+    buttons.pause.title = pauseLabel;
+    buttons.pause.setAttribute('aria-label', pauseLabel);
+    buttons.auto.dataset.label = autoLabel;
+    buttons.auto.title = autoLabel;
+    buttons.auto.setAttribute('aria-label', autoLabel);
+    buttons.speed.dataset.label = speedText;
+    buttons.speed.title = speedText;
+    buttons.speed.setAttribute('aria-label', speedText);
+    dom.modeLabel.textContent = state.paused ? 'Paused' : state.autoPlay ? 'Auto Replay' : state.manualRun ? 'Manual Replay' : 'Manual Complete';
+  }
+
+  buttons.pause.onclick = togglePause;
+  buttons.auto.onclick = toggleAuto;
+  buttons.speed.onclick = toggleSpeed;
+  // buttons.theme.onclick = toggleTheme;
+  // buttons.fs.onclick = toggleFullscreen;
+  sceneButtons.forEach(btn => btn.addEventListener('click', () => gotoScene(btn.dataset.scene, { manual: true })));
+
+  // document.addEventListener('fullscreenchange', () => {
+  //   buttons.fs.innerHTML = document.fullscreenElement ? svgMinim : svgMaxim;
+  //   scheduleResize();
+  // });
+
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+    const k = e.key.toLowerCase();
+    if (k === 'a') toggleAuto();
+    if (k === 's') toggleSpeed();
+    // Theme and fullscreen shortcuts are temporarily disabled.
+    // if (k === 't') toggleTheme();
+    // if (k === 'f') toggleFullscreen();
+    const digit = Number(e.key);
+    if (digit >= 1 && digit <= sceneOrder.length) gotoScene(sceneOrder[digit - 1], { manual: true });
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const p = eventPoint(e);
+    state.mouse = p;
+    state.hoverKey = hitTest(p.x, p.y);
+    canvas.style.cursor = state.hoverKey ? 'help' : 'default';
+  });
+  canvas.addEventListener('mouseleave', () => { state.hoverKey = null; });
+
+  function eventPoint(e) {
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * W / canvas.offsetWidth,
+      y: (e.clientY - r.top) * H / canvas.offsetHeight
+    };
+  }
+
+  function hitTest(x, y) {
+    const zones = [
+      ['cdcStream', rects.cdcStream], ['ingress', rects.ingress], ['runtime', rects.runtime],
+      ['tx', rects.tx], ['index', rects.index], ['catalog', rects.catalog],
+      ['storage', rects.storage], ['query', rects.query]
+    ];
+    for (let i = zones.length - 1; i >= 0; i--) {
+      const [key, r] = zones[i];
+      if (inside(x, y, r)) return key;
+    }
+    return null;
+  }
+
+  function inside(x, y, r) { return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h; }
+
+  function update(dt) {
+    const running = state.autoPlay || state.manualRun;
+    if (!state.paused && running) {
+      const scaledDt = dt * playbackRate();
+      state.stepClock += scaledDt;
+      state.flash = Math.max(0, state.flash - scaledDt / ANIMATION_BEAT_SECONDS);
+      const st = currentStep();
+      if (state.stepClock >= st.duration) advanceStep();
+    }
+    updateControls();
+  }
+
+  function draw() {
+    const c = palette();
+    ctx.clearRect(0, 0, W, H);
+    drawBackground(c);
+    drawCanvasHeader(c);
+    drawBoundaries(c);
+    drawStaticFlows(c);
+    drawExternalCdcStream(c);
+    drawPixelsSink(c);
+    drawQuery(c);
+    drawTransactionService(c);
+    drawCatalog(c);
+    drawIndex(c);
+    drawReplayers(c);
+    drawStorage(c);
+    drawTokens(c);
+    drawCommitWait(c);
+    if (state.flash > 0) {
+      ctx.fillStyle = alpha(c.accent, state.flash * .08);
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function drawBackground(c) {
+    ctx.fillStyle = c.bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = alpha(c.grid, c.dark ? .20 : .26);
+    ctx.lineWidth = 1;
+    for (let x = 24; x <= W - 24; x += 48) {
+      ctx.beginPath();
+      ctx.moveTo(x, MIDDLE_TOP + 52);
+      ctx.lineTo(x, MIDDLE_BOTTOM - 4);
+      ctx.stroke();
+    }
+    for (let y = MIDDLE_TOP + 56; y <= MIDDLE_BOTTOM - 4; y += 48) {
+      ctx.beginPath();
+      ctx.moveTo(24, y);
+      ctx.lineTo(W - 24, y);
+      ctx.stroke();
+    }
+  }
+
+  function drawCanvasHeader(c) {
+    if (!document.fullscreenElement) return;
+
+    const st = currentStep();
+    const x = 1218, y = 6, w = 526;
+    ctx.fillStyle = alpha(c.elevated, .86);
+    ctx.strokeStyle = c.borderSoft;
+    roundRect(x, y, w, 38, 10, true, true);
+    ctx.fillStyle = state.paused ? flow.delete : state.autoPlay ? flow.replay : flow.tx;
+    ctx.beginPath();
+    ctx.arc(x + 20, y + 19, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'left';
+    ctx.fillText(state.paused ? 'Paused' : state.autoPlay ? 'Playing' : 'Stepped', x + 34, y + 18);
+    ctx.fillStyle = c.muted;
+    ctx.textAlign = 'right';
+    ctx.fillText(`Step ${state.stepIndex + 1}/${scenes[state.scene].length} · ${state.detailFocus}`, x + w - 16, y + 18);
+  }
+
+  function drawBoundaries(c) {
+    drawBoundary(rects.ingress, c, 'ingress');
+    drawBoundary(rects.runtime, c, 'runtime');
+  }
+
+  function drawBoundary(r, c, key) {
+    const highlighted = isModuleHighlighted(key);
+    const color = moduleActivityColor(key);
+    ctx.save();
+    ctx.fillStyle = highlighted ? alpha(color, c.dark ? .16 : .10) : alpha(c.elevated, .94);
+    ctx.strokeStyle = highlighted ? alpha(color, .62) : c.borderSoft;
+    ctx.lineWidth = highlighted ? 1.8 : 1.1;
+    roundRect(r.x, r.y, r.w, r.h, 18, true, true);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.moduleTitle, 900);
+    ctx.textAlign = 'left';
+    fitText(r.title, r.x + MODULE_TITLE_X, r.y + MODULE_TITLE_Y, r.w - MODULE_TITLE_X * 2, 'left');
+    ctx.restore();
+  }
+
+  function isModuleHighlighted(key) {
+    if (isHighlighted(key)) return true;
+    const st = currentStep();
+    const tokenParts = (st.tokens || []).flatMap(t => t.path || []);
+    if (key === 'runtime') {
+      return ['lane0', 'lane1', 'lane2'].some(isHighlighted) ||
+        tokenParts.some(part => typeof part === 'string' && /^lane[0-2]\b/.test(part));
+    }
+    if (key === 'ingress') {
+      return tokenParts.some(part => typeof part === 'string' && part.startsWith('ingress.'));
+    }
+    if (key === 'query') {
+      return tokenParts.some(part => typeof part === 'string' && part.startsWith('query.'));
+    }
+    return false;
+  }
+
+  function moduleActivityColor(key) {
+    if (key === 'cdcStream' || key === 'ingress') return flow.cdc;
+    if (key === 'query') return flow.query;
+    if (key === 'runtime') return currentReplayOperationColor();
+    return flow[key] || flow.replay;
+  }
+
+  function currentReplayOperationColor() {
+    const text = `${state.scene} ${model && model.sink ? `${model.sink.requestState} ${model.sink.rpcBatch}` : ''}`;
+    if (/delete|DELETE|D:/.test(text)) return flow.delete;
+    if (/update|UPDATE|U:/.test(text)) return flow.index;
+    if (/insert|INSERT|I:/.test(text)) return flow.replay;
+    const st = currentStep();
+    const replayToken = st.tokens.find(t => tokenDirection(t, 'sink', 'runtime') || tokenDirection(t, 'sink', 'lane'));
+    return replayToken ? replayToken.color : flow.replay;
+  }
+
+  function drawStaticFlows(c) {
+    const st = currentStep();
+    const seen = new Set();
+    for (const t of st.tokens) {
+      const key = t.path.map(pathKeyPart).join('>');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      drawFlow(t.path, t.color, c, t.arrowLabel || '', .30, 2.2);
+    }
+  }
+
+  function pathKeyPart(part) {
+    return Array.isArray(part) ? `${part[0]},${part[1]}` : part;
+  }
+
+  function mirrorTxnOps() {
+    const raw = model && model.sink && Array.isArray(model.sink.mirrorOps) && model.sink.mirrorOps.length
+      ? model.sink.mirrorOps
+      : ['insert', 'delete', 'update'];
+    return raw.slice(0, 3).map((op, i) => normalizeMirrorOp(op, i));
+  }
+
+  function normalizeMirrorOp(op, i) {
+    const value = typeof op === 'string' ? op : (op.type || op.label || 'insert');
+    const kind = /delete|^d$/i.test(value) ? 'delete' : /update|^u$/i.test(value) ? 'update' : 'insert';
+    const spec = {
+      insert: { label: 'INSERT', short: 'I', color: flow.replay },
+      delete: { label: 'DELETE', short: 'D', color: flow.delete },
+      update: { label: 'UPDATE', short: 'U', color: flow.index }
+    }[kind];
+    return { id: kind, order: i + 1, ...spec };
+  }
+
+  function pixelsSinkLayout(r) {
+    const pad = MODULE_CONTENT_PAD;
+    const top = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
+    const ops = mirrorTxnOps();
+    const maxStackCards = 3;
+    const cardH = 58;
+    const rowH = 64;
+    const stackOffsetX = 14;
+    const stackOffsetY = 20;
+    const stackPadY = 6;
+    const stackH = rowH + stackOffsetY * (maxStackCards - 1) + stackPadY * 2;
+    const txnH = 50 + cardH + MIRROR_BEGIN_STACK_GAP + stackH + MIRROR_STACK_COMMIT_GAP + cardH + 18;
+    const maxTxnH = r.y + r.h - top - MODULE_CONTENT_PAD;
+    const txn = { x: r.x + pad, y: top, w: r.w - pad * 2, h: Math.min(maxTxnH, txnH) };
+    const begin = { x: txn.x + 28, y: txn.y + 50, w: txn.w - 56, h: cardH };
+    const commit = { x: txn.x + 28, y: txn.y + txn.h - cardH - 18, w: txn.w - 56, h: cardH };
+    const stack = {
+      x: txn.x + 44,
+      y: begin.y + begin.h + MIRROR_BEGIN_STACK_GAP,
+      w: txn.w - 88,
+      h: Math.max(stackH, commit.y - (begin.y + begin.h) - MIRROR_BEGIN_STACK_GAP - MIRROR_STACK_COMMIT_GAP)
+    };
+    const rowW = MIRROR_ROW_CARD_W;
+    const rowStartX = stack.x + (stack.w - (rowW + stackOffsetX * (maxStackCards - 1))) / 2;
+    const rows = ops.map((op, i) => ({
+      ...op,
+      x: rowStartX + i * stackOffsetX,
+      y: stack.y + stackPadY + i * stackOffsetY,
+      w: rowW,
+      h: rowH,
+      stackIndex: i
+    }));
+    const build = { x: txn.x + 18, y: txn.y + 18, w: txn.w - 36, h: 44 };
+    const replay = {
+      x: stack.x,
+      y: stack.y,
+      w: stack.w,
+      h: stack.h
+    };
+    const byId = {
+      read: build,
+      build,
+      begin,
+      replay,
+      commit
+    };
+    rows.forEach(row => { byId[row.id] = row; });
+    return { r, txn, begin, stack, rows, replay, commit, byId };
+  }
+
+  function currentPixelsSinkStep() {
+    const explicit = model.sink.sinkStep;
+    if (['empty', 'read', 'build', 'begin', 'row1', 'row2', 'row3', 'rowsOk', 'replay', 'commit'].includes(explicit)) return explicit;
+    const text = `${model.sink.requestState} ${model.sink.rpcBatch} ${model.sink.txState}`;
+    if (/HWM|commit|OK|pending|eligible/i.test(text)) return 'commit';
+    if (/replay|RPC|row/i.test(text)) return 'replay';
+    if (/timestamp|begin/i.test(text)) return 'begin';
+    if (/mirror tx ready|mirror transaction/i.test(text)) return 'build';
+    return null;
+  }
+
+  function drawPixelsSink(c) {
+    const layout = pixelsSinkLayout(rects.ingress);
+    const activeId = currentPixelsSinkStep();
+
+    drawMirrorTransactionPanel(layout, activeId, c);
+  }
+
+  function drawExternalCdcStream(c) {
+    drawCdcStreamPanel(rects.cdcStream, currentPixelsSinkStep(), c);
+  }
+
+  function cdcStreamRecords() {
+    const rows = [{ label: 'BEGIN', color: flow.cdc, begin: true }];
+    rows.push(...mirrorTxnOps().map(op => ({ label: op.label, color: op.color, row: true })));
+    rows.push({ label: 'COMMIT', color: flow.cdc, commit: true });
+    return rows;
+  }
+
+  function cdcStreamRecordCount(rowRecords = CDC_STREAM_ROW_RECORDS) {
+    return rowRecords + 2;
+  }
+
+  function cdcStreamProgressState(records) {
+    const phase = model && model.sink ? model.sink.cdcPhase : 'idle';
+    const local = stepProgress();
+    const maxPos = records.length;
+    const rowCount = Math.max(1, records.length - 2);
+    let cursorPos = 0;
+    if (phase === 'begin') cursorPos = local;
+    else if (phase === 'rows') cursorPos = 1 + local * rowCount;
+    else if (phase === 'commit') cursorPos = maxPos - 1 + local;
+    else if (phase === 'complete') cursorPos = maxPos;
+    cursorPos = clamp(cursorPos, 0, maxPos);
+    return {
+      phase,
+      cursorPos,
+      reachedIndex: Math.floor(cursorPos + 1e-6) - 1,
+      cursorP: cdcStreamRailP(cursorPos, maxPos),
+      done: phase === 'complete'
+    };
+  }
+
+  function cdcStreamPhaseUnits(phase, recordCount = CDC_STREAM_RECORD_COUNT) {
+    const maxPos = Math.max(2, recordCount);
+    const rowCount = Math.max(1, maxPos - 2);
+    const ranges = {
+      begin: [0, 1],
+      rows: [1, 1 + rowCount],
+      commit: [maxPos - 1, maxPos]
+    };
+    const range = ranges[phase];
+    if (!range) return CDC_STREAM_RECORD_GAP_UNITS;
+    const referenceGapP = Math.abs(cdcStreamRailP(2, CDC_STREAM_RECORD_COUNT) - cdcStreamRailP(1, CDC_STREAM_RECORD_COUNT));
+    const phaseP = Math.abs(cdcStreamRailP(range[1], maxPos) - cdcStreamRailP(range[0], maxPos));
+    return Math.max(.1, phaseP / Math.max(.001, referenceGapP) * CDC_STREAM_RECORD_GAP_UNITS);
+  }
+
+  function cdcStreamRailMargin(maxPos) {
+    return maxPos === cdcStreamRecordCount(1) ? CDC_STREAM_SINGLE_OP_RAIL_MARGIN_P : CDC_STREAM_RAIL_MARGIN_P;
+  }
+
+  function cdcStreamRailP(cursorPos, maxPos) {
+    const margin = cdcStreamRailMargin(maxPos);
+    if (maxPos <= 1) return .5;
+    if (cursorPos <= 1) return lerp(0, margin, clamp(cursorPos, 0, 1));
+    return margin + clamp((cursorPos - 1) / (maxPos - 1), 0, 1) * (1 - margin * 2);
+  }
+
+  function drawCdcStreamPanel(stream, activeId, c) {
+    const phase = model && model.sink ? model.sink.cdcPhase : 'idle';
+    const active = isHighlighted('cdcStream') || ['begin', 'rows', 'commit'].includes(phase);
+    ctx.fillStyle = active ? alpha(flow.cdc, c.dark ? .16 : .10) : alpha(c.elevated, .94);
+    ctx.strokeStyle = active ? alpha(flow.cdc, .62) : c.borderSoft;
+    ctx.lineWidth = active ? 1.4 : 1;
+    roundRect(stream.x, stream.y, stream.w, stream.h, 10, true, true);
+
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.moduleTitle, 900);
+    ctx.textAlign = 'left';
+    fitText('CDC stream', stream.x + MODULE_TITLE_X, stream.y + MODULE_TITLE_Y, stream.w - MODULE_TITLE_X * 2, 'left');
+
+    const railY = stream.y + 58;
+    const startX = stream.x + MODULE_CONTENT_PAD;
+    const endX = stream.x + stream.w - MODULE_CONTENT_PAD;
+    ctx.strokeStyle = active ? alpha(flow.cdc, .62) : alpha(c.border, .46);
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(startX, railY);
+    ctx.lineTo(endX, railY);
+    ctx.stroke();
+
+    const records = cdcStreamRecords();
+    const progress = cdcStreamProgressState(records);
+    records.forEach((record, i) => {
+      if (i > progress.reachedIndex) return;
+      const x = map(cdcStreamRailP(i + 1, records.length), 0, 1, startX, endX);
+      const cardW = 62;
+      drawCdcDot(x, railY, true, record.color, c);
+      drawRecordTypeCard(x - cardW / 2, railY + 14, cardW, 24, record.label, record.color, c, TYPE.text);
+    });
+
+    if (progress.done) return;
+    const p = progress.cursorP;
+    const cursorX = map(p, 0, 1, startX, endX);
+    ctx.fillStyle = flow.cdc;
+    ctx.beginPath();
+    ctx.arc(cursorX, railY, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = alpha('#ffffff', .74);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cursorX, railY, 11, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawMirrorTransactionPanel(layout, activeId, c) {
+    const { txn, begin, rows, replay, commit } = layout;
+    const active = !!activeId && activeId !== 'empty';
+    const color = pixelsSinkActivityColor(activeId);
+    ctx.fillStyle = alpha(c.panel2, active ? .82 : .72);
+    ctx.strokeStyle = active ? alpha(color, .56) : c.borderSoft;
+    ctx.lineWidth = active ? 1.4 : 1;
+    roundRect(txn.x, txn.y, txn.w, txn.h, 12, true, true);
+
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText(`mirror transaction`, txn.x + PANEL_TITLE_X, txn.y + PANEL_TITLE_Y, txn.w - PANEL_TITLE_X * 2, 'left');
+    if (activeId === 'empty') return;
+
+    const visibleRows = visibleMirrorRows(activeId, rows.length);
+    const visibleCommit = activeId === 'commit';
+    drawMirrorBeginCard(begin, activeId === 'begin' || activeId === 'build', c);
+    drawMirrorStackArea(layout, visibleRows, ['row1', 'row2', 'row3', 'replay', 'rowsOk'].includes(activeId), c);
+    rows.slice(0, visibleRows).forEach((row, i) => drawMirrorRowCard(row, rowStageActive(activeId, i), c));
+    if (visibleCommit) drawMirrorCommitCard(commit, true, c);
+  }
+
+  function pixelsSinkActivityColor(activeId) {
+    if (activeId === 'replay') return currentReplayOperationColor();
+    if (activeId === 'row1') return flow.replay;
+    if (activeId === 'row2') return flow.delete;
+    if (activeId === 'row3') return flow.index;
+    return flow.cdc;
+  }
+
+  function visibleMirrorRows(activeId, total) {
+    if (['replay', 'rowsOk', 'commit'].includes(activeId)) return total;
+    if (activeId === 'row1') return Math.min(1, total);
+    if (activeId === 'row2') return Math.min(2, total);
+    if (activeId === 'row3') return Math.min(3, total);
+    return 0;
+  }
+
+  function rowStageActive(activeId, index) {
+    return activeId === 'build' || activeId === 'replay' || activeId === `row${index + 1}`;
+  }
+
+  function drawMirrorStackArea(layout, visibleRows, active, c) {
+  }
+
+  function drawMirrorBeginCard(box, active, c) {
+    drawCdcCard(box.x, box.y, box.w, box.h, flow.cdc, active, c);
+    ctx.fillStyle = flow.cdc;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    ctx.fillText('BEGIN', box.x + 18, box.y + 29);
+  }
+
+  function drawMirrorRowCard(row, active, c) {
+    ctx.save();
+    ctx.shadowColor = alpha(row.color, active ? .22 : .12);
+    ctx.shadowBlur = active ? 10 : 6;
+    ctx.shadowOffsetY = active ? 4 : 2;
+    drawCdcCard(row.x, row.y, row.w, row.h, row.color, active, c, { opaque: true });
+    ctx.shadowColor = 'transparent';
+    drawRowGlyph(row.x + 14, row.y + 22, row.color, false, c);
+    ctx.fillStyle = alpha(row.color, active ? .24 : .12);
+    ctx.strokeStyle = alpha(row.color, active ? .58 : .30);
+    ctx.lineWidth = 1;
+    roundRect(row.x + 32, row.y + 17, 24, 24, 8, true, true);
+    ctx.fillStyle = row.color;
+    ctx.font = typeFont(TYPE.micro, 900);
+    ctx.textAlign = 'center';
+    ctx.fillText(String(row.order), row.x + 44, row.y + 33);
+    ctx.fillStyle = row.color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    ctx.fillText(row.label, row.x + 66, row.y + 29);
+    drawLogStripes(row.x + 66, row.y + 42, 76, 10, row.color, c);
+    ctx.restore();
+  }
+
+  function drawMirrorCommitCard(box, active, c) {
+    drawCdcCard(box.x, box.y, box.w, box.h, flow.cdc, active, c);
+    ctx.fillStyle = flow.cdc;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    ctx.fillText('COMMIT', box.x + 18, box.y + 30);
+    if (!active) {
+      drawServiceChip(box.x + box.w - 86, box.y + 13, 68, 36, 'HWM', flow.cdc, c, false);
+    }
+  }
+
+  function drawMiniTxCard(x, y, w, h, label, color, c, active) {
+    ctx.fillStyle = alpha(color, active ? .18 : .10);
+    ctx.strokeStyle = alpha(color, active ? .56 : .30);
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 7, true, true);
+    drawTxnBracket(x + 8, y + 9, w - 16, h - 18, color, c);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    fitText(label, x + 6, y + h / 2 + 4, w - 12, 'center');
+  }
+
+  function drawServiceChip(x, y, w, h, label, color, c, active) {
+    ctx.fillStyle = alpha(color, active ? .18 : .10);
+    ctx.strokeStyle = alpha(color, active ? .58 : .30);
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 8, true, true);
+    ctx.fillStyle = alpha(color, active ? .26 : .14);
+    roundRect(x + 7, y + 7, w - 14, Math.max(18, h - 14), 6, true, false);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    fitText(label, x + 6, y + h / 2 + 5, w - 12, 'center');
+  }
+
+  function drawReplayOkDots(x, y, c, active) {
+    for (let i = 0; i < 3; i++) {
+      const cx = x + i * 24;
+      ctx.fillStyle = alpha(flow.replay, active ? .20 : .11);
+      ctx.strokeStyle = alpha(flow.replay, active ? .55 : .30);
+      ctx.lineWidth = 1;
+      roundRect(cx - 9, y - 11, 18, 22, 5, true, true);
+      ctx.fillStyle = flow.replay;
+      ctx.font = typeFont(TYPE.micro, 900);
+      ctx.textAlign = 'center';
+      ctx.fillText('OK', cx, y + 3);
+    }
+  }
+
+  function drawMirrorTxChips(x, y, w, c, active) {
+    const labels = ['BEGIN', 'INSERT', 'DELETE', 'UPDATE', 'COMMIT'];
+    const gap = 6;
+    const chipW = Math.floor((w - gap * (labels.length - 1)) / labels.length);
+    labels.forEach((label, i) => {
+      const color = label === 'DELETE' ? flow.delete : label === 'COMMIT' || label === 'BEGIN' ? flow.tx : flow.replay;
+      const xx = x + i * (chipW + gap);
+      ctx.fillStyle = alpha(color, active ? .18 : .10);
+      ctx.strokeStyle = alpha(color, active ? .48 : .26);
+      ctx.lineWidth = 1;
+      roundRect(xx, y, chipW, 30, 7, true, true);
+      ctx.fillStyle = active ? color : c.text;
+      ctx.font = typeFont(TYPE.text, 900);
+      ctx.textAlign = 'center';
+      fitText(label, xx + 4, y + 19, chipW - 8, 'center');
+    });
+  }
+
+  function drawCdcDot(cx, cy, active, color, c) {
+    ctx.fillStyle = active ? color : alpha(color, .30);
+    ctx.beginPath();
+    ctx.arc(cx, cy, active ? 5 : 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = active ? alpha(color, .78) : alpha(c.border, .45);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, active ? 10 : 7, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawCdcCard(x, y, w, h, color, active, c, opts = {}) {
+    ctx.fillStyle = opts.opaque ? c.panel : active ? alpha(color, c.dark ? .18 : .11) : alpha(c.panel2, .70);
+    ctx.strokeStyle = active ? alpha(color, .62) : c.borderSoft;
+    ctx.lineWidth = active ? 1.6 : 1;
+    roundRect(x, y, w, h, 8, true, true);
+  }
+
+  function drawRecordTypeCard(x, y, w, h, label, color, c, fs = TYPE.text) {
+    ctx.fillStyle = alpha(color, .16);
+    ctx.strokeStyle = alpha(color, .48);
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 6, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(fs, 900);
+    ctx.textAlign = 'center';
+    fitText(label, x + 4, y + h / 2 + fs * .36, w - 8, 'center');
+  }
+
+  function drawFoldCorner(x, y, color, c) {
+    ctx.fillStyle = alpha(color, .30);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 7, y);
+    ctx.lineTo(x + 7, y + 7);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawMiniArrow(x1, y1, x2, y2, color) {
+    ctx.strokeStyle = alpha(color, .62);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    arrowHead({ x: x1, y: y1 }, { x: x2, y: y2 }, alpha(color, .72));
+  }
+
+  function drawTxnBracket(x, y, w, h, color, c) {
+    ctx.strokeStyle = alpha(color, .70);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 7, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + h);
+    ctx.lineTo(x + 7, y + h);
+    ctx.moveTo(x + w - 7, y);
+    ctx.lineTo(x + w, y);
+    ctx.lineTo(x + w, y + h);
+    ctx.lineTo(x + w - 7, y + h);
+    ctx.stroke();
+    ctx.fillStyle = alpha(color, .20);
+    ctx.beginPath();
+    ctx.arc(x + w / 2, y + h / 2, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawLogStripes(x, y, w, h, color, c) {
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = alpha(color, .18 + i * .04);
+      roundRect(x + i * 13, y + i % 2, 10, h - 2, 3, true, false);
+    }
+    ctx.strokeStyle = alpha(color, .28);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + h + 4);
+    ctx.lineTo(x + w, y + h + 4);
+    ctx.stroke();
+  }
+
+  function drawRowGlyph(x, y, color, empty, c) {
+    ctx.strokeStyle = empty ? alpha(c.muted, .52) : alpha(color, .62);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      ctx.moveTo(x, y - 7 + i * 6);
+      ctx.lineTo(x + 9, y - 7 + i * 6);
+    }
+    ctx.stroke();
+    if (empty) {
+      ctx.strokeStyle = alpha(flow.delete, .70);
+      ctx.beginPath();
+      ctx.moveTo(x, y - 7);
+      ctx.lineTo(x + 9, y + 5);
+      ctx.moveTo(x + 9, y - 7);
+      ctx.lineTo(x, y + 5);
+      ctx.stroke();
+    }
+  }
+
+  function drawCommitStamp(x, y, w, h, color, c) {
+    ctx.fillStyle = alpha(color, .13);
+    ctx.strokeStyle = alpha(color, .52);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y + 15);
+    ctx.lineTo(x + 13, y + 20);
+    ctx.lineTo(x + 21, y + 9);
+    ctx.stroke();
+  }
+
+  function drawSink(c) {
+    const r = rects.sink;
+    drawComponent(r, c, { color: flow.replay, key: 'sink' });
+    const layout = writerLayout();
+    drawRowChangeStagingPanel(layout, c);
+    drawReplayRpcPanel(layout, c);
+    drawWriterFlowAnimations(layout, c);
+  }
+
+  function writerLayout() {
+    const r = rects.sink;
+    const x = r.x + 16;
+    const w = r.w - 32;
+    const top = r.y + 70;
+    const bottom = r.y + r.h - 22;
+    const gap = 20;
+    const stagingH = Math.min(194, Math.round((bottom - top - gap) * .52));
+    const staging = { x, y: top, w, h: stagingH };
+    const rpc = { x, y: staging.y + staging.h + gap, w, h: bottom - (staging.y + staging.h + gap) };
+    return { r, staging, rpc };
+  }
+
+  function drawRowChangeStagingPanel(layout, c) {
+    const { x, y, w, h } = layout.staging;
+    drawCdcCard(x, y, w, h, flow.replay, /route|stage|queued|pk|row/i.test(`${model.sink.requestState} ${model.sink.writePlan}`), c);
+    ctx.fillStyle = flow.replay;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText('row-change staging', x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
+    drawRecordSheet(x + 12, y + 46, 50, 48, flow.replay, c);
+    drawRouteHub(x + 92, y + 70, flow.replay, c);
+    drawMiniArrow(x + 118, y + 70, x + w - 34, y + 70, flow.replay);
+    drawPill(x + 12, y + h - 68, w - 24, 28, displaySinkText(model.sink.routingRule || 'row image rule'), flow.index, c, /after|before|split|key|route/i.test(model.sink.routingRule || ''), 9);
+    drawPill(x + 12, y + h - 34, w - 24, 26, displaySinkText(model.sink.writePlan || 'rows queued'), flow.replay, c, /pk|row|queued|stage/i.test(model.sink.writePlan || ''), 8);
+    drawStagedRows(x + 130, y + 43, w - 156, 60, c);
+  }
+
+  function drawStagedRows(x, y, w, h, c) {
+    const rows = stagedRowLabels();
+    const visible = rows.slice(0, 3);
+    const gap = 8;
+    const cardW = Math.max(48, Math.min(72, (w - gap * Math.max(0, visible.length - 1)) / Math.max(1, visible.length)));
+    const total = cardW * visible.length + gap * Math.max(0, visible.length - 1);
+    const start = x + Math.max(0, (w - total) / 2);
+    visible.forEach((label, i) => {
+      const color = /^D/i.test(label) ? flow.delete : /^U/i.test(label) ? flow.index : flow.replay;
+      drawStagedRowCard(start + i * (cardW + gap), y + 8, cardW, Math.min(36, h - 12), label, color, c);
+    });
+    if (!visible.length) {
+      drawEmptyRowSlot(x + 8, y + 18, w - 16, 14, c);
+    }
+  }
+
+  function stagedRowLabels() {
+    const labels = [];
+    model.lanes.forEach(l => {
+      const short = shortRowLabel(l.currentOp);
+      if (short && short !== 'row' && !labels.includes(short)) labels.push(short);
+    });
+    if (!labels.length) {
+      const plan = String(model.sink.writePlan || '');
+      const matches = plan.match(/[IUD]?\s*pk\d+/gi) || plan.match(/pk\d+/gi) || [];
+      matches.forEach(m => labels.push(m.replace(/\s+/g, ' ')));
+    }
+    return labels;
+  }
+
+  function drawStagedRowCard(x, y, w, h, label, color, c) {
+    ctx.fillStyle = alpha(color, .18);
+    ctx.strokeStyle = alpha(color, .50);
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 5, true, true);
+    drawRowGlyph(x + 6, y + 11, color, false, c);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'left';
+    fitText(label || 'row', x + 18, y + h / 2 + 5, w - 22, 'left');
+  }
+
+  function drawEmptyRowSlot(x, y, w, h, c) {
+    ctx.strokeStyle = alpha(c.border, .36);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    roundRect(x, y, w, h, 4, false, true);
+    ctx.setLineDash([]);
+  }
+
+  function drawReplayRpcPanel(layout, c) {
+    const { x, y, w, h } = layout.rpc;
+    drawCdcCard(x, y, w, h, flow.tx, /RPC|batch|OK|pending|rows/i.test(model.sink.rpcBatch), c);
+    ctx.fillStyle = flow.tx;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText('replay RPC', x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
+    const sendLane = streamLane(layout, false);
+    const ackLane = streamLane(layout, true);
+    drawStreamLane(sendLane.a.x, sendLane.a.y, sendLane.b.x - sendLane.a.x, flow.replay, c, false);
+    drawStreamLane(ackLane.a.x, ackLane.a.y, ackLane.b.x - ackLane.a.x, flow.tx, c, true);
+    ctx.fillStyle = alpha(flow.replay, .78);
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'right';
+    ctx.fillText('send', x + 88, sendLane.a.y + 3);
+    ctx.fillStyle = alpha(flow.tx, .78);
+    ctx.fillText('ack', x + 88, ackLane.a.y + 3);
+  }
+
+  function streamLane(layout, reverse) {
+    const r = layout.rpc;
+    const y = reverse ? r.y + r.h - 56 : r.y + 48;
+    return {
+      a: { x: r.x + 92, y },
+      b: { x: r.x + r.w - 18, y }
+    };
+  }
+
+  function drawStreamLane(x, y, w, color, c, reverse) {
+    ctx.strokeStyle = alpha(color, .34);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w, y);
+    ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const px = x + 8 + i * Math.max(16, (w - 24) / 3);
+      ctx.fillStyle = alpha(color, .18 + i * .025);
+      roundRect(px - 5, y - 4, 10, 8, 3, true, false);
+    }
+    arrowHead(
+      reverse ? { x: x + w - 10, y } : { x: x + w - 18, y },
+      reverse ? { x: x + w - 30, y } : { x: x + w, y },
+      alpha(color, .52)
+    );
+  }
+
+  function drawWriterFlowAnimations(layout, c) {
+    const incoming = activeTokenProgress(t => tokenDirection(t, 'cdc', 'sink'));
+    if (incoming && incoming.local > .34) {
+      const a = { x: layout.r.x + layout.r.w / 2, y: layout.r.y + 38 };
+      const b = stagingRowCenter(layout);
+      drawMovingMiniRow(a, b, clamp((incoming.local - .34) / .66, 0, 1), incoming.token.label, flow.replay, c);
+    }
+
+    const dispatch = activeTokenProgress(t => tokenDirection(t, 'sink', 'lane'));
+    if (dispatch) {
+      const a = stagingRowCenter(layout);
+      const b = { x: layout.r.x + layout.r.w - 8, y: a.y };
+      drawMovingMiniRow(a, b, dispatch.local, dispatch.token.label, dispatch.token.color || flow.replay, c);
+    }
+
+    const send = repeatingTokenProgress(t => tokenDirection(t, 'sink', 'runtime')) ||
+      activeTokenProgress(t => tokenDirection(t, 'sink', 'runtime'));
+    if (send) drawStagedRowToStream(layout, send, c);
+    if (!send && writerStreamActive()) {
+      drawStagedRowToStream(layout, {
+        token: { label: stagedRowLabels()[0] || 'row', color: flow.replay },
+        local: streamCycleProgress()
+      }, c);
+    }
+
+    const recv = repeatingTokenProgress(t => tokenDirection(t, 'runtime', 'sink')) ||
+      activeTokenProgress(t => tokenDirection(t, 'runtime', 'sink'));
+    if (recv) drawMovingRpcStreamChunk(layout, recv.local, true, c);
+  }
+
+  function writerStreamActive() {
+    const text = `${model.sink.requestState} ${model.sink.rpcBatch}`;
+    if (/1 tx per request|ready$/i.test(text)) return false;
+    return /replay|dispatch|grouped|batch|tx\d+|rows|pending|OK/i.test(text);
+  }
+
+  function activeTokenProgress(predicate) {
+    const st = currentStep();
+    const p = stepProgress();
+    for (const token of st.tokens) {
+      if (!predicate(token)) continue;
+      if (p < token.start || p > token.end) continue;
+      return { token, local: ease((p - token.start) / (token.end - token.start)) };
+    }
+    return null;
+  }
+
+  function repeatingTokenProgress(predicate) {
+    const st = currentStep();
+    const token = st.tokens.find(predicate);
+    if (!token) return null;
+    const p = stepProgress();
+    if (p < Math.max(0, token.start - .12) || p > Math.min(1, token.end + .12)) return null;
+    return { token, local: streamCycleProgress() };
+  }
+
+  function tokenDirection(token, fromPrefix, toPrefix) {
+    const from = tokenPrefixIndex(token, fromPrefix);
+    const to = tokenPrefixIndex(token, toPrefix);
+    return from >= 0 && to >= 0 && from < to;
+  }
+
+  function tokenPrefixIndex(token, prefix) {
+    return token.path.findIndex(part => typeof part === 'string' && part.startsWith(prefix));
+  }
+
+  function stagingRowCenter(layout) {
+    const s = layout.staging;
+    return { x: s.x + s.w * .58, y: s.y + Math.min(58, s.h - 42) };
+  }
+
+  function drawStagedRowToStream(layout, send, c) {
+    const rowStart = stagingRowCenter(layout);
+    const lane = streamLane(layout, false);
+    const rowEnd = { x: lane.a.x + 8, y: lane.a.y };
+    drawInternalMotionPath(rowStart, rowEnd, send.token.color || flow.replay, c);
+    drawActiveStreamGlow(layout, false, c);
+
+    const mergeT = clamp(send.local / .62, 0, 1);
+    if (send.local < .82) {
+      drawMovingMiniRow(rowStart, rowEnd, mergeT, send.token.label, send.token.color || flow.replay, c, 48, 18);
+    }
+
+    const streamT = clamp((send.local - .16) / .84, 0, 1);
+    drawMovingRpcStreamChunk(layout, streamT, false, c, 'row');
+    if (send.local > .36) drawMovingRpcStreamChunk(layout, (streamT + .36) % 1, false, c, 'row');
+    if (send.local > .58) drawMovingRpcStreamChunk(layout, (streamT + .68) % 1, false, c, 'row');
+  }
+
+  function drawActiveStreamGlow(layout, reverse, c) {
+    const lane = streamLane(layout, reverse);
+    const color = reverse ? flow.tx : flow.replay;
+    ctx.save();
+    ctx.strokeStyle = alpha(color, .72);
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(lane.a.x, lane.a.y);
+    ctx.lineTo(lane.b.x, lane.b.y);
+    ctx.stroke();
+    ctx.strokeStyle = alpha('#ffffff', .68);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(lane.a.x, lane.a.y);
+    ctx.lineTo(lane.b.x, lane.b.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawInternalMotionPath(a, b, color, c) {
+    ctx.save();
+    ctx.strokeStyle = alpha(color, .32);
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([4, 5]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y + 3);
+    ctx.lineTo(a.x, b.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    arrowHead({ x: b.x - 12, y: b.y }, b, alpha(color, .50));
+    ctx.restore();
+  }
+
+  function drawMovingMiniRow(a, b, t, label, color, c, ww, hh) {
+    const x = lerp(a.x, b.x, clamp(t, 0, 1));
+    const y = lerp(a.y, b.y, clamp(t, 0, 1));
+    const w = ww || 48;
+    const h = hh || 22;
+    ctx.save();
+    ctx.shadowColor = alpha(color, .24);
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = color;
+    roundRect(x - w / 2, y - h / 2, w, h, 5, true, false);
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = alpha('#ffffff', .80);
+    ctx.lineWidth = 1;
+    roundRect(x - w / 2, y - h / 2, w, h, 5, false, true);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = typeFont(TYPE.micro, 900);
+    ctx.textAlign = 'center';
+    fitText(shortRowLabel(label), x - w / 2 + 4, y + 3, w - 8, 'center');
+    ctx.restore();
+  }
+
+  function shortRowLabel(label) {
+    const text = String(label || 'row');
+    const op = text.match(/\b([IUD]):?pk(\d+)/i) || text.match(/\b([IUD]).*?(pk\d+)/i);
+    if (op) return /^\d+$/.test(op[2]) ? `${op[1].toUpperCase()} pk${op[2]}` : `${op[1].toUpperCase()} ${op[2]}`;
+    const pk = text.match(/pk\d+/i);
+    if (pk) return pk[0];
+    return 'row';
+  }
+
+  function drawMovingRpcStreamChunk(layout, t, reverse, c, labelOverride) {
+    const lane = streamLane(layout, reverse);
+    const a = lane.a;
+    const b = lane.b;
+    const p = reverse ? 1 - clamp(t, 0, 1) : clamp(t, 0, 1);
+    const x = lerp(a.x, b.x, p);
+    const y = lerp(a.y, b.y, p);
+    const label = labelOverride || (reverse ? 'ack' : 'chunk');
+    ctx.save();
+    ctx.shadowColor = alpha(reverse ? flow.replay : flow.tx, .26);
+    ctx.shadowBlur = 9;
+    ctx.fillStyle = reverse ? flow.replay : flow.tx;
+    roundRect(x - 26, y - 11, 52, 22, 8, true, false);
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = alpha('#ffffff', .82);
+    ctx.lineWidth = 1;
+    roundRect(x - 26, y - 11, 52, 22, 8, false, true);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = typeFont(TYPE.micro, 900);
+    ctx.textAlign = 'center';
+    fitText(label, x - 22, y + 4, 44, 'center');
+    ctx.restore();
+  }
+
+  function drawRpcEndpoint(x, y, w, h, color, c) {
+    ctx.fillStyle = alpha(color, .14);
+    ctx.strokeStyle = alpha(color, .44);
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 7, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    fitText('Retina OK', x + 4, y + 18, w - 8, 'center');
+  }
+
+  function drawWriterRequestCard(x, y, w, h, c) {
+    drawCdcCard(x, y, w, h, flow.replay, /replay/i.test(model.sink.requestMode), c);
+    drawRecordSheet(x + 14, y + 10, 28, 28, flow.replay, c);
+    drawRecordTypeCard(x + 54, y + 12, 86, 22, 'replay RPC', flow.replay, c);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'left';
+    fitText(displaySinkText(model.sink.requestState), x + 54, y + 43, w - 66, 'left');
+  }
+
+  function drawWriterRpcCard(x, y, w, h, c) {
+    drawCdcCard(x, y, w, h, flow.tx, /batch|RPC|OK|pending|rows/i.test(model.sink.rpcBatch), c);
+    drawRpcBundle(x + 12, y + 9, flow.tx, c);
+    const txCount = rpcTxCount();
+    for (let i = 0; i < txCount; i++) {
+      drawTxDot(x + 64 + i * 24, y + 19, flow.tx, c);
+    }
+    drawMiniArrow(x + w - 44, y + 24, x + w - 16, y + 24, flow.replay);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'left';
+    fitText(displaySinkText(model.sink.rpcBatch), x + 12, y + 41, w - 24, 'left');
+  }
+
+  function rpcTxCount() {
+    const text = `${model.sink.rpcBatch} ${model.sink.requestState}`;
+    if (/3 tx|tx43 \+ tx44 \+ tx45|3 tx rows/i.test(text)) return 3;
+    if (/tx\d+.*tx\d+/i.test(text)) return 2;
+    return 1;
+  }
+
+  function drawRecordSheet(x, y, w, h, color, c) {
+    ctx.fillStyle = alpha(color, .12);
+    ctx.strokeStyle = alpha(color, .48);
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 5, true, true);
+    drawFoldCorner(x + w - 9, y + 3, color, c);
+    ctx.strokeStyle = alpha(color, .38);
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      ctx.moveTo(x + 7, y + 10 + i * 6);
+      ctx.lineTo(x + w - 8, y + 10 + i * 6);
+    }
+    ctx.stroke();
+  }
+
+  function drawRouteHub(x, y, color, c) {
+    ctx.fillStyle = alpha(color, .18);
+    ctx.strokeStyle = alpha(color, .56);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(x, y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    ctx.fillText('pk', x, y + 3);
+  }
+
+  function drawRpcBundle(x, y, color, c) {
+    ctx.fillStyle = alpha(color, .14);
+    ctx.strokeStyle = alpha(color, .42);
+    roundRect(x, y, 40, 22, 6, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    ctx.fillText('RPC', x + 20, y + 17);
+  }
+
+  function drawTxDot(cx, cy, color, c) {
+    ctx.fillStyle = alpha(color, .16);
+    ctx.strokeStyle = alpha(color, .52);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  function txWindowLayout(r) {
+    const y = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
+    const h = r.y + r.h - y - MODULE_CONTENT_PAD;
+    return {
+      x: r.x + MODULE_CONTENT_PAD,
+      y,
+      w: r.w - MODULE_CONTENT_PAD * 2,
+      h
+    };
+  }
+
+  function drawTransactionService(c) {
+    const r = rects.tx;
+    drawComponent(r, c, { color: flow.tx, key: 'tx' });
+
+    const { x, y, w, h } = txWindowLayout(r);
+
+    drawTxWindow(x, y, w, h, c);
+  }
+
+  function drawTxWindow(x, y, w, h, c) {
+    ctx.fillStyle = alpha(c.panel2, .72);
+    ctx.strokeStyle = c.borderSoft;
+    roundRect(x, y, w, h, 9, true, true);
+    const min = model.tx.lwm - 10;
+    const max = model.tx.hwm + 8;
+    const lx = map(model.tx.lwm, min, max, x + 18, x + w - 18);
+    const hx = map(model.tx.hwm, min, max, x + 18, x + w - 18);
+    const lineY = y + h / 2;
+    ctx.strokeStyle = alpha(c.border, .56);
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x + 18, lineY); ctx.lineTo(x + w - 18, lineY); ctx.stroke();
+    ctx.strokeStyle = alpha(flow.visibility, .58);
+    ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(lx, lineY); ctx.lineTo(hx, lineY); ctx.stroke();
+    marker(lx, lineY, `LWM ${model.tx.lwm}`, flow.gc, c, 'top');
+    marker(hx, lineY, `HWM ${model.tx.hwm}`, flow.tx, c, 'bottom');
+  }
+
+  function marker(x, y, label, color, c, labelSide = 'top') {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y - 16); ctx.lineTo(x, y + 16); ctx.stroke();
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, labelSide === 'bottom' ? y + 30 : y - 20);
+  }
+
+  function drawIndex(c) {
+    const r = rects.index;
+    const active = isHighlighted('index');
+    drawComponent(r, c, { color: flow.index, key: 'index' });
+
+    const x = r.x + MODULE_CONTENT_PAD;
+    const y = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
+    const w = r.w - MODULE_CONTENT_PAD * 2;
+    const h = r.y + r.h - y - MODULE_CONTENT_PAD;
+    const gap = 10;
+    const mapW = Math.round(w * .50);
+    const locationW = w - mapW - gap;
+    const primaryRows = parseIndexPairs(model.index.primaryEntries);
+    const locationRows = parseIndexPairs(model.index.mainEntries);
+
+    drawPrimaryIndexMap(x, y, mapW, h, primaryRows, c, active);
+    drawMainIndexMap(x + mapW + gap, y, locationW, h, primaryRows, locationRows, c, active);
+  }
+
+  function drawPrimaryIndexMap(x, y, w, h, rows, c, active) {
+    const color = flow.index;
+    ctx.fillStyle = alpha(color, active ? .16 : .08);
+    ctx.strokeStyle = alpha(color, active ? .52 : .24);
+    ctx.lineWidth = active ? 1.5 : 1;
+    roundRect(x, y, w, h, 9, true, true);
+
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText('PRIMARY INDEX MAP', x + 10, y + 19, w - 20, 'left');
+
+    const visibleRows = rows.slice(0, 3);
+    const rowCount = Math.max(visibleRows.length, 1);
+    const top = y + 34;
+    const bottom = y + h - 26;
+
+    visibleRows.forEach((row, i) => {
+      const yy = rowCount === 1 ? top : top + i * ((bottom - top) / (rowCount - 1));
+      drawIndexKeyCard(x + 10, yy, 70, 24, row.from, color, c, active);
+      drawRowIdNode(x + w - 24, yy + 12, row.to, color, c, active);
+
+      const a = { x: x + 86, y: yy + 12 };
+      const b = { x: x + w - 40, y: yy + 12 };
+      ctx.strokeStyle = alpha(color, active ? .74 : .44);
+      ctx.lineWidth = 1.6;
+      drawPolyline([a, b]);
+      arrowHead(a, b, alpha(color, active ? .86 : .56));
+    });
+  }
+
+  function drawMainIndexMap(x, y, w, h, primaryRows, locationRows, c, active) {
+    const color = flow.storage;
+    ctx.fillStyle = alpha(color, active ? .15 : .07);
+    ctx.strokeStyle = alpha(color, active ? .50 : .22);
+    ctx.lineWidth = active ? 1.5 : 1;
+    roundRect(x, y, w, h, 9, true, true);
+
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    ctx.fillText('MAIN INDEX', x + 9, y + 19);
+
+    ctx.fillStyle = alpha(c.text, .68);
+    ctx.font = typeFont(TYPE.text, 800);
+    fitText('rowId → RowLocation', x + 9, y + 35, w - 18, 'left');
+
+    const matchedLocations = primaryRows
+      .slice(0, 3)
+      .map(row => locationRows.find(loc => loc.from === row.to))
+      .filter(Boolean);
+    const visibleLocations = (matchedLocations.length ? matchedLocations : locationRows.slice(0, 3)).slice(0, 3);
+
+    visibleLocations.forEach((loc, i) => {
+      const rowCount = Math.max(visibleLocations.length, 1);
+      const top = y + 44;
+      const bottom = y + h - 28;
+      const yy = rowCount === 1 ? top : top + i * ((bottom - top) / (rowCount - 1));
+      const rowW = Math.max(42, Math.min(56, Math.round(w * .33)));
+      const valX = x + rowW + 32;
+      const valW = Math.max(42, x + w - valX - 8);
+      const midY = yy + 12;
+
+      drawIndexKeyCard(x + 8, yy, rowW, 24, compactRowId(loc.from), color, c, active);
+
+      const a = { x: x + 10 + rowW, y: midY };
+      const b = { x: valX - 7, y: midY };
+      ctx.strokeStyle = alpha(color, active ? .70 : .42);
+      ctx.lineWidth = 1.3;
+      drawPolyline([a, b]);
+      arrowHead(a, b, alpha(color, active ? .82 : .52));
+
+      drawRowLocationTuple(valX, yy - 3, valW, 32, loc.to, color, c, active);
+    });
+  }
+
+  function drawRowLocationTuple(x, y, w, h, location, color, c, active) {
+    const parts = locationParts(location);
+    ctx.fillStyle = alpha(c.panel2, active ? .76 : .56);
+    ctx.strokeStyle = alpha(color, active ? .48 : .26);
+    ctx.lineWidth = active ? 1.2 : 1;
+    roundRect(x, y, w, h, 5, true, true);
+
+    ctx.fillStyle = c.text;
+    ctx.font = monoFont(TYPE.text, 900);
+    fitText(parts.file, x + 6, y + 14, w - 12, 'left');
+    ctx.fillStyle = c.muted;
+    ctx.font = monoFont(TYPE.text, 800);
+    fitText(`${parts.rg} ${parts.off}`, x + 6, y + 27, w - 12, 'left');
+  }
+
+  function drawIndexKeyCard(x, y, w, h, label, color, c, active) {
+    ctx.fillStyle = alpha(color, active ? .24 : .12);
+    ctx.strokeStyle = alpha(color, active ? .62 : .32);
+    ctx.lineWidth = active ? 1.3 : 1;
+    roundRect(x, y, w, h, 5, true, true);
+
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    fitText(label, x + 4, y + 16, w - 8, 'center');
+  }
+
+  function drawRowIdNode(x, y, rowId, color, c, active) {
+    ctx.fillStyle = alpha(color, active ? .28 : .15);
+    ctx.strokeStyle = alpha(color, active ? .70 : .38);
+    ctx.lineWidth = active ? 1.4 : 1;
+    ctx.beginPath();
+    ctx.arc(x, y, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 900);
+    fitText(compactRowId(rowId), x - 12, y + 4, 24, 'center');
+  }
+
+  function parseIndexPairs(rows) {
+    return (rows || [])
+      .map(s => {
+        const parts = String(s).split('->');
+        return {
+          from: (parts[0] || '').trim(),
+          to: (parts[1] || '').trim()
+        };
+      })
+      .filter(row => row.from && row.to);
+  }
+
+  function compactRowId(rowId) {
+    return String(rowId || '').replace(/^rowId/, '#');
+  }
+
+  function compactLocation(location) {
+    return String(location || '')
+      .replace('.pxl', '')
+      .replace('fileId', 'f')
+      .replace('file-', 'f');
+  }
+
+  function locationParts(location) {
+    const parts = compactLocation(location).split('/').filter(Boolean);
+    return {
+      file: parts[0] || 'file?',
+      rg: parts[1] || 'rg?',
+      off: parts[2] || 'off?'
+    };
+  }
+
+  function drawReplayers(c) {
+    drawReplayerInternals(c);
+  }
+
+  function replayerPanelLayout() {
+    const r = rects.runtime;
+    const pad = MODULE_CONTENT_PAD;
+    const y = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
+    const frame = { x: r.x + pad, y, w: r.w - pad * 2, h: r.y + r.h - y - MODULE_CONTENT_PAD };
+    const gap = 20;
+    const writeH = Math.round((frame.h - gap) * .43);
+    const visibilityH = frame.h - gap - writeH;
+    return {
+      frame,
+      write: { x: frame.x, y: frame.y, w: frame.w, h: writeH },
+      visibility: { x: frame.x, y: frame.y + writeH + gap, w: frame.w, h: visibilityH }
+    };
+  }
+
+  function activeReplayLane() {
+    const st = currentStep();
+    const parts = [];
+    (st.highlights || []).forEach(h => parts.push(h));
+    (st.tokens || []).forEach(t => (t.path || []).forEach(p => {
+      if (typeof p === 'string') parts.push(p);
+    }));
+    for (const part of parts) {
+      const m = /^lane([0-2])/.exec(part);
+      if (m) return model.lanes[Number(m[1])] || model.lanes[DETAIL_REPLAY_ID];
+    }
+    return model.lanes[DETAIL_REPLAY_ID];
+  }
+
+  function drawReplayerInternals(c) {
+    const { write, visibility } = replayerPanelLayout();
+    const lane = activeReplayLane();
+    drawReplayWriteBuffer(write.x, write.y, write.w, write.h, lane, c);
+    drawReplayVisibility(visibility.x, visibility.y, visibility.w, visibility.h, lane, c);
+  }
+
+  function drawReplayWriteBuffer(x, y, w, h, lane, c) {
+    smallBox(x, y, w, h, 'write buffer', flow.storage, c, state.detailFocus === 'writeBuffer' || lane.highlight === 'active' || lane.highlight === 'immutable');
+    const st = currentStep();
+    const p = stepProgress(true);
+    const activeX = x + 16, activeY = y + 54;
+    const blockW = 78, blockH = Math.max(72, Math.min(98, h - 72));
+    const immX = activeX + blockW + 24;
+    const immW = x + w - 14 - immX;
+    const prevRows = lane.prevActiveRows ?? lane.activeRows;
+    const displayRows = lerp(prevRows, lane.activeRows, p);
+    const fillH = (blockH - 10) * clamp(displayRows / lane.activeCap, 0, 1);
+
+    ctx.fillStyle = alpha(flow.replay, lane.highlight === 'active' ? .24 : .11);
+    ctx.strokeStyle = alpha(flow.replay, lane.highlight === 'active' ? .62 : .34);
+    roundRect(activeX, activeY, blockW, blockH, 8, true, true);
+    ctx.fillStyle = alpha(flow.replay, .34);
+    roundRect(activeX + 10, activeY + blockH - 6 - fillH, blockW - 20, Math.max(5, fillH), 5, true, false);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'center';
+    ctx.fillText('active', activeX + blockW / 2, activeY + 14);
+    ctx.fillText(`${Math.round(displayRows)}/${lane.activeCap}`, activeX + blockW / 2, activeY + blockH - 8);
+
+    if (st.anim !== 'seal') {
+      const a = { x: activeX + blockW + 5, y: activeY + blockH / 2 };
+      const b = { x: immX - 7, y: activeY + blockH / 2 };
+      ctx.strokeStyle = alpha(flow.storage, .50);
+      ctx.lineWidth = 1.5;
+      drawPolyline([a, b]);
+      arrowHead(a, b, alpha(flow.storage, .68));
+    }
+
+    drawCompactImmQueue(immX, activeY, immW, blockH, lane.immutable, lane.highlight === 'immutable', c);
+
+    if (st.anim === 'seal' && p < 1) {
+      const ghostX = lerp(activeX, immX + 8, p);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, p * 3) * .85;
+      ctx.fillStyle = alpha(flow.gc, .26);
+      ctx.strokeStyle = alpha(flow.gc, .62);
+      roundRect(ghostX, activeY, blockW, blockH, 6, true, true);
+      ctx.fillStyle = flow.gc;
+      ctx.font = typeFont(TYPE.text, 800);
+      ctx.textAlign = 'center';
+      ctx.fillText('sealing', ghostX + blockW / 2, activeY + blockH / 2 + 3);
+      ctx.restore();
+    }
+
+    if (st.anim === 'flush' && p < 1 && lane.prevImmutable > 0) {
+      const ghostX = immX + immW - 28 + p * 46;
+      ctx.save();
+      ctx.globalAlpha = (1 - p) * .85;
+      ctx.fillStyle = alpha(flow.gc, .20);
+      ctx.strokeStyle = alpha(flow.gc, .50);
+      roundRect(ghostX, activeY + 7, 24, blockH - 14, 4, true, true);
+      ctx.restore();
+    }
+  }
+
+  function drawCompactImmQueue(x, y, w, h, count, active, c) {
+    const color = flow.gc;
+    ctx.fillStyle = alpha(color, active ? .14 : .06);
+    ctx.strokeStyle = alpha(color, active ? .52 : .24);
+    ctx.lineWidth = active ? 1.5 : 1;
+    roundRect(x, y, w, h, 6, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'left';
+    ctx.fillText('imm FIFO', x + 8, y + 18);
+    const n = Math.min(count, 3);
+    if (!n) {
+      ctx.fillStyle = c.muted;
+      ctx.font = typeFont(TYPE.text, 0);
+      ctx.textAlign = 'center';
+      ctx.fillText('empty', x + w / 2, y + h / 2 + 6);
+      return;
+    }
+    const gap = 4;
+    const cellW = Math.max(24, Math.min(38, (w - 18 - gap * (n - 1)) / n));
+    const startX = x + Math.max(9, (w - (cellW * n + gap * (n - 1))) / 2);
+    for (let i = 0; i < n; i++) {
+      const bx = startX + i * (cellW + gap);
+      const label = count > 3 && i === n - 1 ? `+${count - 2}` : `b${count - i}`;
+      ctx.fillStyle = alpha(color, active ? .22 : .12);
+      ctx.strokeStyle = alpha(color, active ? .56 : .28);
+      roundRect(bx, y + 28, cellW, h - 36, 5, true, true);
+      ctx.fillStyle = c.text;
+      ctx.font = typeFont(TYPE.micro, 800);
+      ctx.textAlign = 'center';
+      fitText(label, bx + 3, y + h / 2 + 5, cellW - 6, 'center');
+    }
+  }
+
+  function drawReplayVisibility(x, y, w, h, lane, c) {
+    smallBox(x, y, w, h, 'visibility structure', flow.visibility, c, state.detailFocus === 'visibility' || state.detailFocus === 'gc' || lane.highlight === 'visibility' || lane.highlight === 'baseBitmap' || lane.highlight === 'foldEligible');
+
+    const rowX = x + 12;
+    const rowY = y + 46;
+    const rowW = w - 24;
+    const labelW = Math.floor(rowW * 0.35);
+    const bitmapX = rowX + labelW;
+    const bitmapW = rowW - labelW;
+
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText(`baseTs=${lane.baseTs}`, rowX, rowY + 14, labelW - 4, 'left');
+    drawFixedDeleteBitmap(lane, bitmapX, rowY, bitmapW, c);
+
+    const chainY = y + 92;
+    const chainH = Math.max(64, h - 108);
+    ctx.fillStyle = alpha(flow.delete, lane.highlight === 'visibility' || lane.highlight === 'foldEligible' ? .18 : .08);
+    ctx.strokeStyle = alpha(flow.delete, lane.highlight === 'visibility' || lane.highlight === 'foldEligible' ? .46 : .24);
+    roundRect(x + 10, chainY, w - 20, chainH, 7, true, true);
+    ctx.fillStyle = flow.delete;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'left';
+    ctx.fillText('delete ts chain', x + 18, chainY + 22);
+    drawCompactDeleteTsItems(x + 18, chainY + 34, w - 36, lane, c);
+  }
+
+  function drawFixedDeleteBitmap(lane, x, y, w, c) {
+    const len = 16;
+    const bits = (lane.baseBitmap || '').padEnd(len, '0').slice(0, len);
+    const gap = 2;
+    const cellW = Math.max(4, Math.min(6, Math.floor((w - gap * (len - 1)) / len)));
+    const cellH = 14;
+    const totalW = len * cellW + (len - 1) * gap;
+    const startX = x + Math.max(0, (w - totalW) / 2);
+    const pendingDeletes = new Set();
+    const eligibleDeletes = new Set();
+
+    lane.deleteTs.forEach(item => {
+      const offset = deleteOffsetValue(item);
+      if (!Number.isFinite(offset) || offset < 0 || offset >= len) return;
+      pendingDeletes.add(offset);
+      if (lane.safeTs != null && deleteTsValue(item) <= lane.safeTs) {
+        eligibleDeletes.add(offset);
+      }
+    });
+
+    for (let i = 0; i < len; i++) {
+      const folded = bits[i] === '1';
+      const eligible = eligibleDeletes.has(i);
+      const pending = pendingDeletes.has(i);
+      let fill = alpha(c.border, .20);
+      let stroke = alpha(c.border, .42);
+
+      if (folded) {
+        const color = lane.highlight === 'baseBitmap' ? flow.gc : flow.visibility;
+        fill = alpha(color, .62);
+        stroke = alpha(color, .78);
+      } else if (eligible) {
+        fill = alpha(flow.gc, .50);
+        stroke = alpha(flow.gc, .76);
+      } else if (pending) {
+        fill = alpha(flow.delete, .46);
+        stroke = alpha(flow.delete, .70);
+      }
+
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = folded || pending ? 1.2 : 1;
+      roundRect(startX + i * (cellW + gap), y, cellW, cellH, 2.5, true, true);
+    }
+  }
+
+  function drawCompactDeleteTsItems(x, y, w, lane, c) {
+    const visible = lane.deleteTs.slice(0, 3);
+    const gap = 4;
+    const itemW = Math.min(72, Math.floor((w - gap * 2) / 3));
+    visible.forEach((item, i) => {
+      const ts = deleteTsValue(item);
+      const eligible = lane.safeTs != null && ts <= lane.safeTs;
+      const active = lane.highlight === 'foldEligible' && eligible;
+      const color = active ? flow.gc : flow.delete;
+      drawPill(x + i * (itemW + gap), y, itemW, 24, item, color, c, active, 8);
+    });
+    if (lane.deleteTs.length > 3) {
+      ctx.fillStyle = c.muted;
+      ctx.font = typeFont(TYPE.micro, 800);
+      ctx.textAlign = 'right';
+      ctx.fillText(`+${lane.deleteTs.length - 3}`, x + w, y + 17);
+    }
+  }
+
+  function deleteOffsetValue(item) {
+    const m = /\((\d+),/.exec(item);
+    return m ? Number(m[1]) : Number.NaN;
+  }
+
+  function deleteTsValue(item) {
+    const m = /,(\d+)\)/.exec(item);
+    return m ? Number(m[1]) : Number.POSITIVE_INFINITY;
+  }
+
+  function drawStorage(c) {
+    const r = rects.storage;
+    drawComponent(r, c, { color: flow.storage, key: 'storage' });
+    const layout = storagePanelsLayout(r);
+    const panels = [
+      { ...layout.memtable, title: 'flushed immutable memtable', color: flow.storage, kind: 'OBJ', labels: model.storage.objectEntries.slice(0, 4), active: state.detailFocus === 'writeBuffer' || state.activeChannels.includes('flush'), maxItems: 4 },
+      { ...layout.files, title: 'regular columnar files', color: flow.replay, kind: 'FILE', labels: regularStorageFileLabels(), active: ['query', 'gc', 'storageGc'].includes(state.detailFocus), regular: true, maxItems: 5 }
+    ];
+    panels.forEach(panel => drawStoragePanel(panel.x, panel.y, panel.w, panel.h, panel, c));
+  }
+
+  function storagePanelsLayout(r) {
+    const x = r.x + MODULE_CONTENT_PAD;
+    const y = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
+    const w = r.w - MODULE_CONTENT_PAD * 2;
+    const h = Math.max(180, r.y + r.h - y - MODULE_CONTENT_PAD);
+    const gap = 16;
+    if (r.w < 700) {
+      const memH = Math.round((h - gap) * .38);
+      return {
+        memtable: { x, y, w, h: memH },
+        files: { x, y: y + memH + gap, w, h: h - gap - memH }
+      };
+    }
+    const available = w - gap;
+    const memtableW = Math.floor(available * .35);
+    return {
+      memtable: { x, y, w: memtableW, h },
+      files: { x: x + memtableW + gap, y, w: available - memtableW, h }
+    };
+  }
+
+  function regularStorageFileLabels() {
+    const files = [];
+    if (model.storage.agingQueue.length) files.push(...model.storage.agingQueue);
+    files.push(...model.storage.regularFiles);
+    if (model.storage.newFile && model.storage.newFile !== 'none') files.push(model.storage.newFile);
+    return [...new Set(files)];
+  }
+
+  function drawStoragePanel(x, y, w, h, panel, c) {
+    ctx.fillStyle = alpha(panel.color, panel.active ? .14 : .07);
+    ctx.strokeStyle = alpha(panel.color, panel.active ? .52 : .24);
+    ctx.lineWidth = panel.active ? 1.5 : 1;
+    roundRect(x, y, w, h, 10, true, true);
+    ctx.fillStyle = panel.color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText(panel.title, x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
+    const labels = panel.labels.length ? panel.labels : ['empty'];
+    const maxItems = panel.maxItems || 4;
+    const visibleLabels = labels.slice(0, maxItems);
+    const iconGap = 9;
+    const iconY = y + 48;
+    const iconH = Math.max(58, h - 66);
+    const maxIconW = panel.regular ? 150 : 112;
+    const iconW = Math.min(maxIconW, (w - 24 - iconGap * (visibleLabels.length - 1)) / visibleLabels.length);
+    const totalIconW = iconW * visibleLabels.length + iconGap * (visibleLabels.length - 1);
+    const startX = x + Math.max(12, (w - totalIconW) / 2);
+    visibleLabels.forEach((label, i) => {
+      const oldFile = panel.regular && model.storage.agingQueue.includes(String(label));
+      const retired = oldFile && /RETIRED|cleanupAt|physically/.test(model.storage.cleanup);
+      const candidate = oldFile && !retired;
+      const newFile = panel.regular && String(label) === model.storage.newFile;
+      const temporary = newFile && model.storage.newFileState === 'TEMPORARY_GC';
+      const iconKind = retired ? 'RETIRED' : temporary ? 'TEMP' : candidate ? 'CAND' : panel.kind;
+      const iconX = startX + i * (iconW + iconGap);
+      drawTabularStorageIcon(iconX, iconY, iconW, iconH, String(label), iconKind, panel.color, c, {
+        active: panel.active,
+        candidate,
+        retired,
+        newFile,
+        temporary
+      });
+    });
+  }
+
+  function drawTabularStorageIcon(x, y, w, h, label, kind, color, c, opts = {}) {
+    const iconColor = opts.retired ? flow.delete : opts.candidate || opts.temporary ? flow.gc : opts.newFile ? flow.storage : color;
+    const emphasized = opts.active || opts.candidate || opts.retired || opts.newFile || opts.temporary;
+    ctx.fillStyle = alpha(iconColor, emphasized ? .20 : .10);
+    ctx.strokeStyle = alpha(iconColor, emphasized ? .62 : .30);
+    ctx.lineWidth = emphasized ? 1.5 : 1;
+    roundRect(x, y, w, h, 7, true, true);
+    ctx.fillStyle = alpha(iconColor, .22);
+    roundRect(x + 6, y + 8, w - 12, 7, 3, true, false);
+    ctx.strokeStyle = alpha(iconColor, .24);
+    ctx.lineWidth = 1;
+    const rowTop = y + 26;
+    const rowBottom = y + h - 24;
+    const rowCount = 4;
+    for (let i = 0; i < rowCount; i++) {
+      const yy = rowTop + i * ((rowBottom - rowTop) / Math.max(1, rowCount - 1));
+      ctx.beginPath();
+      ctx.moveTo(x + 8, yy);
+      ctx.lineTo(x + w - 8, yy);
+      ctx.stroke();
+    }
+    ctx.fillStyle = iconColor;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    ctx.fillText(kind, x + 8, y + 29);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    fitText(label, x + 8, y + h - 10, w - 16, 'left');
+  }
+
+  function drawCatalog(c) {
+    const r = rects.catalog;
+    const color = flow.metadata || flow.visibility;
+    const active = isHighlighted('catalog');
+    const queryActive = active && state.detailFocus === 'query';
+    const switchActive = active && (state.detailFocus === 'storageGc' || model.catalog.switchState === 'switching');
+
+    drawComponent(r, c, { color, key: 'catalog' });
+
+    const x = r.x + MODULE_CONTENT_PAD;
+    const topY = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
+    const w = r.w - MODULE_CONTENT_PAD * 2;
+    const topH = 28;
+    const shelfY = topY + topH + 10;
+    const shelfH = 44;
+    const stagingY = shelfY + shelfH + 8;
+    const stagingH = Math.max(18, r.y + r.h - stagingY - MODULE_CONTENT_PAD);
+    drawMetadataBlueprint(x, topY, 86, topH, c, queryActive);
+    drawMetadataStats(x + 96, topY, 76, topH, c, queryActive);
+    drawMetadataSwitch(x + 182, topY, w - 182, topH, c, switchActive);
+
+    drawMetadataShelf(x, shelfY, 202, shelfH, c, queryActive, switchActive);
+    drawMetadataRetiredBin(x + 212, shelfY, w - 212, shelfH, c, switchActive);
+    drawMetadataStaging(x, stagingY, w, stagingH, c, switchActive);
+    drawMetadataCatalogMotion(x, shelfY, 202, stagingY, w, c);
+  }
+
+  function drawMetadataBlueprint(x, y, w, h, c, active) {
+    const color = flow.metadata || flow.visibility;
+    ctx.fillStyle = alpha(color, active ? .18 : .08);
+    ctx.strokeStyle = alpha(color, active ? .56 : .24);
+    ctx.lineWidth = active ? 1.4 : 1;
+    roundRect(x, y, w, h, 7, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText('SCHEMA', x + 8, y + 14, w - 16, 'left');
+    ctx.strokeStyle = alpha(color, active ? .66 : .34);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      const yy = y + 15 + i * 4;
+      ctx.beginPath();
+      ctx.moveTo(x + 8, yy);
+      ctx.lineTo(x + w - 8, yy);
+      ctx.stroke();
+    }
+    for (let i = 1; i < 3; i++) {
+      const xx = x + 8 + i * ((w - 16) / 3);
+      ctx.beginPath();
+      ctx.moveTo(xx, y + 14);
+      ctx.lineTo(xx, y + h - 5);
+      ctx.stroke();
+    }
+  }
+
+  function drawMetadataStats(x, y, w, h, c, active) {
+    const color = flow.query;
+    ctx.fillStyle = alpha(color, active ? .16 : .07);
+    ctx.strokeStyle = alpha(color, active ? .52 : .22);
+    ctx.lineWidth = active ? 1.4 : 1;
+    roundRect(x, y, w, h, 7, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    ctx.fillText('STATS', x + 8, y + 14);
+    const bars = [7, 12, 9, 16];
+    bars.forEach((bh, i) => {
+      ctx.fillStyle = alpha(color, active ? .62 : .38);
+      roundRect(x + 34 + i * 8, y + h - 5 - bh, 5, bh, 2, true, false);
+    });
+  }
+
+  function drawMetadataSwitch(x, y, w, h, c, active) {
+    const color = active ? flow.gc : (flow.metadata || flow.visibility);
+    const switching = model.catalog.switchState === 'switching';
+    const p = stepProgress(true);
+    ctx.fillStyle = alpha(color, active ? .18 : .07);
+    ctx.strokeStyle = alpha(color, active ? .56 : .24);
+    ctx.lineWidth = active ? 1.5 : 1;
+    roundRect(x, y, w, h, 7, true, true);
+    const railX = x + 12;
+    const railY = y + h / 2 + 3;
+    const railW = w - 24;
+    ctx.strokeStyle = alpha(color, .44);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(railX, railY);
+    ctx.lineTo(railX + railW, railY);
+    ctx.stroke();
+    const knobX = switching ? lerp(railX + 6, railX + railW - 6, p) : railX + 8;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(knobX, railY, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    fitText(switching ? 'ATOMIC SWITCH' : 'LOCKED CATALOG', x + 6, y + 14, w - 12, 'center');
+  }
+
+  function drawMetadataShelf(x, y, w, h, c, queryActive, switchActive) {
+    const color = flow.metadata || flow.visibility;
+    ctx.fillStyle = alpha(color, queryActive ? .16 : .07);
+    ctx.strokeStyle = alpha(color, queryActive ? .54 : .24);
+    ctx.lineWidth = queryActive ? 1.5 : 1;
+    roundRect(x, y, w, h, 8, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText('VISIBLE MANIFEST', x + 8, y + 14, w - 16, 'left');
+    const files = model.catalog.visible.slice(0, 3);
+    const gap = 5;
+    const cardW = Math.min(58, (w - 16 - gap * Math.max(files.length - 1, 0)) / Math.max(files.length, 1));
+    const cardY = y + 18;
+    files.forEach((file, i) => {
+      const cardX = x + 8 + i * (cardW + gap);
+      const isNew = file === model.storage.newFile || /file-043/.test(file);
+      drawMetadataFileCard(cardX, cardY, cardW, Math.max(22, h - 24), file, isNew ? flow.storage : color, c, queryActive || (switchActive && isNew));
+    });
+  }
+
+  function drawMetadataFileCard(x, y, w, h, file, color, c, active) {
+    ctx.fillStyle = alpha(color, active ? .24 : .11);
+    ctx.strokeStyle = alpha(color, active ? .62 : .30);
+    ctx.lineWidth = active ? 1.3 : 1;
+    roundRect(x, y, w, h, 4, true, true);
+    ctx.fillStyle = alpha(color, .34);
+    roundRect(x + 4, y + 4, w - 8, 2.5, 2, true, false);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    fitText(shortFileLabel(file), x + 3, y + h - 7, w - 6, 'center');
+  }
+
+  function drawMetadataRetiredBin(x, y, w, h, c, active) {
+    const label = catalogRetiredLabel();
+    const color = label === 'clean' ? flow.replay : flow.delete;
+    ctx.fillStyle = alpha(color, active ? .15 : .06);
+    ctx.strokeStyle = alpha(color, active ? .48 : .22);
+    ctx.lineWidth = active ? 1.4 : 1;
+    roundRect(x, y, w, h, 8, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    fitText('RETIRED', x + 5, y + 14, w - 10, 'center');
+    ctx.fillStyle = label === 'empty' ? c.muted : color;
+    ctx.font = typeFont(TYPE.text, 900);
+    fitText(label, x + 5, y + h - 10, w - 10, 'center');
+  }
+
+  function drawMetadataStaging(x, y, w, h, c, active) {
+    const color = flow.gc;
+    const pending = catalogPendingLabel();
+    const hasPending = pending !== 'empty';
+    ctx.fillStyle = alpha(color, hasPending ? .18 : .05);
+    ctx.strokeStyle = alpha(color, hasPending ? .52 : .18);
+    ctx.lineWidth = hasPending ? 1.4 : 1;
+    roundRect(x, y, w, h, 8, true, true);
+    ctx.fillStyle = hasPending ? color : c.muted;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'left';
+    fitText(`STAGING ${pending}`, x + 8, y + 15, w * .44, 'left');
+
+    const start = { x: x + w * .50, y: y + h / 2 };
+    const gate = { x: x + w * .70, y: y + h / 2 };
+    const end = { x: x + w - 10, y: y + h / 2 };
+    ctx.strokeStyle = alpha(active ? flow.gc : c.border, hasPending ? .62 : .30);
+    ctx.lineWidth = 1.5;
+    drawPolyline([start, gate, end]);
+    arrowHead(gate, end, alpha(active ? flow.gc : c.border, hasPending ? .72 : .36));
+    ctx.fillStyle = active ? flow.gc : c.muted;
+    ctx.font = typeFont(TYPE.text, 900);
+    ctx.textAlign = 'center';
+    fitText(hasPending ? 'publish gate' : 'no pending switch', x + w * .50, y + 15, w * .44, 'center');
+  }
+
+  function drawMetadataCatalogMotion(x, shelfY, shelfW, stagingY, totalW, c) {
+    if (model.catalog.switchState !== 'switching') return;
+    const pending = catalogPendingLabel();
+    if (pending === 'empty') return;
+    const p = stepProgress(true);
+    const start = { x: x + 78, y: stagingY + 8 };
+    const end = { x: x + shelfW - 35, y: shelfY + 23 };
+    ctx.save();
+    ctx.globalAlpha = .88;
+    drawMetadataFileCard(lerp(start.x, end.x, p) - 32, lerp(start.y, end.y, p) - 11, 64, 24, pending, flow.storage, c, true);
+    ctx.restore();
+  }
+
+  function shortFileLabel(file) {
+    const m = /file-(\d+)/.exec(String(file));
+    return m ? m[1] : String(file).replace('.pxl', '').slice(0, 6);
+  }
+
+  function catalogPendingLabel() {
+    if (model.storage.newFile && model.storage.newFile !== 'none') return shortFileLabel(model.storage.newFile);
+    const pending = String(model.catalog.pending || 'none');
+    if (pending === 'none') return 'empty';
+    const matches = pending.match(/file-\d+/g);
+    if (matches && matches.length) return shortFileLabel(matches[matches.length - 1]);
+    if (/await/.test(pending)) return 'waiting';
+    return pending.slice(0, 10);
+  }
+
+  function catalogRetiredLabel() {
+    if (/old file removed|physically deleted/.test(model.storage.cleanup)) return 'clean';
+    const pending = String(model.catalog.pending || '');
+    const matches = pending.match(/file-\d+/g);
+    if (matches && matches.length > 1) return shortFileLabel(matches[0]);
+    if ((state.detailFocus === 'gc' || state.detailFocus === 'storageGc') && model.storage.agingQueue.length) return shortFileLabel(model.storage.agingQueue[0]);
+    return 'empty';
+  }
+
+  function queryLayout(r, splits) {
+    const x = r.x + 18;
+    const w = r.w - 36;
+    const list = splits && splits.length ? splits : [{}, {}, {}];
+    const scheduler = { x, y: r.y + 116, w, h: 80 };
+    const splitH = 94;
+    const splitGap = 20;
+    const gateH = 150;
+    const queueH = 78;
+    const opsH = 88;
+    const bottom = r.y + r.h - 22;
+    const fixedH = scheduler.h + list.length * splitH + Math.max(0, list.length - 1) * splitGap + gateH + queueH + opsH;
+    const spare = Math.max(120, bottom - scheduler.y - fixedH);
+    const schedulerSplitGap = Math.round(spare * .18);
+    const splitGateGap = Math.round(spare * .34);
+    const gateQueueGap = Math.round(spare * .18);
+    const queueOpsGap = spare - schedulerSplitGap - splitGateGap - gateQueueGap;
+    const portGap = list.length > 1 ? Math.min(82, (w - 96) / (list.length - 1)) : 0;
+    const splitY = scheduler.y + scheduler.h + schedulerSplitGap;
+    const splitBoxes = list.map((split, i) => ({
+      x,
+      y: splitY + i * (splitH + splitGap),
+      w,
+      h: splitH,
+      split,
+      portX: x + 48 + i * portGap
+    }));
+    const lastSplit = splitBoxes[splitBoxes.length - 1];
+    const gateBox = { x, y: lastSplit.y + lastSplit.h + splitGateGap, w, h: gateH };
+    const queueBox = { x, y: gateBox.y + gateBox.h + gateQueueGap, w, h: queueH };
+    const opsBox = { x, y: queueBox.y + queueBox.h + queueOpsGap, w, h: opsH };
+    return { x, w, scheduler, splitBoxes, gateBox, queueBox, opsBox };
+  }
+
+  function drawQuery(c) {
+    const r = rects.query;
+    const q = model.query;
+    const splits = q.splits || [];
+    const gate = q.gate || {};
+    const { x, w, scheduler, splitBoxes, gateBox, queueBox, opsBox } = queryLayout(r, splits);
+    drawBoundary(r, c, 'query');
+
+    drawPill(x, r.y + 64, 86, 30, q.id, flow.query, c, q.active, 11);
+    drawPill(x + 96, r.y + 64, w - 96, 30, `transTs=${q.transTs}`, flow.tx, c, q.active, 11);
+
+    splitBoxes.forEach(box => {
+      drawQueryInternalLink([
+        [scheduler.x + scheduler.w / 2, scheduler.y + scheduler.h],
+        [box.portX, scheduler.y + scheduler.h + 12],
+        [box.portX, box.y]
+      ], querySplitColor(box.split.kind), c, .28);
+      drawQueryInternalLink([
+        [box.portX, box.y + box.h],
+        [box.portX, gateBox.y - 12],
+        [gateBox.x + gateBox.w / 2, gateBox.y]
+      ], querySplitColor(box.split.kind), c, .24);
+    });
+    drawQueryInternalLink([[gateBox.x + gateBox.w / 2, gateBox.y + gateBox.h], [queueBox.x + queueBox.w / 2, queueBox.y]], flow.visibility, c, .34);
+    drawQueryInternalLink([[queueBox.x + queueBox.w / 2, queueBox.y + queueBox.h], [opsBox.x + opsBox.w / 2, opsBox.y]], flow.query, c, .34);
+
+    smallBox(scheduler.x, scheduler.y, scheduler.w, scheduler.h, 'Split Scheduler', flow.query, c, state.detailFocus === 'query');
+    drawPill(scheduler.x + 12, scheduler.y + 32, scheduler.w - 24, 28, q.parallelism || 'parallel split execution', flow.query, c, q.active, 10);
+    drawSchedulerGlyph(scheduler.x + scheduler.w - 42, scheduler.y + 21, flow.query, c);
+
+    splitBoxes.forEach((box, i) => drawQuerySplitCard(box, c, i));
+    drawVisibilityGateBox(gateBox, gate, c);
+    drawVisibleQueueBox(queueBox, q, c);
+    drawOperatorPipelineBox(opsBox, q, c);
+  }
+
+  function querySplitColor(kind) {
+    if (kind === 'active') return flow.replay;
+    if (kind === 'flushed') return flow.storage;
+    return flow.query;
+  }
+
+  function drawQueryInternalLink(points, color, c, opacity) {
+    const pts = points.map(arrPoint);
+    ctx.save();
+    ctx.strokeStyle = alpha(color, opacity);
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.setLineDash([5, 6]);
+    drawPolyline(pts);
+    ctx.setLineDash([]);
+    arrowHead(pts[pts.length - 2], pts[pts.length - 1], alpha(color, opacity + .18));
+    ctx.restore();
+  }
+
+  function drawSchedulerGlyph(cx, cy, color, c) {
+    ctx.save();
+    ctx.fillStyle = alpha(color, .20);
+    ctx.strokeStyle = alpha(color, .55);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    for (let i = 0; i < 3; i++) {
+      const y = cy + 18 + i * 6;
+      ctx.strokeStyle = alpha(color, .42);
+      ctx.beginPath(); ctx.moveTo(cx - 18, y); ctx.lineTo(cx + 18, y); ctx.stroke();
+      ctx.fillStyle = i === 1 ? color : alpha(c.text, .55);
+      ctx.beginPath(); ctx.arc(cx - 18 + i * 18, y, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawQuerySplitCard(box, c, index) {
+    const split = box.split;
+    const color = querySplitColor(split.kind);
+    const active = split.status !== 'waiting' || state.detailFocus === 'query' || state.activeChannels.includes('flush');
+    ctx.fillStyle = active ? alpha(color, c.dark ? .16 : .10) : alpha(c.panel2, .80);
+    ctx.strokeStyle = active ? alpha(color, .58) : c.borderSoft;
+    ctx.lineWidth = active ? 1.5 : 1;
+    roundRect(box.x, box.y, box.w, box.h, 9, true, true);
+    drawQuerySplitIcon(split.kind, box.x + 12, box.y + 16, color, c);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.subTitle, 900);
+    ctx.textAlign = 'left';
+    fitText(`${split.id} · ${split.title}`, box.x + 52, box.y + 25, box.w - 122, 'left');
+    ctx.fillStyle = c.muted;
+    ctx.font = typeFont(TYPE.text, 0);
+    fitText(split.source, box.x + 52, box.y + 46, box.w - 122, 'left');
+    drawPill(box.x + box.w - 76, box.y + 14, 64, 26, split.status, color, c, active, 9);
+    drawProgressBar(box.x + 52, box.y + 60, box.w - 122, 8, split.progress || 0, color, c);
+    drawBatchDots(box.x + box.w - 62, box.y + 58, Math.max(split.batches || 0, split.visible || 0), color, c);
+    ctx.fillStyle = alpha(c.muted, .72);
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'center';
+    ctx.fillText(`task ${index + 1}`, box.x + 25, box.y + box.h - 10);
+  }
+
+  function drawQuerySplitIcon(kind, x, y, color, c) {
+    ctx.save();
+    ctx.strokeStyle = alpha(color, .55);
+    ctx.fillStyle = alpha(color, .18);
+    ctx.lineWidth = 1;
+    if (kind === 'regular') {
+      for (let i = 0; i < 3; i++) roundRect(x + i * 5, y + i * 4, 24, 20, 4, true, true);
+      ctx.fillStyle = color;
+      ctx.font = typeFont(TYPE.micro, 800);
+      ctx.textAlign = 'center';
+      ctx.fillText('RG', x + 17, y + 17);
+    } else if (kind === 'active') {
+      roundRect(x, y, 34, 28, 5, true, true);
+      ctx.strokeStyle = alpha(color, .42);
+      for (let i = 1; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x + i * 11, y + 4); ctx.lineTo(x + i * 11, y + 24); ctx.stroke(); }
+      for (let i = 1; i < 2; i++) { ctx.beginPath(); ctx.moveTo(x + 4, y + i * 14); ctx.lineTo(x + 30, y + i * 14); ctx.stroke(); }
+    } else {
+      roundRect(x + 2, y + 4, 30, 22, 6, true, true);
+      ctx.fillStyle = alpha(color, .28);
+      roundRect(x + 7, y, 20, 8, 4, true, false);
+      ctx.fillStyle = color;
+      ctx.font = typeFont(TYPE.micro, 900);
+      ctx.textAlign = 'center';
+      ctx.fillText('OBJ', x + 17, y + 20);
+    }
+    ctx.restore();
+  }
+
+  function drawProgressBar(x, y, w, h, progress, color, c) {
+    const p = clamp(progress, 0, 1);
+    ctx.fillStyle = alpha(c.border, .38);
+    roundRect(x, y, w, h, h / 2, true, false);
+    ctx.fillStyle = alpha(color, .72);
+    roundRect(x, y, Math.max(h, w * p), h, h / 2, true, false);
+  }
+
+  function drawBatchDots(x, y, count, color, c) {
+    const n = Math.max(3, Math.min(5, count || 0));
+    for (let i = 0; i < n; i++) {
+      const filled = i < (count || 0);
+      ctx.fillStyle = filled ? alpha(color, .62) : alpha(c.border, .42);
+      roundRect(x + i * 9, y, 7, 10, 2, true, false);
+    }
+  }
+
+  function drawVisibilityGateBox(box, gate, c) {
+    smallBox(box.x, box.y, box.w, box.h, 'VFoR Visibility Gate', flow.visibility, c, state.detailFocus === 'visibility');
+    const fx = box.x + 18, fy = box.y + 34;
+    ctx.fillStyle = alpha(flow.visibility, c.dark ? .22 : .14);
+    ctx.strokeStyle = alpha(flow.visibility, .58);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx + 60, fy);
+    ctx.lineTo(fx + 42, fy + 36);
+    ctx.lineTo(fx + 42, fy + 50);
+    ctx.lineTo(fx + 18, fy + 50);
+    ctx.lineTo(fx + 18, fy + 36);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    drawBits(gate.bitmap || '0010100110', box.x + 92, box.y + 36, c, flow.visibility);
+    drawPill(box.x + 88, box.y + 62, box.w - 104, 28, gate.rule || 'visibility rule', flow.visibility, c, true, 9);
+    metricRows(box.x + 88, box.y + 91, box.w - 104, [
+      ['input', `${gate.inputBatches || 0} batches`],
+      ['output', `${gate.visibleBatches || 0} visible`]
+    ], c);
+  }
+
+  function drawVisibleQueueBox(box, q, c) {
+    smallBox(box.x, box.y, box.w, box.h, 'Visible Batch Queue', flow.query, c, state.detailFocus === 'query');
+    drawBatchDots(box.x + 14, box.y + 34, q.gate ? q.gate.visibleBatches : 0, flow.query, c);
+    drawPill(box.x + 72, box.y + 33, box.w - 86, 28, q.queueState || 'waiting', flow.query, c, (q.gate && q.gate.visibleBatches > 0), 10);
+  }
+
+  function drawOperatorPipelineBox(box, q, c) {
+    smallBox(box.x, box.y, box.w, box.h, 'Downstream Operators', flow.query, c, state.detailFocus === 'query');
+    const labels = ['Scan', 'Filter', 'Project', 'Agg'];
+    const bw = 62;
+    labels.forEach((label, i) => {
+      const bx = box.x + 12 + i * 68;
+      drawPill(bx, box.y + 34, bw, 28, label, flow.query, c, q.returnedRows > 0 || i === 0, 9);
+    });
+    ctx.fillStyle = c.muted;
+    ctx.font = typeFont(TYPE.text, 0);
+    ctx.textAlign = 'left';
+    fitText(`${q.operatorInput} · rows ${q.returnedRows.toLocaleString()}`, box.x + 12, box.y + 76, box.w - 24, 'left');
+  }
+
+  function drawTokens(c) {
+    const st = currentStep();
+    const p = stepProgress();
+    st.tokens.forEach(t => {
+      if (p < t.start || p > t.end) return;
+      const local = ease((p - t.start) / (t.end - t.start));
+      const pt = pathPoint(t.path.map(point), local);
+      drawToken(pt.x, pt.y, t.label, t.color, c);
+    });
+  }
+
+  function drawToken(x, y, label, color, c) {
+    ctx.save();
+    label = displaySinkText(label);
+    ctx.font = typeFont(TYPE.text, 900);
+    const textW = Math.min(180, Math.max(54, ctx.measureText(label).width + 28));
+    ctx.shadowColor = alpha(color, .22);
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = color;
+    roundRect(x - textW / 2, y - 18, textW, 36, 18, true, false);
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = alpha('#ffffff', .86);
+    ctx.lineWidth = 1;
+    roundRect(x - textW / 2, y - 18, textW, 36, 18, false, true);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    fitText(label, x - textW / 2 + 10, y + 1, textW - 20, 'center');
+    ctx.restore();
+  }
+
+  function displaySinkText(text) {
+    let value = String(text || '');
+    value = value.replace(/\btx\d+\s*\+\s*tx\d+\s*\+\s*tx\d+\b/gi, 'mirror batch');
+    value = value.replace(/\b(\d+)\s+tx\s+rows\b/gi, '$1 rows');
+    value = value.replace(/\b(\d+)\s+mirror tx\b/gi, '$1 mirror transactions');
+    value = value.replace(/\bmirror tx\b/gi, 'mirror transaction');
+    value = value.replace(/\b(txn:)?tx\d+\s*/gi, '');
+    value = value.replace(/\bTXN\b\s*/g, '');
+    value = value.replace(/\s*\+\s*/g, ' + ');
+    value = value.replace(/^\s*\+\s*|\s*\+\s*$/g, '');
+    value = value.replace(/\s{2,}/g, ' ').trim();
+    return value || 'mirror transaction';
+  }
+
+  function drawCommitWait(c) {
+    const st = currentStep();
+    if (st.anim !== 'waitCommit') return;
+    const layout = pixelsSinkLayout(rects.ingress);
+    const commit = layout.byId.commit;
+    const cx = commit.x + commit.w - 28;
+    const cy = commit.y + commit.h - 32;
+    const size = 18;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(streamCycleProgress() * Math.PI * 2);
+    ctx.strokeStyle = flow.gc;
+    ctx.fillStyle = alpha(flow.gc, c.dark ? .18 : .10);
+    ctx.lineWidth = 2;
+    roundRect(-size / 2, -size / 2, size, size, 5, true, true);
+    ctx.beginPath();
+    ctx.moveTo(-6, -6);
+    ctx.lineTo(6, -6);
+    ctx.lineTo(-6, 6);
+    ctx.lineTo(6, 6);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawComponent(r, c, opts) {
+    const highlighted = isHighlighted(opts.key);
+    ctx.save();
+    ctx.fillStyle = highlighted ? alpha(opts.color, c.dark ? .16 : .10) : alpha(c.elevated, .94);
+    ctx.strokeStyle = highlighted ? alpha(opts.color, .62) : c.borderSoft;
+    ctx.lineWidth = highlighted ? 1.8 : 1;
+    if (highlighted) shadow(c);
+    roundRect(r.x, r.y, r.w, r.h, 12, true, true);
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.moduleTitle, 900);
+    ctx.textAlign = 'left';
+    fitText(r.title, r.x + MODULE_TITLE_X, r.y + MODULE_TITLE_Y, r.w - MODULE_TITLE_X * 2, 'left');
+    ctx.restore();
+  }
+
+  function drawGroup(r, c, color, key) {
+    const highlighted = isHighlighted(key);
+    ctx.fillStyle = highlighted ? alpha(color, c.dark ? .12 : .08) : alpha(color, c.dark ? .05 : .035);
+    ctx.strokeStyle = highlighted ? alpha(color, .58) : alpha(color, .24);
+    ctx.lineWidth = highlighted ? 1.7 : 1;
+    roundRect(r.x, r.y, r.w, r.h, 14, true, true);
+  }
+
+  function smallBox(x, y, w, h, title, color, c, active) {
+    ctx.fillStyle = active ? alpha(color, c.dark ? .18 : .11) : alpha(c.panel2, .78);
+    ctx.strokeStyle = active ? alpha(color, .62) : c.borderSoft;
+    ctx.lineWidth = active ? 1.5 : 1;
+    roundRect(x, y, w, h, 9, true, true);
+    ctx.fillStyle = color;
+    ctx.font = typeFont(TYPE.subTitle, 900);
+    ctx.textAlign = 'left';
+    fitText(title, x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
+  }
+
+  function drawMiniStack(x, y, w, rows, c) {
+    rows.forEach((row, i) => {
+      const yy = y + i * 40;
+      ctx.fillStyle = alpha(row[2], c.dark ? .13 : .08);
+      ctx.strokeStyle = alpha(row[2], .28);
+      roundRect(x, yy, w, 32, 8, true, true);
+      ctx.fillStyle = row[2];
+      ctx.font = typeFont(TYPE.subTitle, 900);
+      ctx.textAlign = 'left';
+      ctx.fillText(row[0], x + 10, yy + 17);
+      ctx.fillStyle = c.text;
+      ctx.font = typeFont(TYPE.text, 0);
+      fitText(row[1], x + 10, yy + 32, w - 20, 'left');
+    });
+  }
+
+  function metricRows(x, y, w, rows, c) {
+    rows.forEach((row, i) => {
+      const yy = y + i * 22;
+      ctx.fillStyle = c.muted;
+      ctx.font = typeFont(TYPE.text, 0);
+      ctx.textAlign = 'left';
+      fitText(row[0], x, yy, w * .42, 'left');
+      ctx.fillStyle = c.text;
+      ctx.font = typeFont(TYPE.text, 900);
+      fitText(row[1], x + w * .43, yy, w * .57, 'right');
+    });
+  }
+
+  function drawPill(x, y, w, h, label, color, c, active, fs) {
+    ctx.fillStyle = alpha(color, active ? .22 : .10);
+    ctx.strokeStyle = alpha(color, active ? .60 : .26);
+    roundRect(x, y, w, h, Math.min(10, h / 2), true, true);
+    ctx.fillStyle = active ? color : c.text;
+    const requested = pillTypeSize(fs);
+    const size = Math.max(TYPE.micro, Math.min(requested, h - 6));
+    ctx.font = typeFont(size, 900);
+    ctx.textAlign = 'center';
+    fitText(label, x + 6, y + h / 2 + size * .36, w - 12, 'center');
+  }
+
+  function drawBlockPile(x, y, w, h, count, active, label, color, c) {
+    ctx.fillStyle = alpha(color, active ? .22 : .10);
+    ctx.strokeStyle = alpha(color, active ? .60 : .28);
+    roundRect(x, y, w, h, 6, true, true);
+    for (let i = 0; i < Math.min(count, 3); i++) {
+      ctx.fillStyle = alpha(color, .22 + i * .06);
+      roundRect(x + 7, y + 6 + i * 5, w - 14, 4, 2, true, false);
+    }
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + w / 2, y + h - 8);
+  }
+
+  function immCellW(queueW, n) {
+    return Math.min(72, Math.floor((queueW - 56 - Math.max(0, n - 1) * 5) / Math.max(n, 1)));
+  }
+
+  function drawImmFifoQueue(x, y, w, h, count, active, c) {
+    const color = flow.gc;
+    ctx.fillStyle = alpha(color, active ? .14 : .06);
+    ctx.strokeStyle = alpha(color, active ? .52 : .24);
+    ctx.lineWidth = active ? 1.5 : 1;
+    roundRect(x, y, w, h, 6, true, true);
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.fillText('imm', x + 7, y + 12);
+    ctx.fillStyle = alpha(color, active ? .70 : .42);
+    ctx.textAlign = 'right';
+    ctx.fillText('flush →', x + w - 7, y + 12);
+    if (count === 0) {
+      ctx.fillStyle = c.muted;
+      ctx.font = typeFont(TYPE.text, 0);
+      ctx.textAlign = 'center';
+      ctx.fillText('empty', x + w / 2, y + h / 2 + 4);
+      return;
+    }
+    const maxVisible = 4;
+    const nVisible = Math.min(count, maxVisible);
+    const cw = immCellW(w, nVisible);
+    const cellH = h - 6;
+    const cellY = y + 3;
+    for (let i = 0; i < nVisible; i++) {
+      const bx = x + 28 + i * (cw + 5);
+      const ageAlpha = active ? (.14 + i * .05) : (.07 + i * .025);
+      ctx.fillStyle = alpha(color, ageAlpha);
+      ctx.strokeStyle = alpha(color, active ? (.46 + i * .04) : (.22 + i * .02));
+      ctx.lineWidth = 1;
+      roundRect(bx, cellY, cw, cellH, 4, true, true);
+      const isOverflow = count > maxVisible && i === maxVisible - 1;
+      const label = isOverflow ? `+${count - maxVisible + 1}` : `blk${count - i}`;
+      ctx.fillStyle = c.text;
+      ctx.font = typeFont(TYPE.text, 800);
+      ctx.textAlign = 'center';
+      fitText(label, bx + 2, cellY + cellH / 2 + 4, cw - 4, 'center');
+    }
+  }
+
+  function drawBits(bits, x, y, c, color) {
+    for (let i = 0; i < bits.length; i++) {
+      const on = bits[i] === '1';
+      ctx.fillStyle = on ? alpha(color, .54) : alpha(c.border, .42);
+      roundRect(x + i * 11, y, 9, 14, 3, true, false);
+    }
+  }
+
+  function drawFlow(names, color, c, label, opacity, width) {
+    const pts = names.map(point);
+    ctx.save();
+    ctx.strokeStyle = alpha(color, opacity);
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.setLineDash([9, 9]);
+    drawPolyline(pts);
+    ctx.setLineDash([]);
+    const a = pts[pts.length - 2];
+    const b = pts[pts.length - 1];
+    arrowHead(a, b, alpha(color, Math.min(.78, opacity + .15)));
+    if (label && opacity > .3) {
+      const mid = pathPoint(pts, .52);
+      ctx.fillStyle = alpha(c.text, .66);
+      ctx.font = typeFont(TYPE.text, 0);
+      ctx.textAlign = 'center';
+      ctx.fillText(label, mid.x, mid.y - 8);
+    }
+    ctx.restore();
+  }
+
+  function replayAnchorSet(slot) {
+    const layout = replayerPanelLayout();
+    const { frame, write, visibility } = layout;
+    const activeX = write.x + 16;
+    const activeY = write.y + 54;
+    const blockW = 78;
+    const blockH = Math.max(72, Math.min(98, write.h - 72));
+    const immX = activeX + blockW + 24;
+    const immW = write.x + write.w - 14 - immX;
+    const rowX = visibility.x + 12;
+    const rowY = visibility.y + 46;
+    const rowW = visibility.w - 24;
+    const labelW = Math.floor(rowW * 0.35);
+    const bitmapX = rowX + labelW;
+    const bitmapW = rowW - labelW;
+    const chainY = visibility.y + 92;
+    const offset = (slot - 1) * 18;
+    return {
+      center: [frame.x + frame.w / 2, frame.y + frame.h / 2],
+      in: [frame.x, frame.y + 34 + offset],
+      out: [frame.x + frame.w, frame.y + 34 + offset],
+      left: [frame.x, frame.y + frame.h / 2 + offset],
+      right: [frame.x + frame.w, frame.y + frame.h / 2 + offset],
+      top: [frame.x + frame.w / 2, frame.y],
+      bottom: [frame.x + frame.w / 2, frame.y + frame.h],
+      active: [activeX + blockW / 2, activeY + blockH / 2],
+      immutable: [immX + immW / 2, activeY + blockH / 2],
+      visibility: [visibility.x + visibility.w / 2, visibility.y + visibility.h / 2],
+      deleteArray: [visibility.x + visibility.w / 2, chainY + 38],
+      baseBitmap: [bitmapX + bitmapW / 2, rowY + 7],
+      write: [write.x + write.w / 2, write.y + write.h / 2]
+    };
+  }
+
+  function point(name) {
+    if (Array.isArray(name)) return { x: name[0], y: name[1] };
+    const lane = /^lane([0-2])\.(.+)$/.exec(name);
+    if (lane) {
+      const i = Number(lane[1]);
+      const part = lane[2];
+      const anchors = replayAnchorSet(i);
+      return arrPoint(anchors[part] || anchors.center);
+    }
+    // Anchor selection rule for rect components:
+    // - top/bottom are for vertical neighbors.
+    // - left/right are for horizontal neighbors.
+    // - in/out are aliases for left/right and should only be used on left-to-right flows.
+    // If a component is above another, never connect out -> in; use bottom -> top.
+    const parts = name.split('.');
+    const r = rects[parts[0]];
+    if (!r) return { x: 0, y: 0 };
+    const pos = parts[1] || 'center';
+    if (parts[0] === 'cdcStream') {
+      const railY = r.y + 58;
+      const anchors = {
+        center: [r.x + r.w / 2, r.y + r.h / 2],
+        left: [r.x, railY],
+        right: [r.x + r.w, railY],
+        top: [r.x + r.w / 2, r.y],
+        bottom: [r.x + r.w / 2, r.y + r.h],
+        out: [r.x + r.w / 2, r.y + r.h],
+        row: [r.x + r.w / 2, railY],
+        commit: [r.x + r.w - 42, railY]
+      };
+      return arrPoint(anchors[pos] || anchors.center);
+    }
+    if (parts[0] === 'runtime') {
+      const anchors = replayAnchorSet(1);
+      if (anchors[pos]) return arrPoint(anchors[pos]);
+    }
+    const txWindow = parts[0] === 'tx' ? txWindowLayout(r) : null;
+    const txWindowY = txWindow ? txWindow.y + txWindow.h / 2 : r.y + r.h / 2;
+    const catalogTopY = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
+    const catalogTopH = 28;
+    const catalogShelfY = catalogTopY + catalogTopH + 10;
+    const catalogShelfH = 44;
+    const catalogStagingY = catalogShelfY + catalogShelfH + 8;
+    const catalogStagingH = Math.max(18, r.y + r.h - catalogStagingY - MODULE_CONTENT_PAD);
+    const query = parts[0] === 'query' ? queryLayout(r, model.query ? model.query.splits : []) : null;
+    const pixelsSink = parts[0] === 'ingress' ? pixelsSinkLayout(r) : null;
+    const storageLayout = parts[0] === 'storage' ? storagePanelsLayout(r) : null;
+    const fallbackStorageY = r.y + 90 + Math.max(42, (r.h - 72) - 52) / 2;
+    const storageMemtableCenter = storageLayout
+      ? [storageLayout.memtable.x + storageLayout.memtable.w / 2, storageLayout.memtable.y + storageLayout.memtable.h / 2]
+      : [r.x + r.w * .20, fallbackStorageY];
+    const storageFilesCenter = storageLayout
+      ? [storageLayout.files.x + storageLayout.files.w / 2, storageLayout.files.y + storageLayout.files.h / 2]
+      : [r.x + r.w * .58, fallbackStorageY];
+    const storageAgingCenter = storageLayout
+      ? [storageLayout.files.x + storageLayout.files.w * .35, storageLayout.files.y + storageLayout.files.h / 2]
+      : [r.x + r.w * .55, fallbackStorageY];
+    const storageNewFileCenter = storageLayout
+      ? [storageLayout.files.x + storageLayout.files.w * .78, storageLayout.files.y + storageLayout.files.h / 2]
+      : [r.x + r.w * .86, fallbackStorageY];
+    const querySplit = i => query && query.splitBoxes[i]
+      ? [query.splitBoxes[i].x + query.splitBoxes[i].w / 2, query.splitBoxes[i].y + query.splitBoxes[i].h / 2]
+      : [r.x + r.w / 2, r.y + r.h / 2];
+    const sinkStepPoint = (id, side = 'center') => {
+      const box = pixelsSink && pixelsSink.byId[id];
+      if (!box) return [r.x + r.w / 2, r.y + r.h / 2];
+      if (side === 'left') return [box.x, box.y + box.h / 2];
+      if (side === 'right') return [box.x + box.w, box.y + box.h / 2];
+      if (side === 'top') return [box.x + box.w / 2, box.y];
+      if (side === 'bottom') return [box.x + box.w / 2, box.y + box.h];
+      return [box.x + box.w / 2, box.y + box.h / 2];
+    };
+    const sinkBorderStepPoint = (id, side = 'right') => {
+      const box = pixelsSink && pixelsSink.byId[id];
+      const y = box ? box.y + box.h / 2 : r.y + r.h / 2;
+      if (side === 'left') return [r.x, y];
+      return [r.x + r.w, y];
+    };
+
+    const custom = {
+      center: [r.x + r.w / 2, r.y + r.h / 2],
+      left: [r.x, r.y + r.h / 2],
+      right: [r.x + r.w, r.y + r.h / 2],
+      top: [r.x + r.w / 2, r.y],
+      bottom: [r.x + r.w / 2, r.y + r.h],
+      read: sinkStepPoint('read'),
+      readLeft: sinkStepPoint('read', 'left'),
+      readRight: sinkStepPoint('read', 'right'),
+      build: sinkStepPoint('build'),
+      buildLeft: sinkStepPoint('build', 'left'),
+      buildRight: sinkStepPoint('build', 'right'),
+      begin: sinkStepPoint('begin'),
+      beginLeft: sinkStepPoint('begin', 'left'),
+      beginRight: sinkBorderStepPoint('begin', 'right'),
+      replay: sinkStepPoint('replay'),
+      replayLeft: sinkStepPoint('replay', 'left'),
+      replayRight: sinkBorderStepPoint('replay', 'right'),
+      commit: sinkStepPoint('commit'),
+      commitLeft: sinkStepPoint('commit', 'left'),
+      commitRight: sinkBorderStepPoint('commit', 'right'),
+      insertRight: sinkBorderStepPoint('insert', 'right'),
+      deleteRight: sinkBorderStepPoint('delete', 'right'),
+      updateRight: sinkBorderStepPoint('update', 'right'),
+      sources: query ? [query.scheduler.x + query.scheduler.w / 2, query.scheduler.y + query.scheduler.h / 2] : [r.x + r.w / 2, r.y + 158],
+      scheduler: query ? [query.scheduler.x + query.scheduler.w / 2, query.scheduler.y + query.scheduler.h / 2] : [r.x + r.w / 2, r.y + 158],
+      splitRegular: querySplit(0),
+      splitActive: querySplit(1),
+      splitFlushed: querySplit(2),
+      filter: query ? [query.gateBox.x + query.gateBox.w / 2, query.gateBox.y + query.gateBox.h / 2] : [r.x + r.w / 2, r.y + 617],
+      gate: query ? [query.gateBox.x + query.gateBox.w / 2, query.gateBox.y + query.gateBox.h / 2] : [r.x + r.w / 2, r.y + 617],
+      queue: query ? [query.queueBox.x + query.queueBox.w / 2, query.queueBox.y + query.queueBox.h / 2] : [r.x + r.w / 2, r.y + 745],
+      operators: query ? [query.opsBox.x + query.opsBox.w / 2, query.opsBox.y + query.opsBox.h / 2] : [r.x + r.w / 2, r.y + 841],
+      recordIn: [r.x, r.y + 80],
+      cacheIn: [r.x + 10, r.y + 118],
+      cacheOut: [r.x + 10, r.y + 150],
+      toSinkLeft: [r.x + r.w * .38, r.y + r.h],
+      toSinkRight: [r.x + r.w * .62, r.y + r.h],
+      fromCdcLeft: [r.x + r.w * .38, r.y],
+      fromCdcRight: [r.x + r.w * .62, r.y],
+      in: [r.x, r.y + r.h / 2],
+      out: [r.x + r.w, r.y + r.h / 2],
+      tx: [r.x + r.w, r.y + 74],
+      commit: [r.x + r.w - 48, r.y + r.h - 18],
+      lwm: [r.x + 72, txWindowY],
+      hwm: [r.x + r.w - 72, txWindowY],
+      window: [r.x + r.w / 2, txWindowY],
+      blocks: storageMemtableCenter,
+      objects: storageMemtableCenter,
+      memtable: storageMemtableCenter,
+      files: storageFilesCenter,
+      aging: storageAgingCenter,
+      newFile: storageNewFileCenter,
+      catalog: [r.x + r.w * .40, r.y + r.h],
+      storage: [r.x + r.w * .76, r.y + r.h],
+      schema: [r.x + 60, catalogTopY + catalogTopH / 2],
+      manifest: [r.x + 112, catalogShelfY + catalogShelfH / 2],
+      staging: [r.x + 96, catalogStagingY + catalogStagingH / 2],
+      switch: [r.x + r.w - 74, catalogTopY + catalogTopH / 2],
+      retired: [r.x + r.w - 54, catalogShelfY + catalogShelfH / 2]
+    };
+    return arrPoint(custom[pos] || custom.center);
+  }
+
+  function arrPoint(a) { return { x: a[0], y: a[1] }; }
+
+  function pathPoint(points, t) {
+    if (points.length === 1) return points[0];
+    const lengths = [];
+    let total = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const d = dist(points[i], points[i + 1]);
+      lengths.push(d);
+      total += d;
+    }
+    let target = clamp(t, 0, 1) * total;
+    for (let i = 0; i < lengths.length; i++) {
+      if (target <= lengths[i]) {
+        const a = points[i], b = points[i + 1], k = lengths[i] ? target / lengths[i] : 0;
+        return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k) };
+      }
+      target -= lengths[i];
+    }
+    return points[points.length - 1];
+  }
+
+  function drawPolyline(points) {
+    if (!points.length) return;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.stroke();
+  }
+
+  function arrowHead(a, b, color) {
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    const r = 8;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - r * Math.cos(ang - .55), b.y - r * Math.sin(ang - .55));
+    ctx.lineTo(b.x - r * Math.cos(ang + .55), b.y - r * Math.sin(ang + .55));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function isHighlighted(key) { return currentStep().highlights.includes(key); }
+
+  function wrapText(text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' ');
+    let line = '';
+    let yy = y;
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        ctx.fillText(line, x, yy);
+        line = word;
+        yy += lineHeight;
+      } else {
+        line = test;
+      }
+    }
+    if (line) ctx.fillText(line, x, yy);
+  }
+
+  function fitText(text, x, y, maxWidth, align) {
+    if (!Number.isFinite(maxWidth) || maxWidth <= 0) return;
+    let str = String(text);
+    const originalFont = ctx.font;
+    if (ctx.measureText(str).width > maxWidth) str = ellipsizeText(str, maxWidth);
+    if (align === 'center') {
+      ctx.textAlign = 'center';
+      ctx.fillText(str, x + maxWidth / 2, y);
+    } else if (align === 'right') {
+      ctx.textAlign = 'right';
+      ctx.fillText(str, x + maxWidth, y);
+    } else {
+      ctx.textAlign = 'left';
+      ctx.fillText(str, x, y);
+    }
+    ctx.font = originalFont;
+  }
+
+  function ellipsizeText(str, maxWidth) {
+    const suffix = '...';
+    if (ctx.measureText(suffix).width > maxWidth) return '';
+    let lo = 0;
+    let hi = str.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (ctx.measureText(str.slice(0, mid) + suffix).width <= maxWidth) lo = mid;
+      else hi = mid - 1;
+    }
+    return str.slice(0, lo) + suffix;
+  }
+
+  function shadow(c) {
+    ctx.shadowColor = c.shadow;
+    ctx.shadowBlur = c.dark ? 14 : 12;
+    ctx.shadowOffsetY = 6;
+  }
+
+  function roundRect(x, y, w, h, r, fill, stroke) {
+    const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  function alpha(hex, a) {
+    const clean = hex.replace('#', '').trim();
+    const full = clean.length === 3 ? clean.split('').map(ch => ch + ch).join('') : clean;
+    const n = parseInt(full, 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function ease(t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function dist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
+  function map(v, a0, a1, b0, b1) { return b0 + (v - a0) / (a1 - a0) * (b1 - b0); }
+
+  function loop(now) {
+    const dt = Math.min(.05, (now - state.last) / 1000);
+    state.last = now;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', scheduleResize);
+  window.addEventListener('load', scheduleResize);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scheduleResize);
+  }
+  scheduleResize();
+  gotoScene('cdc');
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
