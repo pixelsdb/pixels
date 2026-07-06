@@ -13,8 +13,8 @@
       --surface-subtle: #f7f9fc;
       --text: #122033;
       --muted: #667386;
-      --border: #cbd5e1;
-      --border-soft: #dde5ee;
+      --border: #b8c4d3;
+      --border-soft: #c7d2df;
       --primary: #315fcb;
        --primary-hover: #254ead;
       --primary-soft: #eaf0ff;
@@ -586,8 +586,8 @@
   };
 
   const TYPE = {
-    moduleTitle: 16,
-    subTitle: 14,
+    moduleTitle: 18,
+    subTitle: 16,
     text: 12
   };
   const MODULE_TITLE_X = 16;
@@ -628,14 +628,15 @@
   const TOP_RUNTIME_GAP = 14;
   const RUNTIME_Y = SERVICE_Y + SERVICE_H + TOP_RUNTIME_GAP;
   const RUNTIME_H = MIDDLE_BOTTOM - RUNTIME_Y;
+  const RETINA_REPLAYER_H = 500;
   const LEFT_PANEL_X = 44;
   const LEFT_PANEL_W = 390;
   const SERVICE_X = LEFT_PANEL_X + LEFT_PANEL_W + 10;
   const SERVICE_RIGHT = 1424;
   const SERVICE_GAP = 18;
   const RUNTIME_STORAGE_GAP = 18;
-  const RUNTIME_W = Math.round((SERVICE_RIGHT - SERVICE_X - RUNTIME_STORAGE_GAP) * .50);
-  const STORAGE_X = SERVICE_X + RUNTIME_W + RUNTIME_STORAGE_GAP;
+  const RETINA_REPLAYER_W = 450;
+  const STORAGE_X = SERVICE_X + RETINA_REPLAYER_W + RUNTIME_STORAGE_GAP;
   const STORAGE_W = SERVICE_RIGHT - STORAGE_X;
   const TOP_SERVICE_W = Math.round((SERVICE_RIGHT - SERVICE_X - SERVICE_GAP * 2) / 3);
   const INDEX_W = SERVICE_RIGHT - (SERVICE_X + (TOP_SERVICE_W + SERVICE_GAP) * 2);
@@ -661,7 +662,7 @@
     tx: { x: SERVICE_X, y: SERVICE_Y, w: TOP_SERVICE_W, h: TX_SERVICE_H, title: 'Transaction Service', sub: 'MVCC time boundary: HWM / LWM' },
     catalog: { x: SERVICE_X + TOP_SERVICE_W + SERVICE_GAP, y: SERVICE_Y, w: TOP_SERVICE_W, h: SERVICE_H, title: 'Metadata Service', sub: 'schema, stats, visible file list' },
     index: { x: SERVICE_X + (TOP_SERVICE_W + SERVICE_GAP) * 2, y: SERVICE_Y, w: INDEX_W, h: SERVICE_H, title: 'Index Service', sub: 'primaryKey→rowId + rowId→RowLocation' },
-    runtime: { x: SERVICE_X, y: RUNTIME_Y, w: RUNTIME_W, h: RUNTIME_H, title: 'Retina replayer', sub: 'RetinaWorkerService RPC + write / visibility state' },
+    runtime: { x: SERVICE_X, y: RUNTIME_Y, w: RETINA_REPLAYER_W, h: RETINA_REPLAYER_H, title: 'Retina replayer', sub: 'RetinaWorkerService RPC + write / visibility state' },
     storage: { x: STORAGE_X, y: RUNTIME_Y, w: STORAGE_W, h: RUNTIME_H, title: 'Storage', sub: 'flushed immutable memtable + regular columnar files' },
 
     query: { x: 1450, y: MIDDLE_TOP, w: 316, h: MIDDLE_H, title: 'Query Engine', sub: 'parallel splits → VFoR gate → visible batches' }
@@ -728,9 +729,9 @@
         txState: 'Transaction Service ready'
       },
       lanes: [
-        laneModel(0, 'I:pk160', 5, 2, ['(2,1276)'], 1266),
-        laneModel(1, 'U:pk132', 7, 3, ['(5,1278)', '(7,1282)'], 1264),
-        laneModel(2, 'D:pk208', 4, 2, ['(1,1279)'], 1267)
+        laneModel(0, 'I:pk160', 5, 0, ['(2,1276)'], 1266),
+        laneModel(1, 'U:pk132', 7, 0, ['(5,1278)', '(7,1282)'], 1264),
+        laneModel(2, 'D:pk208', 4, 0, ['(1,1279)'], 1267)
       ],
       index: {
         hot: 'pk132',
@@ -741,6 +742,8 @@
       storage: {
         regularFiles: ['file-041.pxl', 'file-042.pxl'],
         objectEntries: ['obj-77'],
+        pendingFlushObject: null,
+        flushedHot: null,
         staleRatio: 0.31,
         agingQueue: [],
         newFile: 'none',
@@ -929,16 +932,16 @@
         ['ingress', 'tx'], [tok('begin tx8421', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=1290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
         m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=1290'; }, 'mvcc', ['tx']),
       step('Pixels Sink creates the INSERT row in the mirror transaction and sends its replay RPC.', 3.8,
-        ['ingress', 'runtime'], [tok('INSERT', 'ingress.insertRight', 'runtime.left', flow.replay, .18, .86)],
+        ['ingress', 'runtime'], [tok('INSERT', 'ingress.right', 'runtime.left', flow.replay, .18, .86)],
         m => { m.sink.sinkStep = 'row1'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay INSERT'; m.sink.rpcBatch = 'INSERT pending'; m.lanes[0].currentOp = 'I:row'; }, 'dispatch', ['dispatch']),
       step('Pixels Sink creates the DELETE row next and sends its replay RPC after INSERT.', 3.8,
-        ['ingress', 'runtime'], [tok('DELETE', 'ingress.deleteRight', 'runtime.left', flow.delete, .18, .86)],
+        ['ingress', 'runtime'], [tok('DELETE', 'ingress.right', 'runtime.left', flow.delete, .18, .86)],
         m => { m.sink.sinkStep = 'row2'; m.sink.requestState = 'replay DELETE'; m.sink.rpcBatch = 'DELETE pending'; m.lanes[1].currentOp = 'D:row'; }, 'dispatch', ['dispatch']),
       step('Pixels Sink creates the UPDATE row last and sends its replay RPC.', 3.8,
-        ['ingress', 'runtime'], [tok('UPDATE', 'ingress.updateRight', 'runtime.left', flow.index, .18, .86)],
+        ['ingress', 'runtime'], [tok('UPDATE', 'ingress.right', 'runtime.left', flow.index, .18, .86)],
         m => { m.sink.sinkStep = 'row3'; m.sink.requestState = 'replay UPDATE'; m.sink.rpcBatch = 'UPDATE pending'; m.lanes[2].currentOp = 'U:row'; }, 'dispatch', ['dispatch']),
       step('After every replay RPC returns OK, Pixels Sink can finish the mirror transaction.', 3.6,
-        ['ingress', 'runtime'], [tok('all replay OK', 'runtime.left', 'ingress.replayRight', flow.replay, .16, .84)],
+        ['ingress', 'runtime'], [tok('all replay OK', 'runtime.left', 'ingress.right', flow.replay, .16, .84)],
         m => { m.sink.sinkStep = 'rowsOk'; m.sink.requestState = 'all replay OK'; m.sink.rpcBatch = 'all replay OK'; }, 'mvcc', []),
       step('Pixels Sink commits tx8421 and Transaction Service advances HWM internally.', 4.2,
         ['ingress', 'tx'], [tok('commit tx8421', 'ingress.commitRight', 'tx.left', flow.tx, .18, .58)],
@@ -949,53 +952,65 @@
         ['cdcStream', 'ingress'], [tok('tx43 rows', 'cdcStream.out', 'ingress.top', flow.cdc, .08, .78)],
         m => { m.sink.sinkStep = 'replay'; m.sink.coordState = 'tx43 mirror tx'; m.sink.requestState = 'replay rows'; m.sink.routingRule = 'inspect row image'; }, 'cdc', ['cdc']),
       step('Insert rows use the after-image primary key, so the new tuple can be staged for replay.', 4.0,
-        ['ingress', 'lane0'], [tok('I:pk160', 'ingress.replayRight', 'lane0.in', flow.replay, .12, .82)],
+        ['ingress', 'lane0'], [tok('I:pk160', 'ingress.right', 'runtime.left', flow.replay, .12, .82)],
         m => { m.sink.routingRule = 'insert: after key'; m.sink.writePlan = 'pk160 queued'; m.lanes[0].currentOp = 'I:pk160'; m.lanes[0].status = 'after key staged'; }, 'dispatch', ['dispatch']),
       step('Delete rows use the before-image primary key because the current tuple location must be resolved from the old key.', 4.0,
-        ['ingress', 'lane1', 'index'], [tok('D:pk208', 'ingress.replayRight', 'lane1.in', flow.delete, .08, .58), tok('old key lookup', 'lane1.in', 'index.in', flow.index, .52, .92)],
+        ['ingress', 'lane1', 'index'], [tok('D:pk208', 'ingress.right', 'runtime.left', flow.delete, .08, .58), tok('old key lookup', 'lane1.in', 'index.in', flow.index, .52, .92)],
         m => { m.sink.routingRule = 'delete: before key'; m.sink.writePlan = 'pk208 queued'; m.lanes[1].currentOp = 'D:pk208'; m.index.hot = 'pk208'; m.index.operation = 'resolve before key'; }, 'dispatch', ['dispatch', 'index']),
       step('If an update changes its primary key, Pixels Sink preserves the delete-old then insert-new order before replay.', 4.4,
-        ['ingress', 'lane1', 'lane2'], [tok('delete old pk132', 'ingress.replayRight', 'lane1.in', flow.delete, .08, .58), tok('insert new pk733', 'ingress.replayRight', 'lane2.in', flow.replay, .40, .92)],
+        ['ingress', 'lane1', 'lane2'], [tok('delete old pk132', 'ingress.right', 'runtime.left', flow.delete, .08, .58), tok('insert new pk733', 'ingress.right', 'runtime.left', flow.replay, .40, .92)],
         m => { m.sink.routingRule = 'pk update: split'; m.sink.writePlan = 'delete old before insert new'; m.sink.rpcBatch = 'tx43 rows staged'; m.lanes[1].currentOp = 'D:pk132'; m.lanes[2].currentOp = 'I:pk733'; }, 'dispatch', ['dispatch']),
       step('Pixels Sink begins mirror transactions with Transaction Service, then sends replay RPCs to Retina replayers.', 4.6,
-        ['ingress', 'tx', 'runtime'], [tok('tx43 ts1291', 'tx.left', 'ingress.beginRight', flow.tx, .04, .34), tok('tx44 ts1292', 'tx.left', 'ingress.beginRight', flow.tx, .16, .46), tok('tx45 ts1293', 'tx.left', 'ingress.beginRight', flow.tx, .28, .58), tok('replay RPCs', 'ingress.replayRight', 'runtime.left', flow.replay, .58, .96)],
+        ['ingress', 'tx', 'runtime'], [tok('tx43 ts1291', 'tx.left', 'ingress.beginRight', flow.tx, .04, .34), tok('tx44 ts1292', 'tx.left', 'ingress.beginRight', flow.tx, .16, .46), tok('tx45 ts1293', 'tx.left', 'ingress.beginRight', flow.tx, .28, .58), tok('replay RPCs', 'ingress.right', 'runtime.left', flow.replay, .58, .96)],
         m => { m.sink.sinkStep = 'replay'; m.sink.requestMode = 'replay RPC'; m.sink.requestState = '3 mirror tx'; m.sink.rpcBatch = 'tx43 + tx44 + tx45'; m.sink.txState = 'timestamps assigned'; }, 'mvcc', ['tx']),
       step('Inside Retina, the same RPC applies rows from different transactions while preserving their visibility timestamps.', 4.2,
-        ['ingress', 'lane0', 'lane1', 'lane2'], [tok('tx43 row', 'ingress.replayRight', 'lane0.in', flow.replay, .08, .58), tok('tx44 row', 'ingress.replayRight', 'lane1.in', flow.delete, .22, .74), tok('tx45 row', 'ingress.replayRight', 'lane2.in', flow.replay, .36, .90)],
+        ['ingress', 'lane0', 'lane1', 'lane2'], [tok('tx43 row', 'ingress.right', 'runtime.left', flow.replay, .08, .58), tok('tx44 row', 'ingress.right', 'runtime.left', flow.delete, .22, .74), tok('tx45 row', 'ingress.right', 'runtime.left', flow.replay, .36, .90)],
         m => { m.sink.requestState = 'apply one RPC'; m.sink.rpcBatch = '3 tx rows'; m.lanes[0].currentOp = 'tx43 I:pk160'; m.lanes[1].currentOp = 'tx44 D:pk208'; m.lanes[2].currentOp = 'tx45 I:pk733'; }, 'dispatch', ['dispatch'])
     ],
     insert: [
       ...singleOpCdcPrelude('insert', 'tx1290'),
-      step('Pixels Sink assembles tx1290 as a mirror transaction with INSERT row changes.', 3.8,
-        ['ingress'], [],
-        m => { m.sink.sinkStep = 'build'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'mirror tx ready'; }, 'cdc', ['cdc']),
-      step('Transaction Service assigns timestamp=1290; Pixels Sink sends the INSERT row changes as replay RPCs.', 3.8,
-        ['ingress', 'tx', 'runtime'], [tok('ts=1290', 'tx.left', 'ingress.beginRight', flow.tx, .12, .58), tok('INSERT replay', 'ingress.replayRight', 'runtime.left', flow.replay, .50, .96)],
-        m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay RPC ready'; m.sink.txState = 'timestamp=1290'; }, 'mvcc', ['tx']),
-      step('Retina replayer processes INSERT row changes against write and visibility state.', 4.0,
-        ['ingress', 'lane0', 'lane1', 'lane2'],
-        [tok('pk160', 'ingress.replayRight', 'lane0.in', flow.replay, .08, .86), tok('pk174', 'ingress.replayRight', 'lane1.in', flow.replay, .14, .92), tok('pk181', 'ingress.replayRight', 'lane2.in', flow.replay, .20, .98)],
-        m => { m.lanes.forEach((l, i) => { l.currentOp = `I:pk${160 + i * 14}`; l.status = 'replay row'; }); }, 'dispatch', ['dispatch']),
-      step('Retina appends the after image to its write buffer. Index Service records key -> rowId and rowId -> RowLocation for the new version.', 4.3,
-        ['lane1', 'index'],
-        [tok('after image', 'lane1.in', 'lane1.active', flow.replay, .05, .55), tok('pk174 -> rowId7807', 'lane1.active', 'index.in', flow.index, .45, .95)],
-        m => { const l = m.lanes[1]; l.activeRows = 8; l.highlight = 'active'; m.index.primaryEntries.unshift('pk174 -> rowId7807'); m.index.mainEntries.unshift('rowId7807 -> fileId78/rg0/off7'); m.index.hot = 'pk174'; m.index.operation = 'putMainIndexEntries + putPrimaryIndexEntries'; }, 'writeBuffer', ['index']),
-      step('When the active memtable fills, it seals into an immutable memtable. Replay continues with a fresh active memtable instead of blocking on storage.', 3.9,
-        ['lane1'], [tok('seal memtable', 'lane1.active', 'lane1.immutable', flow.storage, .10, .82)],
-        m => { const l = m.lanes[1]; l.activeRows = 1; l.immutable += 1; l.highlight = 'immutable'; }, 'writeBuffer', ['flush'], 'seal'),
-      step('A flush process writes the immutable memtable to Storage; the resulting object entry is the flushed immutable memtable representation.', 4.5,
-        ['lane1', 'storage', 'index'],
-        [tok('flushed memtable', 'lane1.immutable', 'storage.memtable', flow.storage, .06, .68), tok('object entry metadata', 'storage.memtable', 'index.in', flow.index, .50, .96)],
-        m => { m.storage.objectEntries.unshift('obj-78'); m.lanes[1].highlight = 'immutable'; m.lanes[1].immutable = Math.max(0, m.lanes[1].immutable - 1); }, 'writeBuffer', ['flush', 'index'], 'flush'),
-      ...commitSequence('tx1290', 1291, 'tx1290 committed; HWM=1291')
+      step('Pixels Sink begins mirror transaction tx1290 and Transaction Service assigns timestamp=1290.', 4.0,
+        ['ingress', 'tx'], [tok('begin tx1290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=1290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=1290'; }, 'mvcc', ['tx']),
+      step('Pixels Sink sends the INSERT row changes after the mirror transaction has a timestamp.', 3.6,
+        ['ingress'], [tok('INSERT', 'ingress.right', 'runtime.left', flow.replay, .18, .86)],
+        m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay RPC ready'; m.sink.txState = 'timestamp=1290'; }, 'dispatch', []),
+      step('Retina applies the INSERT to the write buffer first: the active memtable grows by one row.', 4.0,
+        ['lane1'],
+        [],
+        m => { const l = m.lanes[1]; l.currentOp = 'I:pk174'; l.status = 'append after image'; l.activeRows = 8; l.highlight = 'active'; m.sink.rpcBatch = 'INSERT applying'; }, 'writeBuffer', []),
+      step('The active memtable reaches capacity, so Retina seals it into the immutable queue and opens a fresh empty active memtable.', 3.9,
+        ['lane1'], [],
+        m => { const l = m.lanes[1]; l.activeRows = 0; l.immutable += 1; l.highlight = 'immutable'; }, 'writeBuffer', [], 'seal'),
+      step('The sealed memtable now sits in the immutable queue while the active memtable is empty again.', 1.2,
+        ['lane1'], [],
+        m => { const l = m.lanes[1]; l.highlight = 'immutable'; }, 'writeBuffer', []),
+      step('A background flush asynchronously moves the immutable memtable to Storage.', 3.8,
+        ['lane1'], [],
+        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; }, 'writeBuffer', [], 'flush'),
+      step('After the row is appended, Retina calls Index Service to insert the primary and row-location indexes.', 4.2,
+        ['index'], [tok('put index pk174', 'runtime.right', 'index.left', flow.index, .12, .82)],
+        m => { const l = m.lanes[1]; l.highlight = null; if (m.storage.pendingFlushObject && !m.storage.objectEntries.includes(m.storage.pendingFlushObject)) m.storage.objectEntries.unshift(m.storage.pendingFlushObject); m.storage.pendingFlushObject = null; m.index.primaryEntries.unshift('pk174 -> rowId7807'); m.index.mainEntries.unshift('rowId7807 -> fileId78/rg0/off7'); m.index.hot = 'pk174'; m.index.operation = 'putMainIndexEntries + putPrimaryIndexEntries'; }, 'index', ['index']),
+      step('Index Service finishes the insert index update and returns to Retina.', 3.2,
+        ['index'], [tok('index OK', 'index.left', 'runtime.right', flow.index, .18, .82)],
+        m => { m.index.operation = 'index insert OK'; m.sink.rpcBatch = 'INSERT replay OK'; }, 'index', ['index']),
+      step('Retina returns replay OK to Pixels Sink; the INSERT operation is complete for this mirror transaction.', 3.4,
+        ['ingress'], [tok('replay OK', 'runtime.left', 'ingress.right', flow.replay, .12, .82)],
+        m => { m.sink.sinkStep = 'rowsOk'; m.sink.requestState = 'INSERT replay OK'; m.sink.rpcBatch = 'INSERT replay OK'; }, 'mvcc', []),
+      step(`Pixels Sink asks Transaction Service to commit tx1290.`, 3.2,
+        ['ingress', 'tx'], [tok(`commit tx1290`, 'ingress.commitRight', 'tx.left', flow.tx, .12, .82)],
+        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'commit requested'; m.sink.txState = `tx1290 commit in flight`; }, 'mvcc', ['tx']),
+      step(`Transaction Service advances HWM internally for later snapshots.`, 2.8,
+        ['tx'], [],
+        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'HWM advanced'; m.sink.txState = 'tx1290 committed; HWM=1291'; m.tx.hwm = 1291; }, 'mvcc', ['tx'])
     ],
     delete: [
       ...singleOpCdcPrelude('delete', 'tx1291'),
       step('Delete replay starts after Pixels Sink begins mirror transaction tx1291 with timestamp=1291.', 3.7,
-        ['ingress', 'tx', 'lane1'], [tok('timestamp=1291', 'tx.left', 'ingress.beginRight', flow.tx, .10, .52), tok('DELETE replay', 'ingress.replayRight', 'lane1.in', flow.delete, .50, .96)],
+        ['ingress', 'tx', 'lane1'], [tok('timestamp=1291', 'tx.left', 'ingress.beginRight', flow.tx, .10, .52), tok('DELETE', 'ingress.right', 'runtime.left', flow.delete, .50, .96)],
         m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=1291'; }, 'mvcc', ['cdc', 'tx']),
       step('Retina receives D:pk208 and calls Index Service deletePrimaryIndexEntries to remove the primary entry and return the current RowLocation.', 4.0,
-        ['ingress', 'lane1', 'index'], [tok('D:pk208', 'ingress.replayRight', 'lane1.in', flow.delete, .05, .48), tok('deletePrimary pk208', 'lane1.in', 'index.in', flow.index, .42, .88)],
+        ['ingress', 'lane1', 'index'], [tok('D:pk208', 'ingress.right', 'runtime.left', flow.delete, .05, .48), tok('deletePrimary pk208', 'lane1.in', 'index.in', flow.index, .42, .88)],
         m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'D:pk208'; l.status = 'delete primary entry'; m.index.hot = 'pk208'; m.index.operation = 'deletePrimaryIndexEntries pk208'; }, 'index', ['index']),
       step('Index Service returns RowLocation(fileId, rgId, rowOffset). The old tuple stays in place until visibility says otherwise.', 3.7,
         ['index', 'lane1'], [tok('file-042 rg0 off7', 'index.out', 'lane1.visibility', flow.index, .08, .80)],
@@ -1008,7 +1023,7 @@
     update: [
       ...singleOpCdcPrelude('update', 'tx1292'),
       step('Update replay arrives after Pixels Sink begins mirror transaction tx1292 with timestamp=1292.', 3.8,
-        ['ingress', 'tx', 'lane1'], [tok('timestamp=1292', 'tx.left', 'ingress.beginRight', flow.tx, .10, .52), tok('UPDATE replay', 'ingress.replayRight', 'lane1.in', flow.index, .50, .96)],
+        ['ingress', 'tx', 'lane1'], [tok('timestamp=1292', 'tx.left', 'ingress.beginRight', flow.tx, .10, .52), tok('UPDATE', 'ingress.right', 'runtime.left', flow.index, .50, .96)],
         m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=1292'; }, 'mvcc', ['tx']),
       step('Retina first inserts the after image into the write buffer and allocates a new rowId plus RowLocation for the new tuple version.', 4.2,
         ['lane1', 'index'], [tok('after image', 'lane1.in', 'lane1.active', flow.index, .06, .52), tok('new RowLocation', 'lane1.active', 'index.in', flow.index, .48, .94)],
@@ -1052,7 +1067,7 @@
         ['lane1', 'runtime'], [tok('fold delete items', 'lane1.deleteArray', 'lane1.baseBitmap', flow.gc, .08, .78)],
         m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(9,1291)']; l.baseBitmap = '0010100000000000'; l.baseTs = DEFAULT_GC_SAFE_TS; l.highlight = 'baseBitmap'; }, 'gc', ['visibility']),
       step('After bitmap folding, foreground replay can continue while Retina prepares Storage GC file groups; no running query is holding the GC safe timestamp back.', 4.0,
-        ['lane1', 'lane2', 'runtime'], [tok('folded bitmap', 'lane1.baseBitmap', 'storage.aging', flow.gc, .05, .50), tok('replay continues', 'ingress.replayRight', 'lane2.in', flow.replay, .34, .82)],
+        ['lane1', 'lane2', 'runtime'], [tok('folded bitmap', 'lane1.baseBitmap', 'storage.aging', flow.gc, .05, .50), tok('replay continues', 'ingress.right', 'runtime.left', flow.replay, .34, .82)],
         m => { m.lanes[DETAIL_REPLAY_ID].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[2].status = 'replay continues'; m.query.active = false; }, 'gc', ['dispatch', 'query']),
       step('Storage GC selects low-valid-ratio regular files. They remain regular columnar files, just highlighted as rewrite candidates.', 4.0,
         ['runtime', 'storage'], [tok('candidate files', 'runtime.right', 'storage.aging', flow.gc, .08, .76)],
@@ -1170,8 +1185,8 @@
       subtle: dark ? '#141b24' : '#f7f9fc',
       text: dark ? '#edf2f7' : '#122033',
       muted: dark ? '#9aa8b8' : '#667386',
-      border: dark ? '#344256' : '#cbd5e1',
-      borderSoft: dark ? '#2a3546' : '#dde5ee',
+      border: dark ? '#344256' : '#b8c4d3',
+      borderSoft: dark ? '#2a3546' : '#c7d2df',
       grid: dark ? '#263244' : '#dce5ef',
       shadow: dark ? 'rgba(0,0,0,.28)' : 'rgba(15,23,42,.10)',
       accent: dark ? '#6ea8ff' : '#315fcb'
@@ -1390,6 +1405,7 @@
     drawIndex(c);
     drawReplayers(c);
     drawStorage(c);
+    drawAsyncFlushMemtable(c);
     drawTokens(c);
     drawCommitWait(c);
     if (state.flash > 0) {
@@ -1463,8 +1479,7 @@
     const st = currentStep();
     const tokenParts = (st.tokens || []).flatMap(t => t.path || []);
     if (key === 'runtime') {
-      return ['lane0', 'lane1', 'lane2'].some(isHighlighted) ||
-        tokenParts.some(part => typeof part === 'string' && /^lane[0-2]\b/.test(part));
+      return false;
     }
     if (key === 'ingress') {
       return tokenParts.some(part => typeof part === 'string' && part.startsWith('ingress.'));
@@ -1683,8 +1698,9 @@
       if (i > progress.reachedIndex) return;
       const x = map(cdcStreamRailP(i + 1, records.length), 0, 1, startX, endX);
       const cardW = 62;
+      const cardTextSize = TYPE.text;
       drawCdcDot(x, railY, true, record.color, c);
-      drawRecordTypeCard(x - cardW / 2, railY + 14, cardW, 24, record.label, record.color, c, TYPE.text);
+      drawRecordTypeCard(x - cardW / 2, railY + 14, cardW, 24, record.label, record.color, c, cardTextSize);
     });
 
     if (progress.done) return;
@@ -1711,7 +1727,7 @@
     roundRect(txn.x, txn.y, txn.w, txn.h, 12, true, true);
 
     ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'left';
     fitText(`mirror transaction`, txn.x + PANEL_TITLE_X, txn.y + PANEL_TITLE_Y, txn.w - PANEL_TITLE_X * 2, 'left');
     if (activeId === 'empty') return;
@@ -1768,7 +1784,7 @@
     ctx.lineWidth = 1;
     roundRect(row.x + 32, row.y + 17, 24, 24, 8, true, true);
     ctx.fillStyle = row.color;
-    ctx.font = typeFont(TYPE.micro, 900);
+    ctx.font = typeFont(TYPE.text, 900);
     ctx.textAlign = 'center';
     ctx.fillText(String(row.order), row.x + 44, row.y + 33);
     ctx.fillStyle = row.color;
@@ -1823,7 +1839,7 @@
       ctx.lineWidth = 1;
       roundRect(cx - 9, y - 11, 18, 22, 5, true, true);
       ctx.fillStyle = flow.replay;
-      ctx.font = typeFont(TYPE.micro, 900);
+      ctx.font = typeFont(TYPE.text, 900);
       ctx.textAlign = 'center';
       ctx.fillText('OK', cx, y + 3);
     }
@@ -2239,7 +2255,7 @@
     ctx.lineWidth = 1;
     roundRect(x - w / 2, y - h / 2, w, h, 5, false, true);
     ctx.fillStyle = '#ffffff';
-    ctx.font = typeFont(TYPE.micro, 900);
+    ctx.font = typeFont(TYPE.text, 900);
     ctx.textAlign = 'center';
     fitText(shortRowLabel(label), x - w / 2 + 4, y + 3, w - 8, 'center');
     ctx.restore();
@@ -2272,7 +2288,7 @@
     ctx.lineWidth = 1;
     roundRect(x - 26, y - 11, 52, 22, 8, false, true);
     ctx.fillStyle = '#ffffff';
-    ctx.font = typeFont(TYPE.micro, 900);
+    ctx.font = typeFont(TYPE.text, 900);
     ctx.textAlign = 'center';
     fitText(label, x - 22, y + 4, 44, 'center');
     ctx.restore();
@@ -2447,7 +2463,7 @@
     roundRect(x, y, w, h, 9, true, true);
 
     ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'left';
     fitText('PRIMARY INDEX MAP', x + 10, y + 19, w - 20, 'left');
 
@@ -2478,7 +2494,7 @@
     roundRect(x, y, w, h, 9, true, true);
 
     ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'left';
     ctx.fillText('MAIN INDEX', x + 9, y + 19);
 
@@ -2597,13 +2613,54 @@
     const y = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
     const frame = { x: r.x + pad, y, w: r.w - pad * 2, h: r.y + r.h - y - MODULE_CONTENT_PAD };
     const gap = 20;
-    const writeH = Math.round((frame.h - gap) * .43);
+    const writeH = Math.round((frame.h - gap) * .45);
     const visibilityH = frame.h - gap - writeH;
     return {
       frame,
       write: { x: frame.x, y: frame.y, w: frame.w, h: writeH },
       visibility: { x: frame.x, y: frame.y + writeH + gap, w: frame.w, h: visibilityH }
     };
+  }
+
+  function replayWriteBufferLayout(x, y, w, h) {
+    const top = y + 50;
+    const bottom = y + h - MODULE_CONTENT_PAD;
+    const panelH = Math.max(72, bottom - top);
+    const gap = 28;
+    const innerPad = MODULE_CONTENT_PAD;
+    const activePanelW = 84;
+    const activePanel = { x: x + innerPad, y: top, w: activePanelW, h: panelH };
+    const queueX = activePanel.x + activePanel.w + gap;
+    const queue = { x: queueX, y: top, w: x + w - innerPad - queueX, h: panelH };
+    const maxVisible = 3;
+    const itemGap = 12;
+    const memW = Math.max(42, Math.min(78, (queue.w - 18 - itemGap * (maxVisible - 1)) / maxVisible));
+    const memY = top + 28;
+    const memH = Math.max(36, panelH - 36);
+    const activeMem = { x: activePanel.x + (activePanel.w - memW) / 2, y: memY, w: memW, h: memH };
+    const fillPadX = 10;
+    const fillPadTop = 4;
+    const fillPadBottom = 6;
+    const fullFill = {
+      x: activeMem.x + fillPadX,
+      y: activeMem.y + fillPadTop,
+      w: activeMem.w - fillPadX * 2,
+      h: activeMem.h - fillPadTop - fillPadBottom
+    };
+    return { activePanel, queue, activeMem, fullFill, memW: fullFill.w, memY: fullFill.y, memH: fullFill.h, itemGap };
+  }
+
+  function replayVisibilityLayout(x, y, w, h) {
+    const rowX = x + 20;
+    const rowY = y + 46;
+    const rowW = w - 32;
+    const labelW = Math.floor(rowW * 0.31);
+    const bitmapX = rowX + labelW;
+    const bitmapW = rowW - labelW;
+    const chainY = y + 88;
+    const maxChainH = Math.max(40, y + h - MODULE_CONTENT_PAD - chainY);
+    const chainH = Math.max(44, maxChainH);
+    return { rowX, rowY, rowW, labelW, bitmapX, bitmapW, chainY, chainH };
   }
 
   function activeReplayLane() {
@@ -2627,108 +2684,127 @@
     drawReplayVisibility(visibility.x, visibility.y, visibility.w, visibility.h, lane, c);
   }
 
+  function drawNeutralPanelBox(x, y, w, h, title, c, radius = 9, active = false) {
+    ctx.fillStyle = active ? alpha(c.panel3, .88) : alpha(c.panel2, .78);
+    ctx.strokeStyle = active ? c.border : c.borderSoft;
+    ctx.lineWidth = active ? 1.4 : 1;
+    roundRect(x, y, w, h, radius, true, true);
+    if (!title) return;
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.subTitle, 900);
+    ctx.textAlign = 'left';
+    fitText(title, x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
+  }
+
   function drawReplayWriteBuffer(x, y, w, h, lane, c) {
-    smallBox(x, y, w, h, 'write buffer', flow.storage, c, state.detailFocus === 'writeBuffer' || lane.highlight === 'active' || lane.highlight === 'immutable');
+    const writeActive = state.detailFocus === 'writeBuffer' || lane.highlight === 'active' || lane.highlight === 'immutable';
+    drawNeutralPanelBox(x, y, w, h, 'write buffer', c, 9, writeActive);
     const st = currentStep();
     const p = stepProgress(true);
-    const activeX = x + 16, activeY = y + 54;
-    const blockW = 78, blockH = Math.max(72, Math.min(98, h - 72));
-    const immX = activeX + blockW + 24;
-    const immW = x + w - 14 - immX;
+    const layout = replayWriteBufferLayout(x, y, w, h);
+    const { activePanel, queue, activeMem } = layout;
     const prevRows = lane.prevActiveRows ?? lane.activeRows;
     const displayRows = lerp(prevRows, lane.activeRows, p);
-    const fillH = (blockH - 10) * clamp(displayRows / lane.activeCap, 0, 1);
+    const fillH = layout.fullFill.h * clamp(displayRows / lane.activeCap, 0, 1);
 
-    ctx.fillStyle = alpha(flow.replay, lane.highlight === 'active' ? .24 : .11);
-    ctx.strokeStyle = alpha(flow.replay, lane.highlight === 'active' ? .62 : .34);
-    roundRect(activeX, activeY, blockW, blockH, 8, true, true);
+    drawNeutralPanelBox(activePanel.x, activePanel.y, activePanel.w, activePanel.h, '', c, 6, lane.highlight === 'active');
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'left';
+    ctx.fillText('active', activePanel.x + 8, activePanel.y + 18);
+
     ctx.fillStyle = alpha(flow.replay, .34);
-    roundRect(activeX + 10, activeY + blockH - 6 - fillH, blockW - 20, Math.max(5, fillH), 5, true, false);
+    roundRect(layout.fullFill.x, layout.fullFill.y + layout.fullFill.h - fillH, layout.fullFill.w, Math.max(5, fillH), 5, true, false);
     ctx.fillStyle = c.text;
     ctx.font = typeFont(TYPE.text, 800);
     ctx.textAlign = 'center';
-    ctx.fillText('active', activeX + blockW / 2, activeY + 14);
-    ctx.fillText(`${Math.round(displayRows)}/${lane.activeCap}`, activeX + blockW / 2, activeY + blockH - 8);
+    ctx.fillText(`${Math.round(displayRows)}/${lane.activeCap}`, activeMem.x + activeMem.w / 2, activeMem.y + activeMem.h - 14);
 
-    if (st.anim !== 'seal') {
-      const a = { x: activeX + blockW + 5, y: activeY + blockH / 2 };
-      const b = { x: immX - 7, y: activeY + blockH / 2 };
-      ctx.strokeStyle = alpha(flow.storage, .50);
-      ctx.lineWidth = 1.5;
-      drawPolyline([a, b]);
-      arrowHead(a, b, alpha(flow.storage, .68));
-    }
-
-    drawCompactImmQueue(immX, activeY, immW, blockH, lane.immutable, lane.highlight === 'immutable', c);
+    const sealMoving = st.anim === 'seal' && p < 1;
+    const flushMoving = st.anim === 'flush' && p < 1 && lane.prevImmutable > 0;
+    const visibleImmutable = sealMoving || flushMoving ? lane.prevImmutable : lane.immutable;
+    const queueCount = flushMoving ? 0 : visibleImmutable;
+    drawCompactImmQueue(layout, queueCount, lane.highlight === 'immutable', c, { suppressEmpty: sealMoving || flushMoving });
 
     if (st.anim === 'seal' && p < 1) {
-      const ghostX = lerp(activeX, immX + 8, p);
+      const targetX = firstImmutableMemX(layout, lane.prevImmutable + 1);
+      const ghostX = lerp(layout.fullFill.x, targetX, p);
       ctx.save();
       ctx.globalAlpha = Math.min(1, p * 3) * .85;
       ctx.fillStyle = alpha(flow.gc, .26);
       ctx.strokeStyle = alpha(flow.gc, .62);
-      roundRect(ghostX, activeY, blockW, blockH, 6, true, true);
-      ctx.fillStyle = flow.gc;
-      ctx.font = typeFont(TYPE.text, 800);
-      ctx.textAlign = 'center';
-      ctx.fillText('sealing', ghostX + blockW / 2, activeY + blockH / 2 + 3);
+      roundRect(ghostX, layout.fullFill.y, layout.fullFill.w, layout.fullFill.h, 6, true, true);
       ctx.restore();
     }
 
-    if (st.anim === 'flush' && p < 1 && lane.prevImmutable > 0) {
-      const ghostX = immX + immW - 28 + p * 46;
-      ctx.save();
-      ctx.globalAlpha = (1 - p) * .85;
-      ctx.fillStyle = alpha(flow.gc, .20);
-      ctx.strokeStyle = alpha(flow.gc, .50);
-      roundRect(ghostX, activeY + 7, 24, blockH - 14, 4, true, true);
-      ctx.restore();
-    }
   }
 
-  function drawCompactImmQueue(x, y, w, h, count, active, c) {
+  function firstImmutableMemX(layout, count) {
+    const { queue, memW, itemGap } = layout;
+    const n = Math.max(1, Math.min(count, 3));
+    const totalW = memW * n + itemGap * (n - 1);
+    return queue.x + Math.max(9, (queue.w - totalW) / 2);
+  }
+
+  function drawCompactImmQueue(layout, count, active, c, opts = {}) {
+    const { queue, memW, memY, memH, itemGap } = layout;
     const color = flow.gc;
-    ctx.fillStyle = alpha(color, active ? .14 : .06);
-    ctx.strokeStyle = alpha(color, active ? .52 : .24);
-    ctx.lineWidth = active ? 1.5 : 1;
-    roundRect(x, y, w, h, 6, true, true);
-    ctx.fillStyle = color;
+    drawNeutralPanelBox(queue.x, queue.y, queue.w, queue.h, '', c, 6, active);
+    ctx.fillStyle = c.text;
     ctx.font = typeFont(TYPE.text, 800);
     ctx.textAlign = 'left';
-    ctx.fillText('imm FIFO', x + 8, y + 18);
+    ctx.fillText('immut queue', queue.x + 8, queue.y + 18);
     const n = Math.min(count, 3);
-    if (!n) {
+    if (count <= 0) {
+      if (opts.suppressEmpty) return;
       ctx.fillStyle = c.muted;
-      ctx.font = typeFont(TYPE.text, 0);
+      ctx.font = typeFont(TYPE.text, 800);
       ctx.textAlign = 'center';
-      ctx.fillText('empty', x + w / 2, y + h / 2 + 6);
+      ctx.fillText('empty', queue.x + queue.w / 2, queue.y + queue.h / 2 + 6);
       return;
     }
-    const gap = 4;
-    const cellW = Math.max(24, Math.min(38, (w - 18 - gap * (n - 1)) / n));
-    const startX = x + Math.max(9, (w - (cellW * n + gap * (n - 1))) / 2);
+    const startX = firstImmutableMemX(layout, count);
     for (let i = 0; i < n; i++) {
-      const bx = startX + i * (cellW + gap);
+      const bx = startX + i * (memW + itemGap);
       const label = count > 3 && i === n - 1 ? `+${count - 2}` : `b${count - i}`;
       ctx.fillStyle = alpha(color, active ? .22 : .12);
       ctx.strokeStyle = alpha(color, active ? .56 : .28);
-      roundRect(bx, y + 28, cellW, h - 36, 5, true, true);
+      roundRect(bx, memY, memW, memH, 5, true, true);
       ctx.fillStyle = c.text;
-      ctx.font = typeFont(TYPE.micro, 800);
+      ctx.font = typeFont(TYPE.text, 800);
       ctx.textAlign = 'center';
-      fitText(label, bx + 3, y + h / 2 + 5, cellW - 6, 'center');
+      fitText(label, bx + 3, memY + memH / 2 + 5, memW - 6, 'center');
     }
   }
 
-  function drawReplayVisibility(x, y, w, h, lane, c) {
-    smallBox(x, y, w, h, 'visibility structure', flow.visibility, c, state.detailFocus === 'visibility' || state.detailFocus === 'gc' || lane.highlight === 'visibility' || lane.highlight === 'baseBitmap' || lane.highlight === 'foldEligible');
+  function drawAsyncFlushMemtable(c) {
+    const st = currentStep();
+    if (st.anim !== 'flush') return;
+    const p = stepProgress(true);
+    if (p >= 1) return;
+    const lane = activeReplayLane();
+    if ((lane.prevImmutable || 0) <= 0) return;
+    const { write } = replayerPanelLayout();
+    const layout = replayWriteBufferLayout(write.x, write.y, write.w, write.h);
+    const startX = firstImmutableMemX(layout, lane.prevImmutable);
+    const start = { x: startX + layout.memW / 2, y: layout.memY + layout.memH / 2 };
+    const end = point('storage.memtable');
+    const x = lerp(start.x, end.x, p);
+    const y = lerp(start.y, end.y, p);
 
-    const rowX = x + 12;
-    const rowY = y + 46;
-    const rowW = w - 24;
-    const labelW = Math.floor(rowW * 0.35);
-    const bitmapX = rowX + labelW;
-    const bitmapW = rowW - labelW;
+    ctx.save();
+    ctx.fillStyle = alpha(flow.storage, .22);
+    ctx.strokeStyle = alpha(flow.storage, .62);
+    ctx.lineWidth = 1.4;
+    roundRect(x - layout.memW / 2, y - layout.memH / 2, layout.memW, layout.memH, 5, true, true);
+    ctx.restore();
+  }
+
+  function drawReplayVisibility(x, y, w, h, lane, c) {
+    drawNeutralPanelBox(x, y, w, h, 'visibility structure', c);
+
+    const layout = replayVisibilityLayout(x, y, w, h);
+    const { rowX, rowY, labelW, bitmapX, bitmapW, chainY, chainH } = layout;
 
     ctx.fillStyle = c.text;
     ctx.font = typeFont(TYPE.text, 900);
@@ -2736,24 +2812,27 @@
     fitText(`baseTs=${lane.baseTs}`, rowX, rowY + 14, labelW - 4, 'left');
     drawFixedDeleteBitmap(lane, bitmapX, rowY, bitmapW, c);
 
-    const chainY = y + 92;
-    const chainH = Math.max(64, h - 108);
-    ctx.fillStyle = alpha(flow.delete, lane.highlight === 'visibility' || lane.highlight === 'foldEligible' ? .18 : .08);
-    ctx.strokeStyle = alpha(flow.delete, lane.highlight === 'visibility' || lane.highlight === 'foldEligible' ? .46 : .24);
-    roundRect(x + 10, chainY, w - 20, chainH, 7, true, true);
-    ctx.fillStyle = flow.delete;
+    const chainX = x + MODULE_CONTENT_PAD;
+    const chainW = w - MODULE_CONTENT_PAD * 2;
+    const chainPad = 8;
+    const itemPad = 20;
+    ctx.fillStyle = alpha(c.panel2, .78);
+    ctx.strokeStyle = c.borderSoft;
+    ctx.lineWidth = 1;
+    roundRect(chainX, chainY, chainW, chainH, 7, true, true);
+    ctx.fillStyle = c.text;
     ctx.font = typeFont(TYPE.text, 800);
     ctx.textAlign = 'left';
-    ctx.fillText('delete ts chain', x + 18, chainY + 22);
-    drawCompactDeleteTsItems(x + 18, chainY + 34, w - 36, lane, c);
+    ctx.fillText('delete ts chain', chainX + chainPad, chainY + 22);
+    drawCompactDeleteTsItems(chainX + itemPad, chainY + 34, chainW - itemPad * 2, lane, c);
   }
 
   function drawFixedDeleteBitmap(lane, x, y, w, c) {
     const len = 16;
     const bits = (lane.baseBitmap || '').padEnd(len, '0').slice(0, len);
-    const gap = 2;
-    const cellW = Math.max(4, Math.min(6, Math.floor((w - gap * (len - 1)) / len)));
-    const cellH = 14;
+    const gap = 3;
+    const cellW = Math.max(7, Math.min(12, Math.floor((w - gap * (len - 1)) / len)));
+    const cellH = 18;
     const totalW = len * cellW + (len - 1) * gap;
     const startX = x + Math.max(0, (w - totalW) / 2);
     const pendingDeletes = new Set();
@@ -2772,8 +2851,8 @@
       const folded = bits[i] === '1';
       const eligible = eligibleDeletes.has(i);
       const pending = pendingDeletes.has(i);
-      let fill = alpha(c.border, .20);
-      let stroke = alpha(c.border, .42);
+      let fill = alpha(c.border, .22);
+      let stroke = alpha(c.border, .56);
 
       if (folded) {
         const color = lane.highlight === 'baseBitmap' ? flow.gc : flow.visibility;
@@ -2795,21 +2874,27 @@
   }
 
   function drawCompactDeleteTsItems(x, y, w, lane, c) {
-    const visible = lane.deleteTs.slice(0, 3);
-    const gap = 4;
-    const itemW = Math.min(72, Math.floor((w - gap * 2) / 3));
+    const columns = 4;
+    const rows = 2;
+    const visible = lane.deleteTs.slice(0, columns * rows);
+    const itemW = Math.min(72, Math.floor((w - 18 * (columns - 1)) / columns));
+    const gapX = columns > 1 ? (w - itemW * columns) / (columns - 1) : 0;
+    const itemH = 24;
+    const rowGap = 10;
     visible.forEach((item, i) => {
+      const col = i % columns;
+      const row = Math.floor(i / columns);
       const ts = deleteTsValue(item);
       const eligible = lane.safeTs != null && ts <= lane.safeTs;
       const active = lane.highlight === 'foldEligible' && eligible;
       const color = active ? flow.gc : flow.delete;
-      drawPill(x + i * (itemW + gap), y, itemW, 24, item, color, c, active, 8);
+      drawPill(x + col * (itemW + gapX), y + row * (itemH + rowGap), itemW, itemH, item, color, c, active, 8);
     });
-    if (lane.deleteTs.length > 3) {
+    if (lane.deleteTs.length > columns * rows) {
       ctx.fillStyle = c.muted;
-      ctx.font = typeFont(TYPE.micro, 800);
+      ctx.font = typeFont(TYPE.text, 800);
       ctx.textAlign = 'right';
-      ctx.fillText(`+${lane.deleteTs.length - 3}`, x + w, y + 17);
+      ctx.fillText(`+${lane.deleteTs.length - columns * rows}`, x + w, y + rows * itemH + rowGap);
     }
   }
 
@@ -2828,10 +2913,21 @@
     drawComponent(r, c, { color: flow.storage, key: 'storage' });
     const layout = storagePanelsLayout(r);
     const panels = [
-      { ...layout.memtable, title: 'flushed immutable memtable', color: flow.storage, kind: 'OBJ', labels: model.storage.objectEntries.slice(0, 4), active: state.detailFocus === 'writeBuffer' || state.activeChannels.includes('flush'), maxItems: 4 },
+      { ...layout.memtable, title: 'flushed immutable memtable', color: flow.storage, kind: 'OBJ', labels: storageObjectLabels().slice(0, 4), active: false, hotLabel: model.storage.flushedHot, maxItems: 4 },
       { ...layout.files, title: 'regular columnar files', color: flow.replay, kind: 'FILE', labels: regularStorageFileLabels(), active: ['query', 'gc', 'storageGc'].includes(state.detailFocus), regular: true, maxItems: 5 }
     ];
     panels.forEach(panel => drawStoragePanel(panel.x, panel.y, panel.w, panel.h, panel, c));
+  }
+
+  function storageObjectLabels() {
+    const labels = [...model.storage.objectEntries];
+    const pending = model.storage.pendingFlushObject;
+    if (pending) {
+      const st = currentStep();
+      const showPending = st.anim !== 'flush' || stepProgress(true) > .86;
+      if (showPending && !labels.includes(pending)) labels.unshift(pending);
+    }
+    return labels;
   }
 
   function storagePanelsLayout(r) {
@@ -2869,7 +2965,7 @@
     ctx.lineWidth = panel.active ? 1.5 : 1;
     roundRect(x, y, w, h, 10, true, true);
     ctx.fillStyle = panel.color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'left';
     fitText(panel.title, x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
     const labels = panel.labels.length ? panel.labels : ['empty'];
@@ -2891,7 +2987,7 @@
       const iconKind = retired ? 'RETIRED' : temporary ? 'TEMP' : candidate ? 'CAND' : panel.kind;
       const iconX = startX + i * (iconW + iconGap);
       drawTabularStorageIcon(iconX, iconY, iconW, iconH, String(label), iconKind, panel.color, c, {
-        active: panel.active,
+        active: panel.active || String(label) === panel.hotLabel,
         candidate,
         retired,
         newFile,
@@ -2964,7 +3060,7 @@
     ctx.lineWidth = active ? 1.4 : 1;
     roundRect(x, y, w, h, 7, true, true);
     ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'left';
     fitText('SCHEMA', x + 8, y + 14, w - 16, 'left');
     ctx.strokeStyle = alpha(color, active ? .66 : .34);
@@ -2992,7 +3088,7 @@
     ctx.lineWidth = active ? 1.4 : 1;
     roundRect(x, y, w, h, 7, true, true);
     ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'left';
     ctx.fillText('STATS', x + 8, y + 14);
     const bars = [7, 12, 9, 16];
@@ -3025,7 +3121,7 @@
     ctx.arc(knobX, railY, 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'center';
     fitText(switching ? 'ATOMIC SWITCH' : 'LOCKED CATALOG', x + 6, y + 14, w - 12, 'center');
   }
@@ -3037,7 +3133,7 @@
     ctx.lineWidth = queryActive ? 1.5 : 1;
     roundRect(x, y, w, h, 8, true, true);
     ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'left';
     fitText('VISIBLE MANIFEST', x + 8, y + 14, w - 16, 'left');
     const files = model.catalog.visible.slice(0, 3);
@@ -3072,7 +3168,7 @@
     ctx.lineWidth = active ? 1.4 : 1;
     roundRect(x, y, w, h, 8, true, true);
     ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'center';
     fitText('RETIRED', x + 5, y + 14, w - 10, 'center');
     ctx.fillStyle = label === 'empty' ? c.muted : color;
@@ -3089,7 +3185,7 @@
     ctx.lineWidth = hasPending ? 1.4 : 1;
     roundRect(x, y, w, h, 8, true, true);
     ctx.fillStyle = hasPending ? color : c.muted;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.font = typeFont(TYPE.subTitle, 900);
     ctx.textAlign = 'left';
     fitText(`STAGING ${pending}`, x + 8, y + 15, w * .44, 'left');
 
@@ -3281,7 +3377,7 @@
     if (kind === 'regular') {
       for (let i = 0; i < 3; i++) roundRect(x + i * 5, y + i * 4, 24, 20, 4, true, true);
       ctx.fillStyle = color;
-      ctx.font = typeFont(TYPE.micro, 800);
+      ctx.font = typeFont(TYPE.text, 800);
       ctx.textAlign = 'center';
       ctx.fillText('RG', x + 17, y + 17);
     } else if (kind === 'active') {
@@ -3294,7 +3390,7 @@
       ctx.fillStyle = alpha(color, .28);
       roundRect(x + 7, y, 20, 8, 4, true, false);
       ctx.fillStyle = color;
-      ctx.font = typeFont(TYPE.micro, 900);
+      ctx.font = typeFont(TYPE.text, 900);
       ctx.textAlign = 'center';
       ctx.fillText('OBJ', x + 17, y + 20);
     }
@@ -3500,7 +3596,7 @@
     roundRect(x, y, w, h, Math.min(10, h / 2), true, true);
     ctx.fillStyle = active ? color : c.text;
     const requested = pillTypeSize(fs);
-    const size = Math.max(TYPE.micro, Math.min(requested, h - 6));
+    const size = Math.max(TYPE.text, Math.min(requested, h - 6));
     ctx.font = typeFont(size, 900);
     ctx.textAlign = 'center';
     fitText(label, x + 6, y + h / 2 + size * .36, w - 12, 'center');
@@ -3598,19 +3694,10 @@
   function replayAnchorSet(slot) {
     const layout = replayerPanelLayout();
     const { frame, write, visibility } = layout;
-    const activeX = write.x + 16;
-    const activeY = write.y + 54;
-    const blockW = 78;
-    const blockH = Math.max(72, Math.min(98, write.h - 72));
-    const immX = activeX + blockW + 24;
-    const immW = write.x + write.w - 14 - immX;
-    const rowX = visibility.x + 12;
-    const rowY = visibility.y + 46;
-    const rowW = visibility.w - 24;
-    const labelW = Math.floor(rowW * 0.35);
-    const bitmapX = rowX + labelW;
-    const bitmapW = rowW - labelW;
-    const chainY = visibility.y + 92;
+    const writeLayout = replayWriteBufferLayout(write.x, write.y, write.w, write.h);
+    const { queue, fullFill } = writeLayout;
+    const visibilityLayout = replayVisibilityLayout(visibility.x, visibility.y, visibility.w, visibility.h);
+    const { rowY, bitmapX, bitmapW, chainY, chainH } = visibilityLayout;
     const offset = (slot - 1) * 18;
     return {
       center: [frame.x + frame.w / 2, frame.y + frame.h / 2],
@@ -3620,10 +3707,10 @@
       right: [frame.x + frame.w, frame.y + frame.h / 2 + offset],
       top: [frame.x + frame.w / 2, frame.y],
       bottom: [frame.x + frame.w / 2, frame.y + frame.h],
-      active: [activeX + blockW / 2, activeY + blockH / 2],
-      immutable: [immX + immW / 2, activeY + blockH / 2],
+      active: [fullFill.x + fullFill.w / 2, fullFill.y + fullFill.h / 2],
+      immutable: [queue.x + queue.w / 2, queue.y + queue.h / 2],
       visibility: [visibility.x + visibility.w / 2, visibility.y + visibility.h / 2],
-      deleteArray: [visibility.x + visibility.w / 2, chainY + 38],
+      deleteArray: [visibility.x + visibility.w / 2, chainY + chainH / 2],
       baseBitmap: [bitmapX + bitmapW / 2, rowY + 7],
       write: [write.x + write.w / 2, write.y + write.h / 2]
     };
@@ -3662,6 +3749,16 @@
       return arrPoint(anchors[pos] || anchors.center);
     }
     if (parts[0] === 'runtime') {
+      const borderAnchors = {
+        center: [r.x + r.w / 2, r.y + r.h / 2],
+        left: [r.x, r.y + r.h / 2],
+        right: [r.x + r.w, r.y + r.h / 2],
+        top: [r.x + r.w / 2, r.y],
+        bottom: [r.x + r.w / 2, r.y + r.h],
+        in: [r.x, r.y + r.h / 2],
+        out: [r.x + r.w, r.y + r.h / 2]
+      };
+      if (borderAnchors[pos]) return arrPoint(borderAnchors[pos]);
       const anchors = replayAnchorSet(1);
       if (anchors[pos]) return arrPoint(anchors[pos]);
     }
