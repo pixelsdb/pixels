@@ -499,11 +499,11 @@
             <button class="scene-btn" data-scene="update" data-label="Update Replay" title="Update Replay" aria-label="Update Replay">
               <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3c.478 0 .947 -.016 1.402 -.046"/><path d="M20 12v-6"/><path d="M4 12v6c0 1.526 3.04 2.786 6.972 2.975"/><path d="M18.42 15.61a2.1 2.1 0 0 1 2.97 2.97l-3.39 3.42h-3v-3l3.42 -3.39"/></svg></span>
             </button>
-            <button class="scene-btn" data-scene="query" data-label="Query Path" title="Query Path" aria-label="Query Path" hidden>
-              <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3m8 -3.5v-5.5"/><path d="M4 12v6c0 1.657 3.582 3 8 3"/><path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M20.2 20.2l1.8 1.8"/></svg></span>
-            </button>
             <button class="scene-btn" data-scene="gc" data-label="Garbage Collection" title="Garbage Collection" aria-label="Garbage Collection">
               <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17l-2 2l2 2"/><path d="M10 19h9a2 2 0 0 0 1.75 -2.75l-.55 -1"/><path d="M8.536 11l-.732 -2.732l-2.732 .732"/><path d="M7.804 8.268l-4.5 7.794a2 2 0 0 0 1.506 2.89l1.141 .024"/><path d="M15.464 11l2.732 .732l.732 -2.732"/><path d="M18.196 11.732l-4.5 -7.794a2 2 0 0 0 -3.256 -.14l-.591 .976"/></svg></span>
+            </button>
+            <button class="scene-btn" data-scene="query" data-label="Query Path" title="Query Path" aria-label="Query Path" hidden>
+              <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3m8 -3.5v-5.5"/><path d="M4 12v6c0 1.657 3.582 3 8 3"/><path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M20.2 20.2l1.8 1.8"/></svg></span>
             </button>
           </div>
         </section>
@@ -561,8 +561,7 @@
   const autoSceneOrder = ['cdc'];
   const sceneOrder = ['insert', 'delete', 'update', 'gc'];
   const sceneMeta = {
-    cdc: { label: 'CDC Mirror Transaction', type: 'pixels-sink flow', summary: 'Pixels Sink reads the ordered CDC log, reconstructs one mirror transaction, begins it in Retina, replays row changes, and commits only after replay OK.' },
-    routing: { label: 'Mirror Row Replay', type: 'sink write path', summary: 'Pixels Sink sends row changes from a mirror transaction to Retina replayers; single-operation scenes keep the replay behavior easy to inspect.' },
+    cdc: { label: 'Mirror Transaction', type: 'pixels-sink flow', summary: 'Pixels Sink creates one mirror transaction, begins it in Retina, replays row changes, and commits only after replay OK.' },
     insert: { label: 'Insert Replay', type: 'write path', summary: 'Insert row changes arrive through a mirror transaction, append to the write buffer, then sealed memtables flush to object entries.' },
     delete: { label: 'Delete Replay', type: 'visibility path', summary: 'Delete unfolds Index Service lookup and RGVisibility state: get returns the old RowLocation, then delete timestamp entries update visibility without rewriting columnar files.' },
     update: { label: 'Update Replay', type: 'MVCC versioning', summary: 'Update inserts the new tuple version first, updates the primary index, then deletes the old tuple version under one timestamp.' },
@@ -609,7 +608,9 @@
   const DEFAULT_HWM = 290;
   const DEFAULT_LWM = 281;
   const DEFAULT_QUERY_TS = DEFAULT_HWM - 1;
-  const DEFAULT_GC_SAFE_TS = DEFAULT_HWM - 1;
+  const DEFAULT_GC_SAFE_TS = DEFAULT_LWM - 1;
+  const GC_BASE_BITMAP = '0000010100000000';
+  const GC_FOLD_TARGET_OFFSET = 11;
 
   function typeFont(size, weight = 800, family = 'Inter, system-ui, sans-serif') {
     const prefix = weight ? `${weight} ` : '';
@@ -656,23 +657,16 @@
   const STORAGE_H = MODULE_TITLE_Y + MODULE_CONTENT_GAP + STORAGE_COMPACT_PANEL_H * 2 + STORAGE_PANEL_GAP + STORAGE_EDGE_PAD;
   const TOP_SERVICE_W = 430;
   const INDEX_W = 481;
-  const CDC_STREAM_H = 116;
-  const CDC_STREAM_ROW_RECORDS = 3;
-  const CDC_STREAM_RECORD_COUNT = CDC_STREAM_ROW_RECORDS + 2;
-  const CDC_STREAM_CARD_W = 72;
-  const CDC_STREAM_RAIL_MARGIN_P = .08;
-  const CDC_STREAM_SINGLE_OP_RAIL_MARGIN_P = .20;
-  const CDC_STREAM_RECORD_GAP_UNITS = 1;
-  const CDC_TO_SINK_GAP = 100;
-  const INGRESS_Y = MIDDLE_TOP + CDC_STREAM_H + CDC_TO_SINK_GAP;
+  const INGRESS_Y = MIDDLE_TOP;
   const PIXELS_SINK_W = 285;
   const PIXELS_SINK_H = 394;
   const MIRROR_ROW_CARD_W = 163;
   const MIRROR_BEGIN_STACK_GAP = 12;
   const MIRROR_STACK_COMMIT_GAP = 10;
+  const MIRROR_BEGIN_TS_REPLY_END = .82;
+  const MIRROR_BEGIN_TS_FADE_END = .92;
   const PIXELS_SINK_X = LEFT_PANEL_X + (LEFT_PANEL_W - PIXELS_SINK_W) / 2;
   const rects = {
-    cdcStream: { x: LEFT_PANEL_X, y: MIDDLE_TOP, w: LEFT_PANEL_W, h: CDC_STREAM_H, title: 'CDC stream', sub: 'row changes + commit marker' },
     ingress: { x: PIXELS_SINK_X, y: INGRESS_Y, w: PIXELS_SINK_W, h: PIXELS_SINK_H, title: 'Pixels Sink', sub: 'mirror transaction -> replay RPC' },
     sink: { x: PIXELS_SINK_X + 14, y: INGRESS_Y + 292, w: PIXELS_SINK_W - 28, h: 96, title: 'Pixels Sink replay', sub: 'replay path anchors' },
 
@@ -687,8 +681,7 @@
   const DETAIL_REPLAY_ID = 1;
 
   const info = {
-    cdcStream: ['CDC stream', 'External ordered row-change stream. It carries row records plus a commit marker for one source transaction.'],
-    ingress: ['Pixels Sink', 'Consumes the external CDC stream, reconstructs mirror transactions, sends replay RPCs, and commits after replay OK.'],
+    ingress: ['Pixels Sink', 'Creates mirror transactions, sends replay RPCs, and commits after replay OK.'],
     sink: ['Pixels Sink replay anchor', 'Invisible anchor region for replay paths.'],
     runtime: ['Retina replayer', 'RetinaServerImpl handles RetinaWorkerService RPCs and keeps write-buffer and visibility state.'],
     tx: ['Transaction Service', 'Exposes MVCC time boundaries. Callers get snapshot or safeTs on demand; the panel stays focused on HWM and LWM.'],
@@ -730,10 +723,7 @@
         sinkStep: null,
         cdcTx: 1208,
         changeCount: 72410,
-        cdcLog: 'TXN or ROW record',
-        cdcRecord: 'CDC tx1287',
-        cdcPhase: 'idle',
-        coordState: 'waiting for CDC log',
+        coordState: 'mirror tx ready',
         cachedRows: '0 cached',
         routingRule: 'by row key',
         writePlan: 'waiting for row changes',
@@ -755,10 +745,13 @@
         operation: 'idle'
       },
       storage: {
-        regularFiles: ['file-06.pxl', 'file-07.pxl'],
+        regularFiles: ['file-0.pxl', 'file-1.pxl'],
         objectEntries: ['obj-77'],
+        prevRegularFiles: ['file-0.pxl', 'file-1.pxl'],
+        prevObjectEntries: ['obj-77'],
         pendingFlushObject: null,
         flushedHot: null,
+        compactionFile: null,
         staleRatio: 0.31,
         agingQueue: [],
         newFile: 'none',
@@ -802,7 +795,10 @@
       regularFile: `file-0${id + 6}.pxl`,
       baseTs,
       baseBitmap: '0000000000000000',
+      prevBaseTs: baseTs,
+      prevBaseBitmap: '0000000000000000',
       deleteTs: deletes,
+      prevDeleteTs: [...deletes],
       safeTs: null,
       throughput: 72 + id * 11,
       highlight: null
@@ -818,46 +814,24 @@
       m.sink.rowChanges = ['INSERT', 'DELETE', 'UPDATE'];
       m.sink.mirrorOps = ['insert', 'delete', 'update'];
       m.sink.sinkStep = 'empty';
-      m.sink.cdcPhase = 'begin';
-      m.sink.cdcLog = 'ordered CDC log';
-      m.sink.cdcRecord = 'BEGIN';
-      m.sink.coordState = 'read CDC log';
+      m.sink.coordState = 'mirror tx ready';
       m.sink.cachedRows = '';
-      m.sink.requestState = 'read CDC log';
+      m.sink.requestState = 'begin mirror tx';
       m.sink.txState = 'await begin';
       m.index.hot = 'pk208';
       m.index.primaryEntries = ['pk@212 -> rowId820'];
       m.index.mainEntries = ['rowId820 -> file-07/rg0/off7'];
-    }
-    if (scene === 'routing') {
-      m.sink.mirrorTx = 'tx8503';
-      m.sink.rowChanges = ['customer 1', 'orders 2'];
-      m.sink.mirrorOps = ['insert', 'delete', 'update'];
-      m.sink.sinkStep = 'replay';
-      m.sink.cdcPhase = 'complete';
-      m.sink.cdcLog = 'ROW records ready';
-      m.sink.cdcRecord = 'ROW txn:tx8503 orders before:{pk:208} after:null';
-      m.sink.coordState = 'tx8503 complete';
-      m.sink.cachedRows = '0 cached';
-      m.sink.routingRule = 'after / before / split';
-      m.sink.writePlan = 'rows staged by key image';
-      m.sink.rpcBatch = 'batch open';
-      m.sink.requestState = 'routing rows';
-      m.sink.txState = 'Pixels tx pending';
     }
     if (scene === 'insert') {
       m.sink.mirrorTx = 'tx290';
       m.sink.rowChanges = ['orders 3'];
       m.sink.mirrorOps = ['insert'];
       m.sink.sinkStep = 'empty';
-      m.sink.cdcPhase = 'begin';
-      m.sink.cdcLog = 'ordered CDC log';
-      m.sink.cdcRecord = 'BEGIN';
-      m.sink.coordState = 'read CDC log';
+      m.sink.coordState = 'mirror tx ready';
       m.sink.routingRule = 'after-image key';
       m.sink.writePlan = 'pk160, pk174, pk181 queued';
       m.sink.rpcBatch = 'tx290 only';
-      m.sink.requestState = 'read CDC log';
+      m.sink.requestState = 'begin mirror tx';
       m.sink.txState = 'tx290 ready';
     }
     if (scene === 'delete') {
@@ -865,14 +839,11 @@
       m.sink.rowChanges = ['orders 1'];
       m.sink.mirrorOps = ['delete'];
       m.sink.sinkStep = 'empty';
-      m.sink.cdcPhase = 'begin';
-      m.sink.cdcLog = 'ordered CDC log';
-      m.sink.cdcRecord = 'BEGIN';
-      m.sink.coordState = 'read CDC log';
+      m.sink.coordState = 'mirror tx ready';
       m.sink.routingRule = 'before-image key';
       m.sink.writePlan = 'pk208 queued';
       m.sink.rpcBatch = 'tx290 only';
-      m.sink.requestState = 'read CDC log';
+      m.sink.requestState = 'begin mirror tx';
       m.sink.txState = 'tx290 ready';
       m.index.hot = 'pk208';
       m.index.primaryEntries = ['pk@212 -> rowId820'];
@@ -884,14 +855,11 @@
       m.sink.rowChanges = ['customer 1'];
       m.sink.mirrorOps = ['update'];
       m.sink.sinkStep = 'empty';
-      m.sink.cdcPhase = 'begin';
-      m.sink.cdcLog = 'ordered CDC log';
-      m.sink.cdcRecord = 'BEGIN';
-      m.sink.coordState = 'read CDC log';
+      m.sink.coordState = 'mirror tx ready';
       m.sink.routingRule = 'same primary key';
       m.sink.writePlan = 'pk132 queued';
       m.sink.rpcBatch = 'tx290 only';
-      m.sink.requestState = 'read CDC log';
+      m.sink.requestState = 'begin mirror tx';
       m.sink.txState = 'tx290 ready';
       m.index.hot = 'pk132';
       m.index.primaryEntries = ['pk@212 -> rowId820'];
@@ -918,53 +886,37 @@
       m.query.operatorInput = 'waiting visible batches';
     }
     if (scene === 'gc') {
-      m.tx.lwm = DEFAULT_LWM;
-      m.lanes[DETAIL_REPLAY_ID].deleteTs = ['(2,272)', '(4,278)', '(7,283)', '(9,291)'];
-      m.lanes[DETAIL_REPLAY_ID].baseTs = 268;
-      m.storage.staleRatio = 0.58;
-      m.storage.agingQueue = ['file-04.pxl', 'file-05.pxl'];
-      m.storage.newFile = 'none';
-      m.storage.newFileState = 'none';
-      m.storage.cleanup = 'await memory phase';
+      const l = m.lanes[DETAIL_REPLAY_ID];
+      l.baseBitmap = GC_BASE_BITMAP;
+      l.prevBaseBitmap = GC_BASE_BITMAP;
     }
     return m;
   }
 
   const scenes = {
     cdc: [
-      step('The CDC stream starts with BEGIN on the ordered source log.', cdcStreamPhaseUnits('begin'),
-        ['cdcStream'], [],
-        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'begin'; m.sink.cdcRecord = 'BEGIN'; m.sink.requestState = 'waiting for complete CDC log'; }, 'cdc', ['cdc']),
-      step('Row changes arrive in source-log order: INSERT, DELETE, then UPDATE.', cdcStreamPhaseUnits('rows'),
-        ['cdcStream'], [],
-        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'rows'; m.sink.cdcRecord = 'ROWS'; m.sink.requestState = 'CDC rows streaming'; }, 'cdc', ['cdc']),
-      step('COMMIT closes the CDC stream.', cdcStreamPhaseUnits('commit'),
-        ['cdcStream'], [],
-        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'commit'; m.sink.cdcRecord = 'COMMIT'; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc']),
-      step('The CDC log is complete and is handed to Pixels Sink.', 1.2,
-        ['cdcStream', 'ingress'], [tok('complete log', 'cdcStream.out', 'ingress.top', flow.cdc, .14, .82)],
-        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'complete'; m.sink.cdcRecord = 'COMMIT'; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc']),
       step('Pixels Sink creates the mirror transaction BEGIN and Transaction Service assigns its timestamp.', 4.0,
-        ['ingress', 'tx'], [tok('begin tx8421', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
-        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
+        ['ingress', 'tx'], [tok('begin tx8421', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, MIRROR_BEGIN_TS_REPLY_END)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
       step('Pixels Sink creates the INSERT row in the mirror transaction and sends its replay RPC.', 3.4,
         ['ingress', 'runtime'], [tok('INSERT', 'ingress.right', 'runtime.left', flow.replay, .18, .86)],
-        m => { m.sink.sinkStep = 'row1'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay INSERT'; m.sink.rpcBatch = 'INSERT pending'; m.lanes[1].currentOp = 'I:pk174'; }, 'dispatch', ['dispatch']),
-      step('Retina applies the INSERT to the write buffer: the active memtable grows by one row.', 4.0,
+        m => { m.sink.sinkStep = 'row1'; m.sink.requestState = 'replay INSERT'; m.sink.rpcBatch = 'INSERT pending'; m.lanes[1].currentOp = 'I:pk174'; }, 'dispatch', ['dispatch']),
+      step('Retina applies the INSERT to the write buffer: the active memtable grows by one row.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.currentOp = 'I:pk174'; l.status = 'append after image'; l.activeRows = 8; l.highlight = 'active'; m.sink.rpcBatch = 'INSERT applying'; }, 'writeBuffer', []),
-      step('The active memtable reaches capacity, so Retina seals it into the immutable queue.', 3.9,
+      step('The active memtable reaches capacity, so Retina seals it into the immutable queue.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.activeRows = 0; l.immutable += 1; l.highlight = 'immutable'; }, 'writeBuffer', [], 'seal'),
       step('The sealed memtable now sits in the immutable queue while replay opens a fresh active memtable.', 1.2,
         ['lane1'], [],
         m => { m.lanes[1].highlight = 'immutable'; }, 'writeBuffer', []),
-      step('A background flush asynchronously moves the immutable memtable to Storage.', 3.8,
+      step('A background flush asynchronously moves the immutable memtable to Storage.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; }, 'writeBuffer', [], 'flush'),
       step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
         [], [],
         m => { m.lanes[1].highlight = null; settlePendingFlushObject(m); }, 'storage', []),
+      compactFlushedObjectsToFile(),
       step('After the new row is durable, Retina calls Index Service to insert the primary and row-location indexes.', 4.2,
         ['index'], [tok('put pk@290', 'runtime.right', 'index.left', flow.index, .12, .82)],
         m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk174'; m.index.operation = 'put pk@290 in flight'; }, 'index', ['index']),
@@ -979,7 +931,7 @@
         m => { m.sink.sinkStep = 'row1Ok'; m.sink.requestState = 'INSERT OK'; m.sink.rpcBatch = 'OK'; }, 'mvcc', []),
       step('Pixels Sink sends the DELETE row changes after the mirror transaction has a timestamp.', 3.6,
         ['ingress'], [tok('DELETE', 'ingress.right', 'runtime.left', flow.delete, .18, .86)],
-        m => { m.sink.sinkStep = 'row2'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=290'; m.sink.rpcBatch = 'DELETE pending'; m.lanes[1].currentOp = 'D:pk208'; }, 'dispatch', []),
+        m => { m.sink.sinkStep = 'row2'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=290'; m.sink.rpcBatch = 'DELETE pending'; m.lanes[1].currentOp = 'D:pk208'; }, 'dispatch', []),
       step('Retina sends a delete request to Index Service for the second index entry.', 4.0,
         ['index'], [tok('delete pk@290', 'runtime.right', 'index.left', flow.index, .12, .82)],
         m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'DELETE'; l.status = 'delete index entry'; l.highlight = null; m.index.hot = 'pk208'; m.index.operation = 'delete pk@290 in flight'; m.sink.rpcBatch = 'DELETE applying'; }, 'index', ['index']),
@@ -997,8 +949,8 @@
         m => { m.sink.sinkStep = 'row2Ok'; m.sink.requestState = 'DELETE OK'; m.sink.rpcBatch = 'OK'; clearDeleteTsChainEffects(m, DETAIL_REPLAY_ID); }, 'mvcc', []),
       step('Pixels Sink sends the UPDATE row changes after the mirror transaction has a timestamp.', 3.6,
         ['ingress'], [tok('UPDATE', 'ingress.right', 'runtime.left', flow.index, .18, .86)],
-        m => { m.sink.sinkStep = 'row3'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=290'; m.sink.rpcBatch = 'UPDATE pending'; m.lanes[1].currentOp = 'U:pk132'; }, 'dispatch', []),
-      step('Retina inserts the UPDATE after image into the active memtable as the new tuple version.', 4.0,
+        m => { m.sink.sinkStep = 'row3'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=290'; m.sink.rpcBatch = 'UPDATE pending'; m.lanes[1].currentOp = 'U:pk132'; }, 'dispatch', []),
+      step('Retina inserts the UPDATE after image into the active memtable as the new tuple version.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.currentOp = 'U:pk132'; l.status = 'append after image'; l.activeRows = 1; l.highlight = 'active'; m.index.operation = 'await update index'; m.sink.rpcBatch = 'UPDATE applying'; }, 'writeBuffer', []),
       step('Because the active memtable is not full, Retina sends an update request to Index Service.', 3.6,
@@ -1026,50 +978,30 @@
         [], [],
         m => { m.sink.sinkStep = 'committed'; m.sink.requestState = 'HWM advanced'; m.sink.txState = 'tx8421 committed; HWM=291'; m.tx.hwm = 291; }, 'mvcc', [])
     ],
-    routing: [
-      step('Pixels Sink has reconstructed tx43 from the CDC stream and starts replaying its row changes.', 3.8,
-        ['cdcStream', 'ingress'], [tok('tx43 rows', 'cdcStream.out', 'ingress.top', flow.cdc, .08, .78)],
-        m => { m.sink.sinkStep = 'replay'; m.sink.coordState = 'tx43 mirror tx'; m.sink.requestState = 'replay rows'; m.sink.routingRule = 'inspect row image'; }, 'cdc', ['cdc']),
-      step('Insert rows use the after-image primary key, so the new tuple can be staged for replay.', 4.0,
-        ['ingress', 'lane0'], [tok('I:pk160', 'ingress.right', 'runtime.left', flow.replay, .12, .82)],
-        m => { m.sink.routingRule = 'insert: after key'; m.sink.writePlan = 'pk160 queued'; m.lanes[0].currentOp = 'I:pk160'; m.lanes[0].status = 'after key staged'; }, 'dispatch', ['dispatch']),
-      step('Delete rows use the before-image primary key because the current tuple location must be resolved from the old key.', 4.0,
-        ['ingress', 'lane1', 'index'], [tok('D:pk208', 'ingress.right', 'runtime.left', flow.delete, .08, .58), tok('old key lookup', 'lane1.in', 'index.in', flow.index, .52, .92)],
-        m => { m.sink.routingRule = 'delete: before key'; m.sink.writePlan = 'pk208 queued'; m.lanes[1].currentOp = 'D:pk208'; m.index.hot = 'pk208'; m.index.operation = 'resolve before key'; }, 'dispatch', ['dispatch', 'index']),
-      step('If an update changes its primary key, Pixels Sink preserves the delete-old then insert-new order before replay.', 4.4,
-        ['ingress', 'lane1', 'lane2'], [tok('delete old pk132', 'ingress.right', 'runtime.left', flow.delete, .08, .58), tok('insert new pk733', 'ingress.right', 'runtime.left', flow.replay, .40, .92)],
-        m => { m.sink.routingRule = 'pk update: split'; m.sink.writePlan = 'delete old before insert new'; m.sink.rpcBatch = 'tx43 rows staged'; m.lanes[1].currentOp = 'D:pk132'; m.lanes[2].currentOp = 'I:pk733'; }, 'dispatch', ['dispatch']),
-      step('Pixels Sink begins mirror transactions with Transaction Service, then sends replay RPCs to Retina replayers.', 4.6,
-        ['ingress', 'tx', 'runtime'], [tok('tx43 ts291', 'tx.left', 'ingress.beginRight', flow.tx, .04, .34), tok('tx44 ts292', 'tx.left', 'ingress.beginRight', flow.tx, .16, .46), tok('tx45 ts293', 'tx.left', 'ingress.beginRight', flow.tx, .28, .58), tok('replay RPCs', 'ingress.right', 'runtime.left', flow.replay, .58, .96)],
-        m => { m.sink.sinkStep = 'replay'; m.sink.requestMode = 'replay RPC'; m.sink.requestState = '3 mirror tx'; m.sink.rpcBatch = 'tx43 + tx44 + tx45'; m.sink.txState = 'timestamps assigned'; }, 'mvcc', ['tx']),
-      step('Inside Retina, the same RPC applies rows from different transactions while preserving their visibility timestamps.', 4.2,
-        ['ingress', 'lane0', 'lane1', 'lane2'], [tok('tx43 row', 'ingress.right', 'runtime.left', flow.replay, .08, .58), tok('tx44 row', 'ingress.right', 'runtime.left', flow.delete, .22, .74), tok('tx45 row', 'ingress.right', 'runtime.left', flow.replay, .36, .90)],
-        m => { m.sink.requestState = 'apply one RPC'; m.sink.rpcBatch = '3 tx rows'; m.lanes[0].currentOp = 'tx43 I:pk160'; m.lanes[1].currentOp = 'tx44 D:pk208'; m.lanes[2].currentOp = 'tx45 I:pk733'; }, 'dispatch', ['dispatch'])
-    ],
     insert: [
-      ...singleOpCdcPrelude('insert', 'tx290'),
       step('Pixels Sink begins mirror transaction tx290 and Transaction Service assigns timestamp=290.', 4.0,
-        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
+        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, MIRROR_BEGIN_TS_REPLY_END)],
         m => { m.sink.sinkStep = 'begin'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
       step('Pixels Sink sends the INSERT row changes after the mirror transaction has a timestamp.', 3.6,
         ['ingress'], [tok('INSERT', 'ingress.right', 'runtime.left', flow.replay, .18, .86)],
         m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay RPC ready'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
-      step('Retina applies the INSERT to the write buffer first: the active memtable grows by one row.', 4.0,
+      step('Retina applies the INSERT to the write buffer first: the active memtable grows by one row.', 2.0,
         ['lane1'],
         [],
         m => { const l = m.lanes[1]; l.currentOp = 'I:pk174'; l.status = 'append after image'; l.activeRows = 8; l.highlight = 'active'; m.sink.rpcBatch = 'INSERT applying'; }, 'writeBuffer', []),
-      step('The active memtable reaches capacity, so Retina seals it into the immutable queue and opens a fresh empty active memtable.', 3.9,
+      step('The active memtable reaches capacity, so Retina seals it into the immutable queue and opens a fresh empty active memtable.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.activeRows = 0; l.immutable += 1; l.highlight = 'immutable'; }, 'writeBuffer', [], 'seal'),
       step('The sealed memtable now sits in the immutable queue while the active memtable is empty again.', 1.2,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.highlight = 'immutable'; }, 'writeBuffer', []),
-      step('A background flush asynchronously moves the immutable memtable to Storage.', 3.8,
+      step('A background flush asynchronously moves the immutable memtable to Storage.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; }, 'writeBuffer', [], 'flush'),
       step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
         [], [],
         m => { m.lanes[1].highlight = null; settlePendingFlushObject(m); }, 'storage', []),
+      compactFlushedObjectsToFile(),
       step('After the row is appended, Retina calls Index Service to insert the primary and row-location indexes.', 4.2,
         ['index'], [tok('put pk@290', 'runtime.right', 'index.left', flow.index, .12, .82)],
         m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk174'; m.index.operation = 'put pk@290 in flight'; }, 'index', ['index']),
@@ -1090,13 +1022,12 @@
         m => { m.sink.sinkStep = 'committed'; m.sink.requestState = 'HWM advanced'; m.sink.txState = 'tx290 committed; HWM=291'; m.tx.hwm = 291; }, 'mvcc', [])
     ],
     delete: [
-      ...singleOpCdcPrelude('delete', 'tx290'),
       step('Pixels Sink begins mirror transaction tx290 and Transaction Service assigns timestamp=290.', 4.0,
-        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
-        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
+        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, MIRROR_BEGIN_TS_REPLY_END)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
       step('Pixels Sink sends the DELETE row changes after the mirror transaction has a timestamp.', 3.6,
         ['ingress'], [tok('DELETE', 'ingress.right', 'runtime.left', flow.delete, .18, .86)],
-        m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
+        m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
       step('Retina sends a delete request to Index Service for pk208 before deleting visibility.', 4.0,
         ['index'], [tok('delete pk@212', 'runtime.right', 'index.left', flow.index, .12, .82)],
         m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'DELETE'; l.status = 'delete index entry'; l.highlight = null; m.index.hot = 'pk208'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-07/rg0/off7']; m.index.operation = 'delete pk@212 in flight'; m.sink.rpcBatch = 'DELETE applying'; }, 'index', ['index']),
@@ -1112,23 +1043,22 @@
       ...commitSequence('tx290', 291, 'delete committed; HWM=291', DETAIL_REPLAY_ID)
     ],
     update: [
-      ...singleOpCdcPrelude('update', 'tx290'),
       step('Pixels Sink begins mirror transaction tx290 and Transaction Service assigns timestamp=290.', 4.0,
-        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
-        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
+        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, MIRROR_BEGIN_TS_REPLY_END)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
       step('Pixels Sink sends the UPDATE row changes after the mirror transaction has a timestamp.', 3.6,
         ['ingress'], [tok('UPDATE', 'ingress.right', 'runtime.left', flow.index, .18, .86)],
-        m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
-      step('Retina first inserts the after image into the write buffer as the new tuple version.', 4.0,
+        m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
+      step('Retina first inserts the after image into the write buffer as the new tuple version.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.currentOp = 'U:pk132'; l.status = 'append after image'; l.activeRows = 8; l.highlight = 'active'; m.index.operation = 'await update index'; m.sink.rpcBatch = 'UPDATE applying'; }, 'writeBuffer', []),
-      step('The active memtable reaches capacity, so Retina seals the new tuple version into the immutable queue.', 3.9,
+      step('The active memtable reaches capacity, so Retina seals the new tuple version into the immutable queue.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.activeRows = 0; l.immutable += 1; l.highlight = 'immutable'; }, 'writeBuffer', [], 'seal'),
       step('The sealed memtable now sits in the immutable queue while a fresh active memtable is open.', 1.2,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.highlight = 'immutable'; }, 'writeBuffer', []),
-      step('A background flush asynchronously moves the immutable memtable containing the new tuple version to Storage.', 3.8,
+      step('A background flush asynchronously moves the immutable memtable containing the new tuple version to Storage.', 2.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; }, 'writeBuffer', [], 'flush'),
       step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
@@ -1169,33 +1099,24 @@
         m => { m.query.gate.state = 'done'; m.query.queueState = '4 visible batches'; m.query.operatorInput = 'visible batches only'; m.query.returnedRows = 18804; }, 'query', ['query'])
     ],
     gc: [
-      step(`RetinaResourceManager.runGC asks Transaction Service for safeTs=${DEFAULT_GC_SAFE_TS} (HWM - 1, no running query) and sends it to RGVisibility.garbageCollect(safeTs).`, 3.8,
-        ['tx', 'lane1', 'runtime'], [tok('Memory GC asks', 'runtime.top', 'tx.bottom', flow.gc, .08, .42), tok(`safeTs=${DEFAULT_GC_SAFE_TS}`, 'tx.hwm', 'lane1.visibility', flow.gc, .42, .92)],
-        m => { m.lanes[DETAIL_REPLAY_ID].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[DETAIL_REPLAY_ID].highlight = 'visibility'; m.storage.cleanup = 'waiting for bitmap folding'; }, 'gc', ['visibility']),
-      step('Visibility structure compares safeTs with the delete ts chain and highlights items that are safe to fold.', 4.0,
-        ['lane1', 'runtime'], [tok('safe items', 'lane1.visibility', 'lane1.deleteArray', flow.visibility, .08, .70), tok('<= safeTs', 'lane1.deleteArray', 'lane1.baseBitmap', flow.gc, .55, .94)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(2,272)', '(4,278)', '(7,283)', '(9,291)']; l.highlight = 'foldEligible'; }, 'gc', ['visibility']),
-      step('garbageCollect(safeTs) folds the highlighted delete items into baseBitmap, advances baseTs, and leaves newer delete items in the chain.', 4.0,
-        ['lane1', 'runtime'], [tok('fold delete items', 'lane1.deleteArray', 'lane1.baseBitmap', flow.gc, .08, .78)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(9,291)']; l.baseBitmap = '0010100000000000'; l.baseTs = DEFAULT_GC_SAFE_TS; l.highlight = 'baseBitmap'; }, 'gc', ['visibility']),
-      step('After bitmap folding, foreground replay can continue while Retina prepares Storage GC file groups; no running query is holding the GC safe timestamp back.', 4.0,
-        ['lane1', 'lane2', 'runtime'], [tok('folded bitmap', 'lane1.baseBitmap', 'storage.aging', flow.gc, .05, .50), tok('replay continues', 'ingress.right', 'runtime.left', flow.replay, .34, .82)],
-        m => { m.lanes[DETAIL_REPLAY_ID].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[2].status = 'replay continues'; m.query.active = false; }, 'gc', ['dispatch', 'query']),
-      step('Storage GC selects low-valid-ratio regular files. They remain regular columnar files, just highlighted as rewrite candidates.', 4.0,
-        ['runtime', 'storage'], [tok('candidate files', 'runtime.right', 'storage.aging', flow.gc, .08, .76)],
-        m => { m.storage.agingQueue = ['file-04.pxl', 'file-05.pxl']; m.storage.cleanup = 'rewrite candidates'; }, 'storageGc', ['storage']),
-      step('Storage GC rewrites still-visible tuple versions into a new TEMPORARY_GC file inside the regular-files panel.', 4.5,
-        ['storage', 'tx'], [tok(`safeTs=${DEFAULT_GC_SAFE_TS}`, 'tx.hwm', 'storage.files', flow.tx, .08, .48), tok('visible tuples', 'storage.aging', 'storage.newFile', flow.storage, .42, .96)],
-        m => { m.storage.newFile = 'file-08.pxl'; m.storage.newFileState = 'TEMPORARY_GC'; m.storage.cleanup = 'new TEMPORARY_GC'; }, 'storageGc', ['tx']),
-      step('Before publishing it, Retina registers dual-write, synchronizes visibility, and refreshes main and primary index locations.', 4.6,
-        ['storage', 'index', 'lane2'], [tok('location map', 'storage.newFile', 'index.in', flow.index, .06, .56), tok('sync visibility', 'storage.newFile', 'lane2.in', flow.visibility, .48, .94)],
-        m => { m.index.operation = 'storage GC location map'; m.index.mainEntries = ['rowId822 -> file-08/rg0/off2', 'rowId823 -> file-08/rg0/off3']; m.lanes[2].deleteTs.push('(dual,293)'); m.lanes[2].highlight = 'visibility'; }, 'index', ['index', 'visibility']),
-      step('Retina promotes the new file to REGULAR and marks old regular files RETIRED with cleanupAt.', 4.2,
-        ['storage'], [tok('TEMP -> REGULAR', 'storage.newFile', 'storage.files', flow.gc, .08, .46), tok('old -> RETIRED', 'storage.aging', 'storage.files', flow.delete, .44, .90)],
-        m => { m.storage.newFileState = 'REGULAR'; m.storage.regularFiles = ['file-06.pxl', 'file-07.pxl', 'file-08.pxl']; m.storage.cleanup = 'old files RETIRED cleanupAt'; }, 'storageGc', ['storage']),
-      step('After retireDelayMs / cleanupAt, processRetiredFiles reclaims visibility and index state, then physically deletes retired files.', 4.0,
-        ['storage', 'lane2'], [tok('cleanupAt reached', 'storage.files', 'storage.aging', flow.gc, .08, .72), tok('reclaim state', 'lane2.out', 'runtime.right', flow.gc, .32, .92)],
-        m => { m.storage.staleRatio = 0.18; m.storage.agingQueue = []; m.storage.newFile = 'none'; m.storage.newFileState = 'none'; m.storage.regularFiles = ['file-06.pxl', 'file-07.pxl', 'file-08.pxl']; m.storage.cleanup = 'retired files physically deleted'; m.lanes[2].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[2].highlight = 'baseBitmap'; }, 'gc', ['visibility'])
+      step(`Transaction Service sends safeTs=${DEFAULT_GC_SAFE_TS} to Retina.`, 3.0,
+        ['tx'], [tok(`safeTs=${DEFAULT_GC_SAFE_TS}`, 'tx.bottom', 'runtime.top', flow.tx, .16, .86)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = m.tx.lwm - 1; l.highlight = null; m.storage.cleanup = 'safeTs received'; }, 'mvcc', ['tx']),
+      step('Retina checks the delete ts chain and highlights entries with ts <= safeTs.', 3.2,
+        [], [],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = m.tx.lwm - 1; l.highlight = 'foldEligible'; }, 'gc', ['visibility']),
+      step('Retina folds eligible delete timestamps into baseBitmap, advances baseTs to safeTs, and removes those entries from the chain.', 4.0,
+        [], [],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; foldDeleteTsIntoBaseBitmap(l, m.tx.lwm - 1); }, 'gc', ['visibility'], 'foldDeleteTs'),
+      step('Retina finishes the fold and clears the focus before Storage starts its file-validity check.', 1.2,
+        [], [],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.highlight = null; m.storage.cleanup = 'safeTs folded'; }, 'overview', []),
+      step('Storage checks regular files and highlights files whose valid ratio is at or below the compaction threshold.', 4.0,
+        [], [],
+        m => { m.lanes[DETAIL_REPLAY_ID].highlight = null; m.storage.cleanup = 'valid ratio check'; }, 'storageGc', ['storage'], 'validRatioCheck'),
+      step('Storage merges file-0 and file-1 into file-2, then removes the old files.', 4.0,
+        [], [],
+        m => { m.lanes[DETAIL_REPLAY_ID].highlight = null; m.storage.compactionFile = 'file-2.pxl'; m.storage.regularFiles = ['file-2.pxl']; m.storage.cleanup = 'compact files'; }, 'storageGc', ['storage'], 'compactRegularFiles')
     ]
   };
 
@@ -1224,23 +1145,17 @@
     m.storage.flushedHot = null;
   }
 
-  function singleOpCdcPrelude(op, txId) {
-    const spec = normalizeMirrorOp(op, 0);
-    const recordCount = cdcStreamRecordCount(1);
-    return [
-      step(`The CDC stream starts ${txId} with BEGIN on the ordered source log.`, cdcStreamPhaseUnits('begin', recordCount),
-        ['cdcStream'], [],
-        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'begin'; m.sink.cdcRecord = 'BEGIN'; m.sink.requestState = 'waiting for CDC row'; }, 'cdc', ['cdc']),
-      step(`The ${spec.label} row change arrives on the CDC stream.`, cdcStreamPhaseUnits('rows', recordCount),
-        ['cdcStream'], [],
-        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'rows'; m.sink.cdcRecord = spec.label; m.sink.requestState = `${spec.label} row streaming`; }, 'cdc', ['cdc']),
-      step(`COMMIT closes the ${txId} CDC stream.`, cdcStreamPhaseUnits('commit', recordCount),
-        ['cdcStream'], [],
-        m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'commit'; m.sink.cdcRecord = 'COMMIT'; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc']),
-      step(`The complete ${txId} CDC log is handed to Pixels Sink.`, 1.2,
-        ['cdcStream', 'ingress'], [tok('complete log', 'cdcStream.out', 'ingress.top', flow.cdc, .14, .82)],
-        m => { m.sink.sinkStep = 'build'; m.sink.cdcPhase = 'complete'; m.sink.cdcRecord = 'COMMIT'; m.sink.coordState = `${txId} complete`; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc'])
-    ];
+  function compactFlushedObjectsToFile(fileLabel = 'file-2.pxl') {
+    return step(`Storage compacts the flushed objects into ${fileLabel}, moves it into files, then removes the old objects.`, 4.0,
+      ['storage'], [],
+      m => {
+        m.storage.compactionFile = fileLabel;
+        m.storage.objectEntries = [];
+        if (!m.storage.regularFiles.includes(fileLabel)) m.storage.regularFiles.push(fileLabel);
+        m.storage.pendingFlushObject = null;
+        m.storage.flushedHot = null;
+        m.storage.cleanup = 'compact objects to file';
+      }, 'storage', ['storage'], 'compactObjectsToFile');
   }
 
   function commitSequence(txId, hwm, committedStatus, clearDeleteTsLaneId = null) {
@@ -1360,7 +1275,17 @@
     const st = currentStep();
     state.detailFocus = st.detail || 'overview';
     state.activeChannels = st.channels || [];
-    model.lanes.forEach(l => { l.prevActiveRows = l.activeRows; l.prevImmutable = l.immutable; });
+    model.lanes.forEach(l => {
+      l.prevActiveRows = l.activeRows;
+      l.prevImmutable = l.immutable;
+      l.prevDeleteTs = [...l.deleteTs];
+      l.prevBaseTs = l.baseTs;
+      l.prevBaseBitmap = l.baseBitmap;
+    });
+    if (model.storage) {
+      model.storage.prevRegularFiles = [...model.storage.regularFiles];
+      model.storage.prevObjectEntries = [...model.storage.objectEntries];
+    }
     if (st.apply) st.apply(model);
     updateControls();
   }
@@ -1494,7 +1419,7 @@
 
   function hitTest(x, y) {
     const zones = [
-      ['cdcStream', rects.cdcStream], ['ingress', rects.ingress], ['runtime', rects.runtime],
+      ['ingress', rects.ingress], ['runtime', rects.runtime],
       ['tx', rects.tx], ['index', rects.index],
       ['storage', rects.storage]
     ];
@@ -1526,7 +1451,6 @@
     drawCanvasHeader(c);
     drawBoundaries(c);
     drawStaticFlows(c);
-    drawExternalCdcStream(c);
     drawPixelsSink(c);
     drawTransactionService(c);
     drawIndex(c);
@@ -1618,7 +1542,7 @@
   }
 
   function moduleActivityColor(key) {
-    if (key === 'cdcStream' || key === 'ingress') return flow.cdc;
+    if (key === 'ingress') return flow.cdc;
     if (key === 'query') return flow.query;
     if (key === 'runtime') return currentReplayOperationColor();
     if (key === 'index') return currentIndexOperationColor();
@@ -1744,115 +1668,6 @@
     drawMirrorTransactionPanel(layout, activeId, c);
   }
 
-  function drawExternalCdcStream(c) {
-    drawCdcStreamPanel(rects.cdcStream, currentPixelsSinkStep(), c);
-  }
-
-  function cdcStreamRecords() {
-    const rows = [{ label: 'BEGIN', color: flow.cdc, begin: true }];
-    rows.push(...mirrorTxnOps().map(op => ({ label: op.label, color: op.color, row: true })));
-    rows.push({ label: 'COMMIT', color: flow.cdc, commit: true });
-    return rows;
-  }
-
-  function cdcStreamRecordCount(rowRecords = CDC_STREAM_ROW_RECORDS) {
-    return rowRecords + 2;
-  }
-
-  function cdcStreamProgressState(records) {
-    const phase = model && model.sink ? model.sink.cdcPhase : 'idle';
-    const local = stepProgress();
-    const maxPos = records.length;
-    const rowCount = Math.max(1, records.length - 2);
-    let cursorPos = 0;
-    if (phase === 'begin') cursorPos = local;
-    else if (phase === 'rows') cursorPos = 1 + local * rowCount;
-    else if (phase === 'commit') cursorPos = maxPos - 1 + local;
-    else if (phase === 'complete') cursorPos = maxPos;
-    cursorPos = clamp(cursorPos, 0, maxPos);
-    return {
-      phase,
-      cursorPos,
-      reachedIndex: Math.floor(cursorPos + 1e-6) - 1,
-      cursorP: cdcStreamRailP(cursorPos, maxPos),
-      done: phase === 'complete'
-    };
-  }
-
-  function cdcStreamPhaseUnits(phase, recordCount = CDC_STREAM_RECORD_COUNT) {
-    const maxPos = Math.max(2, recordCount);
-    const rowCount = Math.max(1, maxPos - 2);
-    const ranges = {
-      begin: [0, 1],
-      rows: [1, 1 + rowCount],
-      commit: [maxPos - 1, maxPos]
-    };
-    const range = ranges[phase];
-    if (!range) return CDC_STREAM_RECORD_GAP_UNITS;
-    const referenceGapP = Math.abs(cdcStreamRailP(2, CDC_STREAM_RECORD_COUNT) - cdcStreamRailP(1, CDC_STREAM_RECORD_COUNT));
-    const phaseP = Math.abs(cdcStreamRailP(range[1], maxPos) - cdcStreamRailP(range[0], maxPos));
-    return Math.max(.1, phaseP / Math.max(.001, referenceGapP) * CDC_STREAM_RECORD_GAP_UNITS);
-  }
-
-  function cdcStreamRailMargin(maxPos) {
-    return maxPos === cdcStreamRecordCount(1) ? CDC_STREAM_SINGLE_OP_RAIL_MARGIN_P : CDC_STREAM_RAIL_MARGIN_P;
-  }
-
-  function cdcStreamRailP(cursorPos, maxPos) {
-    const margin = cdcStreamRailMargin(maxPos);
-    if (maxPos <= 1) return .5;
-    if (cursorPos <= 1) return lerp(0, margin, clamp(cursorPos, 0, 1));
-    return margin + clamp((cursorPos - 1) / (maxPos - 1), 0, 1) * (1 - margin * 2);
-  }
-
-  function drawCdcStreamPanel(stream, activeId, c) {
-    const phase = model && model.sink ? model.sink.cdcPhase : 'idle';
-    const active = isHighlighted('cdcStream') || ['begin', 'rows', 'commit'].includes(phase);
-    ctx.fillStyle = active ? alpha(flow.cdc, c.dark ? .16 : .10) : alpha(c.elevated, .94);
-    ctx.strokeStyle = active ? alpha(flow.cdc, .62) : c.borderSoft;
-    ctx.lineWidth = active ? 1.4 : 1;
-    roundRect(stream.x, stream.y, stream.w, stream.h, 10, true, true);
-
-    ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.moduleTitle, 900);
-    ctx.textAlign = 'left';
-    fitText('CDC stream', stream.x + MODULE_TITLE_X, stream.y + MODULE_TITLE_Y, stream.w - MODULE_TITLE_X * 2, 'left');
-
-    const railY = stream.y + 58;
-    const startX = stream.x + MODULE_CONTENT_PAD;
-    const endX = stream.x + stream.w - MODULE_CONTENT_PAD;
-    ctx.strokeStyle = active ? alpha(flow.cdc, .62) : alpha(c.border, .46);
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(startX, railY);
-    ctx.lineTo(endX, railY);
-    ctx.stroke();
-
-    const records = cdcStreamRecords();
-    const progress = cdcStreamProgressState(records);
-    records.forEach((record, i) => {
-      if (i > progress.reachedIndex) return;
-      const x = map(cdcStreamRailP(i + 1, records.length), 0, 1, startX, endX);
-      const cardW = CDC_STREAM_CARD_W;
-      const cardTextSize = TYPE.text;
-      drawCdcDot(x, railY, true, record.color, c);
-      drawRecordTypeCard(x - cardW / 2, railY + 14, cardW, 24, record.label, record.color, c, cardTextSize);
-    });
-
-    if (progress.done) return;
-    const p = progress.cursorP;
-    const cursorX = map(p, 0, 1, startX, endX);
-    ctx.fillStyle = flow.cdc;
-    ctx.beginPath();
-    ctx.arc(cursorX, railY, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = alpha('#ffffff', .74);
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(cursorX, railY, 11, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
   function drawMirrorTransactionPanel(layout, activeId, c) {
     const { txn, begin, rows, replay, commit } = layout;
     const active = !!activeId && activeId !== 'empty' && activeId !== 'committed';
@@ -1906,11 +1721,15 @@
     ctx.textAlign = 'left';
     ctx.fillText('BEGIN', box.x + 18, box.y + 29);
     const tsLabel = mirrorBeginTimestampLabel();
-    if (tsLabel) {
+    const tsAlpha = mirrorBeginTimestampAlpha();
+    if (tsLabel && tsAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha *= tsAlpha;
       ctx.fillStyle = c.text;
       ctx.font = typeFont(TYPE.text, 800);
       ctx.textAlign = 'right';
       fitText(tsLabel, box.x + box.w - 82, box.y + 31, 64, 'right');
+      ctx.restore();
     }
   }
 
@@ -1918,8 +1737,14 @@
     const text = String(model.sink.txState || '');
     const match = text.match(/\b(?:timestamp|ts)\s*=\s*(\d{1,4})\b/i);
     if (!match) return '';
-    if (currentPixelsSinkStep() === 'begin' && stepProgress() < .54) return '';
     return `ts=${match[1]}`;
+  }
+
+  function mirrorBeginTimestampAlpha() {
+    if (currentPixelsSinkStep() !== 'begin') return 1;
+    const p = stepProgress();
+    if (p < MIRROR_BEGIN_TS_REPLY_END) return 0;
+    return ease(clamp((p - MIRROR_BEGIN_TS_REPLY_END) / (MIRROR_BEGIN_TS_FADE_END - MIRROR_BEGIN_TS_REPLY_END), 0, 1));
   }
 
   function drawMirrorRowCard(row, active, c) {
@@ -2030,13 +1855,13 @@
     roundRect(x, y, w, h, 8, true, true);
   }
 
-  function drawRecordTypeCard(x, y, w, h, label, color, c, fs = TYPE.text) {
+  function drawRecordTypeCard(x, y, w, h, label, color, c, fs = TYPE.text, weight = 900) {
     ctx.fillStyle = alpha(color, .16);
     ctx.strokeStyle = alpha(color, .48);
     ctx.lineWidth = 1;
     roundRect(x, y, w, h, 6, true, true);
     ctx.fillStyle = color;
-    ctx.font = typeFont(fs, 900);
+    ctx.font = typeFont(fs, weight);
     ctx.textAlign = 'center';
     fitText(label, x + 4, y + h / 2 + fs * .36, w - 8, 'center');
   }
@@ -3023,10 +2848,7 @@
     const layout = replayVisibilityLayout(x, y, w, h);
     const { rowX, rowY, labelW, bitmapX, bitmapW, chainY, chainH } = layout;
 
-    ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'left';
-    fitText(`baseTs=${lane.baseTs}`, rowX, rowY + 14, labelW - 4, 'left');
+    drawBaseTsLabel(lane, rowX, rowY + 14, labelW - 4, c);
     drawFixedDeleteBitmap(lane, bitmapX, rowY, bitmapW, c);
 
     const chainX = x + MODULE_CONTENT_PAD;
@@ -3041,19 +2863,50 @@
     ctx.font = typeFont(TYPE.text, 800);
     ctx.textAlign = 'left';
     ctx.fillText('delete ts chain', chainX + chainPad, chainY + 22);
-    drawCompactDeleteTsItems(chainX + itemPad, chainY + 34, chainW - itemPad * 2, lane, c);
+    const itemsY = chainY + 34;
+    drawCompactDeleteTsItems(chainX + itemPad, itemsY, chainW - itemPad * 2, lane, c);
+    drawFoldingDeleteTsItems(chainX + itemPad, itemsY, chainW - itemPad * 2, bitmapX, rowY, bitmapW, lane, c);
+    drawDeleteTsConditionPill(chainX + itemPad, itemsY + 32, chainW - itemPad * 2, lane, c);
+  }
+
+  function drawBaseTsLabel(lane, x, y, w, c) {
+    const foldActive = currentStep().anim === 'foldDeleteTs';
+    const p = stepProgress();
+    const showUpdatedBaseTs = !foldActive || p >= .72;
+    const labelTs = showUpdatedBaseTs ? lane.baseTs : lane.prevBaseTs;
+    ctx.save();
+    ctx.fillStyle = foldActive && showUpdatedBaseTs ? flow.gc : c.text;
+    ctx.font = typeFont(TYPE.text, foldActive ? 900 : 900);
+    ctx.textAlign = 'left';
+    if (foldActive && showUpdatedBaseTs) ctx.globalAlpha *= lerp(.72, 1, ease(clamp((p - .72) / .18, 0, 1)));
+    fitText(`baseTs=${labelTs}`, x, y, w, 'left');
+    ctx.restore();
+  }
+
+  function drawDeleteTsConditionPill(x, y, w, lane, c) {
+    if (lane.highlight !== 'foldEligible') return;
+    const p = stepProgress();
+    if (p < .12) return;
+    const a = ease(clamp((p - .12) / .28, 0, 1));
+    const out = 1 - ease(clamp((p - .62) / .10, 0, 1));
+    if (out <= 0) return;
+    const pillW = Math.min(118, Math.max(86, w * .44));
+    const pillH = 24;
+    ctx.save();
+    ctx.globalAlpha *= a * out;
+    drawPill(x + (w - pillW) / 2, y, pillW, pillH, 'ts <= safeTs', flow.visibility, c, true, 8);
+    ctx.restore();
   }
 
   function drawFixedDeleteBitmap(lane, x, y, w, c) {
     const len = 16;
-    const bits = (lane.baseBitmap || '').padEnd(len, '0').slice(0, len);
-    const gap = 3;
-    const cellW = Math.max(7, Math.min(12, Math.floor((w - gap * (len - 1)) / len)));
-    const cellH = 18;
-    const totalW = len * cellW + (len - 1) * gap;
-    const startX = x + Math.max(0, (w - totalW) / 2);
+    const foldActive = currentStep().anim === 'foldDeleteTs';
+    const foldP = stepProgress();
+    const showFoldedBits = !foldActive || foldP >= .72;
+    const bits = ((showFoldedBits ? lane.baseBitmap : lane.prevBaseBitmap) || '').padEnd(len, '0').slice(0, len);
     const pendingDeletes = new Set();
     const eligibleDeletes = new Set();
+    const newlyFolded = new Set();
 
     lane.deleteTs.forEach(item => {
       const offset = deleteOffsetValue(item);
@@ -3063,18 +2916,28 @@
         eligibleDeletes.add(offset);
       }
     });
+    if (foldActive) {
+      (lane.prevDeleteTs || []).forEach(item => {
+        const offset = foldBitmapOffsetValue(item, lane);
+        if (Number.isFinite(offset) && offset >= 0 && offset < len && lane.safeTs != null && deleteTsValue(item) <= lane.safeTs) {
+          newlyFolded.add(offset);
+        }
+      });
+    }
 
     for (let i = 0; i < len; i++) {
       const folded = bits[i] === '1';
       const eligible = eligibleDeletes.has(i);
       const pending = pendingDeletes.has(i);
+      const justFolded = newlyFolded.has(i);
       let fill = alpha(c.border, .22);
       let stroke = alpha(c.border, .56);
 
       if (folded) {
-        const color = lane.highlight === 'baseBitmap' ? flow.gc : flow.visibility;
-        fill = alpha(color, .62);
-        stroke = alpha(color, .78);
+        const color = justFolded ? flow.gc : flow.delete;
+        const foldedAlpha = justFolded ? lerp(.28, .72, ease(clamp((foldP - .72) / .18, 0, 1))) : .62;
+        fill = justFolded ? alpha(color, foldedAlpha) : alpha(flow.delete, .46);
+        stroke = justFolded ? alpha(color, .88) : alpha(flow.delete, .70);
       } else if (eligible) {
         fill = alpha(flow.gc, .50);
         stroke = alpha(flow.gc, .76);
@@ -3085,9 +2948,24 @@
 
       ctx.fillStyle = fill;
       ctx.strokeStyle = stroke;
-      ctx.lineWidth = folded || pending ? 1.2 : 1;
-      roundRect(startX + i * (cellW + gap), y, cellW, cellH, 2.5, true, true);
+      ctx.lineWidth = folded || pending ? (justFolded ? 1.8 : 1.2) : 1;
+      const cell = bitmapCellRect(x, y, w, i);
+      roundRect(cell.x, cell.y, cell.w, cell.h, 2.5, true, true);
     }
+  }
+
+  function bitmapCellMetrics(x, w, len = 16) {
+    const gap = 3;
+    const cellW = Math.max(7, Math.min(12, Math.floor((w - gap * (len - 1)) / len)));
+    const cellH = 18;
+    const totalW = len * cellW + (len - 1) * gap;
+    const startX = x + Math.max(0, (w - totalW) / 2);
+    return { gap, cellW, cellH, startX };
+  }
+
+  function bitmapCellRect(x, y, w, index) {
+    const m = bitmapCellMetrics(x, w);
+    return { x: m.startX + index * (m.cellW + m.gap), y, w: m.cellW, h: m.cellH };
   }
 
   function drawCompactDeleteTsItems(x, y, w, lane, c) {
@@ -3096,7 +2974,8 @@
     const st = currentStep();
     const hideAppendingItem = st.anim === 'appendDeleteTs' && stepProgress() < .82;
     const appendSettled = st.anim === 'appendDeleteTs' && stepProgress() >= .82;
-    const items = hideAppendingItem ? lane.deleteTs.slice(0, -1) : lane.deleteTs;
+    const foldingDeleteTs = st.anim === 'foldDeleteTs' && stepProgress() < .82;
+    const items = foldingDeleteTs ? (lane.prevDeleteTs || lane.deleteTs) : hideAppendingItem ? lane.deleteTs.slice(0, -1) : lane.deleteTs;
     const visible = items.slice(0, columns * rows);
     const itemW = Math.min(72, Math.floor((w - 18 * (columns - 1)) / columns));
     const gapX = columns > 1 ? (w - itemW * columns) / (columns - 1) : 0;
@@ -3107,10 +2986,12 @@
       const row = Math.floor(i / columns);
       const ts = deleteTsValue(item);
       const eligible = lane.safeTs != null && ts <= lane.safeTs;
-      const gcActive = lane.highlight === 'foldEligible' && eligible;
+      const gcActive = foldEligibleHighlightReady() && lane.highlight === 'foldEligible' && eligible;
+      const foldingEligible = foldingDeleteTs && eligible;
+      if (foldingEligible) return;
       const appendVisible = st.anim !== 'appendDeleteTs' || !hideAppendingItem;
-      const active = gcActive || (lane.highlight === 'visibility' && appendVisible && !appendSettled && i === visible.length - 1);
-      const color = gcActive ? flow.gc : flow.delete;
+      const active = gcActive || foldingEligible || (lane.highlight === 'visibility' && appendVisible && !appendSettled && i === visible.length - 1);
+      const color = gcActive || foldingEligible ? flow.gc : active || st.anim === 'appendDeleteTs' ? flow.delete : c.border;
       drawPill(x + col * (itemW + gapX), y + row * (itemH + rowGap), itemW, itemH, item, color, c, active, 8);
     });
     if (hideAppendingItem) {
@@ -3122,6 +3003,62 @@
       ctx.textAlign = 'right';
       ctx.fillText(`+${items.length - columns * rows}`, x + w, y + rows * itemH + rowGap);
     }
+  }
+
+  function foldEligibleHighlightReady() {
+    if (currentStep().anim === 'foldDeleteTs') return true;
+    if (activeReplayLane().highlight !== 'foldEligible') return true;
+    return stepProgress() >= .72;
+  }
+
+  function drawFoldingDeleteTsItems(chainX, chainY, chainW, bitmapX, bitmapY, bitmapW, lane, c) {
+    if (currentStep().anim !== 'foldDeleteTs') return;
+    const p = stepProgress();
+    if (p >= .82) return;
+    const t = ease(clamp((p - .08) / .70, 0, 1));
+    const layout = deleteTsItemLayout(chainW);
+    const items = (lane.prevDeleteTs || []).slice(0, layout.columns * layout.rows);
+    items.forEach((item, i) => {
+      if (lane.safeTs == null || deleteTsValue(item) > lane.safeTs) return;
+      const offset = foldBitmapOffsetValue(item, lane);
+      if (!Number.isFinite(offset)) return;
+      const start = deleteTsItemCenter(chainX, chainY, layout, i);
+      const target = bitmapCellCenter(bitmapX, bitmapY, bitmapW, offset);
+      const cx = lerp(start.x, target.x, t);
+      const cy = lerp(start.y, target.y, t);
+      const alphaOut = 1 - ease(clamp((p - .54) / .28, 0, 1));
+
+      ctx.save();
+      ctx.globalAlpha *= alphaOut;
+      ctx.translate(cx, cy);
+      ctx.scale(lerp(1, .82, t), lerp(1, .82, t));
+      drawPill(-layout.itemW / 2, -layout.itemH / 2, layout.itemW, layout.itemH, item, flow.gc, c, true, 8);
+      ctx.restore();
+    });
+  }
+
+  function deleteTsItemLayout(w) {
+    const columns = 4;
+    const rows = 2;
+    const itemW = Math.min(72, Math.floor((w - 18 * (columns - 1)) / columns));
+    const gapX = columns > 1 ? (w - itemW * columns) / (columns - 1) : 0;
+    const itemH = 24;
+    const rowGap = 10;
+    return { columns, rows, itemW, gapX, itemH, rowGap };
+  }
+
+  function deleteTsItemCenter(x, y, layout, index) {
+    const col = index % layout.columns;
+    const row = Math.floor(index / layout.columns);
+    return {
+      x: x + col * (layout.itemW + layout.gapX) + layout.itemW / 2,
+      y: y + row * (layout.itemH + layout.rowGap) + layout.itemH / 2
+    };
+  }
+
+  function bitmapCellCenter(x, y, w, index) {
+    const cell = bitmapCellRect(x, y, w, index);
+    return { x: cell.x + cell.w / 2, y: cell.y + cell.h / 2 };
   }
 
   function drawAppendingDeleteTsItem(x, y, itemW, itemH, gapX, rowGap, columns, rows, lane, c) {
@@ -3148,6 +3085,33 @@
     ctx.restore();
   }
 
+  function foldDeleteTsIntoBaseBitmap(lane, safeTs) {
+    const len = 16;
+    const bits = (lane.baseBitmap || '').padEnd(len, '0').slice(0, len).split('');
+    const remaining = [];
+    lane.deleteTs.forEach(item => {
+      const ts = deleteTsValue(item);
+      const offset = foldBitmapOffsetValue(item, lane);
+      if (ts <= safeTs) {
+        if (Number.isFinite(offset) && offset >= 0 && offset < len) bits[offset] = '1';
+      } else {
+        remaining.push(item);
+      }
+    });
+    lane.safeTs = safeTs;
+    lane.baseTs = safeTs;
+    lane.baseBitmap = bits.join('');
+    lane.deleteTs = remaining;
+    lane.highlight = 'baseBitmap';
+  }
+
+  function foldBitmapOffsetValue(item, lane) {
+    if (lane && lane.id === DETAIL_REPLAY_ID && deleteTsValue(item) <= DEFAULT_GC_SAFE_TS) {
+      return GC_FOLD_TARGET_OFFSET;
+    }
+    return deleteOffsetValue(item);
+  }
+
   function deleteOffsetValue(item) {
     const m = /\((\d+),/.exec(item);
     return m ? Number(m[1]) : Number.NaN;
@@ -3165,7 +3129,7 @@
     drawFlushedMemtablePanel(layout.memtable.x, layout.memtable.y, layout.memtable.w, layout.memtable.h, {
       title: 'blocks',
       color: flow.storage,
-      labels: storageObjectLabels().slice(0, STORAGE_ITEM_CAPACITY),
+      labels: storageObjectLabelsForDraw().slice(0, STORAGE_ITEM_CAPACITY),
       hotLabel: model.storage.flushedHot
     }, c);
     drawStoragePanel(layout.files.x, layout.files.y, layout.files.w, layout.files.h, {
@@ -3173,15 +3137,121 @@
       title: 'files',
       color: flow.replay,
       kind: 'FILE',
-      labels: regularStorageFileLabels(),
-      active: ['query', 'gc', 'storageGc'].includes(state.detailFocus),
+      labels: regularStorageFileLabelsForDraw(),
+      active: ['query', 'storageGc'].includes(state.detailFocus) || ['compactObjectsToFile', 'validRatioCheck', 'compactRegularFiles'].includes(currentStep().anim),
       regular: true,
       maxItems: STORAGE_ITEM_CAPACITY
     }, c);
+    drawStorageCompactionFileOverlay(c);
+    drawRegularFileCompactionOverlay(c);
   }
 
   function storageObjectLabels() {
     return [...model.storage.objectEntries];
+  }
+
+  function storageObjectLabelsForDraw() {
+    if (currentStep().anim === 'compactObjectsToFile') {
+      const previous = model.storage.prevObjectEntries || [];
+      if (previous.length) return [...previous];
+    }
+    return storageObjectLabels();
+  }
+
+  function drawStorageCompactionFileOverlay(c) {
+    if (currentStep().anim !== 'compactObjectsToFile') return;
+    const p = stepProgress();
+    if (p >= .70) return;
+
+    const fileLabel = model.storage.compactionFile || 'file-2.pxl';
+    const previousObjects = model.storage.prevObjectEntries || [];
+    if (!previousObjects.length) return;
+
+    const layout = storagePanelsLayout(rects.storage);
+    const objectLayout = flushedMemtableObjectLayout(layout.memtable, previousObjects);
+    const objectCenters = objectLayout.visibleLabels.map((_, i) => ({
+      x: objectLayout.xForIndex(i) + objectLayout.objW / 2,
+      y: objectLayout.objY + objectLayout.objH / 2
+    }));
+    const start = averagePoints(objectCenters);
+
+    const fileLabels = regularStorageFileLabels();
+    const fileLayout = flushedMemtableObjectLayout(layout.files, fileLabels, STORAGE_ITEM_CAPACITY, 'left');
+    let fileIndex = fileLayout.visibleLabels.indexOf(fileLabel);
+    if (fileIndex < 0) fileIndex = Math.max(0, fileLayout.visibleLabels.length - 1);
+    const end = {
+      x: fileLayout.xForIndex(fileIndex) + fileLayout.objW / 2,
+      y: fileLayout.objY + fileLayout.objH / 2
+    };
+
+    const move = ease(clamp((p - .06) / .50, 0, 1));
+    const fadeIn = clamp(p / .12, 0, 1);
+    const fadeOut = p > .58 ? 1 - clamp((p - .58) / .12, 0, 1) : 1;
+    const x = lerp(start.x, end.x, move);
+    const y = lerp(start.y, end.y, move);
+
+    ctx.save();
+    ctx.globalAlpha *= fadeIn * fadeOut;
+    drawCompactStorageFileIcon(
+      x - fileLayout.objW / 2,
+      y - fileLayout.objH / 2,
+      fileLayout.objW,
+      fileLayout.objH,
+      displayStorageFileLabel(fileLabel),
+      flow.storage,
+      c,
+      true
+    );
+    ctx.restore();
+  }
+
+  function drawRegularFileCompactionOverlay(c) {
+    if (currentStep().anim !== 'compactRegularFiles') return;
+    const p = stepProgress();
+    const fileLabel = model.storage.compactionFile || 'file-2.pxl';
+    const previousFiles = model.storage.prevRegularFiles || [];
+    if (!previousFiles.length) return;
+
+    const layout = storagePanelsLayout(rects.storage);
+    const oldLayout = flushedMemtableObjectLayout(layout.files, previousFiles, STORAGE_ITEM_CAPACITY, 'left');
+    const oldCenters = oldLayout.visibleLabels.map((_, i) => ({
+      x: oldLayout.xForIndex(i) + oldLayout.objW / 2,
+      y: oldLayout.objY + oldLayout.objH / 2
+    }));
+    const start = averagePoints(oldCenters);
+
+    const finalLabels = [...previousFiles, fileLabel];
+    const finalLayout = flushedMemtableObjectLayout(layout.files, finalLabels, STORAGE_ITEM_CAPACITY, 'left');
+    const finalIndex = Math.min(previousFiles.length, finalLayout.visibleLabels.length - 1);
+    const end = {
+      x: finalLayout.xForIndex(finalIndex) + finalLayout.objW / 2,
+      y: finalLayout.objY + finalLayout.objH / 2
+    };
+
+    const t = ease(clamp((p - .06) / .50, 0, 1));
+    const fadeIn = ease(clamp(p / .14, 0, 1));
+    const x = lerp(start.x, end.x, t);
+    const y = lerp(start.y, end.y, t);
+
+    ctx.save();
+    ctx.globalAlpha *= fadeIn;
+    drawCompactStorageFileIcon(
+      x - finalLayout.objW / 2,
+      y - finalLayout.objH / 2,
+      finalLayout.objW,
+      finalLayout.objH,
+      displayStorageFileLabel(fileLabel),
+      flow.storage,
+      c,
+      true
+    );
+    ctx.restore();
+  }
+
+  function averagePoints(points) {
+    if (!points.length) return { x: 0, y: 0 };
+    const sum = points.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+    return { x: sum.x / points.length, y: sum.y / points.length };
   }
 
   function storagePanelsLayout(r) {
@@ -3212,7 +3282,7 @@
     return labels.slice(0, STORAGE_ITEM_CAPACITY);
   }
 
-  function flushedMemtableObjectLayout(panel, labels, maxItems = STORAGE_ITEM_CAPACITY) {
+  function flushedMemtableObjectLayout(panel, labels, maxItems = STORAGE_ITEM_CAPACITY, align = 'right') {
     const metrics = retinaMemtableMetrics();
     const objW = STORAGE_COMPACT_ITEM_W;
     const objY = panel.y + STORAGE_PANEL_TITLE_Y + STORAGE_TITLE_ITEM_GAP;
@@ -3222,6 +3292,7 @@
     const innerW = Math.max(objW, panel.w - edgePad * 2);
     const maxFit = Math.max(1, Math.floor((innerW + gap) / (objW + gap)));
     const visibleLabels = labels.slice(0, Math.min(maxItems, maxFit));
+    const leftX = panel.x + edgePad;
     const rightX = panel.x + panel.w - edgePad - objW;
     return {
       objW,
@@ -3229,8 +3300,11 @@
       objY,
       gap,
       visibleLabels,
+      leftX,
       rightX,
-      xForIndex: i => rightX - (visibleLabels.length - 1 - i) * (objW + gap)
+      xForIndex: i => align === 'left'
+        ? leftX + i * (objW + gap)
+        : rightX - (visibleLabels.length - 1 - i) * (objW + gap)
     };
   }
 
@@ -3240,6 +3314,13 @@
     files.push(...model.storage.regularFiles);
     if (model.storage.newFile && model.storage.newFile !== 'none') files.push(model.storage.newFile);
     return [...new Set(files)];
+  }
+
+  function regularStorageFileLabelsForDraw() {
+    if (currentStep().anim === 'compactRegularFiles') {
+      return [...(model.storage.prevRegularFiles || [])];
+    }
+    return regularStorageFileLabels();
   }
 
   function drawStoragePanel(x, y, w, h, panel, c) {
@@ -3292,19 +3373,87 @@
       return;
     }
 
-    const layout = flushedMemtableObjectLayout(bounds, labels, panel.maxItems || 5);
+    const layout = flushedMemtableObjectLayout(bounds, labels, panel.maxItems || 5, 'left');
     layout.visibleLabels.forEach((label, i) => {
       const labelText = String(label);
       const oldFile = model.storage.agingQueue.includes(labelText);
       const retired = oldFile && /RETIRED|cleanupAt|physically/.test(model.storage.cleanup);
       const candidate = oldFile && !retired;
       const newFile = labelText === model.storage.newFile;
+      const compactedFile = isCompactionFile(labelText);
+      const regularCompactionFile = isRegularCompactionFile(labelText);
+      const compactingOldFile = isCompactingOldRegularFile(labelText);
+      const fileAlpha = compactedFile ? compactionFileSettledAlpha() : regularCompactionFile ? regularCompactionFileSettledAlpha() : compactingOldFile ? regularCompactionOldFileAlpha() : 1;
+      if (fileAlpha <= 0) return;
       const temporary = newFile && model.storage.newFileState === 'TEMPORARY_GC';
-      const color = retired ? flow.delete : candidate || temporary ? flow.gc : newFile ? flow.storage : panel.color;
-      const active = panel.active || candidate || retired || newFile || temporary;
+      const ratioCandidate = isValidRatioCandidateFile(labelText);
+      const color = compactingOldFile ? flow.delete : retired ? flow.delete : candidate || temporary || ratioCandidate ? flow.gc : newFile || compactedFile || regularCompactionFile ? flow.storage : panel.color;
+      const active = panel.active || candidate || retired || newFile || temporary || compactedFile || regularCompactionFile || compactingOldFile || ratioCandidate;
       const fileX = layout.xForIndex(i);
+      ctx.save();
+      ctx.globalAlpha *= fileAlpha;
       drawCompactStorageFileIcon(fileX, layout.objY, layout.objW, layout.objH, displayStorageFileLabel(labelText), color, c, active);
+      ctx.restore();
     });
+    drawValidRatioConditionPill(bounds, layout, c);
+  }
+
+  function isCompactionFile(label) {
+    return currentStep().anim === 'compactObjectsToFile' && label === model.storage.compactionFile;
+  }
+
+  function isRegularCompactionFile(label) {
+    return currentStep().anim === 'compactRegularFiles' && label === model.storage.compactionFile;
+  }
+
+  function isCompactingOldRegularFile(label) {
+    return currentStep().anim === 'compactRegularFiles' && (model.storage.prevRegularFiles || []).includes(label);
+  }
+
+  function isValidRatioCandidateFile(label) {
+    return currentStep().anim === 'validRatioCheck' &&
+      stepProgress() >= .58 &&
+      (model.storage.regularFiles || []).includes(label);
+  }
+
+  function compactionFileSettledAlpha() {
+    const p = stepProgress();
+    if (p < .58) return 0;
+    return ease(clamp((p - .58) / .22, 0, 1));
+  }
+
+  function regularCompactionFileSettledAlpha() {
+    const p = stepProgress();
+    if (p < .58) return 0;
+    return ease(clamp((p - .58) / .24, 0, 1));
+  }
+
+  function regularCompactionOldFileAlpha() {
+    const p = stepProgress();
+    return 1 - ease(clamp((p - .52) / .34, 0, 1));
+  }
+
+  function drawValidRatioConditionPill(bounds, layout, c) {
+    if (currentStep().anim !== 'validRatioCheck') return;
+    const p = stepProgress();
+    if (p < .12) return;
+    const fadeIn = ease(clamp((p - .12) / .28, 0, 1));
+    const fadeOut = 1 - ease(clamp((p - .48) / .10, 0, 1));
+    if (fadeOut <= 0) return;
+    const lastIndex = Math.max(0, layout.visibleLabels.length - 1);
+    const lastFileRight = layout.xForIndex(lastIndex) + layout.objW;
+    const blankRight = bounds.x + bounds.w;
+    const blankW = Math.max(0, blankRight - lastFileRight);
+    const sideGap = 4;
+    const availableW = Math.max(0, blankW - sideGap * 2);
+    const pillW = availableW >= 110 ? Math.min(140, availableW) : availableW;
+    const pillH = 24;
+    const x = lastFileRight + (blankW - pillW) / 2;
+    const y = layout.objY + layout.objH / 2 - pillH / 2;
+    ctx.save();
+    ctx.globalAlpha *= fadeIn * fadeOut;
+    drawPill(x, y, pillW, pillH, 'valid ratio <= 0.5', flow.gc, c, true, 8);
+    ctx.restore();
   }
 
   function displayStorageFileLabel(label) {
@@ -3361,15 +3510,53 @@
 
     layout.visibleLabels.forEach((label, i) => {
       const objX = layout.xForIndex(i);
-      ctx.fillStyle = alpha(panel.color, .13);
-      ctx.strokeStyle = alpha(panel.color, .30);
-      ctx.lineWidth = 1;
+      const style = storageObjectIconStyle(String(label), panel);
+      if (style.alpha <= 0) return;
+      ctx.save();
+      ctx.globalAlpha *= style.alpha;
+      ctx.fillStyle = alpha(style.color, style.active ? .24 : .13);
+      ctx.strokeStyle = alpha(style.color, style.active ? .62 : .30);
+      ctx.lineWidth = style.active ? 1.5 : 1;
       roundRect(objX, layout.objY, layout.objW, layout.objH, 5, true, true);
       ctx.fillStyle = c.text;
       ctx.font = typeFont(TYPE.text, 800);
       ctx.textAlign = 'center';
       fitText(displayStorageObjectLabel(label), objX + 3, layout.objY + layout.objH / 2 + 5, layout.objW - 6, 'center');
+      if (style.deleting) drawStorageObjectDeleteMark(objX, layout.objY, layout.objW, layout.objH);
+      ctx.restore();
     });
+  }
+
+  function storageObjectIconStyle(label, panel) {
+    const deleting = currentStep().anim === 'compactObjectsToFile' &&
+      (model.storage.prevObjectEntries || []).includes(label) &&
+      stepProgress() >= .50;
+    if (!deleting) {
+      return {
+        color: panel.color,
+        alpha: 1,
+        active: String(label) === String(panel.hotLabel || ''),
+        deleting: false
+      };
+    }
+    const fade = ease(clamp((stepProgress() - .50) / .46, 0, 1));
+    return {
+      color: flow.delete,
+      alpha: lerp(1, 0, fade),
+      active: true,
+      deleting: true
+    };
+  }
+
+  function drawStorageObjectDeleteMark(x, y, w, h) {
+    ctx.strokeStyle = alpha(flow.delete, .82);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + 10);
+    ctx.lineTo(x + w - 10, y + h - 10);
+    ctx.moveTo(x + w - 10, y + 10);
+    ctx.lineTo(x + 10, y + h - 10);
+    ctx.stroke();
   }
 
   function displayStorageObjectLabel(label) {
@@ -3866,6 +4053,7 @@
     const { queue, fullFill } = writeLayout;
     const visibilityLayout = replayVisibilityLayout(visibility.x, visibility.y, visibility.w, visibility.h);
     const { rowY, bitmapX, bitmapW, chainY, chainH } = visibilityLayout;
+    const deleteConditionY = chainY + 68;
     const offset = (slot - 1) * 18;
     return {
       center: [frame.x + frame.w / 2, frame.y + frame.h / 2],
@@ -3879,6 +4067,7 @@
       immutable: [queue.x + queue.w / 2, queue.y + queue.h / 2],
       visibility: [visibility.x + visibility.w / 2, visibility.y + visibility.h / 2],
       deleteArray: [visibility.x + visibility.w / 2, chainY + chainH / 2],
+      deleteCondition: [visibility.x + visibility.w / 2, deleteConditionY],
       baseBitmap: [bitmapX + bitmapW / 2, rowY + 7],
       write: [write.x + write.w / 2, write.y + write.h / 2]
     };
@@ -3902,20 +4091,6 @@
     const r = rects[parts[0]];
     if (!r) return { x: 0, y: 0 };
     const pos = parts[1] || 'center';
-    if (parts[0] === 'cdcStream') {
-      const railY = r.y + 58;
-      const anchors = {
-        center: [r.x + r.w / 2, r.y + r.h / 2],
-        left: [r.x, railY],
-        right: [r.x + r.w, railY],
-        top: [r.x + r.w / 2, r.y],
-        bottom: [r.x + r.w / 2, r.y + r.h],
-        out: [r.x + r.w / 2, r.y + r.h],
-        row: [r.x + r.w / 2, railY],
-        commit: [r.x + r.w - 42, railY]
-      };
-      return arrPoint(anchors[pos] || anchors.center);
-    }
     if (parts[0] === 'runtime') {
       const borderAnchors = {
         center: [r.x + r.w / 2, r.y + r.h / 2],
