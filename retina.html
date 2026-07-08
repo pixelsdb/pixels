@@ -112,7 +112,6 @@
     }
     button:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 24%, transparent); outline-offset: 2px; }
 
-    button.secondary,
     button.scene-btn {
       color: var(--text);
       background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
@@ -120,7 +119,6 @@
       box-shadow: none;
     }
 
-    button.secondary:hover,
     button.scene-btn:hover {
       background: var(--surface);
       border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
@@ -171,81 +169,6 @@
       grid-template-rows: auto auto auto;
       align-content: start;
       gap: var(--gap);
-    }
-
-    .hero {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: clamp(10px, 1vw, 16px);
-      margin: 0;
-      width: 100%;
-      padding: clamp(7px, .7vw, 10px) clamp(9px, .9vw, 12px);
-      background: color-mix(in srgb, var(--surface-elevated) 42%, transparent);
-      border: 1px solid color-mix(in srgb, var(--border-soft) 58%, transparent);
-      border-radius: 14px;
-      backdrop-filter: blur(10px);
-    }
-
-    .title {
-      min-width: 0;
-    }
-
-    .title h1 {
-      margin: 0;
-      font-size: 18px;
-      line-height: 1.16;
-      letter-spacing: -.02em;
-    }
-
-    .title p {
-      margin: 6px 0 0;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .hero-badges {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 8px;
-      color: var(--muted);
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    .badge {
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: color-mix(in srgb, var(--panel) 82%, transparent);
-      padding: 6px 10px;
-    }
-
-    .view-actions {
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: clamp(4px, .45vw, 6px);
-      padding: 4px;
-      background: color-mix(in srgb, var(--surface) 72%, transparent);
-      border: 1px solid color-mix(in srgb, var(--border-soft) 88%, transparent);
-      border-radius: 14px;
-      box-shadow: none;
-      backdrop-filter: blur(10px);
-      flex: 0 0 auto;
-    }
-
-    .view-actions .icon-btn {
-      background: transparent;
-      color: var(--text);
-      border-color: transparent;
-      box-shadow: none;
-    }
-
-    .view-actions .icon-btn:hover {
-      background: var(--primary-soft);
-      color: var(--primary);
-      border-color: color-mix(in srgb, var(--primary) 26%, transparent);
     }
 
     .demo-layout {
@@ -455,27 +378,11 @@
       .control-rail .icon-btn, .control-rail .scene-btn { width: var(--rail-btn); min-width: var(--rail-btn); justify-content: center; padding: 0; }
       .control-rail button::after { display: none; }
     }
-
-    @media (max-width: 700px) {}
-
-    /* Fullscreen layout is disabled while fullscreen controls are commented out. */
   </style>
 </head>
 <body>
   <main class="shell">
     <section class="app-frame">
-      <!-- Header and view toggles are temporarily disabled to give the canvas the full page height.
-      <header class="hero">
-        <div class="title">
-          <h1>Retina: Transactional CDC Replay for Real-Time Lakehouse Analytics</h1>
-        </div>
-        <div class="view-actions" aria-label="View controls">
-          <button id="fsBtn" class="secondary icon-btn" title="Fullscreen" aria-label="Fullscreen"></button>
-          <button id="themeBtn" class="secondary icon-btn" title="Toggle Theme" aria-label="Toggle Theme"></button>
-        </div>
-      </header>
-      -->
-
       <section class="demo-layout">
         <aside class="control-rail" aria-label="Retina demo controls">
         <section class="control-section">
@@ -526,9 +433,7 @@
   const buttons = {
     pause: document.getElementById('pauseBtn'),
     auto: document.getElementById('autoBtn'),
-    speed: document.getElementById('speedBtn'),
-    fs: null,
-    theme: null
+    speed: document.getElementById('speedBtn')
   };
   const dom = {
     modeLabel: document.getElementById('modeLabel')
@@ -539,17 +444,10 @@
   const svgPlay = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16l13 -8z"/></svg>';
   const svgFastFwd = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v14l8 -7z"/><path d="M13 5v14l8 -7z"/></svg>';
   const svgGauge = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4 -4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/><path d="M5 19h14"/></svg>';
-  const svgMaxim = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4l4 0l0 4"/><path d="M14 10l6 -6"/><path d="M8 20l-4 0l0 -4"/><path d="M4 20l6 -6"/><path d="M16 20l4 0l0 -4"/><path d="M14 14l6 6"/><path d="M8 4l-4 0l0 4"/><path d="M4 4l6 6"/></svg>';
-  const svgMinim = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l4 0l0 -4"/><path d="M3 3l6 6"/><path d="M5 15l4 0l0 4"/><path d="M3 21l6 -6"/><path d="M19 9l-4 0l0 -4"/><path d="M15 9l6 -6"/><path d="M19 15l-4 0l0 4"/><path d="M15 15l6 6"/></svg>';
-  const svgSun = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1"/><path d="M12 3v1"/><path d="M20 12h1"/><path d="M12 20v1"/><path d="M5.6 5.6l.7 .7"/><path d="M18.4 5.6l-.7 .7"/><path d="M17.7 17.7l.7 .7"/><path d="M6.3 17.7l-.7 .7"/></svg>';
-  const svgMoon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.132 0 .263 .003 .393 .008a7.5 7.5 0 0 0 7.92 10.564a9 9 0 1 1 -8.313 -10.572z"/></svg>';
 
   buttons.pause.innerHTML = svgPause;
   buttons.auto.innerHTML = svgFastFwd;
   buttons.speed.innerHTML = svgGauge;
-  // Fullscreen and theme controls are temporarily disabled with the header.
-  // buttons.fs.innerHTML = svgMaxim;
-  // buttons.theme.innerHTML = svgMoon;
 
   const W = 1800;
   const H = 1080;
@@ -560,15 +458,6 @@
   const AUTO_START_SCENE = 'cdc';
   const autoSceneOrder = ['cdc'];
   const sceneOrder = ['insert', 'delete', 'update', 'gc'];
-  const sceneMeta = {
-    cdc: { label: 'Mirror Transaction', type: 'pixels-sink flow', summary: 'Pixels Sink creates one mirror transaction, begins it in Retina, replays row changes, and commits only after replay OK.' },
-    insert: { label: 'Insert Replay', type: 'write path', summary: 'Insert row changes arrive through a mirror transaction, append to the write buffer, then sealed memtables flush to object entries.' },
-    delete: { label: 'Delete Replay', type: 'visibility path', summary: 'Delete unfolds Index Service lookup and RGVisibility state: get returns the old RowLocation, then delete timestamp entries update visibility without rewriting columnar files.' },
-    update: { label: 'Update Replay', type: 'MVCC versioning', summary: 'Update inserts the new tuple version first, updates the primary index, then deletes the old tuple version under one timestamp.' },
-    query: { label: 'Query Path', type: 'parallel VFoR read path', summary: 'Query plans source splits for regular files, active memtables, and flushed objects in parallel; returned batches merge through one VFoR visibility gate before operators consume visible rows.' },
-    gc: { label: 'Garbage Collection', type: 'background function', summary: 'GC is shown as Retina bitmap folding plus Storage GC rewriting regular files, retiring old files, and deleting them after cleanupAt.' }
-  };
-
   const flow = {
     cdc: '#c96a1a',
     replay: '#168a52',
@@ -609,16 +498,12 @@
   const DEFAULT_LWM = 281;
   const DEFAULT_QUERY_TS = DEFAULT_HWM - 1;
   const DEFAULT_GC_SAFE_TS = DEFAULT_LWM - 1;
-  const GC_BASE_BITMAP = '0000010100000000';
-  const GC_FOLD_TARGET_OFFSET = 11;
+  const GC_BASE_BITMAP = '0100000100000100';
+  const GC_FOLD_TARGET_OFFSET = 5;
 
   function typeFont(size, weight = 800, family = 'Inter, system-ui, sans-serif') {
     const prefix = weight ? `${weight} ` : '';
     return `${prefix}${size}px ${family}`;
-  }
-
-  function pillTypeSize(fs) {
-    return TYPE.text;
   }
 
   const MIDDLE_TOP = sy(74);
@@ -629,7 +514,6 @@
   const TX_SERVICE_H = 144;
   const TOP_RUNTIME_GAP = 14;
   const RUNTIME_Y = SERVICE_Y + SERVICE_H + TOP_RUNTIME_GAP;
-  const RUNTIME_H = MIDDLE_BOTTOM - RUNTIME_Y;
   const RETINA_REPLAYER_H = 500;
   const LEFT_PANEL_X = 44;
   const LEFT_PANEL_W = 440;
@@ -673,19 +557,6 @@
   };
 
   const DETAIL_REPLAY_ID = 1;
-
-  const info = {
-    ingress: ['Pixels Sink', 'Creates mirror transactions, sends replay RPCs, and commits after replay OK.'],
-    runtime: ['Retina replayer', 'RetinaServerImpl handles RetinaWorkerService RPCs and keeps write-buffer and visibility state.'],
-    tx: ['Transaction Service', 'Exposes MVCC time boundaries. Callers get snapshot or safeTs on demand; the panel stays focused on HWM and LWM.'],
-    index: ['Index Service', 'Maps primary keys to rowIds and physical row locations; delete/update use this map before touching visibility state.'],
-    storage: ['Storage', 'Stores flushed immutable memtables as object entries plus regular columnar files. Storage GC rewrites visible rows into a new regular file and retires old files.'],
-    query: ['Query Engine', 'Schedules regular file scans, active memtable RPC, and flushed-object reads as parallel split-like tasks; all returned batches pass through the same VFoR visibility gate.'],
-    lane0: ['Retina replayer', 'Current operation, write buffer, and visibility structure.'],
-    lane1: ['Retina replayer', 'Current operation, write buffer, and visibility structure.'],
-    lane2: ['Retina replayer', 'Current operation, write buffer, and visibility structure.']
-  };
-
   const state = {
     scene: 'cdc',
     stepIndex: 0,
@@ -722,7 +593,7 @@
       },
       lanes: [
         laneModel(0, 'I:pk160', 5, 0, ['(2,276)'], 266),
-        laneModel(1, 'U:pk132', 7, 0, ['(5,278)', '(9,282)'], 264),
+        laneModel(1, 'U:pk132', 7, 0, ['(5,278)', '(9,282)'], 264, ['(1,0)', '(7,0)', '(13,0)']),
         laneModel(2, 'D:pk208', 4, 0, ['(1,279)'], 267)
       ],
       index: {
@@ -769,7 +640,7 @@
     };
   }
 
-  function laneModel(id, currentOp, activeRows, immutable, deletes, baseTs) {
+  function laneModel(id, currentOp, activeRows, immutable, deletes, baseTs, bitmapDeletes = deletes) {
     return {
       id,
       currentOp,
@@ -786,7 +657,7 @@
       prevBaseBitmap: '0000000000000000',
       deleteTs: deletes,
       prevDeleteTs: [...deletes],
-      bitmapDeleteTs: [...deletes],
+      bitmapDeleteTs: [...bitmapDeletes],
       safeTs: null,
       throughput: 72 + id * 11,
       highlight: null
@@ -1322,22 +1193,6 @@
     gotoScene(AUTO_START_SCENE);
   }
 
-  // Theme and fullscreen switching are temporarily disabled with the header controls.
-  // function toggleTheme() {
-  //   const nextDark = root.dataset.theme !== 'dark';
-  //   root.dataset.theme = nextDark ? 'dark' : 'light';
-  //   buttons.theme.innerHTML = nextDark ? svgSun : svgMoon;
-  //   state.flash = 1;
-  // }
-
-  // function toggleFullscreen() {
-  //   if (!document.fullscreenElement) {
-  //     document.documentElement.requestFullscreen().then(resize).catch(() => {});
-  //   } else {
-  //     document.exitFullscreen().then(resize).catch(() => {});
-  //   }
-  // }
-
   function updateControls() {
     sceneButtons.forEach(btn => {
       const active = state.autoPlay && btn.dataset.scene === state.scene;
@@ -1364,23 +1219,13 @@
   buttons.pause.onclick = togglePause;
   buttons.auto.onclick = toggleAuto;
   buttons.speed.onclick = toggleSpeed;
-  // buttons.theme.onclick = toggleTheme;
-  // buttons.fs.onclick = toggleFullscreen;
   sceneButtons.forEach(btn => btn.addEventListener('click', () => gotoScene(btn.dataset.scene, { manual: true })));
-
-  // document.addEventListener('fullscreenchange', () => {
-  //   buttons.fs.innerHTML = document.fullscreenElement ? svgMinim : svgMaxim;
-  //   scheduleResize();
-  // });
 
   window.addEventListener('keydown', e => {
     if (e.code === 'Space') { e.preventDefault(); togglePause(); }
     const k = e.key.toLowerCase();
     if (k === 'a') toggleAuto();
     if (k === 's') toggleSpeed();
-    // Theme and fullscreen shortcuts are temporarily disabled.
-    // if (k === 't') toggleTheme();
-    // if (k === 'f') toggleFullscreen();
     const digit = Number(e.key);
     if (digit >= 1 && digit <= sceneOrder.length) gotoScene(sceneOrder[digit - 1], { manual: true });
   });
@@ -2385,9 +2230,6 @@
         const foldedAlpha = justFolded ? lerp(.28, .72, ease(clamp((foldP - .72) / .18, 0, 1))) : .62;
         fill = justFolded ? alpha(color, foldedAlpha) : alpha(flow.delete, .46);
         stroke = justFolded ? alpha(color, .88) : alpha(flow.delete, .70);
-      } else if (eligible) {
-        fill = alpha(flow.gc, .50);
-        stroke = alpha(flow.gc, .76);
       } else if (pending) {
         fill = alpha(flow.delete, .46);
         stroke = alpha(flow.delete, .70);
@@ -2580,21 +2422,14 @@
       hotLabel: model.storage.flushedHot
     }, c);
     drawStoragePanel(layout.files.x, layout.files.y, layout.files.w, layout.files.h, {
-      ...layout.files,
       title: 'files',
       color: flow.replay,
-      kind: 'FILE',
       labels: regularStorageFileLabelsForDraw(),
       active: ['query', 'storageGc'].includes(state.detailFocus) || ['compactObjectsToFile', 'validRatioCheck', 'compactRegularFiles'].includes(currentStep().anim),
-      regular: true,
       maxItems: STORAGE_ITEM_CAPACITY
     }, c);
     drawStorageCompactionFileOverlay(c);
     drawRegularFileCompactionOverlay(c);
-  }
-
-  function storageObjectLabels() {
-    return [...model.storage.objectEntries];
   }
 
   function storageObjectLabelsForDraw() {
@@ -2602,7 +2437,7 @@
       const previous = model.storage.prevObjectEntries || [];
       if (previous.length) return [...previous];
     }
-    return storageObjectLabels();
+    return [...model.storage.objectEntries];
   }
 
   function drawStorageCompactionFileOverlay(c) {
@@ -2780,35 +2615,7 @@
     ctx.textAlign = 'left';
     fitText(panel.title, x + STORAGE_PANEL_TITLE_X, y + STORAGE_PANEL_TITLE_Y, w - STORAGE_PANEL_TITLE_X * 2, 'left');
     const labels = panel.labels.length ? panel.labels : ['empty'];
-    if (panel.regular) {
-      drawCompactRegularFiles({ x, y, w, h }, panel, labels, c);
-      return;
-    }
-    const maxItems = panel.maxItems || 4;
-    const visibleLabels = labels.slice(0, maxItems);
-    const iconGap = 9;
-    const iconY = y + 48;
-    const iconH = Math.max(58, h - 66);
-    const maxIconW = panel.regular ? 150 : 112;
-    const iconW = Math.min(maxIconW, (w - 24 - iconGap * (visibleLabels.length - 1)) / visibleLabels.length);
-    const totalIconW = iconW * visibleLabels.length + iconGap * (visibleLabels.length - 1);
-    const startX = x + Math.max(12, (w - totalIconW) / 2);
-    visibleLabels.forEach((label, i) => {
-      const oldFile = panel.regular && model.storage.agingQueue.includes(String(label));
-      const retired = oldFile && /RETIRED|cleanupAt|physically/.test(model.storage.cleanup);
-      const candidate = oldFile && !retired;
-      const newFile = panel.regular && String(label) === model.storage.newFile;
-      const temporary = newFile && model.storage.newFileState === 'TEMPORARY_GC';
-      const iconKind = retired ? 'RETIRED' : temporary ? 'TEMP' : candidate ? 'CAND' : panel.kind;
-      const iconX = startX + i * (iconW + iconGap);
-      drawTabularStorageIcon(iconX, iconY, iconW, iconH, String(label), iconKind, panel.color, c, {
-        active: panel.active || String(label) === panel.hotLabel,
-        candidate,
-        retired,
-        newFile,
-        temporary
-      });
-    });
+    drawCompactRegularFiles({ x, y, w, h }, panel, labels, c);
   }
 
   function drawCompactRegularFiles(bounds, panel, labels, c) {
@@ -3010,36 +2817,6 @@
     return String(label).replace(/obj-(\d+)$/i, (_, n) => `obj-${n.slice(-1)}`);
   }
 
-  function drawTabularStorageIcon(x, y, w, h, label, kind, color, c, opts = {}) {
-    const iconColor = opts.retired ? flow.delete : opts.candidate || opts.temporary ? flow.gc : opts.newFile ? flow.storage : color;
-    const emphasized = opts.active || opts.candidate || opts.retired || opts.newFile || opts.temporary;
-    ctx.fillStyle = alpha(iconColor, emphasized ? .20 : .10);
-    ctx.strokeStyle = alpha(iconColor, emphasized ? .62 : .30);
-    ctx.lineWidth = emphasized ? 1.5 : 1;
-    roundRect(x, y, w, h, 7, true, true);
-    ctx.fillStyle = alpha(iconColor, .22);
-    roundRect(x + 6, y + 8, w - 12, 7, 3, true, false);
-    ctx.strokeStyle = alpha(iconColor, .24);
-    ctx.lineWidth = 1;
-    const rowTop = y + 26;
-    const rowBottom = y + h - 24;
-    const rowCount = 4;
-    for (let i = 0; i < rowCount; i++) {
-      const yy = rowTop + i * ((rowBottom - rowTop) / Math.max(1, rowCount - 1));
-      ctx.beginPath();
-      ctx.moveTo(x + 8, yy);
-      ctx.lineTo(x + w - 8, yy);
-      ctx.stroke();
-    }
-    ctx.fillStyle = iconColor;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'left';
-    ctx.fillText(kind, x + 8, y + 29);
-    ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.text, 800);
-    fitText(label, x + 8, y + h - 10, w - 16, 'left');
-  }
-
   function queryLayout(r, splits) {
     const x = r.x + 18;
     const w = r.w - 36;
@@ -3160,13 +2937,12 @@
     ctx.restore();
   }
 
-  function drawPill(x, y, w, h, label, color, c, active, fs) {
+  function drawPill(x, y, w, h, label, color, c, active) {
     ctx.fillStyle = alpha(color, active ? .22 : .10);
     ctx.strokeStyle = alpha(color, active ? .60 : .26);
     roundRect(x, y, w, h, Math.min(10, h / 2), true, true);
     ctx.fillStyle = active ? color : c.text;
-    const requested = pillTypeSize(fs);
-    const size = Math.max(TYPE.text, Math.min(requested, h - 6));
+    const size = TYPE.text;
     ctx.font = typeFont(size, 900);
     ctx.textAlign = 'center';
     fitText(label, x + 6, y + h / 2 + size * .36, w - 12, 'center');
