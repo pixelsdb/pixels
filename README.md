@@ -117,11 +117,11 @@ Pixels is an academic system aims at providing production-grade quality. It supp
 is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
-> [How Consistent and Fresh are Lake Tables Really](#)  
+> [How Consistent and Fresh are Lake Tables Really (short)](https://doi.org/10.1145/3802514.3812602)  
   Zinuo Li, Dongyang Geng, Haoqyue Li, Hailong Yu, Qi Lei, Haoqiong Bian  
   *Proceedings of the 1st International Workshop on Data FORMATS for Modern Architectures and Workloads* (**FORMATS'26 @ SIGMOD**)
 
-> [PixelsDB: Serverless and NL-Aided Data Analytics with Flexible Service Levels and Prices](https://doi.org/10.1109/ICDE65448.2025.00365)  
+> [PixelsDB: Serverless and NL-Aided Data Analytics with Flexible Service Levels and Prices (demo)](https://doi.org/10.1109/ICDE65448.2025.00365)  
   Haoqiong Bian, Dongyang Geng, Haoyang Li, Yunpeng Chai, Anastasia Ailamaki  
   *Proceedings of the 41st IEEE International Conference on Data Engineering* (**ICDE'25**)
 
