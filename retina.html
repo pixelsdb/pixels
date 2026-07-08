@@ -617,10 +617,6 @@
     return `${prefix}${size}px ${family}`;
   }
 
-  function monoFont(size, weight = 800) {
-    return typeFont(size, weight, 'monospace, Inter, system-ui');
-  }
-
   function pillTypeSize(fs) {
     return TYPE.text;
   }
@@ -668,8 +664,6 @@
   const PIXELS_SINK_X = LEFT_PANEL_X + (LEFT_PANEL_W - PIXELS_SINK_W) / 2;
   const rects = {
     ingress: { x: PIXELS_SINK_X, y: INGRESS_Y, w: PIXELS_SINK_W, h: PIXELS_SINK_H, title: 'Pixels Sink', sub: 'mirror transaction -> replay RPC' },
-    sink: { x: PIXELS_SINK_X + 14, y: INGRESS_Y + 292, w: PIXELS_SINK_W - 28, h: 96, title: 'Pixels Sink replay', sub: 'replay path anchors' },
-
     tx: { x: SERVICE_X, y: SERVICE_Y, w: TOP_SERVICE_W, h: TX_SERVICE_H, title: 'Transaction Service', sub: 'MVCC time boundary: HWM / LWM' },
     index: { x: SERVICE_X + TOP_SERVICE_W + SERVICE_GAP, y: SERVICE_Y, w: INDEX_W, h: SERVICE_H, title: 'Index Service', sub: 'primaryKey→rowId + rowId→RowLocation' },
     runtime: { x: SERVICE_X, y: RUNTIME_Y, w: RETINA_REPLAYER_W, h: RETINA_REPLAYER_H, title: 'Retina replayer', sub: 'RetinaWorkerService RPC + write / visibility state' },
@@ -682,7 +676,6 @@
 
   const info = {
     ingress: ['Pixels Sink', 'Creates mirror transactions, sends replay RPCs, and commits after replay OK.'],
-    sink: ['Pixels Sink replay anchor', 'Invisible anchor region for replay paths.'],
     runtime: ['Retina replayer', 'RetinaServerImpl handles RetinaWorkerService RPCs and keeps write-buffer and visibility state.'],
     tx: ['Transaction Service', 'Exposes MVCC time boundaries. Callers get snapshot or safeTs on demand; the panel stays focused on HWM and LWM.'],
     index: ['Index Service', 'Maps primary keys to rowIds and physical row locations; delete/update use this map before touching visibility state.'],
@@ -721,27 +714,21 @@
         rowChanges: ['pk160', 'pk132', 'pk208'],
         mirrorOps: ['insert', 'delete', 'update'],
         sinkStep: null,
-        cdcTx: 1208,
-        changeCount: 72410,
-        coordState: 'mirror tx ready',
-        cachedRows: '0 cached',
         routingRule: 'by row key',
         writePlan: 'waiting for row changes',
         rpcBatch: '1 tx per request',
-        transServer: 'ready',
-        requestMode: 'replay RPC',
         requestState: 'ready',
         txState: 'Transaction Service ready'
       },
       lanes: [
         laneModel(0, 'I:pk160', 5, 0, ['(2,276)'], 266),
-        laneModel(1, 'U:pk132', 7, 0, ['(5,278)', '(7,282)'], 264),
+        laneModel(1, 'U:pk132', 7, 0, ['(5,278)', '(9,282)'], 264),
         laneModel(2, 'D:pk208', 4, 0, ['(1,279)'], 267)
       ],
       index: {
         hot: 'pk132',
         primaryEntries: ['pk@212 -> rowId820'],
-        mainEntries: ['rowId820 -> file-06/rg1/off5'],
+        mainEntries: ['rowId820 -> file-0/rg1/off02'],
         operation: 'idle'
       },
       storage: {
@@ -799,6 +786,7 @@
       prevBaseBitmap: '0000000000000000',
       deleteTs: deletes,
       prevDeleteTs: [...deletes],
+      bitmapDeleteTs: [...deletes],
       safeTs: null,
       throughput: 72 + id * 11,
       highlight: null
@@ -814,20 +802,17 @@
       m.sink.rowChanges = ['INSERT', 'DELETE', 'UPDATE'];
       m.sink.mirrorOps = ['insert', 'delete', 'update'];
       m.sink.sinkStep = 'empty';
-      m.sink.coordState = 'mirror tx ready';
-      m.sink.cachedRows = '';
       m.sink.requestState = 'begin mirror tx';
       m.sink.txState = 'await begin';
       m.index.hot = 'pk208';
       m.index.primaryEntries = ['pk@212 -> rowId820'];
-      m.index.mainEntries = ['rowId820 -> file-07/rg0/off7'];
+      m.index.mainEntries = ['rowId820 -> file-0/rg1/off02'];
     }
     if (scene === 'insert') {
       m.sink.mirrorTx = 'tx290';
       m.sink.rowChanges = ['orders 3'];
       m.sink.mirrorOps = ['insert'];
       m.sink.sinkStep = 'empty';
-      m.sink.coordState = 'mirror tx ready';
       m.sink.routingRule = 'after-image key';
       m.sink.writePlan = 'pk160, pk174, pk181 queued';
       m.sink.rpcBatch = 'tx290 only';
@@ -839,7 +824,6 @@
       m.sink.rowChanges = ['orders 1'];
       m.sink.mirrorOps = ['delete'];
       m.sink.sinkStep = 'empty';
-      m.sink.coordState = 'mirror tx ready';
       m.sink.routingRule = 'before-image key';
       m.sink.writePlan = 'pk208 queued';
       m.sink.rpcBatch = 'tx290 only';
@@ -847,7 +831,7 @@
       m.sink.txState = 'tx290 ready';
       m.index.hot = 'pk208';
       m.index.primaryEntries = ['pk@212 -> rowId820'];
-      m.index.mainEntries = ['rowId820 -> file-07/rg0/off7'];
+      m.index.mainEntries = ['rowId820 -> file-0/rg1/off02'];
       m.index.operation = 'await Retina delete';
     }
     if (scene === 'update') {
@@ -855,7 +839,6 @@
       m.sink.rowChanges = ['customer 1'];
       m.sink.mirrorOps = ['update'];
       m.sink.sinkStep = 'empty';
-      m.sink.coordState = 'mirror tx ready';
       m.sink.routingRule = 'same primary key';
       m.sink.writePlan = 'pk132 queued';
       m.sink.rpcBatch = 'tx290 only';
@@ -863,7 +846,7 @@
       m.sink.txState = 'tx290 ready';
       m.index.hot = 'pk132';
       m.index.primaryEntries = ['pk@212 -> rowId820'];
-      m.index.mainEntries = ['rowId820 -> file-06/rg1/off5'];
+      m.index.mainEntries = ['rowId820 -> file-0/rg1/off02'];
       m.index.operation = 'insert new + update primary';
     }
     if (scene === 'query') {
@@ -912,17 +895,17 @@
         m => { m.lanes[1].highlight = 'immutable'; }, 'writeBuffer', []),
       step('A background flush asynchronously moves the immutable memtable to Storage.', 2.0,
         ['lane1'], [],
-        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; }, 'writeBuffer', [], 'flush'),
+        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; }, 'writeBuffer', [], 'flush'),
       step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
         [], [],
         m => { m.lanes[1].highlight = null; settlePendingFlushObject(m); }, 'storage', []),
       compactFlushedObjectsToFile(),
       step('After the new row is durable, Retina calls Index Service to insert the primary and row-location indexes.', 4.2,
         ['index'], [tok('put pk@290', 'runtime.right', 'index.left', flow.index, .12, .82)],
-        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk174'; m.index.operation = 'put pk@290 in flight'; }, 'index', ['index']),
+        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; m.index.hot = 'pk174'; m.index.operation = 'put pk@290 in flight'; }, 'index', ['index']),
       step('Index Service inserts the new primary and row-location entries locally.', 2.4,
         ['index'], [],
-        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5', 'rowId821 -> file-07/rg0/off7']; m.index.operation = 'index insert entry applied'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
+        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02', 'rowId821 -> file-2/rg0/off15']; m.index.operation = 'index insert entry applied'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
       step('Only after the index insert is complete does Index Service return OK to Retina.', 3.0,
         ['index'], [tok('index OK', 'index.left', 'runtime.right', flow.index, .18, .82)],
         m => { m.index.operation = 'index insert OK'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
@@ -939,11 +922,11 @@
         ['index'], [],
         m => { m.index.operation = 'delete index entry pk@290 applied'; }, 'index', ['index']),
       step('Only after the entry is deleted, Index Service returns the deleted main-index location.', 3.2,
-        ['index'], [tok('file-07/rg0/off7', 'index.left', 'runtime.right', flow.index, .18, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'deleted location returned'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.operation = 'deleted loc file-07/rg0/off7 returned for pk@290'; }, 'index', ['index']),
+        ['index'], [tok('file-2/rg0/off15', 'index.left', 'runtime.right', flow.index, .18, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'deleted location returned'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; m.index.operation = 'deleted loc file-2/rg0/off15 returned for pk@290'; }, 'index', ['index']),
       step('Retina then appends the delete timestamp into the visibility structure delete-ts chain.', 4.2,
-        ['lane1'], [tok('(off7,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'append delete timestamp'; l.highlight = 'visibility'; if (!l.deleteTs.includes('(7,290)')) l.deleteTs.push('(7,290)'); m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.sink.rpcBatch = 'DELETE applying'; m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
+        ['lane1'], [tok('(off15,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'append delete timestamp'; l.highlight = 'visibility'; if (!l.deleteTs.includes('(15,290)')) l.deleteTs.push('(15,290)'); m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; m.sink.rpcBatch = 'DELETE applying'; m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
       step('Retina returns OK for DELETE before Pixels Sink creates the UPDATE row.', 3.2,
         ['ingress'], [tok('OK', 'runtime.left', 'ingress.right', flow.delete, .12, .82)],
         m => { m.sink.sinkStep = 'row2Ok'; m.sink.requestState = 'DELETE OK'; m.sink.rpcBatch = 'OK'; clearDeleteTsChainEffects(m, DETAIL_REPLAY_ID); }, 'mvcc', []),
@@ -955,19 +938,19 @@
         m => { const l = m.lanes[1]; l.currentOp = 'U:pk132'; l.status = 'append after image'; l.activeRows = 1; l.highlight = 'active'; m.index.operation = 'await update index'; m.sink.rpcBatch = 'UPDATE applying'; }, 'writeBuffer', []),
       step('Because the active memtable is not full, Retina sends an update request to Index Service.', 3.6,
         ['index'], [tok('update pk@290', 'runtime.right', 'index.left', flow.index, .12, .86)],
-        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk132'; m.index.operation = 'update pk@290 in flight'; }, 'index', ['index']),
+        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; m.index.hot = 'pk132'; m.index.operation = 'update pk@290 in flight'; }, 'index', ['index']),
       step('Index Service first inserts the new versioned primary-index entry locally.', 2.4,
         ['index'], [],
-        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5', 'rowId821 -> file-07/rg0/off0']; m.index.operation = 'put version pk@290 applied'; }, 'index', ['index']),
+        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02', 'rowId821 -> file-3/rg0/off00']; m.index.operation = 'put version pk@290 applied'; }, 'index', ['index']),
       step('Index Service then deletes the old index entry for the previous tuple version.', 2.4,
         ['index'], [],
         m => { m.index.operation = 'delete index entry pk@212 applied'; }, 'index', ['index']),
       step('Only after the old entry is deleted, Index Service returns the deleted main-index location.', 3.0,
-        ['index'], [tok('file-06/rg1/off5', 'index.left', 'runtime.right', flow.index, .16, .84)],
-        m => { m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-07/rg0/off0']; m.index.operation = 'deleted loc file-06/rg1/off5 returned for pk@212'; }, 'index', ['index']),
+        ['index'], [tok('file-0/rg1/off02', 'index.left', 'runtime.right', flow.index, .16, .84)],
+        m => { m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-3/rg0/off00']; m.index.operation = 'deleted loc file-0/rg1/off02 returned for pk@212'; }, 'index', ['index']),
       step('Using the returned old location, Retina deletes the old tuple version by appending a delete timestamp to visibility.', 4.2,
-        ['lane1'], [tok('(off5,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
-        m => { const l = m.lanes[1]; l.highlight = 'visibility'; if (!l.deleteTs.includes('(5,290)')) l.deleteTs.push('(5,290)'); m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-07/rg0/off0']; m.index.operation = 'update index OK'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
+        ['lane1'], [tok('(off2,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
+        m => { const l = m.lanes[1]; l.highlight = 'visibility'; if (!l.deleteTs.includes('(2,290)')) l.deleteTs.push('(2,290)'); m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-3/rg0/off00']; m.index.operation = 'update index OK'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
       step('Retina returns OK for UPDATE. Pixels Sink can now finish the mirror transaction.', 3.2,
         ['ingress'], [tok('OK', 'runtime.left', 'ingress.right', flow.index, .12, .82)],
         m => { m.sink.sinkStep = 'row3Ok'; m.sink.requestState = 'UPDATE OK'; m.sink.rpcBatch = 'OK'; clearDeleteTsChainEffects(m, 1); }, 'mvcc', []),
@@ -997,17 +980,17 @@
         m => { const l = m.lanes[1]; l.highlight = 'immutable'; }, 'writeBuffer', []),
       step('A background flush asynchronously moves the immutable memtable to Storage.', 2.0,
         ['lane1'], [],
-        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; }, 'writeBuffer', [], 'flush'),
+        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; }, 'writeBuffer', [], 'flush'),
       step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
         [], [],
         m => { m.lanes[1].highlight = null; settlePendingFlushObject(m); }, 'storage', []),
       compactFlushedObjectsToFile(),
       step('After the row is appended, Retina calls Index Service to insert the primary and row-location indexes.', 4.2,
         ['index'], [tok('put pk@290', 'runtime.right', 'index.left', flow.index, .12, .82)],
-        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk174'; m.index.operation = 'put pk@290 in flight'; }, 'index', ['index']),
+        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; m.index.hot = 'pk174'; m.index.operation = 'put pk@290 in flight'; }, 'index', ['index']),
       step('Index Service inserts the new primary and row-location entries locally.', 2.4,
         ['index'], [],
-        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5', 'rowId821 -> file-07/rg0/off7']; m.index.operation = 'index insert entry applied'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
+        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02', 'rowId821 -> file-2/rg0/off15']; m.index.operation = 'index insert entry applied'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
       step('Only after the index insert is complete does Index Service return OK to Retina.', 3.0,
         ['index'], [tok('index OK', 'index.left', 'runtime.right', flow.index, .18, .82)],
         m => { m.index.operation = 'index insert OK'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
@@ -1030,16 +1013,16 @@
         m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
       step('Retina sends a delete request to Index Service for pk208 before deleting visibility.', 4.0,
         ['index'], [tok('delete pk@212', 'runtime.right', 'index.left', flow.index, .12, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'DELETE'; l.status = 'delete index entry'; l.highlight = null; m.index.hot = 'pk208'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-07/rg0/off7']; m.index.operation = 'delete pk@212 in flight'; m.sink.rpcBatch = 'DELETE applying'; }, 'index', ['index']),
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'DELETE'; l.status = 'delete index entry'; l.highlight = null; m.index.hot = 'pk208'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; m.index.operation = 'delete pk@212 in flight'; m.sink.rpcBatch = 'DELETE applying'; }, 'index', ['index']),
       step('Index Service deletes the matched primary and row-location entries locally.', 2.4,
         ['index'], [],
         m => { m.index.operation = 'delete index entry pk@212 applied'; }, 'index', ['index']),
       step('Only after the entry is deleted, Index Service returns the deleted main-index location.', 3.2,
-        ['index'], [tok('file-07/rg0/off7', 'index.left', 'runtime.right', flow.index, .18, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'deleted location returned'; m.index.primaryEntries = []; m.index.mainEntries = []; m.index.operation = 'deleted loc file-07/rg0/off7 returned for pk@212'; }, 'index', ['index']),
+        ['index'], [tok('file-0/rg1/off02', 'index.left', 'runtime.right', flow.index, .18, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'deleted location returned'; m.index.primaryEntries = []; m.index.mainEntries = []; m.index.operation = 'deleted loc file-0/rg1/off02 returned for pk@212'; }, 'index', ['index']),
       step('Retina then appends the delete timestamp into the visibility structure delete-ts chain.', 4.2,
-        ['lane1'], [tok('(off7,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'append delete timestamp'; l.highlight = 'visibility'; if (!l.deleteTs.includes('(7,290)')) l.deleteTs.push('(7,290)'); m.index.primaryEntries = []; m.index.mainEntries = []; m.sink.rpcBatch = 'DELETE applying'; m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
+        ['lane1'], [tok('(off2,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'append delete timestamp'; l.highlight = 'visibility'; if (!l.deleteTs.includes('(2,290)')) l.deleteTs.push('(2,290)'); m.index.primaryEntries = []; m.index.mainEntries = []; m.sink.rpcBatch = 'DELETE applying'; m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
       ...commitSequence('tx290', 291, 'delete committed; HWM=291', DETAIL_REPLAY_ID)
     ],
     update: [
@@ -1064,21 +1047,22 @@
       step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
         [], [],
         m => { m.lanes[1].highlight = null; settlePendingFlushObject(m); }, 'storage', []),
+      compactFlushedObjectsToFile(),
       step('Retina sends an update request to Index Service for pk132 at the new timestamp.', 3.6,
         ['index'], [tok('update pk@290', 'runtime.right', 'index.left', flow.index, .12, .86)],
-        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk132'; m.index.operation = 'update pk@290 in flight'; }, 'index', ['index']),
+        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02']; m.index.hot = 'pk132'; m.index.operation = 'update pk@290 in flight'; }, 'index', ['index']),
       step('Index Service first inserts the new versioned primary-index entry locally.', 2.4,
         ['index'], [],
-        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5', 'rowId821 -> file-07/rg0/off6']; m.index.operation = 'put version pk@290 applied'; }, 'index', ['index']),
+        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-0/rg1/off02', 'rowId821 -> file-2/rg0/off15']; m.index.operation = 'put version pk@290 applied'; }, 'index', ['index']),
       step('Index Service then deletes the old index entry for the previous tuple version.', 2.4,
         ['index'], [],
         m => { m.index.operation = 'delete index entry pk@212 applied'; }, 'index', ['index']),
       step('Only after the old entry is deleted, Index Service returns the deleted main-index location.', 3.0,
-        ['index'], [tok('file-06/rg1/off5', 'index.left', 'runtime.right', flow.index, .16, .84)],
-        m => { m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-07/rg0/off6']; m.index.operation = 'deleted loc file-06/rg1/off5 returned for pk@212'; }, 'index', ['index']),
+        ['index'], [tok('file-0/rg1/off02', 'index.left', 'runtime.right', flow.index, .16, .84)],
+        m => { m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-2/rg0/off15']; m.index.operation = 'deleted loc file-0/rg1/off02 returned for pk@212'; }, 'index', ['index']),
       step('Using the returned old location, Retina deletes the old tuple version by appending a delete timestamp to visibility.', 4.2,
-        ['lane1'], [tok('(off5,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
-        m => { const l = m.lanes[1]; l.highlight = 'visibility'; if (!l.deleteTs.includes('(5,290)')) l.deleteTs.push('(5,290)'); m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-07/rg0/off6']; m.index.operation = 'update index OK'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
+        ['lane1'], [tok('(off2,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
+        m => { const l = m.lanes[1]; l.highlight = 'visibility'; if (!l.deleteTs.includes('(2,290)')) l.deleteTs.push('(2,290)'); m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-2/rg0/off15']; m.index.operation = 'update index OK'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
       ...commitSequence('tx290', 291, 'update committed; HWM=291', 1)
     ],
     query: [
@@ -1686,7 +1670,6 @@
     const visibleRows = visibleMirrorRows(activeId, rows.length);
     const visibleCommit = activeId === 'commit' || activeId === 'committed';
     drawMirrorBeginCard(begin, activeId === 'begin' || activeId === 'build', c);
-    drawMirrorStackArea(layout, visibleRows, ['row1', 'row2', 'row3', 'replay', 'rowsOk'].includes(activeId), c);
     rows.slice(0, visibleRows).forEach((row, i) => drawMirrorRowCard(row, rowStageActive(activeId, i), c));
     if (visibleCommit) drawMirrorCommitCard(commit, activeId === 'commit', c);
   }
@@ -1709,9 +1692,6 @@
 
   function rowStageActive(activeId, index) {
     return activeId === 'build' || activeId === 'replay' || activeId === `row${index + 1}`;
-  }
-
-  function drawMirrorStackArea(layout, visibleRows, active, c) {
   }
 
   function drawMirrorBeginCard(box, active, c) {
@@ -1779,130 +1759,11 @@
     ctx.fillText('COMMIT', box.x + 18, box.y + 30);
   }
 
-  function drawMiniTxCard(x, y, w, h, label, color, c, active) {
-    ctx.fillStyle = alpha(color, active ? .18 : .10);
-    ctx.strokeStyle = alpha(color, active ? .56 : .30);
-    ctx.lineWidth = 1;
-    roundRect(x, y, w, h, 7, true, true);
-    drawTxnBracket(x + 8, y + 9, w - 16, h - 18, color, c);
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'center';
-    fitText(label, x + 6, y + h / 2 + 4, w - 12, 'center');
-  }
-
-  function drawServiceChip(x, y, w, h, label, color, c, active) {
-    ctx.fillStyle = alpha(color, active ? .18 : .10);
-    ctx.strokeStyle = alpha(color, active ? .58 : .30);
-    ctx.lineWidth = 1;
-    roundRect(x, y, w, h, 8, true, true);
-    ctx.fillStyle = alpha(color, active ? .26 : .14);
-    roundRect(x + 7, y + 7, w - 14, Math.max(18, h - 14), 6, true, false);
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'center';
-    fitText(label, x + 6, y + h / 2 + 5, w - 12, 'center');
-  }
-
-  function drawReplayOkDots(x, y, c, active) {
-    for (let i = 0; i < 3; i++) {
-      const cx = x + i * 24;
-      ctx.fillStyle = alpha(flow.replay, active ? .20 : .11);
-      ctx.strokeStyle = alpha(flow.replay, active ? .55 : .30);
-      ctx.lineWidth = 1;
-      roundRect(cx - 9, y - 11, 18, 22, 5, true, true);
-      ctx.fillStyle = flow.replay;
-      ctx.font = typeFont(TYPE.text, 900);
-      ctx.textAlign = 'center';
-      ctx.fillText('OK', cx, y + 3);
-    }
-  }
-
-  function drawMirrorTxChips(x, y, w, c, active) {
-    const labels = ['BEGIN', 'INSERT', 'DELETE', 'UPDATE', 'COMMIT'];
-    const gap = 6;
-    const chipW = Math.floor((w - gap * (labels.length - 1)) / labels.length);
-    labels.forEach((label, i) => {
-      const color = label === 'DELETE' ? flow.delete : label === 'COMMIT' || label === 'BEGIN' ? flow.tx : flow.replay;
-      const xx = x + i * (chipW + gap);
-      ctx.fillStyle = alpha(color, active ? .18 : .10);
-      ctx.strokeStyle = alpha(color, active ? .48 : .26);
-      ctx.lineWidth = 1;
-      roundRect(xx, y, chipW, 30, 7, true, true);
-      ctx.fillStyle = active ? color : c.text;
-      ctx.font = typeFont(TYPE.text, 900);
-      ctx.textAlign = 'center';
-      fitText(label, xx + 4, y + 19, chipW - 8, 'center');
-    });
-  }
-
-  function drawCdcDot(cx, cy, active, color, c) {
-    ctx.fillStyle = active ? color : alpha(color, .30);
-    ctx.beginPath();
-    ctx.arc(cx, cy, active ? 5 : 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = active ? alpha(color, .78) : alpha(c.border, .45);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, active ? 10 : 7, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
   function drawCdcCard(x, y, w, h, color, active, c, opts = {}) {
     ctx.fillStyle = opts.opaque ? c.panel : active ? alpha(color, c.dark ? .18 : .11) : alpha(c.panel2, .70);
     ctx.strokeStyle = active ? alpha(color, .62) : c.borderSoft;
     ctx.lineWidth = active ? 1.6 : 1;
     roundRect(x, y, w, h, 8, true, true);
-  }
-
-  function drawRecordTypeCard(x, y, w, h, label, color, c, fs = TYPE.text, weight = 900) {
-    ctx.fillStyle = alpha(color, .16);
-    ctx.strokeStyle = alpha(color, .48);
-    ctx.lineWidth = 1;
-    roundRect(x, y, w, h, 6, true, true);
-    ctx.fillStyle = color;
-    ctx.font = typeFont(fs, weight);
-    ctx.textAlign = 'center';
-    fitText(label, x + 4, y + h / 2 + fs * .36, w - 8, 'center');
-  }
-
-  function drawFoldCorner(x, y, color, c) {
-    ctx.fillStyle = alpha(color, .30);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + 7, y);
-    ctx.lineTo(x + 7, y + 7);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  function drawMiniArrow(x1, y1, x2, y2, color) {
-    ctx.strokeStyle = alpha(color, .62);
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    arrowHead({ x: x1, y: y1 }, { x: x2, y: y2 }, alpha(color, .72));
-  }
-
-  function drawTxnBracket(x, y, w, h, color, c) {
-    ctx.strokeStyle = alpha(color, .70);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x + 7, y);
-    ctx.lineTo(x, y);
-    ctx.lineTo(x, y + h);
-    ctx.lineTo(x + 7, y + h);
-    ctx.moveTo(x + w - 7, y);
-    ctx.lineTo(x + w, y);
-    ctx.lineTo(x + w, y + h);
-    ctx.lineTo(x + w - 7, y + h);
-    ctx.stroke();
-    ctx.fillStyle = alpha(color, .20);
-    ctx.beginPath();
-    ctx.arc(x + w / 2, y + h / 2, 8, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   function drawLogStripes(x, y, w, h, color, c) {
@@ -1938,213 +1799,6 @@
     }
   }
 
-  function drawCommitStamp(x, y, w, h, color, c) {
-    ctx.fillStyle = alpha(color, .13);
-    ctx.strokeStyle = alpha(color, .52);
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x + 8, y + 15);
-    ctx.lineTo(x + 13, y + 20);
-    ctx.lineTo(x + 21, y + 9);
-    ctx.stroke();
-  }
-
-  function drawSink(c) {
-    const r = rects.sink;
-    drawComponent(r, c, { color: flow.replay, key: 'sink' });
-    const layout = writerLayout();
-    drawRowChangeStagingPanel(layout, c);
-    drawReplayRpcPanel(layout, c);
-    drawWriterFlowAnimations(layout, c);
-  }
-
-  function writerLayout() {
-    const r = rects.sink;
-    const x = r.x + 16;
-    const w = r.w - 32;
-    const top = r.y + 70;
-    const bottom = r.y + r.h - 22;
-    const gap = 20;
-    const stagingH = Math.min(194, Math.round((bottom - top - gap) * .52));
-    const staging = { x, y: top, w, h: stagingH };
-    const rpc = { x, y: staging.y + staging.h + gap, w, h: bottom - (staging.y + staging.h + gap) };
-    return { r, staging, rpc };
-  }
-
-  function drawRowChangeStagingPanel(layout, c) {
-    const { x, y, w, h } = layout.staging;
-    drawCdcCard(x, y, w, h, flow.replay, /route|stage|queued|pk|row/i.test(`${model.sink.requestState} ${model.sink.writePlan}`), c);
-    ctx.fillStyle = flow.replay;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'left';
-    fitText('row-change staging', x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
-    drawRecordSheet(x + 12, y + 46, 50, 48, flow.replay, c);
-    drawRouteHub(x + 92, y + 70, flow.replay, c);
-    drawMiniArrow(x + 118, y + 70, x + w - 34, y + 70, flow.replay);
-    drawPill(x + 12, y + h - 68, w - 24, 28, displaySinkText(model.sink.routingRule || 'row image rule'), flow.index, c, /after|before|split|key|route/i.test(model.sink.routingRule || ''), 9);
-    drawPill(x + 12, y + h - 34, w - 24, 26, displaySinkText(model.sink.writePlan || 'rows queued'), flow.replay, c, /pk|row|queued|stage/i.test(model.sink.writePlan || ''), 8);
-    drawStagedRows(x + 130, y + 43, w - 156, 60, c);
-  }
-
-  function drawStagedRows(x, y, w, h, c) {
-    const rows = stagedRowLabels();
-    const visible = rows.slice(0, 3);
-    const gap = 8;
-    const cardW = Math.max(48, Math.min(72, (w - gap * Math.max(0, visible.length - 1)) / Math.max(1, visible.length)));
-    const total = cardW * visible.length + gap * Math.max(0, visible.length - 1);
-    const start = x + Math.max(0, (w - total) / 2);
-    visible.forEach((label, i) => {
-      const color = /^D/i.test(label) ? flow.delete : /^U/i.test(label) ? flow.index : flow.replay;
-      drawStagedRowCard(start + i * (cardW + gap), y + 8, cardW, Math.min(36, h - 12), label, color, c);
-    });
-    if (!visible.length) {
-      drawEmptyRowSlot(x + 8, y + 18, w - 16, 14, c);
-    }
-  }
-
-  function stagedRowLabels() {
-    const labels = [];
-    model.lanes.forEach(l => {
-      const short = shortRowLabel(l.currentOp);
-      if (short && short !== 'row' && !labels.includes(short)) labels.push(short);
-    });
-    if (!labels.length) {
-      const plan = String(model.sink.writePlan || '');
-      const matches = plan.match(/[IUD]?\s*pk\d+/gi) || plan.match(/pk\d+/gi) || [];
-      matches.forEach(m => labels.push(m.replace(/\s+/g, ' ')));
-    }
-    return labels;
-  }
-
-  function drawStagedRowCard(x, y, w, h, label, color, c) {
-    ctx.fillStyle = alpha(color, .18);
-    ctx.strokeStyle = alpha(color, .50);
-    ctx.lineWidth = 1;
-    roundRect(x, y, w, h, 5, true, true);
-    drawRowGlyph(x + 6, y + 11, color, false, c);
-    ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.text, 800);
-    ctx.textAlign = 'left';
-    fitText(label || 'row', x + 18, y + h / 2 + 5, w - 22, 'left');
-  }
-
-  function drawEmptyRowSlot(x, y, w, h, c) {
-    ctx.strokeStyle = alpha(c.border, .36);
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 4]);
-    roundRect(x, y, w, h, 4, false, true);
-    ctx.setLineDash([]);
-  }
-
-  function drawReplayRpcPanel(layout, c) {
-    const { x, y, w, h } = layout.rpc;
-    drawCdcCard(x, y, w, h, flow.tx, /RPC|batch|OK|pending|rows/i.test(model.sink.rpcBatch), c);
-    ctx.fillStyle = flow.tx;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'left';
-    fitText('replay RPC', x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
-    const sendLane = streamLane(layout, false);
-    const ackLane = streamLane(layout, true);
-    drawStreamLane(sendLane.a.x, sendLane.a.y, sendLane.b.x - sendLane.a.x, flow.replay, c, false);
-    drawStreamLane(ackLane.a.x, ackLane.a.y, ackLane.b.x - ackLane.a.x, flow.tx, c, true);
-    ctx.fillStyle = alpha(flow.replay, .78);
-    ctx.font = typeFont(TYPE.text, 800);
-    ctx.textAlign = 'right';
-    ctx.fillText('send', x + 88, sendLane.a.y + 3);
-    ctx.fillStyle = alpha(flow.tx, .78);
-    ctx.fillText('ack', x + 88, ackLane.a.y + 3);
-  }
-
-  function streamLane(layout, reverse) {
-    const r = layout.rpc;
-    const y = reverse ? r.y + r.h - 56 : r.y + 48;
-    return {
-      a: { x: r.x + 92, y },
-      b: { x: r.x + r.w - 18, y }
-    };
-  }
-
-  function drawStreamLane(x, y, w, color, c, reverse) {
-    ctx.strokeStyle = alpha(color, .34);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + w, y);
-    ctx.stroke();
-    for (let i = 0; i < 4; i++) {
-      const px = x + 8 + i * Math.max(16, (w - 24) / 3);
-      ctx.fillStyle = alpha(color, .18 + i * .025);
-      roundRect(px - 5, y - 4, 10, 8, 3, true, false);
-    }
-    arrowHead(
-      reverse ? { x: x + w - 10, y } : { x: x + w - 18, y },
-      reverse ? { x: x + w - 30, y } : { x: x + w, y },
-      alpha(color, .52)
-    );
-  }
-
-  function drawWriterFlowAnimations(layout, c) {
-    const incoming = activeTokenProgress(t => tokenDirection(t, 'cdc', 'sink'));
-    if (incoming && incoming.local > .34) {
-      const a = { x: layout.r.x + layout.r.w / 2, y: layout.r.y + 38 };
-      const b = stagingRowCenter(layout);
-      drawMovingMiniRow(a, b, clamp((incoming.local - .34) / .66, 0, 1), incoming.token.label, flow.replay, c);
-    }
-
-    const dispatch = activeTokenProgress(t => tokenDirection(t, 'sink', 'lane'));
-    if (dispatch) {
-      const a = stagingRowCenter(layout);
-      const b = { x: layout.r.x + layout.r.w - 8, y: a.y };
-      drawMovingMiniRow(a, b, dispatch.local, dispatch.token.label, dispatch.token.color || flow.replay, c);
-    }
-
-    const send = repeatingTokenProgress(t => tokenDirection(t, 'sink', 'runtime')) ||
-      activeTokenProgress(t => tokenDirection(t, 'sink', 'runtime'));
-    if (send) drawStagedRowToStream(layout, send, c);
-    if (!send && writerStreamActive()) {
-      drawStagedRowToStream(layout, {
-        token: { label: stagedRowLabels()[0] || 'row', color: flow.replay },
-        local: streamCycleProgress()
-      }, c);
-    }
-
-    const recv = repeatingTokenProgress(t => tokenDirection(t, 'runtime', 'sink')) ||
-      activeTokenProgress(t => tokenDirection(t, 'runtime', 'sink'));
-    if (recv) drawMovingRpcStreamChunk(layout, recv.local, true, c);
-  }
-
-  function writerStreamActive() {
-    const text = `${model.sink.requestState} ${model.sink.rpcBatch}`;
-    if (/1 tx per request|ready$/i.test(text)) return false;
-    return /replay|dispatch|grouped|batch|tx\d+|rows|pending|OK/i.test(text);
-  }
-
-  function activeTokenProgress(predicate) {
-    const st = currentStep();
-    const p = stepProgress();
-    for (const token of st.tokens) {
-      if (!predicate(token)) continue;
-      if (p < token.start || p > token.end) continue;
-      return { token, local: ease((p - token.start) / (token.end - token.start)) };
-    }
-    return null;
-  }
-
-  function repeatingTokenProgress(predicate) {
-    const st = currentStep();
-    const token = st.tokens.find(predicate);
-    if (!token) return null;
-    const p = stepProgress();
-    if (p < Math.max(0, token.start - .12) || p > Math.min(1, token.end + .12)) return null;
-    return { token, local: streamCycleProgress() };
-  }
-
   function tokenDirection(token, fromPrefix, toPrefix) {
     const from = tokenPrefixIndex(token, fromPrefix);
     const to = tokenPrefixIndex(token, toPrefix);
@@ -2153,209 +1807,6 @@
 
   function tokenPrefixIndex(token, prefix) {
     return token.path.findIndex(part => typeof part === 'string' && part.startsWith(prefix));
-  }
-
-  function stagingRowCenter(layout) {
-    const s = layout.staging;
-    return { x: s.x + s.w * .58, y: s.y + Math.min(58, s.h - 42) };
-  }
-
-  function drawStagedRowToStream(layout, send, c) {
-    const rowStart = stagingRowCenter(layout);
-    const lane = streamLane(layout, false);
-    const rowEnd = { x: lane.a.x + 8, y: lane.a.y };
-    drawInternalMotionPath(rowStart, rowEnd, send.token.color || flow.replay, c);
-    drawActiveStreamGlow(layout, false, c);
-
-    const mergeT = clamp(send.local / .62, 0, 1);
-    if (send.local < .82) {
-      drawMovingMiniRow(rowStart, rowEnd, mergeT, send.token.label, send.token.color || flow.replay, c, 48, 18);
-    }
-
-    const streamT = clamp((send.local - .16) / .84, 0, 1);
-    drawMovingRpcStreamChunk(layout, streamT, false, c, 'row');
-    if (send.local > .36) drawMovingRpcStreamChunk(layout, (streamT + .36) % 1, false, c, 'row');
-    if (send.local > .58) drawMovingRpcStreamChunk(layout, (streamT + .68) % 1, false, c, 'row');
-  }
-
-  function drawActiveStreamGlow(layout, reverse, c) {
-    const lane = streamLane(layout, reverse);
-    const color = reverse ? flow.tx : flow.replay;
-    ctx.save();
-    ctx.strokeStyle = alpha(color, .72);
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(lane.a.x, lane.a.y);
-    ctx.lineTo(lane.b.x, lane.b.y);
-    ctx.stroke();
-    ctx.strokeStyle = alpha('#ffffff', .68);
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(lane.a.x, lane.a.y);
-    ctx.lineTo(lane.b.x, lane.b.y);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawInternalMotionPath(a, b, color, c) {
-    ctx.save();
-    ctx.strokeStyle = alpha(color, .32);
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([4, 5]);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y + 3);
-    ctx.lineTo(a.x, b.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    arrowHead({ x: b.x - 12, y: b.y }, b, alpha(color, .50));
-    ctx.restore();
-  }
-
-  function drawMovingMiniRow(a, b, t, label, color, c, ww, hh) {
-    const x = lerp(a.x, b.x, clamp(t, 0, 1));
-    const y = lerp(a.y, b.y, clamp(t, 0, 1));
-    const w = ww || 48;
-    const h = hh || 22;
-    ctx.save();
-    ctx.shadowColor = alpha(color, .24);
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = color;
-    roundRect(x - w / 2, y - h / 2, w, h, 5, true, false);
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = alpha('#ffffff', .80);
-    ctx.lineWidth = 1;
-    roundRect(x - w / 2, y - h / 2, w, h, 5, false, true);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'center';
-    fitText(shortRowLabel(label), x - w / 2 + 4, y + 3, w - 8, 'center');
-    ctx.restore();
-  }
-
-  function shortRowLabel(label) {
-    const text = String(label || 'row');
-    const op = text.match(/\b([IUD]):?pk(\d+)/i) || text.match(/\b([IUD]).*?(pk\d+)/i);
-    if (op) return /^\d+$/.test(op[2]) ? `${op[1].toUpperCase()} pk${op[2]}` : `${op[1].toUpperCase()} ${op[2]}`;
-    const pk = text.match(/pk\d+/i);
-    if (pk) return pk[0];
-    return 'row';
-  }
-
-  function drawMovingRpcStreamChunk(layout, t, reverse, c, labelOverride) {
-    const lane = streamLane(layout, reverse);
-    const a = lane.a;
-    const b = lane.b;
-    const p = reverse ? 1 - clamp(t, 0, 1) : clamp(t, 0, 1);
-    const x = lerp(a.x, b.x, p);
-    const y = lerp(a.y, b.y, p);
-    const label = labelOverride || (reverse ? 'ack' : 'chunk');
-    ctx.save();
-    ctx.shadowColor = alpha(reverse ? flow.replay : flow.tx, .26);
-    ctx.shadowBlur = 9;
-    ctx.fillStyle = reverse ? flow.replay : flow.tx;
-    roundRect(x - 26, y - 11, 52, 22, 8, true, false);
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = alpha('#ffffff', .82);
-    ctx.lineWidth = 1;
-    roundRect(x - 26, y - 11, 52, 22, 8, false, true);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'center';
-    fitText(label, x - 22, y + 4, 44, 'center');
-    ctx.restore();
-  }
-
-  function drawRpcEndpoint(x, y, w, h, color, c) {
-    ctx.fillStyle = alpha(color, .14);
-    ctx.strokeStyle = alpha(color, .44);
-    ctx.lineWidth = 1;
-    roundRect(x, y, w, h, 7, true, true);
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'center';
-    fitText('Retina OK', x + 4, y + 18, w - 8, 'center');
-  }
-
-  function drawWriterRequestCard(x, y, w, h, c) {
-    drawCdcCard(x, y, w, h, flow.replay, /replay/i.test(model.sink.requestMode), c);
-    drawRecordSheet(x + 14, y + 10, 28, 28, flow.replay, c);
-    drawRecordTypeCard(x + 54, y + 12, 86, 22, 'replay RPC', flow.replay, c);
-    ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.text, 800);
-    ctx.textAlign = 'left';
-    fitText(displaySinkText(model.sink.requestState), x + 54, y + 43, w - 66, 'left');
-  }
-
-  function drawWriterRpcCard(x, y, w, h, c) {
-    drawCdcCard(x, y, w, h, flow.tx, /batch|RPC|OK|pending|rows/i.test(model.sink.rpcBatch), c);
-    drawRpcBundle(x + 12, y + 9, flow.tx, c);
-    const txCount = rpcTxCount();
-    for (let i = 0; i < txCount; i++) {
-      drawTxDot(x + 64 + i * 24, y + 19, flow.tx, c);
-    }
-    drawMiniArrow(x + w - 44, y + 24, x + w - 16, y + 24, flow.replay);
-    ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.text, 800);
-    ctx.textAlign = 'left';
-    fitText(displaySinkText(model.sink.rpcBatch), x + 12, y + 41, w - 24, 'left');
-  }
-
-  function rpcTxCount() {
-    const text = `${model.sink.rpcBatch} ${model.sink.requestState}`;
-    if (/3 tx|tx43 \+ tx44 \+ tx45|3 tx rows/i.test(text)) return 3;
-    if (/tx\d+.*tx\d+/i.test(text)) return 2;
-    return 1;
-  }
-
-  function drawRecordSheet(x, y, w, h, color, c) {
-    ctx.fillStyle = alpha(color, .12);
-    ctx.strokeStyle = alpha(color, .48);
-    ctx.lineWidth = 1;
-    roundRect(x, y, w, h, 5, true, true);
-    drawFoldCorner(x + w - 9, y + 3, color, c);
-    ctx.strokeStyle = alpha(color, .38);
-    ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      ctx.moveTo(x + 7, y + 10 + i * 6);
-      ctx.lineTo(x + w - 8, y + 10 + i * 6);
-    }
-    ctx.stroke();
-  }
-
-  function drawRouteHub(x, y, color, c) {
-    ctx.fillStyle = alpha(color, .18);
-    ctx.strokeStyle = alpha(color, .56);
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(x, y, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'center';
-    ctx.fillText('pk', x, y + 3);
-  }
-
-  function drawRpcBundle(x, y, color, c) {
-    ctx.fillStyle = alpha(color, .14);
-    ctx.strokeStyle = alpha(color, .42);
-    roundRect(x, y, 40, 22, 6, true, true);
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
-    ctx.textAlign = 'center';
-    ctx.fillText('RPC', x + 20, y + 17);
-  }
-
-  function drawTxDot(cx, cy, color, c) {
-    ctx.fillStyle = alpha(color, .16);
-    ctx.strokeStyle = alpha(color, .52);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
   }
 
   function txWindowLayout(r) {
@@ -2620,15 +2071,6 @@
 
   function compactPrimaryKey(key) {
     return String(key || '');
-  }
-
-  function compactLocation(location) {
-    return String(location || '')
-      .replace('.pxl', '')
-      .replace('fileId', 'f')
-      .replace('file-', 'f')
-      .replace('/rg', '/r')
-      .replace('/off', '/o');
   }
 
   function drawReplayers(c) {
@@ -2908,10 +2350,15 @@
     const eligibleDeletes = new Set();
     const newlyFolded = new Set();
 
-    lane.deleteTs.forEach(item => {
+    const bitmapDeleteTs = lane.bitmapDeleteTs || lane.deleteTs;
+    bitmapDeleteTs.forEach(item => {
       const offset = deleteOffsetValue(item);
       if (!Number.isFinite(offset) || offset < 0 || offset >= len) return;
       pendingDeletes.add(offset);
+    });
+    lane.deleteTs.forEach(item => {
+      const offset = deleteOffsetValue(item);
+      if (!Number.isFinite(offset) || offset < 0 || offset >= len) return;
       if (lane.safeTs != null && deleteTsValue(item) <= lane.safeTs) {
         eligibleDeletes.add(offset);
       }
@@ -2977,7 +2424,7 @@
     const foldingDeleteTs = st.anim === 'foldDeleteTs' && stepProgress() < .82;
     const items = foldingDeleteTs ? (lane.prevDeleteTs || lane.deleteTs) : hideAppendingItem ? lane.deleteTs.slice(0, -1) : lane.deleteTs;
     const visible = items.slice(0, columns * rows);
-    const itemW = Math.min(72, Math.floor((w - 18 * (columns - 1)) / columns));
+    const itemW = Math.min(90, Math.floor((w - 6 * (columns - 1)) / columns));
     const gapX = columns > 1 ? (w - itemW * columns) / (columns - 1) : 0;
     const itemH = 24;
     const rowGap = 10;
@@ -3040,7 +2487,7 @@
   function deleteTsItemLayout(w) {
     const columns = 4;
     const rows = 2;
-    const itemW = Math.min(72, Math.floor((w - 18 * (columns - 1)) / columns));
+    const itemW = Math.min(90, Math.floor((w - 6 * (columns - 1)) / columns));
     const gapX = columns > 1 ? (w - itemW * columns) / (columns - 1) : 0;
     const itemH = 24;
     const rowGap = 10;
@@ -3627,190 +3074,6 @@
     return { x, w, scheduler, splitBoxes, gateBox, queueBox, opsBox };
   }
 
-  function drawQuery(c) {
-    const r = rects.query;
-    const q = model.query;
-    const splits = q.splits || [];
-    const gate = q.gate || {};
-    const { x, w, scheduler, splitBoxes, gateBox, queueBox, opsBox } = queryLayout(r, splits);
-    drawBoundary(r, c, 'query');
-
-    drawPill(x, r.y + 64, 86, 30, q.id, flow.query, c, q.active, 11);
-    drawPill(x + 96, r.y + 64, w - 96, 30, `transTs=${q.transTs}`, flow.tx, c, q.active, 11);
-
-    splitBoxes.forEach(box => {
-      drawQueryInternalLink([
-        [scheduler.x + scheduler.w / 2, scheduler.y + scheduler.h],
-        [box.portX, scheduler.y + scheduler.h + 12],
-        [box.portX, box.y]
-      ], querySplitColor(box.split.kind), c, .28);
-      drawQueryInternalLink([
-        [box.portX, box.y + box.h],
-        [box.portX, gateBox.y - 12],
-        [gateBox.x + gateBox.w / 2, gateBox.y]
-      ], querySplitColor(box.split.kind), c, .24);
-    });
-    drawQueryInternalLink([[gateBox.x + gateBox.w / 2, gateBox.y + gateBox.h], [queueBox.x + queueBox.w / 2, queueBox.y]], flow.visibility, c, .34);
-    drawQueryInternalLink([[queueBox.x + queueBox.w / 2, queueBox.y + queueBox.h], [opsBox.x + opsBox.w / 2, opsBox.y]], flow.query, c, .34);
-
-    smallBox(scheduler.x, scheduler.y, scheduler.w, scheduler.h, 'Split Scheduler', flow.query, c, state.detailFocus === 'query');
-    drawPill(scheduler.x + 12, scheduler.y + 32, scheduler.w - 24, 28, q.parallelism || 'parallel split execution', flow.query, c, q.active, 10);
-    drawSchedulerGlyph(scheduler.x + scheduler.w - 42, scheduler.y + 21, flow.query, c);
-
-    splitBoxes.forEach((box, i) => drawQuerySplitCard(box, c, i));
-    drawVisibilityGateBox(gateBox, gate, c);
-    drawVisibleQueueBox(queueBox, q, c);
-    drawOperatorPipelineBox(opsBox, q, c);
-  }
-
-  function querySplitColor(kind) {
-    if (kind === 'active') return flow.replay;
-    if (kind === 'flushed') return flow.storage;
-    return flow.query;
-  }
-
-  function drawQueryInternalLink(points, color, c, opacity) {
-    const pts = points.map(arrPoint);
-    ctx.save();
-    ctx.strokeStyle = alpha(color, opacity);
-    ctx.lineWidth = 1.6;
-    ctx.lineCap = 'round';
-    ctx.setLineDash([5, 6]);
-    drawPolyline(pts);
-    ctx.setLineDash([]);
-    arrowHead(pts[pts.length - 2], pts[pts.length - 1], alpha(color, opacity + .18));
-    ctx.restore();
-  }
-
-  function drawSchedulerGlyph(cx, cy, color, c) {
-    ctx.save();
-    ctx.fillStyle = alpha(color, .20);
-    ctx.strokeStyle = alpha(color, .55);
-    ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    for (let i = 0; i < 3; i++) {
-      const y = cy + 18 + i * 6;
-      ctx.strokeStyle = alpha(color, .42);
-      ctx.beginPath(); ctx.moveTo(cx - 18, y); ctx.lineTo(cx + 18, y); ctx.stroke();
-      ctx.fillStyle = i === 1 ? color : alpha(c.text, .55);
-      ctx.beginPath(); ctx.arc(cx - 18 + i * 18, y, 2.4, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  function drawQuerySplitCard(box, c, index) {
-    const split = box.split;
-    const color = querySplitColor(split.kind);
-    const active = split.status !== 'waiting' || state.detailFocus === 'query' || state.activeChannels.includes('flush');
-    ctx.fillStyle = active ? alpha(color, c.dark ? .16 : .10) : alpha(c.panel2, .80);
-    ctx.strokeStyle = active ? alpha(color, .58) : c.borderSoft;
-    ctx.lineWidth = active ? 1.5 : 1;
-    roundRect(box.x, box.y, box.w, box.h, 9, true, true);
-    drawQuerySplitIcon(split.kind, box.x + 12, box.y + 16, color, c);
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.subTitle, 900);
-    ctx.textAlign = 'left';
-    fitText(`${split.id} · ${split.title}`, box.x + 52, box.y + 25, box.w - 122, 'left');
-    ctx.fillStyle = c.muted;
-    ctx.font = typeFont(TYPE.text, 0);
-    fitText(split.source, box.x + 52, box.y + 46, box.w - 122, 'left');
-    drawPill(box.x + box.w - 76, box.y + 14, 64, 26, split.status, color, c, active, 9);
-    drawProgressBar(box.x + 52, box.y + 60, box.w - 122, 8, split.progress || 0, color, c);
-    drawBatchDots(box.x + box.w - 62, box.y + 58, Math.max(split.batches || 0, split.visible || 0), color, c);
-    ctx.fillStyle = alpha(c.muted, .72);
-    ctx.font = typeFont(TYPE.text, 800);
-    ctx.textAlign = 'center';
-    ctx.fillText(`task ${index + 1}`, box.x + 25, box.y + box.h - 10);
-  }
-
-  function drawQuerySplitIcon(kind, x, y, color, c) {
-    ctx.save();
-    ctx.strokeStyle = alpha(color, .55);
-    ctx.fillStyle = alpha(color, .18);
-    ctx.lineWidth = 1;
-    if (kind === 'regular') {
-      for (let i = 0; i < 3; i++) roundRect(x + i * 5, y + i * 4, 24, 20, 4, true, true);
-      ctx.fillStyle = color;
-      ctx.font = typeFont(TYPE.text, 800);
-      ctx.textAlign = 'center';
-      ctx.fillText('RG', x + 17, y + 17);
-    } else if (kind === 'active') {
-      roundRect(x, y, 34, 28, 5, true, true);
-      ctx.strokeStyle = alpha(color, .42);
-      for (let i = 1; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x + i * 11, y + 4); ctx.lineTo(x + i * 11, y + 24); ctx.stroke(); }
-      for (let i = 1; i < 2; i++) { ctx.beginPath(); ctx.moveTo(x + 4, y + i * 14); ctx.lineTo(x + 30, y + i * 14); ctx.stroke(); }
-    } else {
-      roundRect(x + 2, y + 4, 30, 22, 6, true, true);
-      ctx.fillStyle = alpha(color, .28);
-      roundRect(x + 7, y, 20, 8, 4, true, false);
-      ctx.fillStyle = color;
-      ctx.font = typeFont(TYPE.text, 900);
-      ctx.textAlign = 'center';
-      ctx.fillText('OBJ', x + 17, y + 20);
-    }
-    ctx.restore();
-  }
-
-  function drawProgressBar(x, y, w, h, progress, color, c) {
-    const p = clamp(progress, 0, 1);
-    ctx.fillStyle = alpha(c.border, .38);
-    roundRect(x, y, w, h, h / 2, true, false);
-    ctx.fillStyle = alpha(color, .72);
-    roundRect(x, y, Math.max(h, w * p), h, h / 2, true, false);
-  }
-
-  function drawBatchDots(x, y, count, color, c) {
-    const n = Math.max(3, Math.min(5, count || 0));
-    for (let i = 0; i < n; i++) {
-      const filled = i < (count || 0);
-      ctx.fillStyle = filled ? alpha(color, .62) : alpha(c.border, .42);
-      roundRect(x + i * 9, y, 7, 10, 2, true, false);
-    }
-  }
-
-  function drawVisibilityGateBox(box, gate, c) {
-    smallBox(box.x, box.y, box.w, box.h, 'VFoR Visibility Gate', flow.visibility, c, state.detailFocus === 'visibility');
-    const fx = box.x + 18, fy = box.y + 34;
-    ctx.fillStyle = alpha(flow.visibility, c.dark ? .22 : .14);
-    ctx.strokeStyle = alpha(flow.visibility, .58);
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(fx, fy);
-    ctx.lineTo(fx + 60, fy);
-    ctx.lineTo(fx + 42, fy + 36);
-    ctx.lineTo(fx + 42, fy + 50);
-    ctx.lineTo(fx + 18, fy + 50);
-    ctx.lineTo(fx + 18, fy + 36);
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    drawBits(gate.bitmap || '0010100110', box.x + 92, box.y + 36, c, flow.visibility);
-    drawPill(box.x + 88, box.y + 62, box.w - 104, 28, gate.rule || 'visibility rule', flow.visibility, c, true, 9);
-    metricRows(box.x + 88, box.y + 91, box.w - 104, [
-      ['input', `${gate.inputBatches || 0} batches`],
-      ['output', `${gate.visibleBatches || 0} visible`]
-    ], c);
-  }
-
-  function drawVisibleQueueBox(box, q, c) {
-    smallBox(box.x, box.y, box.w, box.h, 'Visible Batch Queue', flow.query, c, state.detailFocus === 'query');
-    drawBatchDots(box.x + 14, box.y + 34, q.gate ? q.gate.visibleBatches : 0, flow.query, c);
-    drawPill(box.x + 72, box.y + 33, box.w - 86, 28, q.queueState || 'waiting', flow.query, c, (q.gate && q.gate.visibleBatches > 0), 10);
-  }
-
-  function drawOperatorPipelineBox(box, q, c) {
-    smallBox(box.x, box.y, box.w, box.h, 'Downstream Operators', flow.query, c, state.detailFocus === 'query');
-    const labels = ['Scan', 'Filter', 'Project', 'Agg'];
-    const bw = 62;
-    labels.forEach((label, i) => {
-      const bx = box.x + 12 + i * 68;
-      drawPill(bx, box.y + 34, bw, 28, label, flow.query, c, q.returnedRows > 0 || i === 0, 9);
-    });
-    ctx.fillStyle = c.muted;
-    ctx.font = typeFont(TYPE.text, 0);
-    ctx.textAlign = 'left';
-    fitText(`${q.operatorInput} · rows ${q.returnedRows.toLocaleString()}`, box.x + 12, box.y + 76, box.w - 24, 'left');
-  }
-
   function drawTokens(c) {
     const st = currentStep();
     const p = stepProgress();
@@ -3897,54 +3160,6 @@
     ctx.restore();
   }
 
-  function drawGroup(r, c, color, key) {
-    const highlighted = isHighlighted(key);
-    ctx.fillStyle = highlighted ? alpha(color, c.dark ? .12 : .08) : alpha(color, c.dark ? .05 : .035);
-    ctx.strokeStyle = highlighted ? alpha(color, .58) : alpha(color, .24);
-    ctx.lineWidth = highlighted ? 1.7 : 1;
-    roundRect(r.x, r.y, r.w, r.h, 14, true, true);
-  }
-
-  function smallBox(x, y, w, h, title, color, c, active) {
-    ctx.fillStyle = active ? alpha(color, c.dark ? .18 : .11) : alpha(c.panel2, .78);
-    ctx.strokeStyle = active ? alpha(color, .62) : c.borderSoft;
-    ctx.lineWidth = active ? 1.5 : 1;
-    roundRect(x, y, w, h, 9, true, true);
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.subTitle, 900);
-    ctx.textAlign = 'left';
-    fitText(title, x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
-  }
-
-  function drawMiniStack(x, y, w, rows, c) {
-    rows.forEach((row, i) => {
-      const yy = y + i * 40;
-      ctx.fillStyle = alpha(row[2], c.dark ? .13 : .08);
-      ctx.strokeStyle = alpha(row[2], .28);
-      roundRect(x, yy, w, 32, 8, true, true);
-      ctx.fillStyle = row[2];
-      ctx.font = typeFont(TYPE.subTitle, 900);
-      ctx.textAlign = 'left';
-      ctx.fillText(row[0], x + 10, yy + 17);
-      ctx.fillStyle = c.text;
-      ctx.font = typeFont(TYPE.text, 0);
-      fitText(row[1], x + 10, yy + 32, w - 20, 'left');
-    });
-  }
-
-  function metricRows(x, y, w, rows, c) {
-    rows.forEach((row, i) => {
-      const yy = y + i * 22;
-      ctx.fillStyle = c.muted;
-      ctx.font = typeFont(TYPE.text, 0);
-      ctx.textAlign = 'left';
-      fitText(row[0], x, yy, w * .42, 'left');
-      ctx.fillStyle = c.text;
-      ctx.font = typeFont(TYPE.text, 900);
-      fitText(row[1], x + w * .43, yy, w * .57, 'right');
-    });
-  }
-
   function drawPill(x, y, w, h, label, color, c, active, fs) {
     ctx.fillStyle = alpha(color, active ? .22 : .10);
     ctx.strokeStyle = alpha(color, active ? .60 : .26);
@@ -3955,73 +3170,6 @@
     ctx.font = typeFont(size, 900);
     ctx.textAlign = 'center';
     fitText(label, x + 6, y + h / 2 + size * .36, w - 12, 'center');
-  }
-
-  function drawBlockPile(x, y, w, h, count, active, label, color, c) {
-    ctx.fillStyle = alpha(color, active ? .22 : .10);
-    ctx.strokeStyle = alpha(color, active ? .60 : .28);
-    roundRect(x, y, w, h, 6, true, true);
-    for (let i = 0; i < Math.min(count, 3); i++) {
-      ctx.fillStyle = alpha(color, .22 + i * .06);
-      roundRect(x + 7, y + 6 + i * 5, w - 14, 4, 2, true, false);
-    }
-    ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.text, 800);
-    ctx.textAlign = 'center';
-    ctx.fillText(label, x + w / 2, y + h - 8);
-  }
-
-  function immCellW(queueW, n) {
-    return Math.min(72, Math.floor((queueW - 56 - Math.max(0, n - 1) * 5) / Math.max(n, 1)));
-  }
-
-  function drawImmFifoQueue(x, y, w, h, count, active, c) {
-    const color = flow.gc;
-    ctx.fillStyle = alpha(color, active ? .14 : .06);
-    ctx.strokeStyle = alpha(color, active ? .52 : .24);
-    ctx.lineWidth = active ? 1.5 : 1;
-    roundRect(x, y, w, h, 6, true, true);
-    ctx.font = typeFont(TYPE.text, 800);
-    ctx.fillStyle = color;
-    ctx.textAlign = 'left';
-    ctx.fillText('imm', x + 7, y + 12);
-    ctx.fillStyle = alpha(color, active ? .70 : .42);
-    ctx.textAlign = 'right';
-    ctx.fillText('flush →', x + w - 7, y + 12);
-    if (count === 0) {
-      ctx.fillStyle = c.muted;
-      ctx.font = typeFont(TYPE.text, 0);
-      ctx.textAlign = 'center';
-      ctx.fillText('empty', x + w / 2, y + h / 2 + 4);
-      return;
-    }
-    const maxVisible = 4;
-    const nVisible = Math.min(count, maxVisible);
-    const cw = immCellW(w, nVisible);
-    const cellH = h - 6;
-    const cellY = y + 3;
-    for (let i = 0; i < nVisible; i++) {
-      const bx = x + 28 + i * (cw + 5);
-      const ageAlpha = active ? (.14 + i * .05) : (.07 + i * .025);
-      ctx.fillStyle = alpha(color, ageAlpha);
-      ctx.strokeStyle = alpha(color, active ? (.46 + i * .04) : (.22 + i * .02));
-      ctx.lineWidth = 1;
-      roundRect(bx, cellY, cw, cellH, 4, true, true);
-      const isOverflow = count > maxVisible && i === maxVisible - 1;
-      const label = isOverflow ? `+${count - maxVisible + 1}` : `blk${count - i}`;
-      ctx.fillStyle = c.text;
-      ctx.font = typeFont(TYPE.text, 800);
-      ctx.textAlign = 'center';
-      fitText(label, bx + 2, cellY + cellH / 2 + 4, cw - 4, 'center');
-    }
-  }
-
-  function drawBits(bits, x, y, c, color) {
-    for (let i = 0; i < bits.length; i++) {
-      const on = bits[i] === '1';
-      ctx.fillStyle = on ? alpha(color, .54) : alpha(c.border, .42);
-      roundRect(x + i * 11, y, 9, 14, 3, true, false);
-    }
   }
 
   function drawFlow(names, color, c, label, opacity, width) {
@@ -4243,23 +3391,6 @@
   }
 
   function isHighlighted(key) { return currentStep().highlights.includes(key); }
-
-  function wrapText(text, x, y, maxWidth, lineHeight) {
-    const words = text.split(' ');
-    let line = '';
-    let yy = y;
-    for (const word of words) {
-      const test = line ? line + ' ' + word : word;
-      if (ctx.measureText(test).width > maxWidth && line) {
-        ctx.fillText(line, x, yy);
-        line = word;
-        yy += lineHeight;
-      } else {
-        line = test;
-      }
-    }
-    if (line) ctx.fillText(line, x, yy);
-  }
 
   function fitText(text, x, y, maxWidth, align) {
     if (!Number.isFinite(maxWidth) || maxWidth <= 0) return;
