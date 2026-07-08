@@ -14,6 +14,17 @@ replay throughput, without compromising query performance or resource cost-effic
 significantly outperforming state-of-the-art lakehouses, Iceberg and Paimon, which provides minute-level data freshness
 and one order of magnitude lower data-change throughput.
 
+## Interactive Demo
+
+<!-- Demo preview placeholder:
+     Add a screenshot or GIF at assets/retina-demo.png and uncomment the line below.
+     [![Pixels-Retina interactive demo](assets/retina-demo.png)](retina.html)
+-->
+
+[Open the Pixels-Retina interactive demo](retina.html).
+
+This demo shows Pixels-Retina in action.
+
 ## Components
 
 The components related to Retina are:
