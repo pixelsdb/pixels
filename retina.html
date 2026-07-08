@@ -499,7 +499,7 @@
             <button class="scene-btn" data-scene="update" data-label="Update Replay" title="Update Replay" aria-label="Update Replay">
               <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3c.478 0 .947 -.016 1.402 -.046"/><path d="M20 12v-6"/><path d="M4 12v6c0 1.526 3.04 2.786 6.972 2.975"/><path d="M18.42 15.61a2.1 2.1 0 0 1 2.97 2.97l-3.39 3.42h-3v-3l3.42 -3.39"/></svg></span>
             </button>
-            <button class="scene-btn" data-scene="query" data-label="Query Path" title="Query Path" aria-label="Query Path">
+            <button class="scene-btn" data-scene="query" data-label="Query Path" title="Query Path" aria-label="Query Path" hidden>
               <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3m8 -3.5v-5.5"/><path d="M4 12v6c0 1.657 3.582 3 8 3"/><path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M20.2 20.2l1.8 1.8"/></svg></span>
             </button>
             <button class="scene-btn" data-scene="gc" data-label="Garbage Collection" title="Garbage Collection" aria-label="Garbage Collection">
@@ -559,12 +559,12 @@
 
   const AUTO_START_SCENE = 'cdc';
   const autoSceneOrder = ['cdc'];
-  const sceneOrder = ['insert', 'delete', 'update', 'query', 'gc'];
+  const sceneOrder = ['insert', 'delete', 'update', 'gc'];
   const sceneMeta = {
     cdc: { label: 'CDC Mirror Transaction', type: 'pixels-sink flow', summary: 'Pixels Sink reads the ordered CDC log, reconstructs one mirror transaction, begins it in Retina, replays row changes, and commits only after replay OK.' },
     routing: { label: 'Mirror Row Replay', type: 'sink write path', summary: 'Pixels Sink sends row changes from a mirror transaction to Retina replayers; single-operation scenes keep the replay behavior easy to inspect.' },
     insert: { label: 'Insert Replay', type: 'write path', summary: 'Insert row changes arrive through a mirror transaction, append to the write buffer, then sealed memtables flush to object entries.' },
-    delete: { label: 'Delete Replay', type: 'visibility path', summary: 'Delete unfolds Index Service lookup and RGVisibility state: deletePrimaryIndexEntries returns the old RowLocation, then delete timestamp entries update visibility without rewriting columnar files.' },
+    delete: { label: 'Delete Replay', type: 'visibility path', summary: 'Delete unfolds Index Service lookup and RGVisibility state: get returns the old RowLocation, then delete timestamp entries update visibility without rewriting columnar files.' },
     update: { label: 'Update Replay', type: 'MVCC versioning', summary: 'Update inserts the new tuple version first, updates the primary index, then deletes the old tuple version under one timestamp.' },
     query: { label: 'Query Path', type: 'parallel VFoR read path', summary: 'Query plans source splits for regular files, active memtables, and flushed objects in parallel; returned batches merge through one VFoR visibility gate before operators consume visible rows.' },
     gc: { label: 'Garbage Collection', type: 'background function', summary: 'GC is shown as Retina bitmap folding plus Storage GC rewriting regular files, retiring old files, and deleting them after cleanupAt.' }
@@ -585,7 +585,7 @@
   const TYPE = {
     moduleTitle: 18,
     subTitle: 16,
-    text: 12
+    text: 14
   };
   const MODULE_TITLE_X = 16;
   const MODULE_TITLE_Y = 32;
@@ -593,13 +593,21 @@
   const MODULE_CONTENT_PAD = 20;
   const PANEL_TITLE_X = 12;
   const PANEL_TITLE_Y = 25;
+  const INDEX_MAP_TITLE_X = 8;
+  const INDEX_MAP_TITLE_Y = 18;
+  const INDEX_MAP_CELL_PAD = 8;
+  const INDEX_MAP_ARROW_GAP = 8;
+  const INDEX_PRIMARY_KEY_W = 70;
+  const INDEX_PRIMARY_VALUE_W = 52;
+  const INDEX_MAIN_KEY_W = 52;
+  const INDEX_MAIN_VALUE_W = 130;
 
   const STANDARD_STEP_UNITS = 3.8;
   const ANIMATION_BEAT_SECONDS = 2;
   const STREAM_CYCLE_RATE = 1 / ANIMATION_BEAT_SECONDS;
   const PLAYBACK_RATES = [1, 2, 3, .5];
-  const DEFAULT_HWM = 1290;
-  const DEFAULT_LWM = 1281;
+  const DEFAULT_HWM = 290;
+  const DEFAULT_LWM = 281;
   const DEFAULT_QUERY_TS = DEFAULT_HWM - 1;
   const DEFAULT_GC_SAFE_TS = DEFAULT_HWM - 1;
 
@@ -620,26 +628,38 @@
   const MIDDLE_BOTTOM = H - 10;
   const MIDDLE_H = MIDDLE_BOTTOM - MIDDLE_TOP;
   const SERVICE_Y = MIDDLE_TOP;
-  const SERVICE_H = 174;
+  const SERVICE_H = 186;
   const TX_SERVICE_H = 144;
   const TOP_RUNTIME_GAP = 14;
   const RUNTIME_Y = SERVICE_Y + SERVICE_H + TOP_RUNTIME_GAP;
   const RUNTIME_H = MIDDLE_BOTTOM - RUNTIME_Y;
   const RETINA_REPLAYER_H = 500;
   const LEFT_PANEL_X = 44;
-  const LEFT_PANEL_W = 390;
+  const LEFT_PANEL_W = 440;
   const SERVICE_X = LEFT_PANEL_X + LEFT_PANEL_W + 10;
-  const SERVICE_RIGHT = 1424;
   const SERVICE_GAP = 18;
   const RUNTIME_STORAGE_GAP = 18;
   const RETINA_REPLAYER_W = 450;
   const STORAGE_X = SERVICE_X + RETINA_REPLAYER_W + RUNTIME_STORAGE_GAP;
-  const STORAGE_W = SERVICE_RIGHT - STORAGE_X;
-  const TOP_SERVICE_W = Math.round((SERVICE_RIGHT - SERVICE_X - SERVICE_GAP) / 2);
-  const INDEX_W = SERVICE_RIGHT - (SERVICE_X + TOP_SERVICE_W + SERVICE_GAP);
+  const STORAGE_EDGE_PAD = 20;
+  const STORAGE_PANEL_GAP = 20;
+  const STORAGE_ITEM_BOTTOM_PAD = 20;
+  const STORAGE_PANEL_TITLE_X = 8;
+  const STORAGE_PANEL_TITLE_Y = 18;
+  const STORAGE_TITLE_ITEM_GAP = 16;
+  const STORAGE_COMPACT_PANEL_H = 129;
+  const STORAGE_ITEM_CAPACITY = 4;
+  const STORAGE_COMPACT_ITEM_W = 52;
+  const STORAGE_COMPACT_ITEM_GAP = 12;
+  const STORAGE_PANEL_W = STORAGE_EDGE_PAD * 2 + STORAGE_COMPACT_ITEM_W * STORAGE_ITEM_CAPACITY + STORAGE_COMPACT_ITEM_GAP * (STORAGE_ITEM_CAPACITY - 1);
+  const STORAGE_W = STORAGE_EDGE_PAD * 2 + STORAGE_PANEL_W;
+  const STORAGE_H = MODULE_TITLE_Y + MODULE_CONTENT_GAP + STORAGE_COMPACT_PANEL_H * 2 + STORAGE_PANEL_GAP + STORAGE_EDGE_PAD;
+  const TOP_SERVICE_W = 430;
+  const INDEX_W = 481;
   const CDC_STREAM_H = 116;
   const CDC_STREAM_ROW_RECORDS = 3;
   const CDC_STREAM_RECORD_COUNT = CDC_STREAM_ROW_RECORDS + 2;
+  const CDC_STREAM_CARD_W = 72;
   const CDC_STREAM_RAIL_MARGIN_P = .08;
   const CDC_STREAM_SINGLE_OP_RAIL_MARGIN_P = .20;
   const CDC_STREAM_RECORD_GAP_UNITS = 1;
@@ -659,9 +679,9 @@
     tx: { x: SERVICE_X, y: SERVICE_Y, w: TOP_SERVICE_W, h: TX_SERVICE_H, title: 'Transaction Service', sub: 'MVCC time boundary: HWM / LWM' },
     index: { x: SERVICE_X + TOP_SERVICE_W + SERVICE_GAP, y: SERVICE_Y, w: INDEX_W, h: SERVICE_H, title: 'Index Service', sub: 'primaryKey→rowId + rowId→RowLocation' },
     runtime: { x: SERVICE_X, y: RUNTIME_Y, w: RETINA_REPLAYER_W, h: RETINA_REPLAYER_H, title: 'Retina replayer', sub: 'RetinaWorkerService RPC + write / visibility state' },
-    storage: { x: STORAGE_X, y: RUNTIME_Y, w: STORAGE_W, h: RUNTIME_H, title: 'Storage', sub: 'flushed immutable memtable + regular columnar files' },
+    storage: { x: STORAGE_X, y: RUNTIME_Y, w: STORAGE_W, h: STORAGE_H, title: 'Storage', sub: 'flushed immutable memtable + regular columnar files' },
 
-    query: { x: 1450, y: MIDDLE_TOP, w: 316, h: MIDDLE_H, title: 'Query Engine', sub: 'parallel splits → VFoR gate → visible batches' }
+    query: { x: W + 80, y: MIDDLE_TOP, w: 316, h: MIDDLE_H, title: 'Query Engine', sub: 'parallel splits → VFoR gate → visible batches' }
   };
 
   const DETAIL_REPLAY_ID = 1;
@@ -724,18 +744,18 @@
         txState: 'Transaction Service ready'
       },
       lanes: [
-        laneModel(0, 'I:pk160', 5, 0, ['(2,1276)'], 1266),
-        laneModel(1, 'U:pk132', 7, 0, ['(5,1278)', '(7,1282)'], 1264),
-        laneModel(2, 'D:pk208', 4, 0, ['(1,1279)'], 1267)
+        laneModel(0, 'I:pk160', 5, 0, ['(2,276)'], 266),
+        laneModel(1, 'U:pk132', 7, 0, ['(5,278)', '(7,282)'], 264),
+        laneModel(2, 'D:pk208', 4, 0, ['(1,279)'], 267)
       ],
       index: {
         hot: 'pk132',
-        primaryEntries: ['pk132 -> rowId7705', 'pk208 -> rowId8208'],
-        mainEntries: ['rowId7705 -> fileId77/rg1/off5', 'rowId8208 -> file-042/rg0/off7'],
+        primaryEntries: ['pk@212 -> rowId820'],
+        mainEntries: ['rowId820 -> file-06/rg1/off5'],
         operation: 'idle'
       },
       storage: {
-        regularFiles: ['file-041.pxl', 'file-042.pxl'],
+        regularFiles: ['file-06.pxl', 'file-07.pxl'],
         objectEntries: ['obj-77'],
         pendingFlushObject: null,
         flushedHot: null,
@@ -779,7 +799,7 @@
       activeCap: 8,
       immutable,
       prevImmutable: immutable,
-      regularFile: `file-04${id}.pxl`,
+      regularFile: `file-0${id + 6}.pxl`,
       baseTs,
       baseBitmap: '0000000000000000',
       deleteTs: deletes,
@@ -805,6 +825,9 @@
       m.sink.cachedRows = '';
       m.sink.requestState = 'read CDC log';
       m.sink.txState = 'await begin';
+      m.index.hot = 'pk208';
+      m.index.primaryEntries = ['pk@212 -> rowId820'];
+      m.index.mainEntries = ['rowId820 -> file-07/rg0/off7'];
     }
     if (scene === 'routing') {
       m.sink.mirrorTx = 'tx8503';
@@ -823,7 +846,7 @@
       m.sink.txState = 'Pixels tx pending';
     }
     if (scene === 'insert') {
-      m.sink.mirrorTx = 'tx1290';
+      m.sink.mirrorTx = 'tx290';
       m.sink.rowChanges = ['orders 3'];
       m.sink.mirrorOps = ['insert'];
       m.sink.sinkStep = 'empty';
@@ -833,12 +856,12 @@
       m.sink.coordState = 'read CDC log';
       m.sink.routingRule = 'after-image key';
       m.sink.writePlan = 'pk160, pk174, pk181 queued';
-      m.sink.rpcBatch = 'tx1290 only';
+      m.sink.rpcBatch = 'tx290 only';
       m.sink.requestState = 'read CDC log';
-      m.sink.txState = 'tx1290 ready';
+      m.sink.txState = 'tx290 ready';
     }
     if (scene === 'delete') {
-      m.sink.mirrorTx = 'tx1291';
+      m.sink.mirrorTx = 'tx290';
       m.sink.rowChanges = ['orders 1'];
       m.sink.mirrorOps = ['delete'];
       m.sink.sinkStep = 'empty';
@@ -848,14 +871,16 @@
       m.sink.coordState = 'read CDC log';
       m.sink.routingRule = 'before-image key';
       m.sink.writePlan = 'pk208 queued';
-      m.sink.rpcBatch = 'tx1291 only';
+      m.sink.rpcBatch = 'tx290 only';
       m.sink.requestState = 'read CDC log';
-      m.sink.txState = 'tx1291 ready';
+      m.sink.txState = 'tx290 ready';
       m.index.hot = 'pk208';
+      m.index.primaryEntries = ['pk@212 -> rowId820'];
+      m.index.mainEntries = ['rowId820 -> file-07/rg0/off7'];
       m.index.operation = 'await Retina delete';
     }
     if (scene === 'update') {
-      m.sink.mirrorTx = 'tx1292';
+      m.sink.mirrorTx = 'tx290';
       m.sink.rowChanges = ['customer 1'];
       m.sink.mirrorOps = ['update'];
       m.sink.sinkStep = 'empty';
@@ -865,10 +890,12 @@
       m.sink.coordState = 'read CDC log';
       m.sink.routingRule = 'same primary key';
       m.sink.writePlan = 'pk132 queued';
-      m.sink.rpcBatch = 'tx1292 only';
+      m.sink.rpcBatch = 'tx290 only';
       m.sink.requestState = 'read CDC log';
-      m.sink.txState = 'tx1292 ready';
+      m.sink.txState = 'tx290 ready';
       m.index.hot = 'pk132';
+      m.index.primaryEntries = ['pk@212 -> rowId820'];
+      m.index.mainEntries = ['rowId820 -> file-06/rg1/off5'];
       m.index.operation = 'insert new + update primary';
     }
     if (scene === 'query') {
@@ -892,10 +919,10 @@
     }
     if (scene === 'gc') {
       m.tx.lwm = DEFAULT_LWM;
-      m.lanes[DETAIL_REPLAY_ID].deleteTs = ['(2,1272)', '(4,1278)', '(7,1283)', '(9,1291)'];
-      m.lanes[DETAIL_REPLAY_ID].baseTs = 1268;
+      m.lanes[DETAIL_REPLAY_ID].deleteTs = ['(2,272)', '(4,278)', '(7,283)', '(9,291)'];
+      m.lanes[DETAIL_REPLAY_ID].baseTs = 268;
       m.storage.staleRatio = 0.58;
-      m.storage.agingQueue = ['file-038.pxl', 'file-039.pxl'];
+      m.storage.agingQueue = ['file-04.pxl', 'file-05.pxl'];
       m.storage.newFile = 'none';
       m.storage.newFileState = 'none';
       m.storage.cleanup = 'await memory phase';
@@ -918,8 +945,8 @@
         ['cdcStream', 'ingress'], [tok('complete log', 'cdcStream.out', 'ingress.top', flow.cdc, .14, .82)],
         m => { m.sink.sinkStep = 'empty'; m.sink.cdcPhase = 'complete'; m.sink.cdcRecord = 'COMMIT'; m.sink.requestState = 'complete CDC log'; }, 'cdc', ['cdc']),
       step('Pixels Sink creates the mirror transaction BEGIN and Transaction Service assigns its timestamp.', 4.0,
-        ['ingress', 'tx'], [tok('begin tx8421', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=1290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
-        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=1290'; }, 'mvcc', ['tx']),
+        ['ingress', 'tx'], [tok('begin tx8421', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
       step('Pixels Sink creates the INSERT row in the mirror transaction and sends its replay RPC.', 3.4,
         ['ingress', 'runtime'], [tok('INSERT', 'ingress.right', 'runtime.left', flow.replay, .18, .86)],
         m => { m.sink.sinkStep = 'row1'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay INSERT'; m.sink.rpcBatch = 'INSERT pending'; m.lanes[1].currentOp = 'I:pk174'; }, 'dispatch', ['dispatch']),
@@ -934,64 +961,70 @@
         m => { m.lanes[1].highlight = 'immutable'; }, 'writeBuffer', []),
       step('A background flush asynchronously moves the immutable memtable to Storage.', 3.8,
         ['lane1'], [],
-        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; }, 'writeBuffer', [], 'flush'),
+        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; }, 'writeBuffer', [], 'flush'),
+      step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
+        [], [],
+        m => { m.lanes[1].highlight = null; settlePendingFlushObject(m); }, 'storage', []),
       step('After the new row is durable, Retina calls Index Service to insert the primary and row-location indexes.', 4.2,
-        ['index'], [tok('put index pk174', 'runtime.right', 'index.left', flow.index, .12, .82)],
-        m => { const l = m.lanes[1]; l.highlight = null; if (m.storage.pendingFlushObject && !m.storage.objectEntries.includes(m.storage.pendingFlushObject)) m.storage.objectEntries.unshift(m.storage.pendingFlushObject); m.storage.pendingFlushObject = null; m.index.primaryEntries.unshift('pk174 -> rowId7807'); m.index.mainEntries.unshift('rowId7807 -> fileId78/rg0/off7'); m.index.hot = 'pk174'; m.index.operation = 'putMainIndexEntries + putPrimaryIndexEntries'; }, 'index', ['index']),
-      step('Index Service finishes the insert index update and returns to Retina.', 3.2,
+        ['index'], [tok('put pk@290', 'runtime.right', 'index.left', flow.index, .12, .82)],
+        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk174'; m.index.operation = 'put pk@290 in flight'; }, 'index', ['index']),
+      step('Index Service inserts the new primary and row-location entries locally.', 2.4,
+        ['index'], [],
+        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5', 'rowId821 -> file-07/rg0/off7']; m.index.operation = 'index insert entry applied'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
+      step('Only after the index insert is complete does Index Service return OK to Retina.', 3.0,
         ['index'], [tok('index OK', 'index.left', 'runtime.right', flow.index, .18, .82)],
         m => { m.index.operation = 'index insert OK'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
       step('Retina returns OK for INSERT before Pixels Sink creates the next row change.', 3.2,
         ['ingress'], [tok('OK', 'runtime.left', 'ingress.right', flow.replay, .12, .82)],
         m => { m.sink.sinkStep = 'row1Ok'; m.sink.requestState = 'INSERT OK'; m.sink.rpcBatch = 'OK'; }, 'mvcc', []),
-      step('Only after INSERT returns OK, Pixels Sink creates the DELETE row and sends its replay RPC.', 3.4,
-        ['ingress', 'runtime'], [tok('DELETE', 'ingress.right', 'runtime.left', flow.delete, .18, .86)],
-        m => { m.sink.sinkStep = 'row2'; m.sink.requestState = 'replay DELETE'; m.sink.rpcBatch = 'DELETE pending'; m.lanes[1].currentOp = 'D:pk208'; }, 'dispatch', ['dispatch']),
-      step('Retina calls Index Service to delete the primary and row-location index entries for pk208.', 4.0,
-        ['index'], [tok('delete index pk208', 'runtime.right', 'index.left', flow.index, .12, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'DELETE'; l.status = 'delete index entries'; l.highlight = null; m.index.hot = 'pk208'; m.index.primaryEntries = ['pk174 -> rowId7807', 'pk132 -> rowId7705']; m.index.mainEntries = ['rowId7807 -> fileId78/rg0/off7', 'rowId7705 -> fileId77/rg1/off5']; m.index.operation = 'deletePrimaryIndexEntries pk208'; m.sink.rpcBatch = 'DELETE applying'; }, 'index', ['index']),
-      step('Index Service finishes the delete and returns the old row location to Retina.', 3.2,
-        ['index'], [tok('index delete OK', 'index.left', 'runtime.right', flow.index, .18, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'index delete OK'; m.index.operation = 'RowLocation off7 returned'; }, 'index', ['index']),
-      step('Retina appends the delete timestamp into the visibility structure delete-ts chain.', 4.2,
-        ['lane1'], [tok('(off7,1291)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'append delete timestamp'; l.highlight = 'visibility'; if (!l.deleteTs.includes('(7,1291)')) l.deleteTs.push('(7,1291)'); m.sink.rpcBatch = 'DELETE applying'; m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
+      step('Pixels Sink sends the DELETE row changes after the mirror transaction has a timestamp.', 3.6,
+        ['ingress'], [tok('DELETE', 'ingress.right', 'runtime.left', flow.delete, .18, .86)],
+        m => { m.sink.sinkStep = 'row2'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=290'; m.sink.rpcBatch = 'DELETE pending'; m.lanes[1].currentOp = 'D:pk208'; }, 'dispatch', []),
+      step('Retina sends a delete request to Index Service for the second index entry.', 4.0,
+        ['index'], [tok('delete pk@290', 'runtime.right', 'index.left', flow.index, .12, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'DELETE'; l.status = 'delete index entry'; l.highlight = null; m.index.hot = 'pk208'; m.index.operation = 'delete pk@290 in flight'; m.sink.rpcBatch = 'DELETE applying'; }, 'index', ['index']),
+      step('Index Service deletes the matched primary and row-location entries locally.', 2.4,
+        ['index'], [],
+        m => { m.index.operation = 'delete index entry pk@290 applied'; }, 'index', ['index']),
+      step('Only after the entry is deleted, Index Service returns the deleted main-index location.', 3.2,
+        ['index'], [tok('file-07/rg0/off7', 'index.left', 'runtime.right', flow.index, .18, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'deleted location returned'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.operation = 'deleted loc file-07/rg0/off7 returned for pk@290'; }, 'index', ['index']),
+      step('Retina then appends the delete timestamp into the visibility structure delete-ts chain.', 4.2,
+        ['lane1'], [tok('(off7,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'append delete timestamp'; l.highlight = 'visibility'; if (!l.deleteTs.includes('(7,290)')) l.deleteTs.push('(7,290)'); m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.sink.rpcBatch = 'DELETE applying'; m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
       step('Retina returns OK for DELETE before Pixels Sink creates the UPDATE row.', 3.2,
         ['ingress'], [tok('OK', 'runtime.left', 'ingress.right', flow.delete, .12, .82)],
-        m => { m.sink.sinkStep = 'row2Ok'; m.sink.requestState = 'DELETE OK'; m.sink.rpcBatch = 'OK'; m.lanes[DETAIL_REPLAY_ID].highlight = null; }, 'mvcc', []),
-      step('Only after DELETE returns OK, Pixels Sink creates the UPDATE row and sends its replay RPC.', 3.4,
-        ['ingress', 'runtime'], [tok('UPDATE', 'ingress.right', 'runtime.left', flow.index, .18, .86)],
-        m => { m.sink.sinkStep = 'row3'; m.sink.requestState = 'replay UPDATE'; m.sink.rpcBatch = 'UPDATE pending'; m.lanes[1].currentOp = 'U:pk132'; }, 'dispatch', ['dispatch']),
-      step('Retina inserts the UPDATE after image into the write buffer as the new tuple version.', 4.0,
+        m => { m.sink.sinkStep = 'row2Ok'; m.sink.requestState = 'DELETE OK'; m.sink.rpcBatch = 'OK'; clearDeleteTsChainEffects(m, DETAIL_REPLAY_ID); }, 'mvcc', []),
+      step('Pixels Sink sends the UPDATE row changes after the mirror transaction has a timestamp.', 3.6,
+        ['ingress'], [tok('UPDATE', 'ingress.right', 'runtime.left', flow.index, .18, .86)],
+        m => { m.sink.sinkStep = 'row3'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=290'; m.sink.rpcBatch = 'UPDATE pending'; m.lanes[1].currentOp = 'U:pk132'; }, 'dispatch', []),
+      step('Retina inserts the UPDATE after image into the active memtable as the new tuple version.', 4.0,
         ['lane1'], [],
-        m => { const l = m.lanes[1]; l.currentOp = 'U:pk132'; l.status = 'append after image'; l.activeRows = 8; l.highlight = 'active'; m.index.operation = 'await update index'; m.sink.rpcBatch = 'UPDATE applying'; }, 'writeBuffer', []),
-      step('The active memtable reaches capacity, so Retina seals the new tuple version into the immutable queue.', 3.9,
-        ['lane1'], [],
-        m => { const l = m.lanes[1]; l.activeRows = 0; l.immutable += 1; l.highlight = 'immutable'; }, 'writeBuffer', [], 'seal'),
-      step('The sealed memtable now sits in the immutable queue while a fresh active memtable is open.', 1.2,
-        ['lane1'], [],
-        m => { m.lanes[1].highlight = 'immutable'; }, 'writeBuffer', []),
-      step('A background flush asynchronously moves the immutable memtable containing the new tuple version to Storage.', 3.8,
-        ['lane1'], [],
-        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-79'; m.storage.flushedHot = 'obj-79'; }, 'writeBuffer', [], 'flush'),
-      step('Retina calls Index Service to update the primary index to the new row location.', 3.6,
-        ['index'], [tok('update index pk132', 'runtime.right', 'index.left', flow.index, .12, .86)],
-        m => { const l = m.lanes[1]; l.highlight = null; if (m.storage.pendingFlushObject && !m.storage.objectEntries.includes(m.storage.pendingFlushObject)) m.storage.objectEntries.unshift(m.storage.pendingFlushObject); m.storage.pendingFlushObject = null; m.index.primaryEntries = ['pk132 -> rowId7806', 'pk174 -> rowId7807']; m.index.mainEntries = ['rowId7806 -> fileId79/rg0/off6', 'rowId7807 -> fileId78/rg0/off7', 'rowId7705 -> fileId77/rg1/off5']; m.index.hot = 'pk132'; m.index.operation = 'updatePrimaryIndexEntries pk132'; }, 'index', ['index']),
-      step('Index Service returns the previous row location for the old tuple version.', 3.0,
-        ['index'], [tok('prevLoc off5', 'index.left', 'runtime.right', flow.index, .16, .84)],
-        m => { m.index.operation = 'prevLoc off5 returned'; }, 'index', ['index']),
+        m => { const l = m.lanes[1]; l.currentOp = 'U:pk132'; l.status = 'append after image'; l.activeRows = 1; l.highlight = 'active'; m.index.operation = 'await update index'; m.sink.rpcBatch = 'UPDATE applying'; }, 'writeBuffer', []),
+      step('Because the active memtable is not full, Retina sends an update request to Index Service.', 3.6,
+        ['index'], [tok('update pk@290', 'runtime.right', 'index.left', flow.index, .12, .86)],
+        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk132'; m.index.operation = 'update pk@290 in flight'; }, 'index', ['index']),
+      step('Index Service first inserts the new versioned primary-index entry locally.', 2.4,
+        ['index'], [],
+        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5', 'rowId821 -> file-07/rg0/off0']; m.index.operation = 'put version pk@290 applied'; }, 'index', ['index']),
+      step('Index Service then deletes the old index entry for the previous tuple version.', 2.4,
+        ['index'], [],
+        m => { m.index.operation = 'delete index entry pk@212 applied'; }, 'index', ['index']),
+      step('Only after the old entry is deleted, Index Service returns the deleted main-index location.', 3.0,
+        ['index'], [tok('file-06/rg1/off5', 'index.left', 'runtime.right', flow.index, .16, .84)],
+        m => { m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-07/rg0/off0']; m.index.operation = 'deleted loc file-06/rg1/off5 returned for pk@212'; }, 'index', ['index']),
       step('Using the returned old location, Retina deletes the old tuple version by appending a delete timestamp to visibility.', 4.2,
-        ['lane1'], [tok('(off5,1292)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
-        m => { const l = m.lanes[1]; l.highlight = 'visibility'; if (!l.deleteTs.includes('(5,1292)')) l.deleteTs.push('(5,1292)'); m.index.operation = 'update index OK'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
+        ['lane1'], [tok('(off5,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
+        m => { const l = m.lanes[1]; l.highlight = 'visibility'; if (!l.deleteTs.includes('(5,290)')) l.deleteTs.push('(5,290)'); m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-07/rg0/off0']; m.index.operation = 'update index OK'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
       step('Retina returns OK for UPDATE. Pixels Sink can now finish the mirror transaction.', 3.2,
         ['ingress'], [tok('OK', 'runtime.left', 'ingress.right', flow.index, .12, .82)],
-        m => { m.sink.sinkStep = 'row3Ok'; m.sink.requestState = 'UPDATE OK'; m.sink.rpcBatch = 'OK'; m.lanes[1].highlight = null; }, 'mvcc', []),
+        m => { m.sink.sinkStep = 'row3Ok'; m.sink.requestState = 'UPDATE OK'; m.sink.rpcBatch = 'OK'; clearDeleteTsChainEffects(m, 1); }, 'mvcc', []),
       step('Pixels Sink creates the COMMIT record and asks Transaction Service to commit tx8421.', 3.2,
         ['ingress', 'tx'], [tok('commit tx8421', 'ingress.commitRight', 'tx.left', flow.tx, .18, .58)],
         m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'commit requested'; m.sink.txState = 'tx8421 commit in flight'; m.sink.rpcBatch = 'OK'; }, 'mvcc', ['tx']),
       step('Transaction Service advances HWM internally for later snapshots.', 2.8,
         [], [],
-        m => { m.sink.sinkStep = 'committed'; m.sink.requestState = 'HWM advanced'; m.sink.txState = 'tx8421 committed; HWM=1291'; m.tx.hwm = 1291; }, 'mvcc', [])
+        m => { m.sink.sinkStep = 'committed'; m.sink.requestState = 'HWM advanced'; m.sink.txState = 'tx8421 committed; HWM=291'; m.tx.hwm = 291; }, 'mvcc', [])
     ],
     routing: [
       step('Pixels Sink has reconstructed tx43 from the CDC stream and starts replaying its row changes.', 3.8,
@@ -1007,20 +1040,20 @@
         ['ingress', 'lane1', 'lane2'], [tok('delete old pk132', 'ingress.right', 'runtime.left', flow.delete, .08, .58), tok('insert new pk733', 'ingress.right', 'runtime.left', flow.replay, .40, .92)],
         m => { m.sink.routingRule = 'pk update: split'; m.sink.writePlan = 'delete old before insert new'; m.sink.rpcBatch = 'tx43 rows staged'; m.lanes[1].currentOp = 'D:pk132'; m.lanes[2].currentOp = 'I:pk733'; }, 'dispatch', ['dispatch']),
       step('Pixels Sink begins mirror transactions with Transaction Service, then sends replay RPCs to Retina replayers.', 4.6,
-        ['ingress', 'tx', 'runtime'], [tok('tx43 ts1291', 'tx.left', 'ingress.beginRight', flow.tx, .04, .34), tok('tx44 ts1292', 'tx.left', 'ingress.beginRight', flow.tx, .16, .46), tok('tx45 ts1293', 'tx.left', 'ingress.beginRight', flow.tx, .28, .58), tok('replay RPCs', 'ingress.right', 'runtime.left', flow.replay, .58, .96)],
+        ['ingress', 'tx', 'runtime'], [tok('tx43 ts291', 'tx.left', 'ingress.beginRight', flow.tx, .04, .34), tok('tx44 ts292', 'tx.left', 'ingress.beginRight', flow.tx, .16, .46), tok('tx45 ts293', 'tx.left', 'ingress.beginRight', flow.tx, .28, .58), tok('replay RPCs', 'ingress.right', 'runtime.left', flow.replay, .58, .96)],
         m => { m.sink.sinkStep = 'replay'; m.sink.requestMode = 'replay RPC'; m.sink.requestState = '3 mirror tx'; m.sink.rpcBatch = 'tx43 + tx44 + tx45'; m.sink.txState = 'timestamps assigned'; }, 'mvcc', ['tx']),
       step('Inside Retina, the same RPC applies rows from different transactions while preserving their visibility timestamps.', 4.2,
         ['ingress', 'lane0', 'lane1', 'lane2'], [tok('tx43 row', 'ingress.right', 'runtime.left', flow.replay, .08, .58), tok('tx44 row', 'ingress.right', 'runtime.left', flow.delete, .22, .74), tok('tx45 row', 'ingress.right', 'runtime.left', flow.replay, .36, .90)],
         m => { m.sink.requestState = 'apply one RPC'; m.sink.rpcBatch = '3 tx rows'; m.lanes[0].currentOp = 'tx43 I:pk160'; m.lanes[1].currentOp = 'tx44 D:pk208'; m.lanes[2].currentOp = 'tx45 I:pk733'; }, 'dispatch', ['dispatch'])
     ],
     insert: [
-      ...singleOpCdcPrelude('insert', 'tx1290'),
-      step('Pixels Sink begins mirror transaction tx1290 and Transaction Service assigns timestamp=1290.', 4.0,
-        ['ingress', 'tx'], [tok('begin tx1290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=1290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
-        m => { m.sink.sinkStep = 'begin'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=1290'; }, 'mvcc', ['tx']),
+      ...singleOpCdcPrelude('insert', 'tx290'),
+      step('Pixels Sink begins mirror transaction tx290 and Transaction Service assigns timestamp=290.', 4.0,
+        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
       step('Pixels Sink sends the INSERT row changes after the mirror transaction has a timestamp.', 3.6,
         ['ingress'], [tok('INSERT', 'ingress.right', 'runtime.left', flow.replay, .18, .86)],
-        m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay RPC ready'; m.sink.txState = 'timestamp=1290'; }, 'dispatch', []),
+        m => { m.sink.sinkStep = 'replay'; m.sink.requestState = 'replay RPC ready'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
       step('Retina applies the INSERT to the write buffer first: the active memtable grows by one row.', 4.0,
         ['lane1'],
         [],
@@ -1033,50 +1066,59 @@
         m => { const l = m.lanes[1]; l.highlight = 'immutable'; }, 'writeBuffer', []),
       step('A background flush asynchronously moves the immutable memtable to Storage.', 3.8,
         ['lane1'], [],
-        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; }, 'writeBuffer', [], 'flush'),
+        m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; }, 'writeBuffer', [], 'flush'),
+      step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
+        [], [],
+        m => { m.lanes[1].highlight = null; settlePendingFlushObject(m); }, 'storage', []),
       step('After the row is appended, Retina calls Index Service to insert the primary and row-location indexes.', 4.2,
-        ['index'], [tok('put index pk174', 'runtime.right', 'index.left', flow.index, .12, .82)],
-        m => { const l = m.lanes[1]; l.highlight = null; if (m.storage.pendingFlushObject && !m.storage.objectEntries.includes(m.storage.pendingFlushObject)) m.storage.objectEntries.unshift(m.storage.pendingFlushObject); m.storage.pendingFlushObject = null; m.index.primaryEntries.unshift('pk174 -> rowId7807'); m.index.mainEntries.unshift('rowId7807 -> fileId78/rg0/off7'); m.index.hot = 'pk174'; m.index.operation = 'putMainIndexEntries + putPrimaryIndexEntries'; }, 'index', ['index']),
-      step('Index Service finishes the insert index update and returns to Retina.', 3.2,
+        ['index'], [tok('put pk@290', 'runtime.right', 'index.left', flow.index, .12, .82)],
+        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk174'; m.index.operation = 'put pk@290 in flight'; }, 'index', ['index']),
+      step('Index Service inserts the new primary and row-location entries locally.', 2.4,
+        ['index'], [],
+        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5', 'rowId821 -> file-07/rg0/off7']; m.index.operation = 'index insert entry applied'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
+      step('Only after the index insert is complete does Index Service return OK to Retina.', 3.0,
         ['index'], [tok('index OK', 'index.left', 'runtime.right', flow.index, .18, .82)],
         m => { m.index.operation = 'index insert OK'; m.sink.rpcBatch = 'INSERT applying'; }, 'index', ['index']),
       step('Retina returns OK to Pixels Sink; the INSERT operation is complete for this mirror transaction.', 3.4,
         ['ingress'], [tok('OK', 'runtime.left', 'ingress.right', flow.replay, .12, .82)],
         m => { m.sink.sinkStep = 'rowsOk'; m.sink.requestState = 'OK'; m.sink.rpcBatch = 'OK'; }, 'mvcc', []),
-      step(`Pixels Sink asks Transaction Service to commit tx1290.`, 3.2,
-        ['ingress', 'tx'], [tok(`commit tx1290`, 'ingress.commitRight', 'tx.left', flow.tx, .12, .82)],
-        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'commit requested'; m.sink.txState = `tx1290 commit in flight`; }, 'mvcc', ['tx']),
+      step(`Pixels Sink asks Transaction Service to commit tx290.`, 3.2,
+        ['ingress', 'tx'], [tok(`commit tx290`, 'ingress.commitRight', 'tx.left', flow.tx, .12, .82)],
+        m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'commit requested'; m.sink.txState = `tx290 commit in flight`; }, 'mvcc', ['tx']),
       step(`Transaction Service advances HWM internally for later snapshots.`, 2.8,
         [], [],
-        m => { m.sink.sinkStep = 'committed'; m.sink.requestState = 'HWM advanced'; m.sink.txState = 'tx1290 committed; HWM=1291'; m.tx.hwm = 1291; }, 'mvcc', [])
+        m => { m.sink.sinkStep = 'committed'; m.sink.requestState = 'HWM advanced'; m.sink.txState = 'tx290 committed; HWM=291'; m.tx.hwm = 291; }, 'mvcc', [])
     ],
     delete: [
-      ...singleOpCdcPrelude('delete', 'tx1291'),
-      step('Pixels Sink begins mirror transaction tx1291 and Transaction Service assigns timestamp=1291.', 4.0,
-        ['ingress', 'tx'], [tok('begin tx1291', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=1291', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
-        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=1291'; }, 'mvcc', ['tx']),
+      ...singleOpCdcPrelude('delete', 'tx290'),
+      step('Pixels Sink begins mirror transaction tx290 and Transaction Service assigns timestamp=290.', 4.0,
+        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
       step('Pixels Sink sends the DELETE row changes after the mirror transaction has a timestamp.', 3.6,
         ['ingress'], [tok('DELETE', 'ingress.right', 'runtime.left', flow.delete, .18, .86)],
-        m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=1291'; }, 'dispatch', []),
-      step('Retina calls Index Service to delete the primary and row-location index entries for pk208.', 4.0,
-        ['index'], [tok('delete index pk208', 'runtime.right', 'index.left', flow.index, .12, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'DELETE'; l.status = 'delete index entries'; l.highlight = null; m.index.hot = 'pk208'; m.index.primaryEntries = ['pk132 -> rowId7705']; m.index.mainEntries = ['rowId7705 -> fileId77/rg1/off5']; m.index.operation = 'deletePrimaryIndexEntries pk208'; m.sink.rpcBatch = 'DELETE applying'; }, 'index', ['index']),
-      step('Index Service finishes the delete and returns the old row location to Retina.', 3.2,
-        ['index'], [tok('index delete OK', 'index.left', 'runtime.right', flow.index, .18, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'index delete OK'; m.index.operation = 'RowLocation off7 returned'; }, 'index', ['index']),
+        m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay DELETE'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
+      step('Retina sends a delete request to Index Service for pk208 before deleting visibility.', 4.0,
+        ['index'], [tok('delete pk@212', 'runtime.right', 'index.left', flow.index, .12, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.currentOp = 'DELETE'; l.status = 'delete index entry'; l.highlight = null; m.index.hot = 'pk208'; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-07/rg0/off7']; m.index.operation = 'delete pk@212 in flight'; m.sink.rpcBatch = 'DELETE applying'; }, 'index', ['index']),
+      step('Index Service deletes the matched primary and row-location entries locally.', 2.4,
+        ['index'], [],
+        m => { m.index.operation = 'delete index entry pk@212 applied'; }, 'index', ['index']),
+      step('Only after the entry is deleted, Index Service returns the deleted main-index location.', 3.2,
+        ['index'], [tok('file-07/rg0/off7', 'index.left', 'runtime.right', flow.index, .18, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'deleted location returned'; m.index.primaryEntries = []; m.index.mainEntries = []; m.index.operation = 'deleted loc file-07/rg0/off7 returned for pk@212'; }, 'index', ['index']),
       step('Retina then appends the delete timestamp into the visibility structure delete-ts chain.', 4.2,
-        ['lane1'], [tok('(off7,1291)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'append delete timestamp'; l.highlight = 'visibility'; if (!l.deleteTs.includes('(7,1291)')) l.deleteTs.push('(7,1291)'); m.sink.rpcBatch = 'DELETE applying'; m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
-      ...commitSequence('tx1291', 1292, 'delete committed; HWM=1292')
+        ['lane1'], [tok('(off7,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.status = 'append delete timestamp'; l.highlight = 'visibility'; if (!l.deleteTs.includes('(7,290)')) l.deleteTs.push('(7,290)'); m.index.primaryEntries = []; m.index.mainEntries = []; m.sink.rpcBatch = 'DELETE applying'; m.storage.staleRatio = 0.36; m.storage.cleanup = 'file unchanged'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
+      ...commitSequence('tx290', 291, 'delete committed; HWM=291', DETAIL_REPLAY_ID)
     ],
     update: [
-      ...singleOpCdcPrelude('update', 'tx1292'),
-      step('Pixels Sink begins mirror transaction tx1292 and Transaction Service assigns timestamp=1292.', 4.0,
-        ['ingress', 'tx'], [tok('begin tx1292', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=1292', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
-        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=1292'; }, 'mvcc', ['tx']),
+      ...singleOpCdcPrelude('update', 'tx290'),
+      step('Pixels Sink begins mirror transaction tx290 and Transaction Service assigns timestamp=290.', 4.0,
+        ['ingress', 'tx'], [tok('begin tx290', 'ingress.beginRight', 'tx.left', flow.tx, .12, .52), tok('ts=290', 'tx.left', 'ingress.beginRight', flow.tx, .54, .92)],
+        m => { m.sink.sinkStep = 'begin'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'begin mirror tx'; m.sink.txState = 'timestamp=290'; }, 'mvcc', ['tx']),
       step('Pixels Sink sends the UPDATE row changes after the mirror transaction has a timestamp.', 3.6,
         ['ingress'], [tok('UPDATE', 'ingress.right', 'runtime.left', flow.index, .18, .86)],
-        m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=1292'; }, 'dispatch', []),
+        m => { m.sink.sinkStep = 'replay'; m.sink.cdcPhase = 'complete'; m.sink.requestState = 'replay UPDATE'; m.sink.txState = 'timestamp=290'; }, 'dispatch', []),
       step('Retina first inserts the after image into the write buffer as the new tuple version.', 4.0,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.currentOp = 'U:pk132'; l.status = 'append after image'; l.activeRows = 8; l.highlight = 'active'; m.index.operation = 'await update index'; m.sink.rpcBatch = 'UPDATE applying'; }, 'writeBuffer', []),
@@ -1089,16 +1131,25 @@
       step('A background flush asynchronously moves the immutable memtable containing the new tuple version to Storage.', 3.8,
         ['lane1'], [],
         m => { const l = m.lanes[1]; l.highlight = 'immutable'; l.immutable = Math.max(0, l.immutable - 1); m.storage.pendingFlushObject = 'obj-78'; m.storage.flushedHot = 'obj-78'; }, 'writeBuffer', [], 'flush'),
-      step('Retina calls Index Service to update the primary index to the new row location.', 3.6,
-        ['index'], [tok('update index pk132', 'runtime.right', 'index.left', flow.index, .12, .86)],
-        m => { const l = m.lanes[1]; l.highlight = null; if (m.storage.pendingFlushObject && !m.storage.objectEntries.includes(m.storage.pendingFlushObject)) m.storage.objectEntries.unshift(m.storage.pendingFlushObject); m.storage.pendingFlushObject = null; m.index.primaryEntries = ['pk132 -> rowId7806', 'pk208 -> rowId8208']; m.index.mainEntries = ['rowId7806 -> fileId78/rg0/off6', 'rowId7705 -> file-041/rg1/off5', 'rowId8208 -> file-042/rg0/off7']; m.index.hot = 'pk132'; m.index.operation = 'updatePrimaryIndexEntries pk132'; }, 'index', ['index']),
-      step('Index Service returns the previous row location for the old tuple version.', 3.0,
-        ['index'], [tok('prevLoc off5', 'index.left', 'runtime.right', flow.index, .16, .84)],
-        m => { m.index.operation = 'prevLoc off5 returned'; }, 'index', ['index']),
+      step('The flushed object is now fixed in Storage before Retina moves on to index maintenance.', 1.2,
+        [], [],
+        m => { m.lanes[1].highlight = null; settlePendingFlushObject(m); }, 'storage', []),
+      step('Retina sends an update request to Index Service for pk132 at the new timestamp.', 3.6,
+        ['index'], [tok('update pk@290', 'runtime.right', 'index.left', flow.index, .12, .86)],
+        m => { const l = m.lanes[1]; l.highlight = null; m.index.primaryEntries = ['pk@212 -> rowId820']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5']; m.index.hot = 'pk132'; m.index.operation = 'update pk@290 in flight'; }, 'index', ['index']),
+      step('Index Service first inserts the new versioned primary-index entry locally.', 2.4,
+        ['index'], [],
+        m => { m.index.primaryEntries = ['pk@212 -> rowId820', 'pk@290 -> rowId821']; m.index.mainEntries = ['rowId820 -> file-06/rg1/off5', 'rowId821 -> file-07/rg0/off6']; m.index.operation = 'put version pk@290 applied'; }, 'index', ['index']),
+      step('Index Service then deletes the old index entry for the previous tuple version.', 2.4,
+        ['index'], [],
+        m => { m.index.operation = 'delete index entry pk@212 applied'; }, 'index', ['index']),
+      step('Only after the old entry is deleted, Index Service returns the deleted main-index location.', 3.0,
+        ['index'], [tok('file-06/rg1/off5', 'index.left', 'runtime.right', flow.index, .16, .84)],
+        m => { m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-07/rg0/off6']; m.index.operation = 'deleted loc file-06/rg1/off5 returned for pk@212'; }, 'index', ['index']),
       step('Using the returned old location, Retina deletes the old tuple version by appending a delete timestamp to visibility.', 4.2,
-        ['lane1'], [tok('(off5,1292)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
-        m => { const l = m.lanes[1]; l.highlight = 'visibility'; if (!l.deleteTs.includes('(5,1292)')) l.deleteTs.push('(5,1292)'); m.index.operation = 'update index OK'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
-      ...commitSequence('tx1292', 1293, 'update committed; HWM=1293')
+        ['lane1'], [tok('(off5,290)', 'lane1.visibility', 'lane1.deleteArray', flow.delete, .10, .82)],
+        m => { const l = m.lanes[1]; l.highlight = 'visibility'; if (!l.deleteTs.includes('(5,290)')) l.deleteTs.push('(5,290)'); m.index.primaryEntries = ['pk@290 -> rowId821']; m.index.mainEntries = ['rowId821 -> file-07/rg0/off6']; m.index.operation = 'update index OK'; }, 'visibility', ['visibility'], 'appendDeleteTs'),
+      ...commitSequence('tx290', 291, 'update committed; HWM=291', 1)
     ],
     query: [
       step(`Query begins with transTs=${DEFAULT_QUERY_TS}. All split readers use the same MVCC timestamp, so visibility is decided consistently after batches return.`, 3.8,
@@ -1123,28 +1174,28 @@
         m => { m.lanes[DETAIL_REPLAY_ID].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[DETAIL_REPLAY_ID].highlight = 'visibility'; m.storage.cleanup = 'waiting for bitmap folding'; }, 'gc', ['visibility']),
       step('Visibility structure compares safeTs with the delete ts chain and highlights items that are safe to fold.', 4.0,
         ['lane1', 'runtime'], [tok('safe items', 'lane1.visibility', 'lane1.deleteArray', flow.visibility, .08, .70), tok('<= safeTs', 'lane1.deleteArray', 'lane1.baseBitmap', flow.gc, .55, .94)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(2,1272)', '(4,1278)', '(7,1283)', '(9,1291)']; l.highlight = 'foldEligible'; }, 'gc', ['visibility']),
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(2,272)', '(4,278)', '(7,283)', '(9,291)']; l.highlight = 'foldEligible'; }, 'gc', ['visibility']),
       step('garbageCollect(safeTs) folds the highlighted delete items into baseBitmap, advances baseTs, and leaves newer delete items in the chain.', 4.0,
         ['lane1', 'runtime'], [tok('fold delete items', 'lane1.deleteArray', 'lane1.baseBitmap', flow.gc, .08, .78)],
-        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(9,1291)']; l.baseBitmap = '0010100000000000'; l.baseTs = DEFAULT_GC_SAFE_TS; l.highlight = 'baseBitmap'; }, 'gc', ['visibility']),
+        m => { const l = m.lanes[DETAIL_REPLAY_ID]; l.safeTs = DEFAULT_GC_SAFE_TS; l.deleteTs = ['(9,291)']; l.baseBitmap = '0010100000000000'; l.baseTs = DEFAULT_GC_SAFE_TS; l.highlight = 'baseBitmap'; }, 'gc', ['visibility']),
       step('After bitmap folding, foreground replay can continue while Retina prepares Storage GC file groups; no running query is holding the GC safe timestamp back.', 4.0,
         ['lane1', 'lane2', 'runtime'], [tok('folded bitmap', 'lane1.baseBitmap', 'storage.aging', flow.gc, .05, .50), tok('replay continues', 'ingress.right', 'runtime.left', flow.replay, .34, .82)],
         m => { m.lanes[DETAIL_REPLAY_ID].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[2].status = 'replay continues'; m.query.active = false; }, 'gc', ['dispatch', 'query']),
       step('Storage GC selects low-valid-ratio regular files. They remain regular columnar files, just highlighted as rewrite candidates.', 4.0,
         ['runtime', 'storage'], [tok('candidate files', 'runtime.right', 'storage.aging', flow.gc, .08, .76)],
-        m => { m.storage.agingQueue = ['file-038.pxl', 'file-039.pxl']; m.storage.cleanup = 'rewrite candidates'; }, 'storageGc', ['storage']),
+        m => { m.storage.agingQueue = ['file-04.pxl', 'file-05.pxl']; m.storage.cleanup = 'rewrite candidates'; }, 'storageGc', ['storage']),
       step('Storage GC rewrites still-visible tuple versions into a new TEMPORARY_GC file inside the regular-files panel.', 4.5,
         ['storage', 'tx'], [tok(`safeTs=${DEFAULT_GC_SAFE_TS}`, 'tx.hwm', 'storage.files', flow.tx, .08, .48), tok('visible tuples', 'storage.aging', 'storage.newFile', flow.storage, .42, .96)],
-        m => { m.storage.newFile = 'file-043.pxl'; m.storage.newFileState = 'TEMPORARY_GC'; m.storage.cleanup = 'new TEMPORARY_GC'; }, 'storageGc', ['tx']),
+        m => { m.storage.newFile = 'file-08.pxl'; m.storage.newFileState = 'TEMPORARY_GC'; m.storage.cleanup = 'new TEMPORARY_GC'; }, 'storageGc', ['tx']),
       step('Before publishing it, Retina registers dual-write, synchronizes visibility, and refreshes main and primary index locations.', 4.6,
         ['storage', 'index', 'lane2'], [tok('location map', 'storage.newFile', 'index.in', flow.index, .06, .56), tok('sync visibility', 'storage.newFile', 'lane2.in', flow.visibility, .48, .94)],
-        m => { m.index.operation = 'storage GC location map'; m.index.mainEntries = ['rowId6032 -> file-043/rg0/off2', 'rowId6033 -> file-043/rg0/off3']; m.lanes[2].deleteTs.push('(dual,1293)'); m.lanes[2].highlight = 'visibility'; }, 'index', ['index', 'visibility']),
+        m => { m.index.operation = 'storage GC location map'; m.index.mainEntries = ['rowId822 -> file-08/rg0/off2', 'rowId823 -> file-08/rg0/off3']; m.lanes[2].deleteTs.push('(dual,293)'); m.lanes[2].highlight = 'visibility'; }, 'index', ['index', 'visibility']),
       step('Retina promotes the new file to REGULAR and marks old regular files RETIRED with cleanupAt.', 4.2,
         ['storage'], [tok('TEMP -> REGULAR', 'storage.newFile', 'storage.files', flow.gc, .08, .46), tok('old -> RETIRED', 'storage.aging', 'storage.files', flow.delete, .44, .90)],
-        m => { m.storage.newFileState = 'REGULAR'; m.storage.regularFiles = ['file-041.pxl', 'file-042.pxl', 'file-043.pxl']; m.storage.cleanup = 'old files RETIRED cleanupAt'; }, 'storageGc', ['storage']),
+        m => { m.storage.newFileState = 'REGULAR'; m.storage.regularFiles = ['file-06.pxl', 'file-07.pxl', 'file-08.pxl']; m.storage.cleanup = 'old files RETIRED cleanupAt'; }, 'storageGc', ['storage']),
       step('After retireDelayMs / cleanupAt, processRetiredFiles reclaims visibility and index state, then physically deletes retired files.', 4.0,
         ['storage', 'lane2'], [tok('cleanupAt reached', 'storage.files', 'storage.aging', flow.gc, .08, .72), tok('reclaim state', 'lane2.out', 'runtime.right', flow.gc, .32, .92)],
-        m => { m.storage.staleRatio = 0.18; m.storage.agingQueue = []; m.storage.newFile = 'none'; m.storage.newFileState = 'none'; m.storage.regularFiles = ['file-041.pxl', 'file-042.pxl', 'file-043.pxl']; m.storage.cleanup = 'retired files physically deleted'; m.lanes[2].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[2].highlight = 'baseBitmap'; }, 'gc', ['visibility'])
+        m => { m.storage.staleRatio = 0.18; m.storage.agingQueue = []; m.storage.newFile = 'none'; m.storage.newFileState = 'none'; m.storage.regularFiles = ['file-06.pxl', 'file-07.pxl', 'file-08.pxl']; m.storage.cleanup = 'retired files physically deleted'; m.lanes[2].safeTs = DEFAULT_GC_SAFE_TS; m.lanes[2].highlight = 'baseBitmap'; }, 'gc', ['visibility'])
     ]
   };
 
@@ -1162,6 +1213,15 @@
   // actually laid out left-to-right; otherwise events will appear to ignore the arrow.
   function tok(label, from, to, color, start, end, via) {
     return { label, path: via ? [from, ...via, to] : [from, to], color, start, end };
+  }
+
+  function settlePendingFlushObject(m) {
+    const pending = m.storage.pendingFlushObject;
+    if (pending && !m.storage.objectEntries.includes(pending)) {
+      m.storage.objectEntries.unshift(pending);
+    }
+    m.storage.pendingFlushObject = null;
+    m.storage.flushedHot = null;
   }
 
   function singleOpCdcPrelude(op, txId) {
@@ -1183,11 +1243,11 @@
     ];
   }
 
-  function commitSequence(txId, hwm, committedStatus) {
+  function commitSequence(txId, hwm, committedStatus, clearDeleteTsLaneId = null) {
     return [
       step(`Retina replayer returns OK for the row change in ${txId}; only now is the mirror transaction eligible to commit.`, 3.4,
         ['runtime', 'ingress'], [tok(`OK`, 'runtime.left', 'ingress.right', flow.replay, .12, .82)],
-        m => { m.sink.sinkStep = 'rowsOk'; m.sink.requestState = 'OK'; m.sink.txState = `${txId} commit eligible`; m.sink.rpcBatch = 'OK'; }, 'mvcc', []),
+        m => { m.sink.sinkStep = 'rowsOk'; m.sink.requestState = 'OK'; m.sink.txState = `${txId} commit eligible`; m.sink.rpcBatch = 'OK'; if (clearDeleteTsLaneId !== null) clearDeleteTsChainEffects(m, clearDeleteTsLaneId); }, 'mvcc', []),
       step(`Pixels Sink asks Transaction Service to commit ${txId}.`, 3.2,
         ['ingress', 'tx'], [tok(`commit ${txId}`, 'ingress.commitRight', 'tx.left', flow.tx, .12, .82)],
         m => { m.sink.sinkStep = 'commit'; m.sink.requestState = 'commit requested'; m.sink.txState = `${txId} commit in flight`; }, 'mvcc', ['tx']),
@@ -1195,6 +1255,16 @@
         [], [],
         m => { m.sink.sinkStep = 'committed'; m.sink.requestState = 'HWM advanced'; m.sink.txState = committedStatus; m.tx.hwm = hwm; }, 'mvcc', [])
     ];
+  }
+
+  function clearDeleteTsChainEffects(m, laneId) {
+    const lane = m.lanes[laneId];
+    if (lane) {
+      lane.highlight = null;
+      if (/append delete timestamp/i.test(lane.status || '')) lane.status = 'idle';
+    }
+    m.index.operation = 'idle';
+    m.storage.cleanup = 'idle';
   }
 
   function resize() {
@@ -1267,6 +1337,7 @@
   }
 
   function gotoScene(scene, opts = {}) {
+    if (scene === 'query') return;
     if (!scenes[scene]) return;
     if (opts.manual) {
       state.autoPlay = false;
@@ -1425,7 +1496,7 @@
     const zones = [
       ['cdcStream', rects.cdcStream], ['ingress', rects.ingress], ['runtime', rects.runtime],
       ['tx', rects.tx], ['index', rects.index],
-      ['storage', rects.storage], ['query', rects.query]
+      ['storage', rects.storage]
     ];
     for (let i = zones.length - 1; i >= 0; i--) {
       const [key, r] = zones[i];
@@ -1457,7 +1528,6 @@
     drawStaticFlows(c);
     drawExternalCdcStream(c);
     drawPixelsSink(c);
-    drawQuery(c);
     drawTransactionService(c);
     drawIndex(c);
     drawReplayers(c);
@@ -1551,7 +1621,16 @@
     if (key === 'cdcStream' || key === 'ingress') return flow.cdc;
     if (key === 'query') return flow.query;
     if (key === 'runtime') return currentReplayOperationColor();
+    if (key === 'index') return currentIndexOperationColor();
     return flow[key] || flow.replay;
+  }
+
+  function currentIndexOperationColor() {
+    const text = `${state.scene} ${model && model.index ? model.index.operation : ''} ${model && model.sink ? `${model.sink.requestState} ${model.sink.rpcBatch}` : ''}`;
+    if (/delete|DELETE|get pk|old loc/i.test(text)) return flow.delete;
+    if (/update|UPDATE|version|prevLoc/i.test(text)) return flow.index;
+    if (/insert|INSERT|put pk@290|index insert/i.test(text)) return flow.replay;
+    return flow.index;
   }
 
   function currentReplayOperationColor() {
@@ -1754,7 +1833,7 @@
     records.forEach((record, i) => {
       if (i > progress.reachedIndex) return;
       const x = map(cdcStreamRailP(i + 1, records.length), 0, 1, startX, endX);
-      const cardW = 62;
+      const cardW = CDC_STREAM_CARD_W;
       const cardTextSize = TYPE.text;
       drawCdcDot(x, railY, true, record.color, c);
       drawRecordTypeCard(x - cardW / 2, railY + 14, cardW, 24, record.label, record.color, c, cardTextSize);
@@ -1826,6 +1905,21 @@
     ctx.font = typeFont(TYPE.text, 900);
     ctx.textAlign = 'left';
     ctx.fillText('BEGIN', box.x + 18, box.y + 29);
+    const tsLabel = mirrorBeginTimestampLabel();
+    if (tsLabel) {
+      ctx.fillStyle = c.text;
+      ctx.font = typeFont(TYPE.text, 800);
+      ctx.textAlign = 'right';
+      fitText(tsLabel, box.x + box.w - 82, box.y + 31, 64, 'right');
+    }
+  }
+
+  function mirrorBeginTimestampLabel() {
+    const text = String(model.sink.txState || '');
+    const match = text.match(/\b(?:timestamp|ts)\s*=\s*(\d{1,4})\b/i);
+    if (!match) return '';
+    if (currentPixelsSinkStep() === 'begin' && stepProgress() < .54) return '';
+    return `ts=${match[1]}`;
   }
 
   function drawMirrorRowCard(row, active, c) {
@@ -2492,137 +2586,195 @@
 
   function drawIndex(c) {
     const r = rects.index;
-    const active = isHighlighted('index');
-    drawComponent(r, c, { color: flow.index, key: 'index' });
+    drawComponent(r, c, { color: moduleActivityColor('index'), key: 'indexService' });
 
     const x = r.x + MODULE_CONTENT_PAD;
     const y = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
     const w = r.w - MODULE_CONTENT_PAD * 2;
     const h = r.y + r.h - y - MODULE_CONTENT_PAD;
     const gap = 10;
-    const mapW = Math.round(w * .50);
+    const primaryFixedW = INDEX_MAP_CELL_PAD * 2 + INDEX_PRIMARY_KEY_W + INDEX_PRIMARY_VALUE_W + INDEX_MAP_ARROW_GAP * 2;
+    const mainFixedW = INDEX_MAP_CELL_PAD * 2 + INDEX_MAIN_KEY_W + INDEX_MAIN_VALUE_W + INDEX_MAP_ARROW_GAP * 2;
+    const mapW = (w - gap + primaryFixedW - mainFixedW) / 2;
     const locationW = w - mapW - gap;
     const primaryRows = parseIndexPairs(model.index.primaryEntries);
     const locationRows = parseIndexPairs(model.index.mainEntries);
+    const mapActive = isIndexInteractionActive();
 
-    drawPrimaryIndexMap(x, y, mapW, h, primaryRows, c, active);
-    drawMainIndexMap(x + mapW + gap, y, locationW, h, primaryRows, locationRows, c, active);
+    drawPrimaryIndexMap(x, y, mapW, h, primaryRows, c, mapActive);
+    drawMainIndexMap(x + mapW + gap, y, locationW, h, primaryRows, locationRows, c, mapActive);
   }
 
   function drawPrimaryIndexMap(x, y, w, h, rows, c, active) {
     const color = flow.index;
-    ctx.fillStyle = alpha(color, active ? .16 : .08);
-    ctx.strokeStyle = alpha(color, active ? .52 : .24);
-    ctx.lineWidth = active ? 1.5 : 1;
+    ctx.fillStyle = active ? alpha(c.panel3, .88) : alpha(c.panel2, .78);
+    ctx.strokeStyle = active ? c.border : c.borderSoft;
+    ctx.lineWidth = active ? 1.4 : 1;
     roundRect(x, y, w, h, 9, true, true);
 
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.subTitle, 900);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
     ctx.textAlign = 'left';
-    fitText('PRIMARY INDEX MAP', x + 10, y + 19, w - 20, 'left');
+    fitText('primary index', x + INDEX_MAP_TITLE_X, y + INDEX_MAP_TITLE_Y, w - INDEX_MAP_TITLE_X * 2, 'left');
 
-    const visibleRows = rows.slice(0, 3);
+    const visibleRows = rows.slice(0, 2);
     const rowCount = Math.max(visibleRows.length, 1);
-    const top = y + 34;
-    const bottom = y + h - 26;
+    const rowH = 24;
+    const top = y + INDEX_MAP_TITLE_Y + 16;
+    const bottom = y + h - 16 - rowH;
+    const keyX = x + INDEX_MAP_CELL_PAD;
+    const keyW = INDEX_PRIMARY_KEY_W;
 
     visibleRows.forEach((row, i) => {
       const yy = rowCount === 1 ? top : top + i * ((bottom - top) / (rowCount - 1));
-      drawIndexKeyCard(x + 10, yy, 70, 24, row.from, color, c, active);
-      drawRowIdNode(x + w - 24, yy + 12, row.to, color, c, active);
+      const rowColor = indexPrimaryRowHighlight(row);
+      const rowAlpha = indexRowRevealAlpha(rowColor);
+      ctx.save();
+      ctx.globalAlpha *= rowAlpha;
+      drawIndexKeyCard(keyX, yy, keyW, rowH, compactPrimaryKey(row.from), color, c, active, rowColor);
+      const valueW = INDEX_PRIMARY_VALUE_W;
+      const valueX = x + w - INDEX_MAP_CELL_PAD - valueW;
+      drawIndexValueCard(valueX, yy, valueW, rowH, compactRowId(row.to), color, c, active, rowColor);
 
-      const a = { x: x + 86, y: yy + 12 };
-      const b = { x: x + w - 40, y: yy + 12 };
-      ctx.strokeStyle = alpha(color, active ? .74 : .44);
+      const a = { x: keyX + keyW + INDEX_MAP_ARROW_GAP, y: yy + 12 };
+      const b = { x: valueX - INDEX_MAP_ARROW_GAP, y: yy + 12 };
+      ctx.strokeStyle = active ? c.border : c.borderSoft;
       ctx.lineWidth = 1.6;
       drawPolyline([a, b]);
-      arrowHead(a, b, alpha(color, active ? .86 : .56));
+      arrowHead(a, b, active ? c.border : c.borderSoft);
+      ctx.restore();
     });
   }
 
   function drawMainIndexMap(x, y, w, h, primaryRows, locationRows, c, active) {
     const color = flow.storage;
-    ctx.fillStyle = alpha(color, active ? .15 : .07);
-    ctx.strokeStyle = alpha(color, active ? .50 : .22);
-    ctx.lineWidth = active ? 1.5 : 1;
+    ctx.fillStyle = active ? alpha(c.panel3, .88) : alpha(c.panel2, .78);
+    ctx.strokeStyle = active ? c.border : c.borderSoft;
+    ctx.lineWidth = active ? 1.4 : 1;
     roundRect(x, y, w, h, 9, true, true);
 
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.subTitle, 900);
-    ctx.textAlign = 'left';
-    ctx.fillText('MAIN INDEX', x + 9, y + 19);
-
-    ctx.fillStyle = alpha(c.text, .68);
+    ctx.fillStyle = c.text;
     ctx.font = typeFont(TYPE.text, 800);
-    fitText('rowId → RowLocation', x + 9, y + 35, w - 18, 'left');
+    ctx.textAlign = 'left';
+    fitText('main index', x + INDEX_MAP_TITLE_X, y + INDEX_MAP_TITLE_Y, w - INDEX_MAP_TITLE_X * 2, 'left');
 
     const matchedLocations = primaryRows
-      .slice(0, 3)
+      .slice(0, 2)
       .map(row => locationRows.find(loc => loc.from === row.to))
       .filter(Boolean);
-    const visibleLocations = (matchedLocations.length ? matchedLocations : locationRows.slice(0, 3)).slice(0, 3);
+    const visibleLocations = (matchedLocations.length ? matchedLocations : locationRows.slice(0, 2)).slice(0, 2);
 
     visibleLocations.forEach((loc, i) => {
       const rowCount = Math.max(visibleLocations.length, 1);
-      const top = y + 44;
-      const bottom = y + h - 28;
+      const rowH = 24;
+      const top = y + INDEX_MAP_TITLE_Y + 16;
+      const bottom = y + h - 16 - rowH;
       const yy = rowCount === 1 ? top : top + i * ((bottom - top) / (rowCount - 1));
-      const rowW = Math.max(42, Math.min(56, Math.round(w * .33)));
-      const valX = x + rowW + 32;
-      const valW = Math.max(42, x + w - valX - 8);
+      const rowW = INDEX_MAIN_KEY_W;
+      const valW = INDEX_MAIN_VALUE_W;
+      const valX = x + w - INDEX_MAP_CELL_PAD - valW;
       const midY = yy + 12;
 
-      drawIndexKeyCard(x + 8, yy, rowW, 24, compactRowId(loc.from), color, c, active);
+      const keyX = x + INDEX_MAP_CELL_PAD;
+      const rowColor = indexMainRowHighlight(loc);
+      const rowAlpha = indexRowRevealAlpha(rowColor);
+      ctx.save();
+      ctx.globalAlpha *= rowAlpha;
+      drawIndexKeyCard(keyX, yy, rowW, rowH, compactRowId(loc.from), color, c, active, rowColor);
 
-      const a = { x: x + 10 + rowW, y: midY };
-      const b = { x: valX - 7, y: midY };
-      ctx.strokeStyle = alpha(color, active ? .70 : .42);
+      const a = { x: keyX + rowW + INDEX_MAP_ARROW_GAP, y: midY };
+      const b = { x: valX - INDEX_MAP_ARROW_GAP, y: midY };
+      ctx.strokeStyle = active ? c.border : c.borderSoft;
       ctx.lineWidth = 1.3;
       drawPolyline([a, b]);
-      arrowHead(a, b, alpha(color, active ? .82 : .52));
+      arrowHead(a, b, active ? c.border : c.borderSoft);
 
-      drawRowLocationTuple(valX, yy - 3, valW, 32, loc.to, color, c, active);
+      drawRowLocationTuple(valX, yy, valW, rowH, loc.to, color, c, active, rowColor);
+      ctx.restore();
     });
   }
 
-  function drawRowLocationTuple(x, y, w, h, location, color, c, active) {
-    const parts = locationParts(location);
-    ctx.fillStyle = alpha(c.panel2, active ? .76 : .56);
-    ctx.strokeStyle = alpha(color, active ? .48 : .26);
+  function indexPrimaryRowHighlight(row) {
+    if (!isIndexInteractionActive()) return null;
+    const op = model.index.operation || '';
+    if (/(insert entry|insert OK|put version|update index OK)/i.test(op) && /@(290|292)$/.test(row.from)) return flow.replay;
+    if (/delete index entry/i.test(op) && indexPrimaryDeleteTarget(row, op)) return flow.delete;
+    if (/(get pk|old loc|RowLocation|resolve before key)/i.test(op) && indexPrimaryLookupTarget(row, op)) return flow.gc;
+    return null;
+  }
+
+  function indexMainRowHighlight(row) {
+    if (!isIndexInteractionActive()) return null;
+    const op = model.index.operation || '';
+    if (/(insert entry|insert OK|put version|update index OK)/i.test(op) && row.from === 'rowId821') return flow.replay;
+    if (/delete index entry/i.test(op) && indexMainDeleteTarget(row, op)) return flow.delete;
+    if (/(get pk|old loc|RowLocation|resolve before key)/i.test(op) && indexMainLookupTarget(row, op)) return flow.gc;
+    return null;
+  }
+
+  function indexPrimaryLookupTarget(row, op) {
+    return /pk@290/i.test(op) ? /@290$/.test(row.from) : /@212$/.test(row.from);
+  }
+
+  function indexMainLookupTarget(row, op) {
+    return /pk@290/i.test(op) ? row.from === 'rowId821' : row.from === 'rowId820';
+  }
+
+  function indexPrimaryDeleteTarget(row, op) {
+    return /pk@290/i.test(op) ? /@290$/.test(row.from) : /@212$/.test(row.from);
+  }
+
+  function indexMainDeleteTarget(row, op) {
+    return /pk@290/i.test(op) ? row.from === 'rowId821' : row.from === 'rowId820';
+  }
+
+  function isIndexInteractionActive() {
+    return state.detailFocus === 'index' || isHighlighted('index');
+  }
+
+  function indexRowRevealAlpha(highlightColor) {
+    if (!highlightColor) return 1;
+    const op = model.index.operation || '';
+    if (/delete index entry .*applied|delete index entry applied/i.test(op)) {
+      const t = ease(clamp(stepProgress() / .82, 0, 1));
+      return lerp(1, .08, t);
+    }
+    if (!/(insert entry applied|put version .* applied)/i.test(op)) return 1;
+    const t = ease(clamp(stepProgress() / .72, 0, 1));
+    return lerp(.18, 1, t);
+  }
+
+  function drawRowLocationTuple(x, y, w, h, location, color, c, active, highlightColor = null) {
+    ctx.fillStyle = highlightColor ? alpha(highlightColor, .22) : active ? alpha(c.panel3, .88) : alpha(c.panel2, .78);
+    ctx.strokeStyle = highlightColor ? alpha(highlightColor, .56) : active ? c.border : c.borderSoft;
     ctx.lineWidth = active ? 1.2 : 1;
     roundRect(x, y, w, h, 5, true, true);
 
     ctx.fillStyle = c.text;
-    ctx.font = monoFont(TYPE.text, 900);
-    fitText(parts.file, x + 6, y + 14, w - 12, 'left');
-    ctx.fillStyle = c.muted;
-    ctx.font = monoFont(TYPE.text, 800);
-    fitText(`${parts.rg} ${parts.off}`, x + 6, y + 27, w - 12, 'left');
+    ctx.font = typeFont(TYPE.text);
+    fitText(String(location || '').replace('.pxl', ''), x + 5, y + 16, w - 10, 'center');
   }
 
-  function drawIndexKeyCard(x, y, w, h, label, color, c, active) {
-    ctx.fillStyle = alpha(color, active ? .24 : .12);
-    ctx.strokeStyle = alpha(color, active ? .62 : .32);
+  function drawIndexKeyCard(x, y, w, h, label, color, c, active, highlightColor = null) {
+    ctx.fillStyle = highlightColor ? alpha(highlightColor, .22) : active ? alpha(c.panel3, .88) : alpha(c.panel2, .78);
+    ctx.strokeStyle = highlightColor ? alpha(highlightColor, .56) : active ? c.border : c.borderSoft;
     ctx.lineWidth = active ? 1.3 : 1;
     roundRect(x, y, w, h, 5, true, true);
 
-    ctx.fillStyle = color;
-    ctx.font = typeFont(TYPE.text, 900);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text);
     fitText(label, x + 4, y + 16, w - 8, 'center');
   }
 
-  function drawRowIdNode(x, y, rowId, color, c, active) {
-    ctx.fillStyle = alpha(color, active ? .28 : .15);
-    ctx.strokeStyle = alpha(color, active ? .70 : .38);
-    ctx.lineWidth = active ? 1.4 : 1;
-    ctx.beginPath();
-    ctx.arc(x, y, 13, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+  function drawIndexValueCard(x, y, w, h, label, color, c, active, highlightColor = null) {
+    ctx.fillStyle = highlightColor ? alpha(highlightColor, .22) : active ? alpha(c.panel3, .88) : alpha(c.panel2, .78);
+    ctx.strokeStyle = highlightColor ? alpha(highlightColor, .56) : active ? c.border : c.borderSoft;
+    ctx.lineWidth = active ? 1.3 : 1;
+    roundRect(x, y, w, h, 5, true, true);
 
     ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.text, 900);
-    fitText(compactRowId(rowId), x - 12, y + 4, 24, 'center');
+    ctx.font = typeFont(TYPE.text);
+    fitText(label, x + 4, y + 16, w - 8, 'center');
   }
 
   function parseIndexPairs(rows) {
@@ -2638,23 +2790,20 @@
   }
 
   function compactRowId(rowId) {
-    return String(rowId || '').replace(/^rowId/, '#');
+    return String(rowId || '').replace(/^rowId/, 'r');
+  }
+
+  function compactPrimaryKey(key) {
+    return String(key || '');
   }
 
   function compactLocation(location) {
     return String(location || '')
       .replace('.pxl', '')
       .replace('fileId', 'f')
-      .replace('file-', 'f');
-  }
-
-  function locationParts(location) {
-    const parts = compactLocation(location).split('/').filter(Boolean);
-    return {
-      file: parts[0] || 'file?',
-      rg: parts[1] || 'rg?',
-      off: parts[2] || 'off?'
-    };
+      .replace('file-', 'f')
+      .replace('/rg', '/r')
+      .replace('/off', '/o');
   }
 
   function drawReplayers(c) {
@@ -2702,6 +2851,17 @@
       h: activeMem.h - fillPadTop - fillPadBottom
     };
     return { activePanel, queue, activeMem, fullFill, memW: fullFill.w, memY: fullFill.y, memH: fullFill.h, itemGap };
+  }
+
+  function retinaMemtableMetrics() {
+    const { write } = replayerPanelLayout();
+    const layout = replayWriteBufferLayout(write.x, write.y, write.w, write.h);
+    return {
+      w: layout.memW,
+      h: layout.memH,
+      queueH: layout.queue.h,
+      itemGap: layout.itemGap
+    };
   }
 
   function replayVisibilityLayout(x, y, w, h) {
@@ -2855,8 +3015,9 @@
   }
 
   function drawReplayVisibility(x, y, w, h, lane, c) {
+    const appendSettled = currentStep().anim === 'appendDeleteTs' && stepProgress() >= .82;
     const visibilityActive = state.detailFocus === 'visibility' || state.detailFocus === 'gc' ||
-      lane.highlight === 'visibility' || lane.highlight === 'baseBitmap' || lane.highlight === 'foldEligible';
+      (lane.highlight === 'visibility' && !appendSettled) || lane.highlight === 'baseBitmap' || lane.highlight === 'foldEligible';
     drawNeutralPanelBox(x, y, w, h, 'visibility structure', c, 9, visibilityActive);
 
     const layout = replayVisibilityLayout(x, y, w, h);
@@ -2934,6 +3095,7 @@
     const rows = 2;
     const st = currentStep();
     const hideAppendingItem = st.anim === 'appendDeleteTs' && stepProgress() < .82;
+    const appendSettled = st.anim === 'appendDeleteTs' && stepProgress() >= .82;
     const items = hideAppendingItem ? lane.deleteTs.slice(0, -1) : lane.deleteTs;
     const visible = items.slice(0, columns * rows);
     const itemW = Math.min(72, Math.floor((w - 18 * (columns - 1)) / columns));
@@ -2947,7 +3109,7 @@
       const eligible = lane.safeTs != null && ts <= lane.safeTs;
       const gcActive = lane.highlight === 'foldEligible' && eligible;
       const appendVisible = st.anim !== 'appendDeleteTs' || !hideAppendingItem;
-      const active = gcActive || (lane.highlight === 'visibility' && appendVisible && i === visible.length - 1);
+      const active = gcActive || (lane.highlight === 'visibility' && appendVisible && !appendSettled && i === visible.length - 1);
       const color = gcActive ? flow.gc : flow.delete;
       drawPill(x + col * (itemW + gapX), y + row * (itemH + rowGap), itemW, itemH, item, color, c, active, 8);
     });
@@ -3000,42 +3162,75 @@
     const r = rects.storage;
     drawComponent(r, c, { color: flow.storage, key: 'storage' });
     const layout = storagePanelsLayout(r);
-    const panels = [
-      { ...layout.memtable, title: 'flushed immutable memtable', color: flow.storage, kind: 'OBJ', labels: storageObjectLabels().slice(0, 4), active: false, hotLabel: model.storage.flushedHot, maxItems: 4 },
-      { ...layout.files, title: 'regular columnar files', color: flow.replay, kind: 'FILE', labels: regularStorageFileLabels(), active: ['query', 'gc', 'storageGc'].includes(state.detailFocus), regular: true, maxItems: 5 }
-    ];
-    panels.forEach(panel => drawStoragePanel(panel.x, panel.y, panel.w, panel.h, panel, c));
+    drawFlushedMemtablePanel(layout.memtable.x, layout.memtable.y, layout.memtable.w, layout.memtable.h, {
+      title: 'blocks',
+      color: flow.storage,
+      labels: storageObjectLabels().slice(0, STORAGE_ITEM_CAPACITY),
+      hotLabel: model.storage.flushedHot
+    }, c);
+    drawStoragePanel(layout.files.x, layout.files.y, layout.files.w, layout.files.h, {
+      ...layout.files,
+      title: 'files',
+      color: flow.replay,
+      kind: 'FILE',
+      labels: regularStorageFileLabels(),
+      active: ['query', 'gc', 'storageGc'].includes(state.detailFocus),
+      regular: true,
+      maxItems: STORAGE_ITEM_CAPACITY
+    }, c);
   }
 
   function storageObjectLabels() {
-    const labels = [...model.storage.objectEntries];
-    const pending = model.storage.pendingFlushObject;
-    if (pending) {
-      const st = currentStep();
-      const showPending = st.anim !== 'flush' || stepProgress(true) > .86;
-      if (showPending && !labels.includes(pending)) labels.unshift(pending);
-    }
-    return labels;
+    return [...model.storage.objectEntries];
   }
 
   function storagePanelsLayout(r) {
-    const x = r.x + MODULE_CONTENT_PAD;
+    const x = r.x + STORAGE_EDGE_PAD;
     const y = r.y + MODULE_TITLE_Y + MODULE_CONTENT_GAP;
-    const w = r.w - MODULE_CONTENT_PAD * 2;
-    const h = Math.max(180, r.y + r.h - y - MODULE_CONTENT_PAD);
-    const gap = 16;
-    if (r.w < 700) {
-      const memH = Math.round((h - gap) * .38);
-      return {
-        memtable: { x, y, w, h: memH },
-        files: { x, y: y + memH + gap, w, h: h - gap - memH }
-      };
-    }
-    const available = w - gap;
-    const memtableW = Math.floor(available * .35);
+    const w = r.w - STORAGE_EDGE_PAD * 2;
+    const gap = STORAGE_PANEL_GAP;
+    const memH = STORAGE_COMPACT_PANEL_H;
+    const filesH = STORAGE_COMPACT_PANEL_H;
     return {
-      memtable: { x, y, w: memtableW, h },
-      files: { x: x + memtableW + gap, y, w: available - memtableW, h }
+      memtable: { x, y, w, h: memH },
+      files: { x, y: y + memH + gap, w, h: filesH }
+    };
+  }
+
+  function flushedMemtableObjectCenter(panel) {
+    const layout = flushedMemtableObjectLayout(panel, flushedMemtableAnchorLabels());
+    if (!layout.visibleLabels.length) {
+      return [layout.rightX + layout.objW / 2, layout.objY + layout.objH / 2];
+    }
+    return [layout.xForIndex(0) + layout.objW / 2, layout.objY + layout.objH / 2];
+  }
+
+  function flushedMemtableAnchorLabels() {
+    const labels = [...model.storage.objectEntries];
+    const pending = model.storage.pendingFlushObject;
+    if (pending && !labels.includes(pending)) labels.unshift(pending);
+    return labels.slice(0, STORAGE_ITEM_CAPACITY);
+  }
+
+  function flushedMemtableObjectLayout(panel, labels, maxItems = STORAGE_ITEM_CAPACITY) {
+    const metrics = retinaMemtableMetrics();
+    const objW = STORAGE_COMPACT_ITEM_W;
+    const objY = panel.y + STORAGE_PANEL_TITLE_Y + STORAGE_TITLE_ITEM_GAP;
+    const objH = Math.min(metrics.h, Math.max(36, panel.h - (objY - panel.y) - STORAGE_ITEM_BOTTOM_PAD));
+    const edgePad = STORAGE_EDGE_PAD;
+    const gap = STORAGE_COMPACT_ITEM_GAP;
+    const innerW = Math.max(objW, panel.w - edgePad * 2);
+    const maxFit = Math.max(1, Math.floor((innerW + gap) / (objW + gap)));
+    const visibleLabels = labels.slice(0, Math.min(maxItems, maxFit));
+    const rightX = panel.x + panel.w - edgePad - objW;
+    return {
+      objW,
+      objH,
+      objY,
+      gap,
+      visibleLabels,
+      rightX,
+      xForIndex: i => rightX - (visibleLabels.length - 1 - i) * (objW + gap)
     };
   }
 
@@ -3048,15 +3243,19 @@
   }
 
   function drawStoragePanel(x, y, w, h, panel, c) {
-    ctx.fillStyle = alpha(panel.color, panel.active ? .14 : .07);
-    ctx.strokeStyle = alpha(panel.color, panel.active ? .52 : .24);
-    ctx.lineWidth = panel.active ? 1.5 : 1;
+    ctx.fillStyle = panel.active ? alpha(c.panel3, .88) : alpha(c.panel2, .78);
+    ctx.strokeStyle = panel.active ? c.border : c.borderSoft;
+    ctx.lineWidth = panel.active ? 1.4 : 1;
     roundRect(x, y, w, h, 10, true, true);
-    ctx.fillStyle = panel.color;
-    ctx.font = typeFont(TYPE.subTitle, 900);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
     ctx.textAlign = 'left';
-    fitText(panel.title, x + PANEL_TITLE_X, y + PANEL_TITLE_Y, w - PANEL_TITLE_X * 2, 'left');
+    fitText(panel.title, x + STORAGE_PANEL_TITLE_X, y + STORAGE_PANEL_TITLE_Y, w - STORAGE_PANEL_TITLE_X * 2, 'left');
     const labels = panel.labels.length ? panel.labels : ['empty'];
+    if (panel.regular) {
+      drawCompactRegularFiles({ x, y, w, h }, panel, labels, c);
+      return;
+    }
     const maxItems = panel.maxItems || 4;
     const visibleLabels = labels.slice(0, maxItems);
     const iconGap = 9;
@@ -3082,6 +3281,99 @@
         temporary
       });
     });
+  }
+
+  function drawCompactRegularFiles(bounds, panel, labels, c) {
+    if (labels.length === 1 && labels[0] === 'empty') {
+      ctx.fillStyle = c.muted;
+      ctx.font = typeFont(TYPE.text, 800);
+      ctx.textAlign = 'center';
+      ctx.fillText('empty', bounds.x + bounds.w / 2, bounds.y + bounds.h / 2 + 6);
+      return;
+    }
+
+    const layout = flushedMemtableObjectLayout(bounds, labels, panel.maxItems || 5);
+    layout.visibleLabels.forEach((label, i) => {
+      const labelText = String(label);
+      const oldFile = model.storage.agingQueue.includes(labelText);
+      const retired = oldFile && /RETIRED|cleanupAt|physically/.test(model.storage.cleanup);
+      const candidate = oldFile && !retired;
+      const newFile = labelText === model.storage.newFile;
+      const temporary = newFile && model.storage.newFileState === 'TEMPORARY_GC';
+      const color = retired ? flow.delete : candidate || temporary ? flow.gc : newFile ? flow.storage : panel.color;
+      const active = panel.active || candidate || retired || newFile || temporary;
+      const fileX = layout.xForIndex(i);
+      drawCompactStorageFileIcon(fileX, layout.objY, layout.objW, layout.objH, displayStorageFileLabel(labelText), color, c, active);
+    });
+  }
+
+  function displayStorageFileLabel(label) {
+    return String(label).replace(/\.pxl$/, '');
+  }
+
+  function drawCompactStorageFileIcon(x, y, w, h, label, color, c, active) {
+    ctx.fillStyle = alpha(color, active ? .24 : .13);
+    ctx.strokeStyle = alpha(color, active ? .62 : .30);
+    ctx.lineWidth = active ? 1.5 : 1;
+    roundRect(x, y, w, h, 5, true, true);
+
+    ctx.fillStyle = alpha(color, active ? .38 : .22);
+    roundRect(x + 6, y + 7, w - 12, 6, 3, true, false);
+    ctx.strokeStyle = alpha(color, active ? .40 : .24);
+    ctx.lineWidth = 1;
+    const rowTop = y + 22;
+    const rowGap = Math.max(8, Math.floor((h - 42) / 2));
+    for (let i = 0; i < 3; i++) {
+      const yy = rowTop + i * rowGap;
+      if (yy > y + h - 20) break;
+      ctx.beginPath();
+      ctx.moveTo(x + 8, yy);
+      ctx.lineTo(x + w - 8, yy);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'center';
+    fitText(label, x + 3, y + h - 9, w - 6, 'center');
+  }
+
+  function drawFlushedMemtablePanel(x, y, w, h, panel, c) {
+    ctx.fillStyle = alpha(c.panel2, .78);
+    ctx.strokeStyle = c.borderSoft;
+    ctx.lineWidth = 1;
+    roundRect(x, y, w, h, 10, true, true);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.text, 800);
+    ctx.textAlign = 'left';
+    fitText(panel.title, x + STORAGE_PANEL_TITLE_X, y + STORAGE_PANEL_TITLE_Y, w - STORAGE_PANEL_TITLE_X * 2, 'left');
+
+    const labels = panel.labels.length ? panel.labels : [];
+    if (!labels.length) {
+      ctx.fillStyle = c.muted;
+      ctx.font = typeFont(TYPE.text, 800);
+      ctx.textAlign = 'center';
+      ctx.fillText('empty', x + w / 2, y + h / 2 + 6);
+      return;
+    }
+
+    const layout = flushedMemtableObjectLayout({ x, y, w, h }, labels);
+
+    layout.visibleLabels.forEach((label, i) => {
+      const objX = layout.xForIndex(i);
+      ctx.fillStyle = alpha(panel.color, .13);
+      ctx.strokeStyle = alpha(panel.color, .30);
+      ctx.lineWidth = 1;
+      roundRect(objX, layout.objY, layout.objW, layout.objH, 5, true, true);
+      ctx.fillStyle = c.text;
+      ctx.font = typeFont(TYPE.text, 800);
+      ctx.textAlign = 'center';
+      fitText(displayStorageObjectLabel(label), objX + 3, layout.objY + layout.objH / 2 + 5, layout.objW - 6, 'center');
+    });
+  }
+
+  function displayStorageObjectLabel(label) {
+    return String(label).replace(/obj-(\d+)$/i, (_, n) => `obj-${n.slice(-1)}`);
   }
 
   function drawTabularStorageIcon(x, y, w, h, label, kind, color, c, opts = {}) {
@@ -3645,7 +3937,7 @@
     const storageLayout = parts[0] === 'storage' ? storagePanelsLayout(r) : null;
     const fallbackStorageY = r.y + 90 + Math.max(42, (r.h - 72) - 52) / 2;
     const storageMemtableCenter = storageLayout
-      ? [storageLayout.memtable.x + storageLayout.memtable.w / 2, storageLayout.memtable.y + storageLayout.memtable.h / 2]
+      ? flushedMemtableObjectCenter(storageLayout.memtable)
       : [r.x + r.w * .20, fallbackStorageY];
     const storageFilesCenter = storageLayout
       ? [storageLayout.files.x + storageLayout.files.w / 2, storageLayout.files.y + storageLayout.files.h / 2]
