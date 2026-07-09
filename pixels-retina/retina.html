@@ -477,6 +477,8 @@
   };
   const MODULE_TITLE_X = 16;
   const MODULE_TITLE_Y = 32;
+  const MODULE_ICON_SIZE = 32;
+  const MODULE_ICON_GAP = 8;
   const MODULE_CONTENT_GAP = 20;
   const MODULE_CONTENT_PAD = 20;
   const PANEL_TITLE_X = 12;
@@ -529,14 +531,14 @@
   const STORAGE_PANEL_TITLE_Y = 18;
   const STORAGE_TITLE_ITEM_GAP = 16;
   const STORAGE_COMPACT_PANEL_H = 129;
-  const STORAGE_ITEM_CAPACITY = 4;
+  const STORAGE_ITEM_CAPACITY = 5;
   const STORAGE_COMPACT_ITEM_W = 52;
-  const STORAGE_COMPACT_ITEM_GAP = 12;
+  const INDEX_W = 455;
+  const STORAGE_COMPACT_ITEM_GAP = (INDEX_W - STORAGE_EDGE_PAD * 4 - STORAGE_COMPACT_ITEM_W * STORAGE_ITEM_CAPACITY) / (STORAGE_ITEM_CAPACITY - 1);
   const STORAGE_PANEL_W = STORAGE_EDGE_PAD * 2 + STORAGE_COMPACT_ITEM_W * STORAGE_ITEM_CAPACITY + STORAGE_COMPACT_ITEM_GAP * (STORAGE_ITEM_CAPACITY - 1);
   const STORAGE_W = STORAGE_EDGE_PAD * 2 + STORAGE_PANEL_W;
   const STORAGE_H = MODULE_TITLE_Y + MODULE_CONTENT_GAP + STORAGE_COMPACT_PANEL_H * 2 + STORAGE_PANEL_GAP + STORAGE_EDGE_PAD;
   const TOP_SERVICE_W = 430;
-  const INDEX_W = 481;
   const INGRESS_Y = MIDDLE_TOP;
   const PIXELS_SINK_W = 285;
   const PIXELS_SINK_H = 394;
@@ -547,12 +549,11 @@
   const MIRROR_BEGIN_TS_FADE_END = .92;
   const PIXELS_SINK_X = LEFT_PANEL_X + (LEFT_PANEL_W - PIXELS_SINK_W) / 2;
   const rects = {
-    ingress: { x: PIXELS_SINK_X, y: INGRESS_Y, w: PIXELS_SINK_W, h: PIXELS_SINK_H, title: 'Pixels Sink', sub: 'mirror transaction -> replay RPC' },
-    tx: { x: SERVICE_X, y: SERVICE_Y, w: TOP_SERVICE_W, h: TX_SERVICE_H, title: 'Transaction Service', sub: 'MVCC time boundary: HWM / LWM' },
-    index: { x: SERVICE_X + TOP_SERVICE_W + SERVICE_GAP, y: SERVICE_Y, w: INDEX_W, h: SERVICE_H, title: 'Index Service', sub: 'primaryKey→rowId + rowId→RowLocation' },
-    runtime: { x: SERVICE_X, y: RUNTIME_Y, w: RETINA_REPLAYER_W, h: RETINA_REPLAYER_H, title: 'Retina replayer', sub: 'RetinaWorkerService RPC + write / visibility state' },
-    storage: { x: STORAGE_X, y: RUNTIME_Y, w: STORAGE_W, h: STORAGE_H, title: 'Storage', sub: 'flushed immutable memtable + regular columnar files' },
-
+    ingress: { x: 150, y: (H - PIXELS_SINK_H) / 2, w: PIXELS_SINK_W, h: PIXELS_SINK_H, title: 'Pixels Sink', sub: 'mirror transaction -> replay RPC' },
+    tx: { x: 557.5, y: 140, w: RETINA_REPLAYER_W, h: TX_SERVICE_H, title: 'Transaction Service', sub: 'MVCC time boundary: HWM / LWM' },
+    index: { x: 1130, y: 180, w: INDEX_W, h: SERVICE_H, title: 'Index Service', sub: 'primaryKey→rowId + rowId→RowLocation' },
+    runtime: { x: 557.5, y: 380, w: RETINA_REPLAYER_W, h: RETINA_REPLAYER_H, title: 'Retina replayer', sub: 'RetinaWorkerService RPC + write / visibility state' },
+    storage: { x: 1130, y: 455, w: STORAGE_W, h: STORAGE_H, title: 'Storage', sub: 'flushed immutable memtable + regular columnar files' },
     query: { x: W + 80, y: MIDDLE_TOP, w: 316, h: MIDDLE_H, title: 'Query Engine', sub: 'parallel splits → VFoR gate → visible batches' }
   };
 
@@ -1297,20 +1298,6 @@
   function drawBackground(c) {
     ctx.fillStyle = c.bg;
     ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = alpha(c.grid, c.dark ? .20 : .26);
-    ctx.lineWidth = 1;
-    for (let x = 24; x <= W - 24; x += 48) {
-      ctx.beginPath();
-      ctx.moveTo(x, MIDDLE_TOP + 52);
-      ctx.lineTo(x, MIDDLE_BOTTOM - 4);
-      ctx.stroke();
-    }
-    for (let y = MIDDLE_TOP + 56; y <= MIDDLE_BOTTOM - 4; y += 48) {
-      ctx.beginPath();
-      ctx.moveTo(24, y);
-      ctx.lineTo(W - 24, y);
-      ctx.stroke();
-    }
   }
 
   function drawCanvasHeader(c) {
@@ -1347,11 +1334,172 @@
     ctx.strokeStyle = highlighted ? alpha(color, .62) : c.borderSoft;
     ctx.lineWidth = highlighted ? 1.8 : 1.1;
     roundRect(r.x, r.y, r.w, r.h, 18, true, true);
+    drawModuleTitle(r, c, key, color);
+    ctx.restore();
+  }
+
+  function drawModuleTitle(r, c, key, color) {
     ctx.fillStyle = c.text;
     ctx.font = typeFont(TYPE.moduleTitle, 900);
     ctx.textAlign = 'left';
-    fitText(r.title, r.x + MODULE_TITLE_X, r.y + MODULE_TITLE_Y, r.w - MODULE_TITLE_X * 2, 'left');
+    ctx.textBaseline = 'alphabetic';
+
+    const metrics = ctx.measureText(r.title);
+    const ascent = metrics.actualBoundingBoxAscent || TYPE.moduleTitle * .72;
+    const descent = metrics.actualBoundingBoxDescent || TYPE.moduleTitle * .22;
+    const baselineY = r.y + MODULE_TITLE_Y;
+    const titleCenterY = baselineY - (ascent - descent) / 2;
+    const iconX = r.x + MODULE_TITLE_X;
+    const iconY = titleCenterY - MODULE_ICON_SIZE / 2;
+    const textX = iconX + MODULE_ICON_SIZE + MODULE_ICON_GAP;
+    drawModuleIcon(iconX, iconY, MODULE_ICON_SIZE, moduleIconKind(key, r.title), color, c);
+
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.moduleTitle, 900);
+    ctx.textAlign = 'left';
+    fitText(r.title, textX, baselineY, r.w - (textX - r.x) - MODULE_TITLE_X, 'left');
+  }
+
+  function moduleIconKind(key, title) {
+    const value = `${key || ''} ${title || ''}`.toLowerCase();
+    if (value.includes('sink') || value.includes('ingress')) return 'sink';
+    if (value.includes('transaction') || value === 'tx') return 'tx';
+    if (value.includes('retina') || value.includes('runtime')) return 'runtime';
+    if (value.includes('index')) return 'index';
+    if (value.includes('storage')) return 'storage';
+    if (value.includes('query')) return 'query';
+    return 'default';
+  }
+
+  function drawModuleIcon(x, y, size, kind, color, c) {
+    const iconColor = moduleIconColor(kind, color);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(size / 24, size / 24);
+    ctx.strokeStyle = iconColor;
+    ctx.lineWidth = 2.3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.fillStyle = 'transparent';
+    if (kind === 'sink') drawSinkIcon(x, y, size, iconColor);
+    else if (kind === 'tx') drawTransactionIcon(x, y, size, iconColor);
+    else if (kind === 'runtime') drawRuntimeIcon(x, y, size, iconColor);
+    else if (kind === 'index') drawIndexIcon(x, y, size, iconColor);
+    else if (kind === 'storage') drawStorageIcon(x, y, size, iconColor);
+    else if (kind === 'query') drawQueryIcon(x, y, size, iconColor);
+    else drawRuntimeIcon(x, y, size, iconColor);
     ctx.restore();
+  }
+
+  function moduleIconColor(kind, fallback) {
+    if (kind === 'sink') return '#5fb58c';
+    if (kind === 'tx') return '#d18a13';
+    if (kind === 'runtime') return flow.tx;
+    if (kind === 'index') return flow.visibility;
+    if (kind === 'storage') return flow.storage;
+    if (kind === 'query') return flow.query;
+    return fallback || flow.tx;
+  }
+
+  function drawSinkIcon() {
+    iconRoundRect(4, 4, 6, 6, 1);
+    iconRoundRect(14, 4, 6, 6, 1);
+    iconRoundRect(4, 14, 6, 6, 1);
+    iconRoundRect(14, 14, 6, 6, 1);
+  }
+
+  function drawTransactionIcon() {
+    ctx.beginPath();
+    ctx.arc(12, 12, 7, .45, Math.PI * 1.45);
+    ctx.stroke();
+    iconLine([[5.7, 15.1], [5, 19], [1.8, 16.6]]);
+
+    ctx.beginPath();
+    ctx.arc(12, 12, 7, Math.PI * 1.45, Math.PI * 2.45);
+    ctx.stroke();
+    iconLine([[18.3, 8.9], [19, 5], [22.2, 7.4]]);
+
+    iconCircle(12, 12, 2.4);
+    iconLine([[12, 12], [12, 8.8]]);
+    iconLine([[12, 12], [14.5, 13.4]]);
+  }
+
+  function drawRuntimeIcon() {
+    iconRoundRect(4, 4, 16, 16, 3);
+    drawStarPath(12, 12.3, 5, 2.2);
+    ctx.stroke();
+  }
+
+  function drawStarPath(cx, cy, outerR, innerR) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const ang = -Math.PI / 2 + i * Math.PI / 5;
+      const r = i % 2 === 0 ? outerR : innerR;
+      const px = cx + Math.cos(ang) * r;
+      const py = cy + Math.sin(ang) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+
+  function drawIndexIcon() {
+    iconDiamond(12, 5, 8, 3.5);
+    iconDiamond(12, 11, 8, 3.5);
+    iconDiamond(12, 17, 8, 3.5);
+  }
+
+  function drawStorageIcon() {
+    ctx.beginPath();
+    ctx.ellipse(12, 6, 7, 3, 0, 0, Math.PI * 2);
+    ctx.moveTo(5, 6);
+    ctx.lineTo(5, 18);
+    ctx.ellipse(12, 18, 7, 3, 0, Math.PI, 0, true);
+    ctx.lineTo(19, 6);
+    ctx.stroke();
+    iconArc(12, 12, 7, 3);
+  }
+
+  function drawQueryIcon() {
+    ctx.beginPath();
+    ctx.arc(10.5, 10.5, 5.5, 0, Math.PI * 2);
+    ctx.stroke();
+    iconLine([[15, 15], [20, 20]]);
+  }
+
+  function iconRoundRect(x, y, w, h, r) {
+    roundRect(x, y, w, h, r, false, true);
+  }
+
+  function iconLine(points) {
+    ctx.beginPath();
+    points.forEach((point, i) => {
+      if (i === 0) ctx.moveTo(point[0], point[1]);
+      else ctx.lineTo(point[0], point[1]);
+    });
+    ctx.stroke();
+  }
+
+  function iconCircle(x, y, r) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function iconDiamond(cx, cy, w, h) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - h);
+    ctx.lineTo(cx + w, cy);
+    ctx.lineTo(cx, cy + h);
+    ctx.lineTo(cx - w, cy);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  function iconArc(cx, cy, rx, ry) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI);
+    ctx.stroke();
   }
 
   function isModuleHighlighted(key) {
@@ -2930,10 +3078,7 @@
     if (highlighted) shadow(c);
     roundRect(r.x, r.y, r.w, r.h, 12, true, true);
     ctx.shadowColor = 'transparent';
-    ctx.fillStyle = c.text;
-    ctx.font = typeFont(TYPE.moduleTitle, 900);
-    ctx.textAlign = 'left';
-    fitText(r.title, r.x + MODULE_TITLE_X, r.y + MODULE_TITLE_Y, r.w - MODULE_TITLE_X * 2, 'left');
+    drawModuleTitle(r, c, opts.key, opts.color);
     ctx.restore();
   }
 
