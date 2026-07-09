@@ -409,7 +409,7 @@
             <button class="scene-btn" data-scene="gc" data-label="Garbage Collection" title="Garbage Collection" aria-label="Garbage Collection">
               <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17l-2 2l2 2"/><path d="M10 19h9a2 2 0 0 0 1.75 -2.75l-.55 -1"/><path d="M8.536 11l-.732 -2.732l-2.732 .732"/><path d="M7.804 8.268l-4.5 7.794a2 2 0 0 0 1.506 2.89l1.141 .024"/><path d="M15.464 11l2.732 .732l.732 -2.732"/><path d="M18.196 11.732l-4.5 -7.794a2 2 0 0 0 -3.256 -.14l-.591 .976"/></svg></span>
             </button>
-            <button class="scene-btn" data-scene="query" data-label="Query Path" title="Query Path" aria-label="Query Path" hidden>
+            <button class="scene-btn" data-scene="query" data-label="Query Path" title="Query Path" aria-label="Query Path">
               <span class="scene-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.657 3.582 3 8 3s8 -1.343 8 -3s-3.582 -3 -8 -3s-8 1.343 -8 3"/><path d="M4 6v6c0 1.657 3.582 3 8 3m8 -3.5v-5.5"/><path d="M4 12v6c0 1.657 3.582 3 8 3"/><path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"/><path d="M20.2 20.2l1.8 1.8"/></svg></span>
             </button>
           </div>
@@ -457,7 +457,7 @@
 
   const AUTO_START_SCENE = 'cdc';
   const autoSceneOrder = ['cdc'];
-  const sceneOrder = ['insert', 'delete', 'update', 'gc'];
+  const sceneOrder = ['insert', 'delete', 'update', 'query', 'gc'];
   const flow = {
     cdc: '#c96a1a',
     replay: '#168a52',
@@ -500,8 +500,17 @@
   const DEFAULT_LWM = 281;
   const DEFAULT_QUERY_TS = DEFAULT_HWM - 1;
   const DEFAULT_GC_SAFE_TS = DEFAULT_LWM - 1;
+  const TX_WINDOW_MIN_TS = DEFAULT_LWM - 10;
+  const TX_WINDOW_MAX_TS = DEFAULT_HWM + 8;
   const GC_BASE_BITMAP = '0100000100000100';
+  const QUERY_BASE_BITMAP = GC_BASE_BITMAP;
+  const QUERY_BITMAP = '0100010101000100';
   const GC_FOLD_TARGET_OFFSET = 5;
+  const QUERY_DISPLAY_ROW_COUNT = 5;
+  const QUERY_TABLE_Y = 108;
+  const QUERY_TABLE_ROW_H = 28;
+  const QUERY_TABLE_ROW_BODY_H = 22;
+  const QUERY_TABLE_BOTTOM_PAD = 10;
 
   function typeFont(size, weight = 800, family = 'Inter, system-ui, sans-serif') {
     const prefix = weight ? `${weight} ` : '';
@@ -605,11 +614,13 @@
       },
       storage: {
         regularFiles: ['file-0.pxl', 'file-1.pxl'],
-        objectEntries: ['obj-77'],
+        objectEntries: ['obj-7'],
         prevRegularFiles: ['file-0.pxl', 'file-1.pxl'],
-        prevObjectEntries: ['obj-77'],
+        prevObjectEntries: ['obj-7'],
         pendingFlushObject: null,
         flushedHot: null,
+        queryHotObject: null,
+        queryHotFile: null,
         compactionFile: null,
         staleRatio: 0.31,
         agingQueue: [],
@@ -618,25 +629,63 @@
         cleanup: 'idle'
       },
       query: {
-        id: 'q44',
         transTs: DEFAULT_QUERY_TS,
-        returnedRows: 18420,
-        active: false,
-        parallelism: 'split fan-out',
-        splits: [
-          { id: 'S0', kind: 'regular', title: 'Regular file split', source: 'file RG ranges', status: 'waiting', progress: .12, batches: 0, visible: 0 },
-          { id: 'S1', kind: 'active', title: 'Active memtable split', source: 'GetWriteBuffer RPC', status: 'waiting', progress: .10, batches: 0, visible: 0 },
-          { id: 'S2', kind: 'flushed', title: 'Flushed object split', source: 'immutable objects', status: 'waiting', progress: .10, batches: 0, visible: 0 }
-        ],
-        gate: {
-          state: 'waiting for source batches',
-          inputBatches: 0,
-          visibleBatches: 0,
-          bitmap: '0010100110',
-          rule: 'ts <= transTs && !deleteBit'
-        },
-        queueState: 'waiting',
-        operatorInput: 'waiting visible batches'
+        phase: 'idle',
+        baseBitmap: QUERY_BASE_BITMAP,
+        queryBitmap: QUERY_BITMAP,
+        deleteChain: ['(5,278)', '(9,282)', '(2,290)'],
+        dataSources: [
+          {
+            id: 'active',
+            title: 'active memtable',
+            origin: 'lane1.active',
+            kind: 'active',
+            color: 'replay',
+            rows: [
+              { id: 'a0', offset: 3, createTs: 287, value: 'pk160' },
+              { id: 'a1', offset: 4, createTs: 290, value: 'pk174' },
+              { id: 'a2', offset: 5, createTs: 288, value: 'pk181' }
+            ]
+          },
+          {
+            id: 'obj',
+            title: 'obj-7 block',
+            origin: 'storage.obj0',
+            kind: 'object',
+            color: 'storage',
+            rows: [
+              { id: 'o0', offset: 9, createTs: 284, value: 'pk121' },
+              { id: 'o1', offset: 10, createTs: 291, value: 'pk224' },
+              { id: 'o2', offset: 12, createTs: 285, value: 'pk244' }
+            ]
+          },
+          {
+            id: 'file0',
+            title: 'file-0.pxl',
+            origin: 'storage.file0',
+            kind: 'file',
+            color: 'storage',
+            rows: [
+              { id: 'f0r0', offset: 1, createTs: 282, value: 'row 01' },
+              { id: 'f0r1', offset: 2, createTs: 288, value: 'row 02' },
+              { id: 'f0r2', offset: 5, createTs: 287, value: 'row 05' },
+              { id: 'f0r3', offset: 6, createTs: 286, value: 'row 06' }
+            ]
+          },
+          {
+            id: 'file1',
+            title: 'file-1.pxl',
+            origin: 'storage.file1',
+            kind: 'file',
+            color: 'storage',
+            rows: [
+              { id: 'f1r0', offset: 7, createTs: 289, value: 'row 07' },
+              { id: 'f1r1', offset: 8, createTs: 291, value: 'row 08' },
+              { id: 'f1r2', offset: 9, createTs: 283, value: 'row 09' },
+              { id: 'f1r3', offset: 11, createTs: 286, value: 'row 11' }
+            ]
+          }
+        ]
       }
     };
   }
@@ -722,23 +771,18 @@
       m.index.operation = 'insert new + update primary';
     }
     if (scene === 'query') {
-      m.query.id = 'q45';
-      m.query.active = true;
+      m.query.phase = 'idle';
       m.query.transTs = DEFAULT_QUERY_TS;
-      m.tx.lwm = DEFAULT_QUERY_TS;
-      m.query.returnedRows = 0;
-      m.query.parallelism = 'IntraWorkerParallelism';
-      m.query.splits.forEach(split => {
-        split.status = 'waiting';
-        split.progress = .08;
-        split.batches = 0;
-        split.visible = 0;
-      });
-      m.query.gate.state = 'waiting for source batches';
-      m.query.gate.inputBatches = 0;
-      m.query.gate.visibleBatches = 0;
-      m.query.queueState = 'waiting';
-      m.query.operatorInput = 'waiting visible batches';
+      m.lanes[DETAIL_REPLAY_ID].activeRows = 7;
+      m.lanes[DETAIL_REPLAY_ID].immutable = 0;
+      m.lanes[DETAIL_REPLAY_ID].highlight = null;
+      m.lanes[DETAIL_REPLAY_ID].baseBitmap = m.query.baseBitmap;
+      m.lanes[DETAIL_REPLAY_ID].prevBaseBitmap = m.query.baseBitmap;
+      m.lanes[DETAIL_REPLAY_ID].deleteTs = m.query.deleteChain.slice(0, 2);
+      m.lanes[DETAIL_REPLAY_ID].prevDeleteTs = m.query.deleteChain.slice(0, 2);
+      m.lanes[DETAIL_REPLAY_ID].bitmapDeleteTs = [];
+      m.storage.objectEntries = ['obj-7'];
+      m.storage.regularFiles = ['file-0.pxl', 'file-1.pxl'];
     }
     if (scene === 'gc') {
       const l = m.lanes[DETAIL_REPLAY_ID];
@@ -938,21 +982,73 @@
       ...commitSequence('tx290', 291, 'update committed; HWM=291', 1)
     ],
     query: [
-      step(`Query begins with transTs=${DEFAULT_QUERY_TS}. All split readers use the same MVCC timestamp, so visibility is decided consistently after batches return.`, 3.8,
-        ['query', 'tx'], [tok('begin q45', 'query.left', 'tx.right', flow.query, .08, .72), tok(`transTs=${DEFAULT_QUERY_TS}`, 'tx.right', 'query.scheduler', flow.tx, .55, .96)],
-        m => { m.query.active = true; m.query.transTs = DEFAULT_QUERY_TS; m.tx.lwm = DEFAULT_QUERY_TS; m.query.gate.state = 'waiting for source batches'; }, 'mvcc', ['query']),
-      step('The planner/worker builds a split graph: regular file scan, active memtable RPC, and flushed-object read are independent source tasks.', 4.2,
-        ['query'], [tok('build split graph', 'query.scheduler', 'query.splitRegular', flow.query, .08, .62), tok('fan-out', 'query.scheduler', 'query.splitActive', flow.query, .16, .74), tok('fan-out', 'query.scheduler', 'query.splitFlushed', flow.query, .24, .86)],
-        m => { m.query.splits.forEach(split => { split.status = 'scheduled'; split.progress = .28; }); m.query.gate.state = 'waiting for parallel splits'; }, 'query', ['query']),
-      step('Source tasks run in parallel: regular RG batches, GetWriteBuffer active rows, and flushed immutable objects are fetched concurrently.', 4.6,
-        ['query', 'storage', 'lane1'], [tok('regular RG batch', 'storage.files', 'query.splitRegular', flow.storage, .08, .78), tok('active rows RPC', 'lane1.active', 'query.splitActive', flow.replay, .08, .70), tok('flushed object', 'storage.memtable', 'query.splitFlushed', flow.storage, .12, .82)],
-        m => { const [regular, active, flushed] = m.query.splits; regular.status = 'running'; regular.progress = .78; regular.batches = 3; active.status = 'fetched'; active.progress = .86; active.batches = 1; flushed.status = 'running'; flushed.progress = .72; flushed.batches = 2; m.query.gate.inputBatches = 0; m.query.gate.state = 'parallel reads running'; m.lanes[DETAIL_REPLAY_ID].highlight = 'active'; }, 'writeBuffer', ['query', 'flush']),
-      step('Returned batches merge at one VFoR gate. Hidden timestamps and delete-bit visibility decide which rows become visible batches.', 4.4,
-        ['query', 'lane1'], [tok('batch', 'query.splitRegular', 'query.gate', flow.query, .08, .58), tok('batch', 'query.splitActive', 'query.gate', flow.query, .12, .62), tok('batch', 'query.splitFlushed', 'query.gate', flow.query, .16, .66), tok('RG visibility', 'lane1.baseBitmap', 'query.gate', flow.visibility, .30, .82)],
-        m => { m.query.splits.forEach((split, i) => { split.status = 'queued'; split.progress = 1; split.visible = [2, 1, 1][i]; }); m.query.gate.inputBatches = 6; m.query.gate.visibleBatches = 4; m.query.gate.state = 'filtering by transTs + deleteBit'; m.query.queueState = 'visible batches queued'; m.lanes[DETAIL_REPLAY_ID].highlight = 'visibility'; }, 'visibility', ['query', 'visibility']),
-      step('Operators consume the merged visible-batch queue. They see a clean scan stream and do not care whether rows came from file, active memtable, or flushed object.', 4.2,
-        ['query'], [tok('visible batches', 'query.gate', 'query.queue', flow.visibility, .08, .55), tok('operator input', 'query.queue', 'query.operators', flow.query, .48, .92)],
-        m => { m.query.gate.state = 'done'; m.query.queueState = '4 visible batches'; m.query.operatorInput = 'visible batches only'; m.query.returnedRows = 18804; }, 'query', ['query'])
+      step(`Transaction Service returns queryTs=${DEFAULT_QUERY_TS}=HWM-1 for the read-only query.`, 3.2,
+        [], [],
+        m => { m.query.phase = 'snapshot'; m.query.transTs = DEFAULT_QUERY_TS; }, 'mvcc', [], 'queryTsMove'),
+      step('Visibility highlights baseTs, then enlarges baseBitmap in place.', 3.0,
+        ['lane1'], [],
+        m => { m.query.phase = 'bitmapBase'; m.lanes[DETAIL_REPLAY_ID].highlight = 'baseTs'; }, 'visibility', ['visibility'], 'queryBitmapBase'),
+      step(`Visibility checks delete timestamps with queryTs=${DEFAULT_QUERY_TS}; offsets 5 and 9 are eligible, offset 2 is not.`, 3.4,
+        ['lane1'], [],
+        m => { m.query.phase = 'bitmapCheck'; m.lanes[DETAIL_REPLAY_ID].highlight = null; }, 'visibility', ['visibility'], 'queryBitmapCheck'),
+      step('The selected delete-ts entries fold into the enlarged baseBitmap.', 3.6,
+        ['lane1'], [],
+        m => { m.query.phase = 'bitmapFold'; m.lanes[DETAIL_REPLAY_ID].highlight = null; }, 'visibility', ['visibility'], 'queryBitmapFold'),
+      step('The folded bitmap moves to the final query delete bitmap position.', 3.0,
+        ['lane1'], [],
+        m => { m.query.phase = 'bitmapMove'; m.lanes[DETAIL_REPLAY_ID].highlight = null; }, 'visibility', ['visibility'], 'queryBitmapMove'),
+
+      step('Read the active memtable first. Its rows float out and expand into the query work area.', 3.6,
+        ['lane1'], [],
+        m => { m.query.phase = 'activeRead'; m.lanes[DETAIL_REPLAY_ID].highlight = 'active'; }, 'writeBuffer', ['query'], 'queryRead'),
+      step('Filter active rows with create_ts <= queryTs.', 2.8,
+        ['lane1'], [tok('create_ts gate', 'queryOverlay.ts', 'queryOverlay.dataTop', flow.tx, .16, .54)],
+        m => { m.query.phase = 'activeCreate'; }, 'query', ['query'], 'queryCreateFilter'),
+      step('Filter active rows with bitmap != 1; bitmap cell 5 removes the deleted row.', 3.0,
+        ['lane1'], [tok('bitmap gate', 'queryOverlay.bitmap', 'queryOverlay.dataTop', flow.visibility, .14, .56)],
+        m => { m.query.phase = 'activeBitmap'; }, 'query', ['query', 'visibility'], 'queryBitmapFilter'),
+      step('The active memtable result remains visible for the operator input.', 2.2,
+        [], [], m => { m.query.phase = 'activeResult'; }, 'query', ['query'], 'queryResult'),
+
+      step('Read storage object obj-7 as a virtual file block.', 3.4,
+        [], [],
+        m => { m.query.phase = 'objRead'; m.lanes[DETAIL_REPLAY_ID].highlight = null; m.storage.queryHotObject = 'obj-7'; }, 'storage', ['query', 'storage'], 'queryRead'),
+      step('Filter obj-7 with create_ts <= queryTs.', 2.8,
+        [], [tok('create_ts gate', 'queryOverlay.ts', 'queryOverlay.dataTop', flow.tx, .16, .54)],
+        m => { m.query.phase = 'objCreate'; }, 'query', ['query'], 'queryCreateFilter'),
+      step('Filter obj-7 with bitmap != 1; bitmap cell 9 removes the deleted row.', 3.0,
+        [], [tok('bitmap gate', 'queryOverlay.bitmap', 'queryOverlay.dataTop', flow.visibility, .14, .56)],
+        m => { m.query.phase = 'objBitmap'; }, 'query', ['query', 'visibility'], 'queryBitmapFilter'),
+      step('The obj-7 result joins the visible data stream.', 2.2,
+        [], [], m => { m.query.phase = 'objResult'; }, 'query', ['query'], 'queryResult'),
+
+      step('Read regular file file-0.pxl from Storage.', 3.4,
+        [], [],
+        m => { m.query.phase = 'file0Read'; m.storage.queryHotFile = 'file-0.pxl'; }, 'storage', ['query', 'storage'], 'queryRead'),
+      step('Filter file-0.pxl with create_ts <= queryTs.', 2.8,
+        [], [tok('create_ts gate', 'queryOverlay.ts', 'queryOverlay.dataTop', flow.tx, .16, .54)],
+        m => { m.query.phase = 'file0Create'; }, 'query', ['query'], 'queryCreateFilter'),
+      step('Filter file-0.pxl with bitmap != 1.', 3.0,
+        [], [tok('bitmap gate', 'queryOverlay.bitmap', 'queryOverlay.dataTop', flow.visibility, .14, .56)],
+        m => { m.query.phase = 'file0Bitmap'; }, 'query', ['query', 'visibility'], 'queryBitmapFilter'),
+      step('The file-0.pxl result rows stay highlighted.', 2.2,
+        [], [], m => { m.query.phase = 'file0Result'; }, 'query', ['query'], 'queryResult'),
+
+      step('Read regular file file-1.pxl from Storage.', 3.4,
+        [], [],
+        m => { m.query.phase = 'file1Read'; m.storage.queryHotFile = 'file-1.pxl'; }, 'storage', ['query', 'storage'], 'queryRead'),
+      step('Filter file-1.pxl with create_ts <= queryTs.', 2.8,
+        [], [tok('create_ts gate', 'queryOverlay.ts', 'queryOverlay.dataTop', flow.tx, .16, .54)],
+        m => { m.query.phase = 'file1Create'; }, 'query', ['query'], 'queryCreateFilter'),
+      step('Filter file-1.pxl with bitmap != 1.', 3.0,
+        [], [tok('bitmap gate', 'queryOverlay.bitmap', 'queryOverlay.dataTop', flow.visibility, .14, .56)],
+        m => { m.query.phase = 'file1Bitmap'; }, 'query', ['query', 'visibility'], 'queryBitmapFilter'),
+      step('The file-1.pxl result rows stay highlighted.', 2.4,
+        [], [],
+        m => { m.query.phase = 'file1Result'; }, 'query', ['query'], 'queryResult'),
+      step('The query demo clears its transient query state.', 1.0,
+        [], [],
+        m => { m.query.phase = 'done'; m.lanes[DETAIL_REPLAY_ID].highlight = null; }, 'query', ['query'], 'queryResult')
     ],
     gc: [
       step(`Transaction Service sends safeTs=${DEFAULT_GC_SAFE_TS} to Retina.`, 3.0,
@@ -1108,7 +1204,6 @@
   }
 
   function gotoScene(scene, opts = {}) {
-    if (scene === 'query') return;
     if (!scenes[scene]) return;
     if (opts.manual) {
       state.autoPlay = false;
@@ -1141,6 +1236,8 @@
     if (model.storage) {
       model.storage.prevRegularFiles = [...model.storage.regularFiles];
       model.storage.prevObjectEntries = [...model.storage.objectEntries];
+      model.storage.queryHotObject = null;
+      model.storage.queryHotFile = null;
     }
     if (st.apply) st.apply(model);
     updateControls();
@@ -1287,6 +1384,8 @@
     drawReplayers(c);
     drawStorage(c);
     drawAsyncFlushMemtable(c);
+    drawQueryOverlay(c);
+    drawQueryTopFlows(c);
     drawTokens(c);
     drawCommitWait(c);
     if (state.flash > 0) {
@@ -1553,6 +1652,19 @@
       seen.add(key);
       drawFlow(t.path, t.color, c, t.arrowLabel || '', .30, 2.2);
     }
+  }
+
+  function drawQueryTopFlows(c) {
+    if (state.scene !== 'query') return;
+    const st = currentStep();
+    if (!['queryCreateFilter', 'queryBitmapFilter'].includes(st.anim)) return;
+    (st.tokens || []).forEach(t => {
+      const path = t.path || [];
+      const fromQueryGate = path.includes('queryOverlay.ts') || path.includes('queryOverlay.bitmap');
+      const toQueryData = path.some(part => typeof part === 'string' && part.startsWith('queryOverlay.data'));
+      if (!fromQueryGate || !toQueryData) return;
+      drawFlow(path, t.color, c, t.arrowLabel || '', .48, 2.6);
+    });
   }
 
   function pathKeyPart(part) {
@@ -1826,8 +1938,8 @@
     ctx.fillStyle = alpha(c.panel2, .72);
     ctx.strokeStyle = c.borderSoft;
     roundRect(x, y, w, h, 9, true, true);
-    const min = model.tx.lwm - 10;
-    const max = model.tx.hwm + 8;
+    const min = TX_WINDOW_MIN_TS;
+    const max = TX_WINDOW_MAX_TS;
     const lx = map(model.tx.lwm, min, max, x + 18, x + w - 18);
     const hx = map(model.tx.hwm, min, max, x + 18, x + w - 18);
     const lineY = y + h / 2;
@@ -2277,7 +2389,7 @@
   function drawReplayVisibility(x, y, w, h, lane, c) {
     const appendSettled = currentStep().anim === 'appendDeleteTs' && stepProgress() >= .82;
     const visibilityActive = state.detailFocus === 'visibility' || state.detailFocus === 'gc' ||
-      (lane.highlight === 'visibility' && !appendSettled) || lane.highlight === 'baseBitmap' || lane.highlight === 'foldEligible';
+      (lane.highlight === 'visibility' && !appendSettled) || lane.highlight === 'baseTs' || lane.highlight === 'baseBitmap' || lane.highlight === 'foldEligible';
     drawNeutralPanelBox(x, y, w, h, 'visibility structure', c, 9, visibilityActive);
 
     const layout = replayVisibilityLayout(x, y, w, h);
@@ -2290,9 +2402,12 @@
     const chainW = w - MODULE_CONTENT_PAD * 2;
     const chainPad = 8;
     const itemPad = 20;
-    ctx.fillStyle = visibilityActive ? alpha(flow.visibility, .10) : alpha(c.panel2, .78);
-    ctx.strokeStyle = visibilityActive ? alpha(flow.visibility, .48) : c.borderSoft;
-    ctx.lineWidth = visibilityActive ? 1.4 : 1;
+    const queryBitmapPhase = state.scene === 'query' &&
+      ['queryBitmapBase', 'queryBitmapCheck', 'queryBitmapFold', 'queryBitmapMove'].includes(currentStep().anim);
+    const chainActive = visibilityActive && !queryBitmapPhase;
+    ctx.fillStyle = chainActive ? alpha(flow.visibility, .10) : alpha(c.panel2, .78);
+    ctx.strokeStyle = chainActive ? alpha(flow.visibility, .48) : c.borderSoft;
+    ctx.lineWidth = chainActive ? 1.4 : 1;
     roundRect(chainX, chainY, chainW, chainH, 7, true, true);
     ctx.fillStyle = c.text;
     ctx.font = typeFont(TYPE.text, 800);
@@ -2301,20 +2416,42 @@
     const itemsY = chainY + 34;
     drawCompactDeleteTsItems(chainX + itemPad, itemsY, chainW - itemPad * 2, lane, c);
     drawFoldingDeleteTsItems(chainX + itemPad, itemsY, chainW - itemPad * 2, bitmapX, rowY, bitmapW, lane, c);
-    drawDeleteTsConditionPill(chainX + itemPad, itemsY + 32, chainW - itemPad * 2, lane, c);
+    drawDeleteTsConditionPill(chainX + itemPad, itemsY, chainW - itemPad * 2, lane, c);
+    drawQueryDeleteTsConditionPill(chainX + itemPad, itemsY, chainW - itemPad * 2, c);
   }
 
   function drawBaseTsLabel(lane, x, y, w, c) {
     const foldActive = currentStep().anim === 'foldDeleteTs';
+    const queryBaseTsActive = state.scene === 'query' && currentStep().anim === 'queryBitmapBase';
     const p = stepProgress();
     const showUpdatedBaseTs = !foldActive || p >= .72;
     const labelTs = showUpdatedBaseTs ? lane.baseTs : lane.prevBaseTs;
+    const highlighted = foldActive && showUpdatedBaseTs;
+    const text = `baseTs=${labelTs}`;
     ctx.save();
-    ctx.fillStyle = foldActive && showUpdatedBaseTs ? flow.gc : c.text;
-    ctx.font = typeFont(TYPE.text, foldActive ? 900 : 900);
+    ctx.font = typeFont(TYPE.text, 900);
     ctx.textAlign = 'left';
+    if (queryBaseTsActive) {
+      ctx.fillStyle = c.text;
+      fitText(text, x, y, w, 'left');
+      const flashWindow = .56;
+      let flash = 0;
+      if (p < flashWindow) {
+        const cycle = (p / flashWindow) * 2;
+        const local = cycle % 1;
+        flash = local < .68 ? 1 : 1 - ease(clamp((local - .68) / .32, 0, 1));
+      }
+      if (flash > 0) {
+        ctx.globalAlpha *= flash;
+        ctx.fillStyle = flow.gc;
+        fitText(text, x, y, w, 'left');
+      }
+      ctx.restore();
+      return;
+    }
+    ctx.fillStyle = highlighted ? flow.gc : c.text;
     if (foldActive && showUpdatedBaseTs) ctx.globalAlpha *= lerp(.72, 1, ease(clamp((p - .72) / .18, 0, 1)));
-    fitText(`baseTs=${labelTs}`, x, y, w, 'left');
+    fitText(text, x, y, w, 'left');
     ctx.restore();
   }
 
@@ -2323,14 +2460,37 @@
     const p = stepProgress();
     if (p < .12) return;
     const a = ease(clamp((p - .12) / .28, 0, 1));
-    const out = 1 - ease(clamp((p - .62) / .10, 0, 1));
-    if (out <= 0) return;
-    const pillW = Math.min(118, Math.max(86, w * .44));
-    const pillH = 24;
+    if (a <= 0) return;
+    const box = deleteTsConditionPillBox(x, y, w);
     ctx.save();
-    ctx.globalAlpha *= a * out;
-    drawPill(x + (w - pillW) / 2, y, pillW, pillH, 'ts <= safeTs', flow.visibility, c, true, 8);
+    ctx.globalAlpha *= a;
+    drawPill(box.x, box.y, box.w, box.h, 'ts <= safeTs', flow.visibility, c, true, 8);
     ctx.restore();
+  }
+
+  function drawQueryDeleteTsConditionPill(x, y, w, c) {
+    const st = currentStep();
+    if (state.scene !== 'query' || st.anim !== 'queryBitmapCheck') return;
+    const p = stepProgress();
+    const a = ease(clamp((p - .12) / .28, 0, 1));
+    if (a <= 0) return;
+    const box = deleteTsConditionPillBox(x, y, w);
+    ctx.save();
+    ctx.globalAlpha *= a;
+    drawPill(box.x, box.y, box.w, box.h, 'ts <= queryTs', flow.visibility, c, true, 8);
+    ctx.restore();
+  }
+
+  function deleteTsConditionPillBox(x, y, w) {
+    const layout = deleteTsItemLayout(w);
+    const col = 2;
+    const pillW = layout.itemW * 2 + layout.gapX;
+    return {
+      x: x + col * (layout.itemW + layout.gapX),
+      y: y + layout.itemH + layout.rowGap + 4,
+      w: pillW,
+      h: 24
+    };
   }
 
   function drawFixedDeleteBitmap(lane, x, y, w, c) {
@@ -2423,13 +2583,19 @@
       const row = Math.floor(i / columns);
       const ts = deleteTsValue(item);
       const eligible = lane.safeTs != null && ts <= lane.safeTs;
+      const queryEligible = queryDeleteTsHighlightReady() && ts <= model.query.transTs;
       const gcActive = foldEligibleHighlightReady() && lane.highlight === 'foldEligible' && eligible;
+      const queryFoldItemActive = st.anim !== 'queryBitmapFold' || stepProgress() < .88;
+      const queryActive = queryEligible && ['queryBitmapCheck', 'queryBitmapFold'].includes(st.anim) && queryFoldItemActive;
       const foldingEligible = foldingDeleteTs && eligible;
-      if (foldingEligible) return;
+      const queryFoldingEligible = st.anim === 'queryBitmapFold' && stepProgress() < .88 && queryActive;
+      if (foldingEligible || queryFoldingEligible) return;
       const appendVisible = st.anim !== 'appendDeleteTs' || !hideAppendingItem;
-      const active = gcActive || foldingEligible || (lane.highlight === 'visibility' && appendVisible && !appendSettled && i === visible.length - 1);
-      const color = gcActive || foldingEligible ? flow.gc : active || st.anim === 'appendDeleteTs' ? flow.delete : c.border;
-      drawPill(x + col * (itemW + gapX), y + row * (itemH + rowGap), itemW, itemH, item, color, c, active, 8);
+      const active = gcActive || queryActive || foldingEligible || (lane.highlight === 'visibility' && appendVisible && !appendSettled && i === visible.length - 1);
+      const color = gcActive || queryActive || foldingEligible ? flow.gc : active || st.anim === 'appendDeleteTs' ? flow.delete : c.border;
+      const itemX = x + col * (itemW + gapX);
+      const itemY = y + row * (itemH + rowGap);
+      drawPill(itemX, itemY, itemW, itemH, item, color, c, active, 8);
     });
     if (hideAppendingItem) {
       drawAppendingDeleteTsItem(x, y, itemW, itemH, gapX, rowGap, columns, rows, lane, c);
@@ -2446,6 +2612,14 @@
     if (currentStep().anim === 'foldDeleteTs') return true;
     if (activeReplayLane().highlight !== 'foldEligible') return true;
     return stepProgress() >= .72;
+  }
+
+  function queryDeleteTsHighlightReady() {
+    const st = currentStep();
+    if (state.scene !== 'query') return false;
+    if (st.anim === 'queryBitmapFold') return true;
+    if (st.anim !== 'queryBitmapCheck') return false;
+    return stepProgress() >= .50;
   }
 
   function drawFoldingDeleteTsItems(chainX, chainY, chainW, bitmapX, bitmapY, bitmapW, lane, c) {
@@ -2567,13 +2741,14 @@
       title: 'blocks',
       color: flow.storage,
       labels: storageObjectLabelsForDraw().slice(0, STORAGE_ITEM_CAPACITY),
-      hotLabel: model.storage.flushedHot
+      hotLabel: model.storage.flushedHot || model.storage.queryHotObject || queryStorageHotObject()
     }, c);
     drawStoragePanel(layout.files.x, layout.files.y, layout.files.w, layout.files.h, {
       title: 'files',
       color: flow.replay,
       labels: regularStorageFileLabelsForDraw(),
-      active: ['query', 'storageGc'].includes(state.detailFocus) || ['compactObjectsToFile', 'validRatioCheck', 'compactRegularFiles'].includes(currentStep().anim),
+      hotLabel: model.storage.queryHotFile || queryStorageHotFile(),
+      active: state.detailFocus === 'storageGc' || ['compactObjectsToFile', 'validRatioCheck', 'compactRegularFiles'].includes(currentStep().anim),
       maxItems: STORAGE_ITEM_CAPACITY
     }, c);
     drawStorageCompactionFileOverlay(c);
@@ -2586,6 +2761,19 @@
       if (previous.length) return [...previous];
     }
     return [...model.storage.objectEntries];
+  }
+
+  function queryStorageHotObject() {
+    if (state.scene !== 'query' || !model.query || !/^obj/.test(model.query.phase || '')) return null;
+    return 'obj-7';
+  }
+
+  function queryStorageHotFile() {
+    if (state.scene !== 'query' || !model.query) return null;
+    const phase = model.query.phase || '';
+    if (/^file0/.test(phase)) return 'file-0.pxl';
+    if (/^file1/.test(phase)) return 'file-1.pxl';
+    return null;
   }
 
   function drawStorageCompactionFileOverlay(c) {
@@ -2785,12 +2973,13 @@
       const compactedFile = isCompactionFile(labelText);
       const regularCompactionFile = isRegularCompactionFile(labelText);
       const compactingOldFile = isCompactingOldRegularFile(labelText);
+      const hotFile = labelText === String(panel.hotLabel || '');
       const fileAlpha = compactedFile ? compactionFileSettledAlpha() : regularCompactionFile ? regularCompactionFileSettledAlpha() : compactingOldFile ? regularCompactionOldFileAlpha() : 1;
       if (fileAlpha <= 0) return;
       const temporary = newFile && model.storage.newFileState === 'TEMPORARY_GC';
       const ratioCandidate = isValidRatioCandidateFile(labelText);
-      const color = compactingOldFile ? flow.delete : retired ? flow.delete : candidate || temporary || ratioCandidate ? flow.gc : newFile || compactedFile || regularCompactionFile ? flow.storage : panel.color;
-      const active = panel.active || candidate || retired || newFile || temporary || compactedFile || regularCompactionFile || compactingOldFile || ratioCandidate;
+      const color = compactingOldFile ? flow.delete : retired ? flow.delete : candidate || temporary || ratioCandidate ? flow.gc : hotFile || newFile || compactedFile || regularCompactionFile ? flow.storage : panel.color;
+      const active = panel.active || hotFile || candidate || retired || newFile || temporary || compactedFile || regularCompactionFile || compactingOldFile || ratioCandidate;
       const fileX = layout.xForIndex(i);
       ctx.save();
       ctx.globalAlpha *= fileAlpha;
@@ -2963,6 +3152,641 @@
 
   function displayStorageObjectLabel(label) {
     return String(label).replace(/obj-(\d+)$/i, (_, n) => `obj-${n.slice(-1)}`);
+  }
+
+  function drawQueryOverlay(c) {
+    if (state.scene !== 'query') return;
+    const q = model.query;
+    if (q.phase === 'done') return;
+    const layout = queryOverlayLayout();
+
+    ctx.save();
+    drawQueryTsBox(layout, q, c);
+    drawQueryVisibilityFold(layout, q, c);
+    drawQueryBitmapArea(layout, q, c);
+    drawQueryDataArea(layout, q, c);
+    ctx.restore();
+  }
+
+  function queryOverlayLayout() {
+    const tsBox = { x: 380, y: 130, w: 212, h: 62 };
+    const bitmapBox = { x: 620, y: 112, w: 570, h: 162 };
+    const dataArea = { x: 715, y: 318, w: 380, h: 324 };
+    const card = { w: 340, h: querySourceCardHeight(), gap: 22, y: dataArea.y + 52 };
+    return { tsBox, bitmapBox, dataArea, card };
+  }
+
+  function queryOverlayAnchors() {
+    const l = queryOverlayLayout();
+    const boxCenter = box => [box.x + box.w / 2, box.y + box.h / 2];
+    const boxTop = box => [box.x + box.w / 2, box.y];
+    const boxBottom = box => [box.x + box.w / 2, box.y + box.h];
+    const anchors = {
+      center: boxCenter(l.dataArea),
+      ts: boxBottom(l.tsBox),
+      bitmap: boxBottom(queryBitmapGroupBox(l)),
+      dataTop: boxTop(l.dataArea)
+    };
+    querySources(model.query).forEach((source, i) => {
+      anchors[`data${i}`] = boxCenter(querySourceSlotBox(l, source));
+    });
+    return anchors;
+  }
+
+  function drawQueryTsBox(layout, q, c) {
+    if (!queryPhaseAtLeast('snapshot')) return;
+    const move = currentStep().anim === 'queryTsMove' ? ease(clamp(stepProgress() / .82, 0, 1)) : 1;
+    const alphaIn = currentStep().anim === 'queryTsMove' ? clamp(stepProgress() / .16, 0, 1) : 1;
+    const finalBox = layout.tsBox;
+    const start = point('tx.hwm');
+    const b = currentStep().anim === 'queryTsMove'
+      ? {
+          x: lerp(start.x - finalBox.w / 2, finalBox.x, move),
+          y: lerp(start.y - finalBox.h / 2, finalBox.y, move),
+          w: finalBox.w,
+          h: finalBox.h
+        }
+      : finalBox;
+    ctx.save();
+    ctx.globalAlpha *= alphaIn;
+    ctx.fillStyle = c.elevated;
+    ctx.strokeStyle = alpha(flow.tx, .58);
+    ctx.lineWidth = 1.4;
+    shadow(c);
+    roundRect(b.x, b.y, b.w, b.h, 10, true, true);
+    ctx.shadowColor = 'transparent';
+    drawModuleIcon(b.x + 14, b.y + 16, 28, 'tx', flow.tx, c);
+    ctx.fillStyle = c.muted;
+    ctx.font = typeFont(11, 900);
+    ctx.textAlign = 'left';
+    fitText('HWM-1', b.x + 52, b.y + 23, 120, 'left');
+    ctx.fillStyle = flow.tx;
+    ctx.font = typeFont(TYPE.moduleTitle, 900);
+    fitText(`queryTs=${q.transTs}`, b.x + 52, b.y + 47, 142, 'left');
+    ctx.restore();
+  }
+
+  function drawQueryDataArea(layout, q, c) {
+    if (currentStep().anim === 'queryBitmapMove' || !queryPhaseAtLeast('activeRead')) return;
+    const sources = querySources(q);
+    const visible = sources
+      .map((source, i) => ({ source, i, stage: querySourceDrawStage(source, q) }))
+      .filter(item => item.stage);
+    if (!visible.length) return;
+
+    const area = layout.dataArea;
+    ctx.save();
+    ctx.fillStyle = c.elevated;
+    ctx.strokeStyle = alpha(flow.query, .28);
+    ctx.lineWidth = 1;
+    roundRect(area.x, area.y, area.w, area.h, 12, true, true);
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.subTitle, 900);
+    ctx.textAlign = 'left';
+    fitText('Data read and filter', area.x + 18, area.y + 28, 260, 'left');
+    ctx.restore();
+
+    visible.forEach(({ source, stage }) => {
+      const target = querySourceSlotBox(layout, source);
+      const move = queryAnimatedSourceBox(source, target, stage);
+      drawQuerySourceCard(move.box, source, stage, c, q, move);
+    });
+  }
+
+  function queryBitmapGroupBox(layout) {
+    return {
+      x: layout.bitmapBox.x,
+      y: layout.bitmapBox.y,
+      w: layout.bitmapBox.w,
+      h: 124
+    };
+  }
+
+  function drawQueryBitmapGroupCard(box, bits, c, opts = {}) {
+    ctx.save();
+    ctx.globalAlpha *= opts.alpha == null ? 1 : opts.alpha;
+    ctx.fillStyle = c.elevated;
+    ctx.strokeStyle = alpha(flow.visibility, .45);
+    ctx.lineWidth = 1.3;
+    shadow(c);
+    roundRect(box.x, box.y, box.w, box.h, 10, true, true);
+    ctx.shadowColor = 'transparent';
+
+    ctx.fillStyle = c.text;
+    ctx.font = typeFont(TYPE.subTitle, 900);
+    ctx.textAlign = 'left';
+    fitText('query delete bitmap', box.x + 20, box.y + 30, 220, 'left');
+
+    drawQueryPlainBitmapCells(box.x + 24, box.y + 58, box.w - 48, 28, bits, c, {
+      foldedOffsets: opts.foldedOffsets || []
+    });
+    ctx.restore();
+  }
+
+  function drawQueryBitmapArea(layout, q, c) {
+    if (!queryPhaseAtLeast('bitmapMove')) return;
+    if (currentStep().anim === 'queryBitmapMove') return;
+    drawQueryBitmapGroupCard(queryBitmapGroupBox(layout), q.queryBitmap, c);
+  }
+
+  function drawQueryVisibilityFold(layout, q, c) {
+    const anim = currentStep().anim;
+    const active = ['queryBitmapBase', 'queryBitmapCheck', 'queryBitmapFold', 'queryBitmapMove'].includes(anim);
+    if (!active) return;
+    const p = stepProgress();
+    const geom = queryVisibilityFoldGeometry(layout);
+
+    if (anim === 'queryBitmapMove') {
+      const t = ease(clamp(p / .78, 0, 1));
+      const box = lerpRect(geom.moveGroupStartBox, geom.targetBox, t);
+      drawQueryBitmapGroupCard(box, q.queryBitmap, c);
+      return;
+    }
+
+    if (anim === 'queryBitmapFold') {
+      drawQueryOriginalFoldItems(geom, q, c);
+    }
+    let bitmapBox = geom.bitmapBox;
+    let baseBitmapAlpha = 1;
+    let baseBitmapBackgroundAlpha = 1;
+    if (anim === 'queryBitmapBase') {
+      const zoom = ease(clamp((p - .62) / .30, 0, 1));
+      bitmapBox = lerpRect(geom.baseBitmapStartBox, geom.bitmapBox, zoom);
+      baseBitmapAlpha = ease(clamp((p - .60) / .16, 0, 1));
+      baseBitmapBackgroundAlpha = ease(clamp((p - .50) / .42, 0, 1));
+    }
+    drawQueryFoldBitmapCard(bitmapBox, queryFoldBitsForDraw(q), c, {
+      alpha: baseBitmapAlpha,
+      backgroundAlpha: baseBitmapBackgroundAlpha,
+      foldedOffsets: queryFoldedOffsetsForDraw(q)
+    });
+  }
+
+  function queryVisibilityFoldGeometry(layout) {
+    const { visibility } = replayerPanelLayout();
+    const v = replayVisibilityLayout(visibility.x, visibility.y, visibility.w, visibility.h);
+    const chainX = visibility.x + MODULE_CONTENT_PAD;
+    const chainW = visibility.w - MODULE_CONTENT_PAD * 2;
+    const bitmapMetrics = bitmapCellMetrics(v.bitmapX, v.bitmapW);
+    const sourceBitmapW = bitmapMetrics.cellW * 16 + bitmapMetrics.gap * 15;
+    const bitmapBoxH = 40;
+    const bitmapTop = clamp(
+      v.rowY - 12,
+      visibility.y + PANEL_TITLE_Y + 8,
+      v.chainY - bitmapBoxH - 8
+    );
+    const bitmapBox = {
+      x: chainX,
+      y: bitmapTop,
+      w: chainW,
+      h: bitmapBoxH
+    };
+    const baseBitmapStartBox = {
+      x: bitmapMetrics.startX - 6,
+      y: v.rowY - 6,
+      w: sourceBitmapW + 12,
+      h: bitmapMetrics.cellH + 12
+    };
+    return {
+      visibility,
+      v,
+      baseTsBox: { x: v.rowX - 6, y: v.rowY - 18, w: v.labelW + 4, h: 32 },
+      baseBitmapBox: { x: v.bitmapX - 6, y: v.rowY - 18, w: v.bitmapW + 12, h: 34 },
+      baseBitmapStartBox,
+      chainBox: { x: chainX, y: v.chainY, w: chainW, h: v.chainH },
+      itemX: chainX + 20,
+      itemsY: v.chainY + 34,
+      itemW: Math.min(90, Math.floor((chainW - 40 - 6 * 3) / 4)),
+      bitmapBox,
+      moveGroupStartBox: {
+        x: bitmapBox.x - 10,
+        y: bitmapBox.y - 52,
+        w: bitmapBox.w + 20,
+        h: queryBitmapGroupBox(layout).h
+      },
+      targetBox: {
+        ...queryBitmapGroupBox(layout)
+      }
+    };
+  }
+
+  function lerpRect(a, b, t) {
+    return {
+      x: lerp(a.x, b.x, t),
+      y: lerp(a.y, b.y, t),
+      w: lerp(a.w, b.w, t),
+      h: lerp(a.h, b.h, t)
+    };
+  }
+
+  function queryOriginalChainItemBox(geom, layout, index) {
+    const col = index % layout.columns;
+    const row = Math.floor(index / layout.columns);
+    return {
+      x: geom.itemX + col * (layout.itemW + layout.gapX),
+      y: geom.itemsY + row * (layout.itemH + layout.rowGap),
+      w: layout.itemW,
+      h: layout.itemH
+    };
+  }
+
+  function drawQueryOriginalFoldItems(geom, q, c) {
+    if (currentStep().anim !== 'queryBitmapFold') return;
+    const p = stepProgress();
+    if (p >= .88) return;
+    const t = ease(clamp(p / .78, 0, 1));
+    const layout = deleteTsItemLayout(geom.chainBox.w - 40);
+    (q.deleteChain || []).forEach((item, i) => {
+      if (deleteTsValue(item) > q.transTs) return;
+      const offset = deleteOffsetValue(item);
+      if (!Number.isFinite(offset)) return;
+      const box = queryOriginalChainItemBox(geom, layout, i);
+      const start = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+      const target = queryFoldBitmapCellCenter(geom.bitmapBox, offset);
+      const x = lerp(start.x, target.x, t);
+      const y = lerp(start.y, target.y, t);
+      const alphaOut = 1 - ease(clamp((p - .62) / .24, 0, 1));
+      ctx.save();
+      ctx.globalAlpha *= alphaOut;
+      ctx.translate(x, y);
+      ctx.scale(lerp(1, .82, t), lerp(1, .82, t));
+      drawPill(-box.w / 2, -box.h / 2, box.w, box.h, item, flow.gc, c, true, 8);
+      ctx.restore();
+    });
+  }
+
+  function drawQueryFoldBitmapCard(box, bits, c, opts = {}) {
+    ctx.save();
+    const inheritedAlpha = ctx.globalAlpha;
+    const contentAlpha = opts.alpha == null ? 1 : opts.alpha;
+    const backgroundAlpha = opts.backgroundAlpha == null ? 1 : opts.backgroundAlpha;
+    const cellsY = box.y + (box.h - 28) / 2;
+    const cellsX = box.x + 14;
+    const cellsW = box.w - 28;
+    ctx.globalAlpha = inheritedAlpha * backgroundAlpha;
+    ctx.fillStyle = c.elevated;
+    ctx.strokeStyle = alpha(flow.visibility, .36);
+    ctx.lineWidth = 1.1;
+    roundRect(box.x, box.y, box.w, box.h, 7, true, true);
+    ctx.globalAlpha = inheritedAlpha * contentAlpha;
+    drawQueryPlainBitmapCells(cellsX, cellsY, cellsW, 28, bits, c, {
+      foldedOffsets: opts.foldedOffsets || []
+    });
+    ctx.restore();
+  }
+
+  function drawQueryPlainBitmapCells(x, y, w, h, bits, c, opts = {}) {
+    const len = 16;
+    const gap = 5;
+    const cellW = Math.max(8, (w - gap * (len - 1)) / len);
+    const value = String(bits || '').padEnd(len, '0').slice(0, len);
+    const folded = new Set(opts.foldedOffsets || []);
+    for (let i = 0; i < len; i++) {
+      const on = value[i] === '1';
+      const justFolded = on && folded.has(i);
+      const cellX = x + i * (cellW + gap);
+      const color = justFolded ? flow.gc : flow.delete;
+      ctx.fillStyle = on ? alpha(color, justFolded ? .58 : .46) : alpha(c.border, .22);
+      ctx.strokeStyle = on ? alpha(color, justFolded ? .88 : .70) : alpha(c.border, .56);
+      ctx.lineWidth = on ? 1.2 : 1;
+      roundRect(cellX, y, cellW, h, 3, true, true);
+    }
+  }
+
+  function queryPlainBitmapCellCenter(x, y, w, h, offset) {
+    const len = 16;
+    const gap = 5;
+    const cellW = Math.max(8, (w - gap * (len - 1)) / len);
+    return {
+      x: x + offset * (cellW + gap) + cellW / 2,
+      y: y + h / 2
+    };
+  }
+
+  function queryFoldBitmapCellCenter(box, offset) {
+    const cellsY = box.y + (box.h - 28) / 2;
+    return queryPlainBitmapCellCenter(box.x + 14, cellsY, box.w - 28, 28, offset);
+  }
+
+  function queryFoldBitsForDraw(q) {
+    if (currentStep().anim !== 'queryBitmapFold') return q.baseBitmap;
+    const p = stepProgress();
+    const bits = String(q.baseBitmap || '').padEnd(16, '0').slice(0, 16).split('');
+    (q.deleteChain || []).forEach((item, i) => {
+      if (deleteTsValue(item) > q.transTs || p <= .34 + i * .18) return;
+      const offset = deleteOffsetValue(item);
+      if (Number.isFinite(offset) && offset >= 0 && offset < bits.length) bits[offset] = '1';
+    });
+    return bits.join('');
+  }
+
+  function queryFoldedOffsetsForDraw(q) {
+    if (currentStep().anim !== 'queryBitmapFold') return [];
+    const p = stepProgress();
+    if (p >= .88) return [];
+    return queryEligibleFoldOffsets(q).filter(({ index }) => p > .34 + index * .18).map(({ offset }) => offset);
+  }
+
+  function queryEligibleFoldOffsets(q) {
+    return (q.deleteChain || []).map((item, index) => ({
+      index,
+      offset: deleteOffsetValue(item),
+      ts: deleteTsValue(item)
+    })).filter(item =>
+      Number.isFinite(item.offset) &&
+      item.offset >= 0 &&
+      item.offset < 16 &&
+      item.ts <= q.transTs
+    );
+  }
+
+  function drawQuerySourceCard(box, source, stage, c, q, move) {
+    const stageRank = queryStageRank(stage);
+    const sourceColor = flow[source.color] || flow.storage;
+    const detailsVisible = stage !== 'read' || move.t > .64;
+    const pulse = querySourceIsPulsing(source, q);
+    const pulseAlpha = pulse ? .12 + .10 * Math.sin(state.stepClock * 10) : 0;
+
+    ctx.save();
+    ctx.globalAlpha *= move.alpha;
+    ctx.fillStyle = c.elevated;
+    ctx.strokeStyle = alpha(sourceColor, .58);
+    ctx.lineWidth = 1.4;
+    shadow(c);
+    roundRect(box.x, box.y, box.w, box.h, 9, true, true);
+    ctx.shadowColor = 'transparent';
+
+    ctx.fillStyle = alpha(sourceColor, c.dark ? .16 : .10);
+    roundRect(box.x + 8, box.y + 8, box.w - 16, 34, 7, true, false);
+    ctx.fillStyle = sourceColor;
+    ctx.font = typeFont(13, 900);
+    ctx.textAlign = 'left';
+    fitText(source.title, box.x + 18, box.y + 30, box.w - 36, 'left');
+
+    const pillGap = 10;
+    const pillAreaW = box.w - 32;
+    const queryTsPillW = Math.round((pillAreaW - pillGap) * .60);
+    const bitmapPillW = pillAreaW - pillGap - queryTsPillW;
+    const createConditionAlpha = detailsVisible ? queryConditionAlpha('create', stage) : 0;
+    const bitmapConditionAlpha = detailsVisible ? queryConditionAlpha('bitmap', stage) : 0;
+    if (stageRank >= 1 && createConditionAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha *= createConditionAlpha;
+      drawPill(box.x + 16, box.y + 58, queryTsPillW, 23, 'create_ts <= queryTs', flow.tx, c, true, 8);
+      ctx.restore();
+    }
+    if (stageRank >= 2 && bitmapConditionAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha *= bitmapConditionAlpha;
+      drawPill(box.x + 16 + queryTsPillW + pillGap, box.y + 58, bitmapPillW, 23, 'bitmap != 1', flow.visibility, c, true, 8);
+      ctx.restore();
+    }
+
+    if (!detailsVisible) {
+      ctx.fillStyle = alpha(sourceColor, .18);
+      roundRect(box.x + 20, box.y + 78, box.w - 40, 56, 8, true, false);
+      ctx.fillStyle = c.muted;
+      ctx.font = typeFont(TYPE.text, 900);
+      ctx.textAlign = 'center';
+      fitText('loading rows...', box.x + box.w / 2 - 70, box.y + 112, 140, 'center');
+      ctx.restore();
+      return;
+    }
+
+    drawQueryRows(box, source, stage, c, q, pulseAlpha);
+    ctx.restore();
+  }
+
+  function drawQueryRows(box, source, stage, c, q, pulseAlpha) {
+    const rows = queryDisplayRows(source);
+    const x = box.x + 14;
+    const y = box.y + QUERY_TABLE_Y;
+    const rowH = QUERY_TABLE_ROW_H;
+    const stageRank = queryEffectiveStageRank(stage);
+    const resultReveal = queryResultRevealAlpha();
+    const rowW = box.w - 28;
+    const dataColW = 60;
+    const createColW = 60;
+    const totalColsW = dataColW * 3 + createColW;
+    const colGap = Math.max(10, (rowW - totalColsW) / 3);
+    const colsStart = x + Math.max(0, (rowW - (totalColsW + colGap * 3)) / 2);
+    const col1 = { x: colsStart, w: dataColW };
+    const col2 = { x: col1.x + dataColW + colGap, w: dataColW };
+    const ellipsis = { x: col2.x + dataColW + colGap, w: dataColW };
+    const create = { x: ellipsis.x + dataColW + colGap, w: createColW };
+
+    ctx.fillStyle = c.muted;
+    ctx.font = typeFont(10, 900);
+    ctx.textAlign = 'center';
+    fitText('col1', col1.x, y - 8, col1.w, 'center');
+    fitText('col2', col2.x, y - 8, col2.w, 'center');
+    fitText('...', ellipsis.x, y - 8, ellipsis.w, 'center');
+    fitText('create_ts', create.x, y - 8, create.w, 'center');
+
+    rows.forEach((displayRow, i) => {
+      const yy = y + i * rowH;
+      const row = displayRow.row;
+      const isEllipsisRow = displayRow.kind === 'ellipsis' || !row;
+      const rowNo = displayRow.label || String(i + 1);
+      const status = row ? queryRowStageStatus(row, q, stage) : null;
+      const dropped = !isEllipsisRow && (status.createDropped || status.bitmapDropped);
+      const dropProgress = dropped ? queryFilterDropProgress(status) : 0;
+      const visibleResult = !isEllipsisRow && stageRank >= 3 && status.visible && resultReveal > 0;
+
+      ctx.save();
+      ctx.globalAlpha *= isEllipsisRow ? .72 : 1;
+      if (visibleResult) {
+        ctx.fillStyle = alpha(flow.query, (.14 + pulseAlpha) * resultReveal);
+        ctx.strokeStyle = alpha(flow.query, (.58 + pulseAlpha) * resultReveal);
+      } else {
+        ctx.fillStyle = alpha(c.panel, .82);
+        ctx.strokeStyle = c.borderSoft;
+      }
+      ctx.lineWidth = visibleResult ? 1.5 : 1;
+      roundRect(x, yy, rowW, QUERY_TABLE_ROW_BODY_H, 5, true, true);
+
+      if (dropped) {
+        ctx.save();
+        ctx.globalAlpha *= dropProgress;
+        ctx.fillStyle = alpha(flow.delete, c.dark ? .16 : .10);
+        ctx.strokeStyle = alpha(flow.delete, .52);
+        ctx.lineWidth = 1;
+        roundRect(x, yy, rowW, QUERY_TABLE_ROW_BODY_H, 5, true, true);
+        ctx.restore();
+      }
+
+      ctx.globalAlpha *= dropped ? lerp(1, .46, dropProgress) : 1;
+      ctx.fillStyle = isEllipsisRow ? c.muted : dropped && dropProgress > .45 ? flow.delete : c.text;
+      ctx.font = typeFont(10.5, 900);
+      ctx.textAlign = 'center';
+      fitText(isEllipsisRow ? '...' : `r${rowNo}c1`, col1.x, yy + 15, col1.w, 'center');
+      fitText(isEllipsisRow ? '...' : `r${rowNo}c2`, col2.x, yy + 15, col2.w, 'center');
+      fitText(isEllipsisRow ? '...' : rowNo === 'n' ? 'rncm' : '...', ellipsis.x, yy + 15, ellipsis.w, 'center');
+      fitText(isEllipsisRow ? '...' : String(row.createTs), create.x, yy + 15, create.w, 'center');
+
+      if (dropped) {
+        ctx.strokeStyle = alpha(flow.delete, .72 * dropProgress);
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(x + 8, yy + 11);
+        ctx.lineTo(x + 8 + (rowW - 16) * dropProgress, yy + 11);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
+
+  function queryDisplayRows(source) {
+    const sourceRows = source.rows || [];
+    const frontRows = [];
+    for (let index = 0; index < QUERY_DISPLAY_ROW_COUNT - 2; index++) {
+      frontRows.push({
+        kind: 'row',
+        row: sourceRows[index] || null,
+        label: String(index + 1)
+      });
+    }
+    const lastSourceRow = sourceRows[sourceRows.length - 1] || null;
+    return [
+      ...frontRows,
+      { kind: 'ellipsis' },
+      { kind: 'row', row: lastSourceRow, label: 'n' }
+    ];
+  }
+
+  function queryPhaseAtLeast(phase) {
+    const order = [
+      'idle', 'snapshot', 'bitmapBase', 'bitmapCheck', 'bitmapFold', 'bitmapMove',
+      'activeRead', 'activeCreate', 'activeBitmap', 'activeResult',
+      'objRead', 'objCreate', 'objBitmap', 'objResult',
+      'file0Read', 'file0Create', 'file0Bitmap', 'file0Result',
+      'file1Read', 'file1Create', 'file1Bitmap', 'file1Result', 'done'
+    ];
+    const current = order.indexOf(model.query.phase || 'idle');
+    const target = order.indexOf(phase);
+    return target >= 0 && current >= target;
+  }
+
+  function querySources(q) {
+    return q.dataSources || [];
+  }
+
+  function querySourceSlotBox(layout, source) {
+    return {
+      x: layout.dataArea.x + (layout.dataArea.w - layout.card.w) / 2,
+      y: layout.card.y,
+      w: layout.card.w,
+      h: querySourceCardHeight(source)
+    };
+  }
+
+  function querySourceCardHeight() {
+    return QUERY_TABLE_Y + (QUERY_DISPLAY_ROW_COUNT - 1) * QUERY_TABLE_ROW_H + QUERY_TABLE_ROW_BODY_H + QUERY_TABLE_BOTTOM_PAD;
+  }
+
+  function querySourceDrawStage(source, q) {
+    if (q.phase === 'done') return null;
+    const parts = queryPhaseParts(q.phase);
+    if (!parts) return null;
+    return source.id === parts.sourceId ? parts.stage : null;
+  }
+
+  function queryPhaseParts(phase) {
+    const m = /^(active|obj|file0|file1)(Read|Create|Bitmap|Result)$/.exec(phase || '');
+    if (!m) return null;
+    return { sourceId: m[1], stage: m[2].toLowerCase() };
+  }
+
+  function queryStageRank(stage) {
+    return { read: 0, create: 1, bitmap: 2, result: 3 }[stage] ?? 0;
+  }
+
+  function queryResultRevealAlpha() {
+    if (currentStep().anim !== 'queryResult') return 1;
+    return ease(clamp((stepProgress() - .28) / .22, 0, 1));
+  }
+
+  function queryConditionAlpha(kind, stage) {
+    const rank = queryStageRank(stage);
+    const anim = currentStep().anim;
+    const p = stepProgress();
+    const timing = queryConditionTiming(kind);
+    if (kind === 'create') {
+      if (rank < 1) return 0;
+      if (anim === 'queryCreateFilter') return ease(clamp((p - timing.conditionStart) / (timing.conditionEnd - timing.conditionStart), 0, 1));
+      return 1;
+    }
+    if (kind === 'bitmap') {
+      if (rank < 2) return 0;
+      if (anim === 'queryBitmapFilter') return ease(clamp((p - timing.conditionStart) / (timing.conditionEnd - timing.conditionStart), 0, 1));
+      return 1;
+    }
+    return 0;
+  }
+
+  function queryConditionTiming(kind) {
+    return kind === 'bitmap'
+      ? { conditionStart: .60, conditionEnd: .74, filterStart: .88 }
+      : { conditionStart: .58, conditionEnd: .72, filterStart: .86 };
+  }
+
+  function queryEffectiveStageRank(stage) {
+    const rank = queryStageRank(stage);
+    const anim = currentStep().anim;
+    const p = stepProgress();
+    if (anim === 'queryCreateFilter') return p >= queryConditionTiming('create').filterStart ? Math.min(rank, 1) : 0;
+    if (anim === 'queryBitmapFilter') return p >= queryConditionTiming('bitmap').filterStart ? Math.min(rank, 2) : Math.min(rank, 1);
+    return rank;
+  }
+
+  function queryFilterDropProgress(status) {
+    const anim = currentStep().anim;
+    const p = stepProgress();
+    if (anim === 'queryCreateFilter' && status.createDropped) {
+      const timing = queryConditionTiming('create');
+      return ease(clamp((p - timing.filterStart) / (1 - timing.filterStart), 0, 1));
+    }
+    if (anim === 'queryBitmapFilter' && status.bitmapDropped) {
+      const timing = queryConditionTiming('bitmap');
+      return ease(clamp((p - timing.filterStart) / (1 - timing.filterStart), 0, 1));
+    }
+    return 1;
+  }
+
+  function queryAnimatedSourceBox(source, target, stage) {
+    const isCurrentRead = stage === 'read' && currentStep().anim === 'queryRead';
+    if (!isCurrentRead) return { box: target, alpha: 1, t: 1 };
+    const p = ease(clamp(stepProgress() / .82, 0, 1));
+    const start = point(source.origin || 'storage.files');
+    const targetCenter = { x: target.x + target.w / 2, y: target.y + target.h / 2 };
+    const scale = lerp(.32, 1, p);
+    const w = target.w * scale;
+    const h = target.h * scale;
+    const cx = lerp(start.x, targetCenter.x, p);
+    const cy = lerp(start.y, targetCenter.y, p);
+    return { box: { x: cx - w / 2, y: cy - h / 2, w, h }, alpha: clamp(p * 1.35, 0, 1), t: p };
+  }
+
+  function querySourceIsPulsing(source, q) {
+    if (currentStep().anim !== 'queryResult') return false;
+    if (q.phase === 'done') return true;
+    const parts = queryPhaseParts(q.phase);
+    return parts && parts.sourceId === source.id;
+  }
+
+  function queryRowStageStatus(row, q, stage) {
+    const rank = queryEffectiveStageRank(stage);
+    const created = row.createTs <= q.transTs;
+    const deleted = queryDeleteBit(row.offset, q);
+    const createDropped = rank >= 1 && !created;
+    const bitmapDropped = rank >= 2 && created && deleted;
+    const visible = rank < 1 ? true : rank < 2 ? created : created && !deleted;
+    return { created, deleted, createDropped, bitmapDropped, visible };
+  }
+
+  function queryDeleteBit(offset, q) {
+    const bits = String(q.queryBitmap || '').padEnd(16, '0');
+    return bits[offset] === '1';
   }
 
   function queryLayout(r, splits) {
@@ -3144,6 +3968,11 @@
 
   function point(name) {
     if (Array.isArray(name)) return { x: name[0], y: name[1] };
+    const queryOverlay = /^queryOverlay\.(.+)$/.exec(name);
+    if (queryOverlay) {
+      const anchors = queryOverlayAnchors();
+      return arrPoint(anchors[queryOverlay[1]] || anchors.center);
+    }
     const lane = /^lane([0-2])\.(.+)$/.exec(name);
     if (lane) {
       const i = Number(lane[1]);
@@ -3192,6 +4021,22 @@
     const storageNewFileCenter = storageLayout
       ? [storageLayout.files.x + storageLayout.files.w * .78, storageLayout.files.y + storageLayout.files.h / 2]
       : [r.x + r.w * .86, fallbackStorageY];
+    const storageObjectCenter = index => {
+      if (!storageLayout) return storageMemtableCenter;
+      const labels = storageObjectLabelsForDraw().slice(0, STORAGE_ITEM_CAPACITY);
+      const layout = flushedMemtableObjectLayout(storageLayout.memtable, labels);
+      if (!layout.visibleLabels.length) return storageMemtableCenter;
+      const i = clamp(index, 0, layout.visibleLabels.length - 1);
+      return [layout.xForIndex(i) + layout.objW / 2, layout.objY + layout.objH / 2];
+    };
+    const storageFileCenter = index => {
+      if (!storageLayout) return storageFilesCenter;
+      const labels = regularStorageFileLabelsForDraw();
+      const layout = flushedMemtableObjectLayout(storageLayout.files, labels, STORAGE_ITEM_CAPACITY, 'left');
+      if (!layout.visibleLabels.length) return storageFilesCenter;
+      const i = clamp(index, 0, layout.visibleLabels.length - 1);
+      return [layout.xForIndex(i) + layout.objW / 2, layout.objY + layout.objH / 2];
+    };
     const querySplit = i => query && query.splitBoxes[i]
       ? [query.splitBoxes[i].x + query.splitBoxes[i].w / 2, query.splitBoxes[i].y + query.splitBoxes[i].h / 2]
       : [r.x + r.w / 2, r.y + r.h / 2];
@@ -3260,8 +4105,12 @@
       window: [r.x + r.w / 2, txWindowY],
       blocks: storageMemtableCenter,
       objects: storageMemtableCenter,
+      obj0: storageObjectCenter(0),
+      obj1: storageObjectCenter(1),
       memtable: storageMemtableCenter,
       files: storageFilesCenter,
+      file0: storageFileCenter(0),
+      file1: storageFileCenter(1),
       aging: storageAgingCenter,
       newFile: storageNewFileCenter,
       storage: [r.x + r.w * .76, r.y + r.h]
