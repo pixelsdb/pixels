@@ -16,12 +16,7 @@ and one order of magnitude lower data-change throughput.
 
 ## Interactive Demo
 
-<!-- Demo preview placeholder:
-     Add a screenshot or GIF at assets/retina-demo.png and uncomment the line below.
-     [![Pixels-Retina interactive demo](assets/retina-demo.png)](retina.html)
--->
-
-[Open the Pixels-Retina interactive demo](retina.html).
+[Open the Pixels-Retina interactive demo](https://htmlpreview.github.io/?https://github.com/pixelsdb/pixels/blob/master/pixels-retina/retina.html).
 
 This demo shows Pixels-Retina in action.
 
