@@ -125,7 +125,7 @@
         <dep.apache-httpclient.version>4.5.13</dep.apache-httpclient.version>
         <!-- apache httpclient-4.5.13 uses httpcore-4.4.13, however, awssdk:apache-client-2.30.17 uses httpcore-4.4.16 -->
         <dep.apache-httpcore.version>4.4.16</dep.apache-httpcore.version>
-        <dep.apache-calcite.version>1.32.0</dep.apache-calcite.version>
+        <dep.apache-calcite.version>1.42.0</dep.apache-calcite.version>
         <dep.apache-parquet.version>1.13.0</dep.apache-parquet.version>
 
         <!--profiling-->
