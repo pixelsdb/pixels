@@ -14,11 +14,12 @@ replay throughput, without compromising query performance or resource cost-effic
 significantly outperforming state-of-the-art lakehouses, Iceberg and Paimon, which provides minute-level data freshness
 and one order of magnitude lower data-change throughput.
 
-## Interactive Demo
+## Visualization
 
-[Open the Pixels-Retina interactive demo](https://htmlpreview.github.io/?https://github.com/pixelsdb/pixels/blob/master/pixels-retina/retina.html).
+We provide an [interactive animation](https://htmlpreview.github.io/?https://github.com/pixelsdb/pixels/blob/master/pixels-retina/retina.html) in your browser to present how Retina works.
 
-This demo shows Pixels-Retina in action.
+In the default view of this animation, we show the replay progress of an example mirror transaction that inserts a tuple, delete it, and update another tuple.
+You can also click the buttons on the left bar to see the animations of detailed scenarios or stages, such as the replay of insert-only, delete-only, update-only mirror transactions, the asynchronous garbage collection behind transaction replay, and the VFoR during query processing.
 
 ## Components
 
