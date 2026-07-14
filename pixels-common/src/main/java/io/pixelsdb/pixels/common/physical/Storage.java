@@ -44,6 +44,7 @@ public interface Storage
         file,  // local fs
         s3,    // Amazon S3
         minio, // Minio
+        cos,   // Tencent Cloud COS
         redis, // Redis
         gcs,   // google cloud storage
         httpstream,  // http (netty) based stream storage
