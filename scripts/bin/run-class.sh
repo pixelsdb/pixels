@@ -33,11 +33,32 @@ if [ -z "$PIXELS_OPTS" ]; then
   PIXELS_OPTS=""
 fi
 
-# Which java to use
-if [ -z "$JAVA_HOME" ]; then
-  JAVA="java"
-else
+# Which java to use. Prefer an explicit valid JAVA_HOME, then PATH, then common node-local JDK locations.
+JAVA=""
+if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
   JAVA="$JAVA_HOME/bin/java"
+elif JAVA="$(command -v java 2>/dev/null)"; then
+  echo "Using Java from PATH: $JAVA"
+else
+  for candidate in "$HOME"/opt/jdk-*/bin/java "$HOME"/.sdkman/candidates/java/current/bin/java /usr/lib/jvm/*/bin/java; do
+    if [ -x "$candidate" ]; then
+      JAVA="$candidate"
+      echo "Using node-local Java: $JAVA"
+      break
+    fi
+  done
+  if [ -z "$JAVA" ]; then
+    echo "ERROR: Java not found. Set JAVA_HOME, add java to PATH, or install a JDK under HOME/opt or /usr/lib/jvm." >&2
+    exit 1
+  fi
+fi
+
+# Resolve the Java home on this node so JNI dependencies (for example libjawt.so) are discoverable.
+PIXELS_JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$JAVA")")")
+export JAVA_HOME="$PIXELS_JAVA_HOME"
+export PATH="$PIXELS_JAVA_HOME/bin:$PATH"
+if [ -d "$PIXELS_JAVA_HOME/lib" ]; then
+  export LD_LIBRARY_PATH="$PIXELS_JAVA_HOME/lib:$PIXELS_JAVA_HOME/lib/server:$LD_LIBRARY_PATH"
 fi
 
 # Parse commands

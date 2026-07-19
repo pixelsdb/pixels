@@ -111,7 +111,8 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     ) throws IOException
     {
         ConfigFactory configFactory = ConfigFactory.Instance();
-        this.retinaBufferStorageFolder = configFactory.getProperty("retina.buffer.object.storage.folder");
+        this.retinaBufferStorageFolder = normalizeRetinaBufferStorageFolder(
+                configFactory.getProperty("retina.buffer.object.storage.folder"));
         this.retinaHost = retinaHost;
         this.retinaEnabled = Boolean.parseBoolean(configFactory.getProperty("retina.enable"));
 
@@ -454,6 +455,15 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
         {
             memoryUsage.addAndGet(-b.getMemoryUsage());
         }
+    }
+
+    static String normalizeRetinaBufferStorageFolder(String folder)
+    {
+        if (folder == null || folder.isEmpty())
+        {
+            throw new IllegalArgumentException("retina.buffer.object.storage.folder must not be empty");
+        }
+        return folder.endsWith("/") ? folder : folder + "/";
     }
 
     private String getRetinaBufferStoragePathFromId(long entryId, int virtualId)

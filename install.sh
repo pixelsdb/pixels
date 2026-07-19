@@ -153,7 +153,7 @@ fi
 
 # find and copy pixels-cpp.properties
 if [ -z "$(find $PIXELS_HOME/etc -name "pixels-cpp.properties")" ]; then
-  cp -v ./cpp/pixels-cpp.properties $PIXELS_HOME/etc
+  cp -v ./cpp/etc/pixels-cpp.properties $PIXELS_HOME/etc
   echo "$(
     tput setaf 1
     tput setab 7
@@ -162,7 +162,7 @@ else
   read -p "'$PIXELS_HOME/etc/pixels-cpp.properties' exists, override?[y/n]" -n 1 -r
   echo # move to a new line
   if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cp -v ./cpp/pixels-cpp.properties $PIXELS_HOME/etc
+    cp -v ./cpp/etc/pixels-cpp.properties $PIXELS_HOME/etc
   fi
 fi
 
