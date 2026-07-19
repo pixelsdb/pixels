@@ -18,10 +18,9 @@ do
 
     # REMOTE_SCRIPT explanation:
     # 1. Set LD_LIBRARY_PATH to find pixels libraries.
-    # 2. Set LD_PRELOAD to the jemalloc lib. This ensures the symbols are loaded into the process's global scope immediately.
     REMOTE_SCRIPT="export PIXELS_HOME=${home} && \
                    export LD_LIBRARY_PATH=${home}/lib:\$LD_LIBRARY_PATH && \
-                   export LD_PRELOAD=${JEMALLOC_LIB} && \
+                   export LD_PRELOAD=${JEMALLOC_LIB}:\$LD_PRELOAD && \
                    \$PIXELS_HOME/bin/start-daemon.sh retina -daemon"
 
     echo "Starting retina on ${retina} using LD_PRELOAD with jemalloc"

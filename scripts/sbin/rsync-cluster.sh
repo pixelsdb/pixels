@@ -6,7 +6,7 @@ if [ -z "$PIXELS_HOME" ]; then
   exit 1
 fi
 
-DEFAULT_PIXELS_HOME=$PIXELS_HOME
+DEFAULT_PIXELS_HOME=${PIXELS_HOME%/}
 
 # Get local hostname to detect localhost nodes
 LOCAL_HOSTNAME=$(hostname)
@@ -35,7 +35,10 @@ sync_node_lib() {
     fi
 
     echo "[Info] Syncing lib to node: $node ($home)"
-    rsync -az --delete --info=progress2 "${PIXELS_HOME}" "${node}:${home}"
+    rsync -az --delete --info=progress2 "${PIXELS_HOME}/" "${node}:${home}"
+    # Synchronizing copies the controller config; rewrite its absolute root for this target node.
+    echo "[Info] Synchronizing node-local paths in pixels.properties: $home"
+    ssh -n "${node}" "sed -i 's|${DEFAULT_PIXELS_HOME}|${home}|g' '${home}/etc/pixels.properties'"
 }
 
 # ---------------------------
