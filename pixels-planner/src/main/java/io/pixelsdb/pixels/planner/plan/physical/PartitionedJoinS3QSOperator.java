@@ -19,11 +19,14 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical;
 
+import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionedTableInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleQueueInfo;
@@ -31,9 +34,11 @@ import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
+import io.pixelsdb.pixels.planner.plan.physical.input.StageWorkerInput;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -45,9 +50,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 /**
  * S3QS exchange scheduler for partitioned joins.
  *
- * Unlike HTTP stream exchange, the workers are the normal partition and
- * partitioned-join workers. The pipeline boundary is the S3QS shuffle protocol:
- * producers publish DATA/PRODUCER_END messages, while consumers poll the queues.
+ * In coordinator mode this operator starts platform workers with a lightweight
+ * stage bootstrap input. The actual PartitionInput/JoinInput payloads stay in
+ * StageCoordinator task queues and are pulled by the runtime workers.
  */
 public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
 {
@@ -71,25 +76,7 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
                 throw new CompletionException("failed to start the previous S3QS stages", exception);
             }
             validateJoinInputs();
-            joinOutputs = new CompletableFuture[joinInputs.size()];
-            for (int i = 0; i < joinInputs.size(); ++i)
-            {
-                JoinInput joinInput = joinInputs.get(i);
-                if (joinAlgo == JoinAlgorithm.PARTITIONED)
-                {
-                    joinOutputs[i] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInput);
-                }
-                else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
-                {
-                    joinOutputs[i] = InvokerFactory.Instance()
-                            .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN).invoke(joinInput);
-                }
-                else
-                {
-                    throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
-                }
-            }
+            joinOutputs = invokeJoinRuntimeWorkers();
 
             logger.debug("invoke S3QS join " + this.getName());
             return joinOutputs;
@@ -112,14 +99,14 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
             checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
             smallChild.execute();
-            largePartitionOutputs = invokePartitionWorkers(largePartitionInputs);
+            largePartitionOutputs = invokePartitionRuntimeWorkers(largePartitionStageId, largePartitionInputs);
             logger.debug("invoke large S3QS partition of " + this.getName());
         }
         else if (largeChild != null)
         {
             checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
             checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-            smallPartitionOutputs = invokePartitionWorkers(smallPartitionInputs);
+            smallPartitionOutputs = invokePartitionRuntimeWorkers(smallPartitionStageId, smallPartitionInputs);
             logger.debug("invoke small S3QS partition of " + this.getName());
             largeChild.execute();
         }
@@ -127,15 +114,34 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
         {
             checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
             checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-            smallPartitionOutputs = invokePartitionWorkers(smallPartitionInputs);
+            smallPartitionOutputs = invokePartitionRuntimeWorkers(smallPartitionStageId, smallPartitionInputs);
             logger.debug("invoke small S3QS partition of " + this.getName());
-            largePartitionOutputs = invokePartitionWorkers(largePartitionInputs);
+            largePartitionOutputs = invokePartitionRuntimeWorkers(largePartitionStageId, largePartitionInputs);
             logger.debug("invoke large S3QS partition of " + this.getName());
         }
         return Completed;
     }
 
-    private CompletableFuture<? extends Output>[] invokePartitionWorkers(List<PartitionInput> partitionInputs)
+    private CompletableFuture<? extends Output>[] invokePartitionRuntimeWorkers(int partitionStageId,
+                                                                               List<PartitionInput> partitionInputs)
+    {
+        StageCoordinator partitionStageCoordinator = getQueuedStageCoordinator(partitionStageId);
+        if (partitionStageCoordinator == null)
+        {
+            return invokePartitionWorkersDirectly(partitionInputs);
+        }
+
+        List<CompletableFuture<? extends Output>> outputFutures = new ArrayList<>();
+        int runtimeWorkerCount = getInitialRuntimeWorkerCount(partitionStageCoordinator);
+        for (int i = 0; i < runtimeWorkerCount; ++i)
+        {
+            outputFutures.add(InvokerFactory.Instance().getInvoker(WorkerType.PARTITION_S3QS)
+                    .invoke(createRuntimeWorkerInput(partitionStageId, WorkerType.PARTITION_S3QS)));
+        }
+        return outputFutures.toArray(new CompletableFuture[0]);
+    }
+
+    private CompletableFuture<? extends Output>[] invokePartitionWorkersDirectly(List<PartitionInput> partitionInputs)
     {
         CompletableFuture<? extends Output>[] outputs = new CompletableFuture[partitionInputs.size()];
         int i = 0;
@@ -145,6 +151,156 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
                     .getInvoker(WorkerType.PARTITION).invoke(partitionInput);
         }
         return outputs;
+    }
+
+    private CompletableFuture<? extends Output>[] invokeJoinRuntimeWorkers()
+    {
+        StageCoordinator joinStageCoordinator = getQueuedStageCoordinator(joinStageId);
+        if (joinStageCoordinator == null)
+        {
+            return invokeJoinWorkersDirectly();
+        }
+
+        List<CompletableFuture<? extends Output>> outputFutures = new ArrayList<>();
+        WorkerType workerType = getS3QSJoinWorkerType();
+        int runtimeWorkerCount = getInitialRuntimeWorkerCount(joinStageCoordinator);
+        for (int i = 0; i < runtimeWorkerCount; ++i)
+        {
+            outputFutures.add(InvokerFactory.Instance().getInvoker(workerType)
+                    .invoke(createRuntimeWorkerInput(joinStageId, workerType)));
+        }
+        return outputFutures.toArray(new CompletableFuture[0]);
+    }
+
+    private CompletableFuture<? extends Output>[] invokeJoinWorkersDirectly()
+    {
+        CompletableFuture<? extends Output>[] outputs = new CompletableFuture[joinInputs.size()];
+        for (int i = 0; i < joinInputs.size(); ++i)
+        {
+            JoinInput joinInput = joinInputs.get(i);
+            if (joinAlgo == JoinAlgorithm.PARTITIONED)
+            {
+                outputs[i] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInput);
+            }
+            else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
+            {
+                outputs[i] = InvokerFactory.Instance()
+                        .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN).invoke(joinInput);
+            }
+            else
+            {
+                throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+            }
+        }
+        return outputs;
+    }
+
+    @Override
+    protected StageCoordinator createJoinStageCoordinator(StageCoordinator parentStageCoordinator,
+                                                         int joinStageId, int workerNum)
+    {
+        List<Task> tasks = new ArrayList<>(joinInputs.size());
+        for (int i = 0; i < joinInputs.size(); ++i)
+        {
+            tasks.add(new Task(i, JSON.toJSONString(joinInputs.get(i))));
+        }
+
+        int workerIndexBegin = 0;
+        if (parentStageCoordinator != null)
+        {
+            if (parentStageCoordinator.leftChildWorkerIsEmpty())
+            {
+                parentStageCoordinator.setLeftChildWorkerNum(workerNum);
+            }
+            else
+            {
+                workerIndexBegin = parentStageCoordinator.getLeftChildWorkerNum();
+                parentStageCoordinator.setRightChildWorkerNum(workerNum);
+            }
+        }
+        StageCoordinator joinStageCoordinator = new StageCoordinator(joinStageId, tasks, workerIndexBegin);
+        if (parentStageCoordinator != null)
+        {
+            joinStageCoordinator.setDownStreamWorkerNum(parentStageCoordinator.getFixedWorkerNum());
+        }
+        return joinStageCoordinator;
+    }
+
+    private StageCoordinator getQueuedStageCoordinator(int stageId)
+    {
+        StageCoordinator stageCoordinator = getStageCoordinator(stageId);
+        if (stageCoordinator == null || !stageCoordinator.isQueued())
+        {
+            return null;
+        }
+        return stageCoordinator;
+    }
+
+    private StageCoordinator getStageCoordinator(int stageId)
+    {
+        if (planCoordinator == null || stageId < 0)
+        {
+            return null;
+        }
+        return planCoordinator.getStageCoordinator(stageId);
+    }
+
+    private int getInitialRuntimeWorkerCount(StageCoordinator stageCoordinator)
+    {
+        return stageCoordinator.getPendingTaskCount();
+    }
+
+    private WorkerType getS3QSJoinWorkerType()
+    {
+        if (joinAlgo == JoinAlgorithm.PARTITIONED)
+        {
+            return WorkerType.PARTITIONED_JOIN_S3QS;
+        }
+        if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
+        {
+            return WorkerType.PARTITIONED_CHAIN_JOIN_S3QS;
+        }
+        throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
+    }
+
+    private StageWorkerInput createRuntimeWorkerInput(int stageId, WorkerType workerType)
+    {
+        return new StageWorkerInput(getTransId(), getTimestamp(), stageId, getName(), workerType);
+    }
+
+    private long getTransId()
+    {
+        if (!joinInputs.isEmpty())
+        {
+            return joinInputs.get(0).getTransId();
+        }
+        if (!smallPartitionInputs.isEmpty())
+        {
+            return smallPartitionInputs.get(0).getTransId();
+        }
+        if (!largePartitionInputs.isEmpty())
+        {
+            return largePartitionInputs.get(0).getTransId();
+        }
+        return -1L;
+    }
+
+    private long getTimestamp()
+    {
+        if (!joinInputs.isEmpty())
+        {
+            return joinInputs.get(0).getTimestamp();
+        }
+        if (!smallPartitionInputs.isEmpty())
+        {
+            return smallPartitionInputs.get(0).getTimestamp();
+        }
+        if (!largePartitionInputs.isEmpty())
+        {
+            return largePartitionInputs.get(0).getTimestamp();
+        }
+        return 0L;
     }
 
     private void validatePartitionInputs()

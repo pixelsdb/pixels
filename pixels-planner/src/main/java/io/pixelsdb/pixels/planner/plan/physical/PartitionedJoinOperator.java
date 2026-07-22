@@ -55,6 +55,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     protected CompletableFuture<? extends Output>[] largePartitionOutputs = null;
     protected int smallPartitionStageId;
     protected int largePartitionStageId;
+    protected PlanCoordinator planCoordinator;
 
     public PartitionedJoinOperator(String name, List<PartitionInput> smallPartitionInputs,
                                    List<PartitionInput> largePartitionInputs,
@@ -139,6 +140,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     @Override
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
+        this.planCoordinator = planCoordinator;
         this.parentStageId = parentStageId;
         this.joinStageId = planCoordinator.assignStageId();
         for (JoinInput joinInput : this.joinInputs)
