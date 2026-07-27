@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -96,6 +97,16 @@ public class StageCoordinator
      * The number of workers in the right child stage.
      */
     private int rightChildWorkerNum;
+    /**
+     * Runtime capacity is unbounded until a StageRuntimeController takes
+     * ownership of this queued stage.
+     */
+    private int desiredRuntimeWorkerCount = Integer.MAX_VALUE;
+    /**
+     * Draining workers may finish their claimed task batch but can not claim
+     * another one.
+     */
+    private final Set<Long> drainingWorkerIds = ConcurrentHashMap.newKeySet();
     private final Object lock = new Object();
 
     /**
@@ -203,6 +214,10 @@ public class StageCoordinator
                 }
             }
             this.workers.add(worker);
+            if (this.isQueued && getAcceptingWorkerCountLocked() > this.desiredRuntimeWorkerCount)
+            {
+                this.drainingWorkerIds.add(worker.getWorkerId());
+            }
             if (!this.isQueued && this.workers.size() == this.fixedWorkerNum)
             {
                 this.lock.notifyAll();
@@ -225,6 +240,10 @@ public class StageCoordinator
         Worker<CFWorkerInfo> worker = this.workerIdToWorkers.get(workerId);
         if (worker != null)
         {
+            if (this.drainingWorkerIds.contains(workerId))
+            {
+                return Collections.emptyList();
+            }
             List<Task> tasks = new ArrayList<>(WorkerTaskParallelism);
             for (int i = 0; i < WorkerTaskParallelism; ++i)
             {
@@ -346,6 +365,100 @@ public class StageCoordinator
     public int getRegisteredWorkerCount()
     {
         return this.workers.size();
+    }
+
+    /**
+     * Set the target number of workers that may claim new task batches.
+     *
+     * Reducing the target marks the newest excess workers as draining. Raising
+     * the target does not reactivate draining workers because they may already
+     * have received an end-of-tasks response; the runtime controller launches
+     * replacements when needed.
+     */
+    public void setDesiredRuntimeWorkerCount(int desiredRuntimeWorkerCount)
+    {
+        checkArgument(this.isQueued, "non-queued stage does not have runtime capacity");
+        checkArgument(desiredRuntimeWorkerCount >= 0, "desiredRuntimeWorkerCount is negative");
+        synchronized (this.lock)
+        {
+            this.desiredRuntimeWorkerCount = desiredRuntimeWorkerCount;
+            int workersToDrain = getAcceptingWorkerCountLocked() - desiredRuntimeWorkerCount;
+            for (int i = this.workers.size() - 1; i >= 0 && workersToDrain > 0; --i)
+            {
+                Worker<CFWorkerInfo> worker = this.workers.get(i);
+                if (!worker.isTerminated() && !this.drainingWorkerIds.contains(worker.getWorkerId()))
+                {
+                    this.drainingWorkerIds.add(worker.getWorkerId());
+                    workersToDrain--;
+                }
+            }
+        }
+    }
+
+    public int getDesiredRuntimeWorkerCount()
+    {
+        synchronized (this.lock)
+        {
+            return this.desiredRuntimeWorkerCount;
+        }
+    }
+
+    public int getActiveRegisteredWorkerCount()
+    {
+        synchronized (this.lock)
+        {
+            int count = 0;
+            for (Worker<CFWorkerInfo> worker : this.workers)
+            {
+                if (!worker.isTerminated())
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+
+    public int getAcceptingWorkerCount()
+    {
+        synchronized (this.lock)
+        {
+            return getAcceptingWorkerCountLocked();
+        }
+    }
+
+    public int getDrainingWorkerCount()
+    {
+        synchronized (this.lock)
+        {
+            int count = 0;
+            for (Worker<CFWorkerInfo> worker : this.workers)
+            {
+                if (!worker.isTerminated() && this.drainingWorkerIds.contains(worker.getWorkerId()))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+
+    public boolean isWorkerDraining(long workerId)
+    {
+        return this.drainingWorkerIds.contains(workerId);
+    }
+
+    private int getAcceptingWorkerCountLocked()
+    {
+        int count = 0;
+        for (Worker<CFWorkerInfo> worker : this.workers)
+        {
+            if (!worker.isTerminated() && !this.drainingWorkerIds.contains(worker.getWorkerId()))
+            {
+                count++;
+            }
+        }
+        return count;
     }
 
     public int getTotalTaskCount()

@@ -19,8 +19,12 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import io.pixelsdb.pixels.common.turbo.Output;
+
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -48,13 +52,25 @@ public class PlanCoordinator
      */
     private final Map<Integer, StageDependency> stageDependencies = new HashMap<>();
     /**
+     * Runtime worker control is registered only for stages whose physical
+     * workers pull coordinator tasks, currently the S3QS shuffle stages.
+     */
+    private final Map<Integer, StageRuntimeController> stageRuntimeControllers = new HashMap<>();
+    private final StageWorkerLauncher stageWorkerLauncher;
+    /**
      * The assigner of stage id.
      */
     private final AtomicInteger stageIdAssigner = new AtomicInteger(0);
 
     public PlanCoordinator(long transId)
     {
+        this(transId, new InvokerStageWorkerLauncher());
+    }
+
+    public PlanCoordinator(long transId, StageWorkerLauncher stageWorkerLauncher)
+    {
         this.transId = transId;
+        this.stageWorkerLauncher = requireNonNull(stageWorkerLauncher, "stageWorkerLauncher is null");
     }
 
     /**
@@ -83,6 +99,48 @@ public class PlanCoordinator
     public StageCoordinator getStageCoordinator(int stageId)
     {
         return this.stageCoordinators.get(stageId);
+    }
+
+    /**
+     * Register the physical execution description for a queued stage. Logical
+     * tasks must already exist in the corresponding StageCoordinator.
+     */
+    public void addStageRuntimeController(StageExecutionDescriptor descriptor)
+    {
+        requireNonNull(descriptor, "descriptor is null");
+        int stageId = descriptor.getStageId();
+        StageCoordinator stageCoordinator = requireNonNull(this.stageCoordinators.get(stageId),
+                "stage coordinator is not found");
+        checkArgument(!this.stageRuntimeControllers.containsKey(stageId),
+                "stage runtime controller already exists");
+        this.stageRuntimeControllers.put(stageId,
+                new StageRuntimeController(stageCoordinator, descriptor, this.stageWorkerLauncher));
+    }
+
+    public StageRuntimeController getStageRuntimeController(int stageId)
+    {
+        return this.stageRuntimeControllers.get(stageId);
+    }
+
+    /**
+     * Start the first worker set for a queued stage. The initial target is
+     * bounded by its current pending logical task count.
+     */
+    public List<CompletableFuture<? extends Output>> activateStage(int stageId)
+    {
+        StageCoordinator stageCoordinator = requireNonNull(this.stageCoordinators.get(stageId),
+                "stage coordinator is not found");
+        return scaleStage(stageId, stageCoordinator.getPendingTaskCount());
+    }
+
+    /**
+     * Manually change the desired runtime worker count for a stage.
+     */
+    public List<CompletableFuture<? extends Output>> scaleStage(int stageId, int targetWorkerCount)
+    {
+        StageRuntimeController runtimeController = requireNonNull(this.stageRuntimeControllers.get(stageId),
+                "stage runtime controller is not found");
+        return runtimeController.scaleTo(targetWorkerCount);
     }
 
     /**

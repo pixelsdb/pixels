@@ -26,6 +26,8 @@ import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageExecutionDescriptor;
 import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionedTableInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
@@ -34,7 +36,6 @@ import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedChainJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
-import io.pixelsdb.pixels.planner.plan.physical.input.StageWorkerInput;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -64,6 +65,21 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
                                        List<JoinInput> joinInputs, JoinAlgorithm joinAlgo)
     {
         super(name, smallPartitionInputs, largePartitionInputs, joinInputs, joinAlgo);
+    }
+
+    @Override
+    public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
+    {
+        super.initPlanCoordinator(planCoordinator, parentStageId, wideDependOnParent);
+        if (!smallPartitionInputs.isEmpty())
+        {
+            registerStageRuntimeController(smallPartitionStageId, WorkerType.PARTITION_S3QS);
+        }
+        if (!largePartitionInputs.isEmpty())
+        {
+            registerStageRuntimeController(largePartitionStageId, WorkerType.PARTITION_S3QS);
+        }
+        registerStageRuntimeController(joinStageId, getS3QSJoinWorkerType());
     }
 
     @Override
@@ -131,13 +147,7 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             return invokePartitionWorkersDirectly(partitionInputs);
         }
 
-        List<CompletableFuture<? extends Output>> outputFutures = new ArrayList<>();
-        int runtimeWorkerCount = getInitialRuntimeWorkerCount(partitionStageCoordinator);
-        for (int i = 0; i < runtimeWorkerCount; ++i)
-        {
-            outputFutures.add(InvokerFactory.Instance().getInvoker(WorkerType.PARTITION_S3QS)
-                    .invoke(createRuntimeWorkerInput(partitionStageId, WorkerType.PARTITION_S3QS)));
-        }
+        List<CompletableFuture<? extends Output>> outputFutures = planCoordinator.activateStage(partitionStageId);
         return outputFutures.toArray(new CompletableFuture[0]);
     }
 
@@ -161,14 +171,7 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             return invokeJoinWorkersDirectly();
         }
 
-        List<CompletableFuture<? extends Output>> outputFutures = new ArrayList<>();
-        WorkerType workerType = getS3QSJoinWorkerType();
-        int runtimeWorkerCount = getInitialRuntimeWorkerCount(joinStageCoordinator);
-        for (int i = 0; i < runtimeWorkerCount; ++i)
-        {
-            outputFutures.add(InvokerFactory.Instance().getInvoker(workerType)
-                    .invoke(createRuntimeWorkerInput(joinStageId, workerType)));
-        }
+        List<CompletableFuture<? extends Output>> outputFutures = planCoordinator.activateStage(joinStageId);
         return outputFutures.toArray(new CompletableFuture[0]);
     }
 
@@ -230,7 +233,8 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
     private StageCoordinator getQueuedStageCoordinator(int stageId)
     {
         StageCoordinator stageCoordinator = getStageCoordinator(stageId);
-        if (stageCoordinator == null || !stageCoordinator.isQueued())
+        if (stageCoordinator == null || !stageCoordinator.isQueued() ||
+                planCoordinator.getStageRuntimeController(stageId) == null)
         {
             return null;
         }
@@ -246,11 +250,6 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
         return planCoordinator.getStageCoordinator(stageId);
     }
 
-    private int getInitialRuntimeWorkerCount(StageCoordinator stageCoordinator)
-    {
-        return stageCoordinator.getPendingTaskCount();
-    }
-
     private WorkerType getS3QSJoinWorkerType()
     {
         if (joinAlgo == JoinAlgorithm.PARTITIONED)
@@ -264,26 +263,10 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
         throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
     }
 
-    private StageWorkerInput createRuntimeWorkerInput(int stageId, WorkerType workerType)
+    private void registerStageRuntimeController(int stageId, WorkerType workerType)
     {
-        return new StageWorkerInput(getTransId(), getTimestamp(), stageId, getName(), workerType);
-    }
-
-    private long getTransId()
-    {
-        if (!joinInputs.isEmpty())
-        {
-            return joinInputs.get(0).getTransId();
-        }
-        if (!smallPartitionInputs.isEmpty())
-        {
-            return smallPartitionInputs.get(0).getTransId();
-        }
-        if (!largePartitionInputs.isEmpty())
-        {
-            return largePartitionInputs.get(0).getTransId();
-        }
-        return -1L;
+        planCoordinator.addStageRuntimeController(new StageExecutionDescriptor(
+                planCoordinator.getTransId(), getTimestamp(), stageId, getName(), workerType));
     }
 
     private long getTimestamp()

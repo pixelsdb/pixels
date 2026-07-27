@@ -55,6 +55,13 @@
             <artifactId>pixels-storage-redis</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!-- testing -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-api</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

@@ -34,6 +34,7 @@ import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.coordinate.CFWorkerInfo;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageRuntimeController;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
@@ -45,6 +46,7 @@ import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
+import io.pixelsdb.pixels.planner.plan.physical.input.StageWorkerInput;
 import org.junit.Test;
 
 import java.lang.reflect.Field;
@@ -56,6 +58,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 
 /**
@@ -140,6 +143,7 @@ public class TestPartitionedJoinS3QSOperator
 
         operator.initPlanCoordinator(planCoordinator, -1, false);
         StageCoordinator smallStage = planCoordinator.getStageCoordinator(operator.smallPartitionStageId);
+        smallStage.setDesiredRuntimeWorkerCount(1);
         Worker<CFWorkerInfo> worker = new Worker<>(1L, new Lease(System.currentTimeMillis(), 60000L),
                 0, new CFWorkerInfo("localhost", 8080, 100L, operator.smallPartitionStageId,
                 Constants.PARTITION_OPERATOR_NAME, Collections.emptyList()));
@@ -168,6 +172,7 @@ public class TestPartitionedJoinS3QSOperator
 
         operator.initPlanCoordinator(planCoordinator, -1, false);
         StageCoordinator smallStage = planCoordinator.getStageCoordinator(operator.smallPartitionStageId);
+        smallStage.setDesiredRuntimeWorkerCount(1);
         assertEquals(1, smallStage.getTotalTaskCount());
         assertEquals(1, smallStage.getPendingTaskCount());
         assertEquals(0, smallStage.getRunningTaskCount());
@@ -190,6 +195,72 @@ public class TestPartitionedJoinS3QSOperator
         assertEquals(0, smallStage.getRunningTaskCount());
         assertEquals(1, smallStage.getCompletedTaskCount());
         assertEquals(0, smallStage.getFailedTaskCount());
+    }
+
+    @Test
+    public void executeStartsS3QSRuntimeWorkersWhenPlanCoordinatorIsInitialized() throws Exception
+    {
+        RecordingInvoker partitionStageInvoker = new RecordingInvoker();
+        RecordingInvoker joinStageInvoker = new RecordingInvoker();
+        Map<WorkerType, Invoker> originalInvokers = replaceS3QSInvokers(partitionStageInvoker, joinStageInvoker);
+        try
+        {
+            PartitionInput smallPartition = partitionInput(7);
+            smallPartition.setTableInfo(scanTableInfo("small", 2));
+            PartitionInput largePartition = partitionInput(8);
+            largePartition.setTableInfo(scanTableInfo("large", 2));
+            PartitionedJoinInput joinInput = joinInput(validShuffleInfo());
+            PartitionedJoinS3QSOperator operator = new PartitionedJoinS3QSOperator("s3qs-join",
+                    Collections.singletonList(smallPartition), Collections.singletonList(largePartition),
+                    Collections.<JoinInput>singletonList(joinInput), JoinAlgorithm.PARTITIONED);
+            PlanCoordinator planCoordinator = new PlanCoordinator(100L);
+            operator.initPlanCoordinator(planCoordinator, -1, false);
+
+            CompletableFuture<CompletableFuture<? extends Output>[]> future = operator.execute();
+            CompletableFuture<? extends Output>[] joinOutputs = future.get();
+
+            assertEquals(2, partitionStageInvoker.inputs.size());
+            StageWorkerInput smallStageWorkerInput = (StageWorkerInput) partitionStageInvoker.inputs.get(0);
+            StageWorkerInput largeStageWorkerInput = (StageWorkerInput) partitionStageInvoker.inputs.get(1);
+            assertEquals(WorkerType.PARTITION_S3QS, smallStageWorkerInput.getWorkerType());
+            assertEquals(WorkerType.PARTITION_S3QS, largeStageWorkerInput.getWorkerType());
+            assertEquals(100L, smallStageWorkerInput.getTransId());
+            assertEquals(100L, largeStageWorkerInput.getTransId());
+            assertEquals(operator.smallPartitionStageId, smallStageWorkerInput.getStageId());
+            assertEquals(operator.largePartitionStageId, largeStageWorkerInput.getStageId());
+            assertEquals(1, joinStageInvoker.inputs.size());
+            StageWorkerInput joinStageWorkerInput = (StageWorkerInput) joinStageInvoker.inputs.get(0);
+            assertEquals(WorkerType.PARTITIONED_JOIN_S3QS, joinStageWorkerInput.getWorkerType());
+            assertEquals(100L, joinStageWorkerInput.getTransId());
+            assertEquals(operator.joinStageId, joinStageWorkerInput.getStageId());
+            assertEquals(1, joinOutputs.length);
+
+            StageCoordinator smallStage = planCoordinator.getStageCoordinator(operator.smallPartitionStageId);
+            StageCoordinator largeStage = planCoordinator.getStageCoordinator(operator.largePartitionStageId);
+            StageCoordinator joinStage = planCoordinator.getStageCoordinator(operator.joinStageId);
+            StageRuntimeController smallRuntime =
+                    planCoordinator.getStageRuntimeController(operator.smallPartitionStageId);
+            StageRuntimeController largeRuntime =
+                    planCoordinator.getStageRuntimeController(operator.largePartitionStageId);
+            StageRuntimeController joinRuntime =
+                    planCoordinator.getStageRuntimeController(operator.joinStageId);
+            assertNotNull(smallRuntime);
+            assertNotNull(largeRuntime);
+            assertNotNull(joinRuntime);
+            assertEquals(1, smallRuntime.getStatus().getDesiredWorkerCount());
+            assertEquals(1, largeRuntime.getStatus().getDesiredWorkerCount());
+            assertEquals(1, joinRuntime.getStatus().getDesiredWorkerCount());
+            assertEquals(1, smallStage.getTotalTaskCount());
+            assertEquals(1, largeStage.getTotalTaskCount());
+            assertEquals(1, joinStage.getTotalTaskCount());
+            assertEquals(1, smallStage.getPendingTaskCount());
+            assertEquals(1, largeStage.getPendingTaskCount());
+            assertEquals(1, joinStage.getPendingTaskCount());
+        }
+        finally
+        {
+            restoreInvokers(originalInvokers);
+        }
     }
 
     private static ShuffleInfo validShuffleInfo()
@@ -258,6 +329,18 @@ public class TestPartitionedJoinS3QSOperator
         return original;
     }
 
+    private static Map<WorkerType, Invoker> replaceS3QSInvokers(Invoker partitionInvoker, Invoker joinInvoker)
+            throws Exception
+    {
+        Map<WorkerType, Invoker> invokerMap = invokerMap();
+        Map<WorkerType, Invoker> original = new EnumMap<>(WorkerType.class);
+        original.put(WorkerType.PARTITION_S3QS, invokerMap.get(WorkerType.PARTITION_S3QS));
+        original.put(WorkerType.PARTITIONED_JOIN_S3QS, invokerMap.get(WorkerType.PARTITIONED_JOIN_S3QS));
+        invokerMap.put(WorkerType.PARTITION_S3QS, partitionInvoker);
+        invokerMap.put(WorkerType.PARTITIONED_JOIN_S3QS, joinInvoker);
+        return original;
+    }
+
     private static void restoreInvokers(Map<WorkerType, Invoker> original) throws Exception
     {
         Map<WorkerType, Invoker> invokerMap = invokerMap();
@@ -311,4 +394,5 @@ public class TestPartitionedJoinS3QSOperator
             return 0;
         }
     }
+
 }
