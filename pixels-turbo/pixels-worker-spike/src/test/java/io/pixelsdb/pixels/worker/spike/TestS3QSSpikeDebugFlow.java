@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.turbo.SpikeWorkerRequest;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinatorFactory;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateServer;
 import io.pixelsdb.pixels.planner.plan.physical.PartitionedJoinS3QSOperator;
@@ -124,6 +125,7 @@ public class TestS3QSSpikeDebugFlow
         coordinateServerThread.setDaemon(true);
         coordinateServerThread.start();
         Thread.sleep(500L);
+        PlanCoordinator planCoordinator = null;
 
         try
         {
@@ -138,7 +140,7 @@ public class TestS3QSSpikeDebugFlow
                     Collections.singletonList(largePartitionInput),
                     Collections.<JoinInput>singletonList(joinInput),
                     JoinAlgorithm.PARTITIONED);
-            PlanCoordinatorFactory.Instance().createPlanCoordinator(transId, operator);
+            planCoordinator = PlanCoordinatorFactory.Instance().createPlanCoordinator(transId, operator);
 
             /*
              * 生产端 stage id 不是在构造 PartitionInput 时手工指定的，而是在
@@ -180,6 +182,10 @@ public class TestS3QSSpikeDebugFlow
         }
         finally
         {
+            if (planCoordinator != null)
+            {
+                PlanCoordinatorFactory.Instance().removePlanCoordinator(transId, planCoordinator);
+            }
             coordinateServer.shutdown();
         }
     }

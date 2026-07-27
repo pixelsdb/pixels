@@ -36,20 +36,26 @@ public class StageExecutionDescriptor
     private final int stageId;
     private final String operatorName;
     private final WorkerType workerType;
+    private final CoordinatorEndpoint coordinatorEndpoint;
 
     public StageExecutionDescriptor(long transId, long timestamp, int stageId,
-                                    String operatorName, WorkerType workerType)
+                                    String operatorName, WorkerType workerType,
+                                    CoordinatorEndpoint coordinatorEndpoint)
     {
         this.transId = transId;
         this.timestamp = timestamp;
         this.stageId = stageId;
         this.operatorName = requireNonNull(operatorName, "operatorName is null");
         this.workerType = requireNonNull(workerType, "workerType is null");
+        this.coordinatorEndpoint = requireNonNull(coordinatorEndpoint, "coordinatorEndpoint is null");
     }
 
     public StageWorkerInput createWorkerInput()
     {
-        return new StageWorkerInput(transId, timestamp, stageId, operatorName, workerType);
+        StageWorkerInput input = new StageWorkerInput(transId, timestamp, stageId, operatorName, workerType);
+        input.setCoordinatorHost(coordinatorEndpoint.getHost());
+        input.setCoordinatorPort(coordinatorEndpoint.getPort());
+        return input;
     }
 
     public int getStageId()

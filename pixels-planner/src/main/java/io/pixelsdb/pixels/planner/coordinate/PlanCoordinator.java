@@ -56,6 +56,7 @@ public class PlanCoordinator
      * workers pull coordinator tasks, currently the S3QS shuffle stages.
      */
     private final Map<Integer, StageRuntimeController> stageRuntimeControllers = new HashMap<>();
+    private final CoordinatorEndpoint coordinatorEndpoint;
     private final StageWorkerLauncher stageWorkerLauncher;
     /**
      * The assigner of stage id.
@@ -64,12 +65,24 @@ public class PlanCoordinator
 
     public PlanCoordinator(long transId)
     {
-        this(transId, new InvokerStageWorkerLauncher());
+        this(transId, CoordinatorEndpoint.fromConfig(), new InvokerStageWorkerLauncher());
     }
 
     public PlanCoordinator(long transId, StageWorkerLauncher stageWorkerLauncher)
     {
+        this(transId, CoordinatorEndpoint.fromConfig(), stageWorkerLauncher);
+    }
+
+    public PlanCoordinator(long transId, CoordinatorEndpoint coordinatorEndpoint)
+    {
+        this(transId, coordinatorEndpoint, new InvokerStageWorkerLauncher());
+    }
+
+    public PlanCoordinator(long transId, CoordinatorEndpoint coordinatorEndpoint,
+                           StageWorkerLauncher stageWorkerLauncher)
+    {
         this.transId = transId;
+        this.coordinatorEndpoint = requireNonNull(coordinatorEndpoint, "coordinatorEndpoint is null");
         this.stageWorkerLauncher = requireNonNull(stageWorkerLauncher, "stageWorkerLauncher is null");
     }
 
@@ -159,6 +172,11 @@ public class PlanCoordinator
     public long getTransId()
     {
         return transId;
+    }
+
+    public CoordinatorEndpoint getCoordinatorEndpoint()
+    {
+        return coordinatorEndpoint;
     }
 
     /**

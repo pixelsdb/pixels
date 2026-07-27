@@ -36,6 +36,8 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
+import io.pixelsdb.pixels.planner.coordinate.CoordinatedPlanExecution;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinatorFactory;
 import io.pixelsdb.pixels.planner.plan.PlanOptimizer;
 import io.pixelsdb.pixels.planner.plan.logical.*;
 import io.pixelsdb.pixels.planner.plan.logical.Table;
@@ -161,6 +163,15 @@ public class PixelsPlanner
             throw new UnsupportedOperationException("root table type '" +
                     this.rootTable.getTableType() + "' is currently not supported");
         }
+    }
+
+    /**
+     * Create a physical plan execution whose coordinator is registered before
+     * any runtime worker can be invoked.
+     */
+    public CoordinatedPlanExecution createPlanExecution() throws IOException, MetadataException
+    {
+        return PlanCoordinatorFactory.Instance().createPlanExecution(this.transId, getRootOperator());
     }
 
     public double getScanSize()

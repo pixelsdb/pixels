@@ -30,8 +30,8 @@ import io.pixelsdb.pixels.common.turbo.WorkerType;
  */
 public class StageWorkerInput extends Input
 {
-    private String coordinatorHost = "128.110.218.225";
-    private int coordinatorPort = 18894;
+    private String coordinatorHost;
+    private int coordinatorPort;
     private WorkerType workerType;
 
     public StageWorkerInput()

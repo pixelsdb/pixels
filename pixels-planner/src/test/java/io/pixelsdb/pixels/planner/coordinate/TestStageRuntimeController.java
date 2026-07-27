@@ -43,13 +43,16 @@ public class TestStageRuntimeController
     {
         StageCoordinator stage = stageCoordinator(2);
         RecordingStageWorkerLauncher launcher = new RecordingStageWorkerLauncher();
-        PlanCoordinator planCoordinator = new PlanCoordinator(1277L, launcher);
+        CoordinatorEndpoint endpoint = new CoordinatorEndpoint("coordinator.internal", 19000);
+        PlanCoordinator planCoordinator = new PlanCoordinator(1277L, endpoint, launcher);
         planCoordinator.addStageCoordinator(stage, new StageDependency(17, -1, false));
         planCoordinator.addStageRuntimeController(new StageExecutionDescriptor(
-                1277L, 1000L, 17, "s3qs-stage", WorkerType.PARTITION_S3QS));
+                1277L, 1000L, 17, "s3qs-stage", WorkerType.PARTITION_S3QS, endpoint));
 
         assertEquals(2, planCoordinator.activateStage(17).size());
         assertEquals(2, launcher.inputs.size());
+        assertEquals("coordinator.internal", launcher.inputs.get(0).getCoordinatorHost());
+        assertEquals(19000, launcher.inputs.get(0).getCoordinatorPort());
 
         planCoordinator.scaleStage(17, 1);
         assertEquals(1, planCoordinator.getStageRuntimeController(17)
@@ -136,7 +139,8 @@ public class TestStageRuntimeController
                                                      RecordingStageWorkerLauncher launcher)
     {
         StageExecutionDescriptor descriptor = new StageExecutionDescriptor(
-                1277L, 1000L, stage.getStageId(), "s3qs-stage", WorkerType.PARTITION_S3QS);
+                1277L, 1000L, stage.getStageId(), "s3qs-stage", WorkerType.PARTITION_S3QS,
+                new CoordinatorEndpoint("localhost", 18894));
         return new StageRuntimeController(stage, descriptor, launcher);
     }
 

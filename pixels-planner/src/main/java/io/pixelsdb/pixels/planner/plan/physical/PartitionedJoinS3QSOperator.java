@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.planner.plan.physical;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.task.Task;
-import io.pixelsdb.pixels.common.turbo.InvokerFactory;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.common.physical.Storage;
@@ -115,14 +114,14 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
             checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
             smallChild.execute();
-            largePartitionOutputs = invokePartitionRuntimeWorkers(largePartitionStageId, largePartitionInputs);
+            largePartitionOutputs = invokePartitionRuntimeWorkers(largePartitionStageId);
             logger.debug("invoke large S3QS partition of " + this.getName());
         }
         else if (largeChild != null)
         {
             checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
             checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-            smallPartitionOutputs = invokePartitionRuntimeWorkers(smallPartitionStageId, smallPartitionInputs);
+            smallPartitionOutputs = invokePartitionRuntimeWorkers(smallPartitionStageId);
             logger.debug("invoke small S3QS partition of " + this.getName());
             largeChild.execute();
         }
@@ -130,73 +129,26 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
         {
             checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
             checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-            smallPartitionOutputs = invokePartitionRuntimeWorkers(smallPartitionStageId, smallPartitionInputs);
+            smallPartitionOutputs = invokePartitionRuntimeWorkers(smallPartitionStageId);
             logger.debug("invoke small S3QS partition of " + this.getName());
-            largePartitionOutputs = invokePartitionRuntimeWorkers(largePartitionStageId, largePartitionInputs);
+            largePartitionOutputs = invokePartitionRuntimeWorkers(largePartitionStageId);
             logger.debug("invoke large S3QS partition of " + this.getName());
         }
         return Completed;
     }
 
-    private CompletableFuture<? extends Output>[] invokePartitionRuntimeWorkers(int partitionStageId,
-                                                                               List<PartitionInput> partitionInputs)
+    private CompletableFuture<? extends Output>[] invokePartitionRuntimeWorkers(int partitionStageId)
     {
-        StageCoordinator partitionStageCoordinator = getQueuedStageCoordinator(partitionStageId);
-        if (partitionStageCoordinator == null)
-        {
-            return invokePartitionWorkersDirectly(partitionInputs);
-        }
-
+        requireControlledStage(partitionStageId, "partition");
         List<CompletableFuture<? extends Output>> outputFutures = planCoordinator.activateStage(partitionStageId);
         return outputFutures.toArray(new CompletableFuture[0]);
     }
 
-    private CompletableFuture<? extends Output>[] invokePartitionWorkersDirectly(List<PartitionInput> partitionInputs)
-    {
-        CompletableFuture<? extends Output>[] outputs = new CompletableFuture[partitionInputs.size()];
-        int i = 0;
-        for (PartitionInput partitionInput : partitionInputs)
-        {
-            outputs[i++] = InvokerFactory.Instance()
-                    .getInvoker(WorkerType.PARTITION).invoke(partitionInput);
-        }
-        return outputs;
-    }
-
     private CompletableFuture<? extends Output>[] invokeJoinRuntimeWorkers()
     {
-        StageCoordinator joinStageCoordinator = getQueuedStageCoordinator(joinStageId);
-        if (joinStageCoordinator == null)
-        {
-            return invokeJoinWorkersDirectly();
-        }
-
+        requireControlledStage(joinStageId, "join");
         List<CompletableFuture<? extends Output>> outputFutures = planCoordinator.activateStage(joinStageId);
         return outputFutures.toArray(new CompletableFuture[0]);
-    }
-
-    private CompletableFuture<? extends Output>[] invokeJoinWorkersDirectly()
-    {
-        CompletableFuture<? extends Output>[] outputs = new CompletableFuture[joinInputs.size()];
-        for (int i = 0; i < joinInputs.size(); ++i)
-        {
-            JoinInput joinInput = joinInputs.get(i);
-            if (joinAlgo == JoinAlgorithm.PARTITIONED)
-            {
-                outputs[i] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.PARTITIONED_JOIN).invoke(joinInput);
-            }
-            else if (joinAlgo == JoinAlgorithm.PARTITIONED_CHAIN)
-            {
-                outputs[i] = InvokerFactory.Instance()
-                        .getInvoker(WorkerType.PARTITIONED_CHAIN_JOIN).invoke(joinInput);
-            }
-            else
-            {
-                throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
-            }
-        }
-        return outputs;
     }
 
     @Override
@@ -230,13 +182,22 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
         return joinStageCoordinator;
     }
 
-    private StageCoordinator getQueuedStageCoordinator(int stageId)
+    private StageCoordinator requireControlledStage(int stageId, String stageRole)
     {
         StageCoordinator stageCoordinator = getStageCoordinator(stageId);
-        if (stageCoordinator == null || !stageCoordinator.isQueued() ||
-                planCoordinator.getStageRuntimeController(stageId) == null)
+        if (stageCoordinator == null)
         {
-            return null;
+            throw new IllegalStateException("S3QS " + stageRole +
+                    " stage is not initialized in PlanCoordinator");
+        }
+        if (!stageCoordinator.isQueued())
+        {
+            throw new IllegalStateException("S3QS " + stageRole + " stage is not queued");
+        }
+        if (planCoordinator.getStageRuntimeController(stageId) == null)
+        {
+            throw new IllegalStateException("S3QS " + stageRole +
+                    " stage does not have a runtime controller");
         }
         return stageCoordinator;
     }
@@ -266,7 +227,8 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
     private void registerStageRuntimeController(int stageId, WorkerType workerType)
     {
         planCoordinator.addStageRuntimeController(new StageExecutionDescriptor(
-                planCoordinator.getTransId(), getTimestamp(), stageId, getName(), workerType));
+                planCoordinator.getTransId(), getTimestamp(), stageId, getName(), workerType,
+                planCoordinator.getCoordinatorEndpoint()));
     }
 
     private long getTimestamp()
