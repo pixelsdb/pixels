@@ -23,7 +23,10 @@ import io.pixelsdb.pixels.planner.plan.physical.Operator;
 import io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.OutputCollection;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -41,17 +44,22 @@ public class CoordinatedPlanExecution implements AutoCloseable
     private final Operator rootOperator;
     private final PlanCoordinator planCoordinator;
     private final PlanCoordinatorFactory coordinatorFactory;
+    private final ShuffleResourceLifecycle shuffleResourceLifecycle;
     private CompletableFuture<CompletableFuture<? extends Output>[]> executionFuture;
     private boolean executed;
+    private boolean resourcesPrepared;
     private boolean closed;
 
     CoordinatedPlanExecution(long transId, Operator rootOperator, PlanCoordinator planCoordinator,
-                             PlanCoordinatorFactory coordinatorFactory)
+                             PlanCoordinatorFactory coordinatorFactory,
+                             ShuffleResourceLifecycle shuffleResourceLifecycle)
     {
         this.transId = transId;
         this.rootOperator = requireNonNull(rootOperator, "rootOperator is null");
         this.planCoordinator = requireNonNull(planCoordinator, "planCoordinator is null");
         this.coordinatorFactory = requireNonNull(coordinatorFactory, "coordinatorFactory is null");
+        this.shuffleResourceLifecycle =
+                requireNonNull(shuffleResourceLifecycle, "shuffleResourceLifecycle is null");
     }
 
     public synchronized CompletableFuture<CompletableFuture<? extends Output>[]> execute()
@@ -59,25 +67,46 @@ public class CoordinatedPlanExecution implements AutoCloseable
         checkState(!closed, "plan execution is closed");
         checkState(!executed, "plan execution has already started");
         executed = true;
-        executionFuture = rootOperator.execute();
-        return executionFuture;
+        try
+        {
+            shuffleResourceLifecycle.prepare(planCoordinator.getShuffleInfos());
+            resourcesPrepared = true;
+            executionFuture = rootOperator.execute();
+            return executionFuture;
+        }
+        catch (IOException e)
+        {
+            CompletionException failure =
+                    new CompletionException("failed to prepare query shuffle resources", e);
+            closeAfterFailure(failure);
+            throw failure;
+        }
+        catch (RuntimeException | Error e)
+        {
+            closeAfterFailure(e);
+            throw e;
+        }
     }
 
     public synchronized OutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
         checkState(!closed, "plan execution is closed");
         checkState(executed, "plan execution has not started");
+        OutputCollection outputs;
         try
         {
             // Ensure the final stage has been started and its worker futures
             // have been installed before traversing the operator output tree.
             executionFuture.get();
-            return rootOperator.collectOutputs();
+            outputs = rootOperator.collectOutputs();
         }
-        finally
+        catch (ExecutionException | InterruptedException | RuntimeException | Error e)
         {
-            close();
+            closeAfterFailure(e);
+            throw e;
         }
+        close();
+        return outputs;
     }
 
     public PlanCoordinator getPlanCoordinator()
@@ -88,10 +117,42 @@ public class CoordinatedPlanExecution implements AutoCloseable
     @Override
     public synchronized void close()
     {
-        if (!closed)
+        if (closed)
+        {
+            return;
+        }
+        closed = true;
+        IOException cleanupFailure = null;
+        try
+        {
+            if (resourcesPrepared)
+            {
+                shuffleResourceLifecycle.cleanup();
+            }
+        }
+        catch (IOException e)
+        {
+            cleanupFailure = e;
+        }
+        finally
         {
             coordinatorFactory.removePlanCoordinator(transId, planCoordinator);
-            closed = true;
+        }
+        if (cleanupFailure != null)
+        {
+            throw new UncheckedIOException("failed to clean query shuffle resources", cleanupFailure);
+        }
+    }
+
+    private void closeAfterFailure(Throwable failure)
+    {
+        try
+        {
+            close();
+        }
+        catch (RuntimeException cleanupFailure)
+        {
+            failure.addSuppressed(cleanupFailure);
         }
     }
 }

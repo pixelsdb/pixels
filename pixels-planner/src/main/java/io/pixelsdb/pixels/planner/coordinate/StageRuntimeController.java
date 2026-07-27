@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -78,9 +79,25 @@ public class StageRuntimeController
         List<CompletableFuture<? extends Output>> visibleAttempts = new ArrayList<>(activeAttempts);
         for (int i = 0; i < workersToLaunch; ++i)
         {
-            CompletableFuture<? extends Output> attempt = requireNonNull(
+            CompletableFuture<? extends Output> launchedAttempt = requireNonNull(
                     workerLauncher.launch(descriptor.getWorkerType(), descriptor.createWorkerInput()),
                     "worker launcher returned null future");
+            CompletableFuture<? extends Output> attempt = launchedAttempt.thenApply(output ->
+            {
+                if (output == null)
+                {
+                    throw new CompletionException(new IllegalStateException(
+                            "runtime worker returned null output for stage " + descriptor.getStageId()));
+                }
+                if (!output.isSuccessful())
+                {
+                    String errorMessage = output.getErrorMessage();
+                    throw new CompletionException(new IllegalStateException(
+                            "runtime worker failed for stage " + descriptor.getStageId() +
+                                    (errorMessage == null || errorMessage.isEmpty() ? "" : ": " + errorMessage)));
+                }
+                return output;
+            });
             activeAttempts.add(attempt);
             visibleAttempts.add(attempt);
             attempt.whenComplete((output, error) -> removeCompletedAttempt(attempt));

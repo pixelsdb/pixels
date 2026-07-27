@@ -57,9 +57,12 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author Haoting Yan
@@ -184,11 +187,13 @@ public class TestPartitionedJoinS3QSOperator
         Map<WorkerType, Invoker> originalInvokers = replaceS3QSInvokers(partitionStageInvoker, joinStageInvoker);
         try
         {
-            PartitionInput smallPartition = partitionInput(7);
+            ShuffleInfo smallShuffle = validShuffleInfo("small-shuffle");
+            ShuffleInfo largeShuffle = validShuffleInfo("large-shuffle");
+            PartitionInput smallPartition = partitionInput(7, smallShuffle);
             smallPartition.setTableInfo(scanTableInfo("small", 2));
-            PartitionInput largePartition = partitionInput(8);
+            PartitionInput largePartition = partitionInput(8, largeShuffle);
             largePartition.setTableInfo(scanTableInfo("large", 2));
-            PartitionedJoinInput joinInput = joinInput(validShuffleInfo());
+            PartitionedJoinInput joinInput = joinInput(smallShuffle, largeShuffle);
             PartitionedJoinS3QSOperator operator = new PartitionedJoinS3QSOperator("s3qs-join",
                     Collections.singletonList(smallPartition), Collections.singletonList(largePartition),
                     Collections.<JoinInput>singletonList(joinInput), JoinAlgorithm.PARTITIONED);
@@ -240,6 +245,7 @@ public class TestPartitionedJoinS3QSOperator
             assertEquals(1, smallStage.getPendingTaskCount());
             assertEquals(1, largeStage.getPendingTaskCount());
             assertEquals(1, joinStage.getPendingTaskCount());
+            assertEquals(2, planCoordinator.getShuffleInfos().size());
         }
         finally
         {
@@ -247,21 +253,60 @@ public class TestPartitionedJoinS3QSOperator
         }
     }
 
+    @Test
+    public void outputCollectionWaitsForAllKnownAttemptsAfterOneFails() throws Exception
+    {
+        CompletableFuture<Output> failedAttempt = new CompletableFuture<>();
+        CompletableFuture<Output> runningAttempt = new CompletableFuture<>();
+
+        CompletableFuture<Void> collectionBarrier = CompletableFuture.runAsync(() ->
+        {
+            try
+            {
+                PartitionedJoinS3QSOperator.waitForAllAttempts(
+                        new CompletableFuture[] {failedAttempt, runningAttempt});
+            }
+            catch (ExecutionException | InterruptedException e)
+            {
+                throw new RuntimeException(e);
+            }
+        });
+
+        failedAttempt.completeExceptionally(new IllegalStateException("worker failed"));
+        assertFalse(collectionBarrier.isDone());
+
+        Output output = new Output() { };
+        output.setSuccessful(true);
+        runningAttempt.complete(output);
+        collectionBarrier.get();
+        assertTrue(collectionBarrier.isDone());
+    }
+
     private static ShuffleInfo validShuffleInfo()
     {
-        return new ShuffleInfo("shuffle-1",
+        return validShuffleInfo("shuffle-1");
+    }
+
+    private static ShuffleInfo validShuffleInfo(String shuffleId)
+    {
+        return new ShuffleInfo(shuffleId,
                 new StorageInfo(Storage.Scheme.s3qs, null, null, null, null),
-                "s3qs://bucket/shuffle/shuffle-1/",
+                "s3qs://bucket/shuffle/" + shuffleId + "/",
                 1, 1, 1, 1,
-                Collections.singletonList(new ShuffleQueueInfo(0, "shuffle-1-p0", null)));
+                Collections.singletonList(new ShuffleQueueInfo(0, shuffleId + "-p0", null)));
     }
 
     private static PartitionInput partitionInput(int producerTaskId)
     {
+        return partitionInput(producerTaskId, validShuffleInfo());
+    }
+
+    private static PartitionInput partitionInput(int producerTaskId, ShuffleInfo shuffleInfo)
+    {
         PartitionInput partitionInput = new PartitionInput();
         OutputInfo outputInfo = new OutputInfo("s3qs://bucket/shuffle/" + producerTaskId + "/part",
                 new StorageInfo(Storage.Scheme.s3qs, null, null, null, null), true);
-        outputInfo.setShuffleInfo(validShuffleInfo());
+        outputInfo.setShuffleInfo(shuffleInfo);
         partitionInput.setOutput(outputInfo);
         partitionInput.setProducerTaskId(producerTaskId);
         return partitionInput;
@@ -287,9 +332,14 @@ public class TestPartitionedJoinS3QSOperator
 
     private static PartitionedJoinInput joinInput(ShuffleInfo shuffleInfo)
     {
+        return joinInput(shuffleInfo, shuffleInfo);
+    }
+
+    private static PartitionedJoinInput joinInput(ShuffleInfo smallShuffleInfo, ShuffleInfo largeShuffleInfo)
+    {
         PartitionedJoinInput joinInput = new PartitionedJoinInput();
-        joinInput.setSmallTable(tableInfo(shuffleInfo));
-        joinInput.setLargeTable(tableInfo(shuffleInfo));
+        joinInput.setSmallTable(tableInfo(smallShuffleInfo));
+        joinInput.setLargeTable(tableInfo(largeShuffleInfo));
         return joinInput;
     }
 

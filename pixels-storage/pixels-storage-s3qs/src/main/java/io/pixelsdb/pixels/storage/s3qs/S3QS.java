@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.lang.UnsupportedOperationException;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link S3QS} is to write and read the small intermediate files in data shuffling. It is compatible with S3, hence its
@@ -55,7 +56,7 @@ public final class S3QS extends AbstractS3
 {
     private static final String SchemePrefix = Scheme.s3qs.name() + "://";
 
-    private final Map<Integer, S3Queue> partitionQueues;
+    private final Map<ShuffleQueueKey, S3Queue> partitionQueues;
     private final int invisibleTime;
 
     private SqsClient sqs;
@@ -67,7 +68,7 @@ public final class S3QS extends AbstractS3
 
     public S3QS(int invisibleTime){
         this.connect();
-        this.partitionQueues = new HashMap<>();
+        this.partitionQueues = new ConcurrentHashMap<>();
         this.invisibleTime = invisibleTime;
     }
 
@@ -107,11 +108,7 @@ public final class S3QS extends AbstractS3
 
     public PhysicalWriter offer(S3QueueMessage mesg) throws IOException
     {
-        S3Queue queue = partitionQueues.get(mesg.getPartitionNum());
-        if (queue == null)
-        {
-            throw new IOException("queue is not registered for partition " + mesg.getPartitionNum());
-        }
+        S3Queue queue = getRegisteredQueue(queueKey(mesg));
         return queue.offer(mesg);
     }
 
@@ -121,19 +118,22 @@ public final class S3QS extends AbstractS3
      */
     public void publish(S3QueueMessage mesg) throws IOException
     {
-        S3Queue queue = partitionQueues.get(mesg.getPartitionNum());
-        if (queue == null)
-        {
-            throw new IOException("queue is not registered for partition " + mesg.getPartitionNum());
-        }
+        S3Queue queue = getRegisteredQueue(queueKey(mesg));
         queue.push(mesg);
     }
 
-    public synchronized String registerQueue(int partitionId, String queueName, String queueUrl) throws IOException
+    public synchronized String registerQueue(String shuffleId, int partitionId,
+                                             String queueName, String queueUrl) throws IOException
     {
-        S3Queue queue = partitionQueues.get(partitionId);
+        ShuffleQueueKey key = queueKey(shuffleId, partitionId);
+        S3Queue queue = partitionQueues.get(key);
         if (queue != null)
         {
+            if (queueUrl != null && !queueUrl.trim().isEmpty() &&
+                    !queue.getQueueUrl().equals(queueUrl))
+            {
+                throw new IOException("queue " + key + " is already registered with a different URL");
+            }
             return queue.getQueueUrl();
         }
 
@@ -142,7 +142,7 @@ public final class S3QS extends AbstractS3
         {
             if (queueName == null || queueName.trim().isEmpty())
             {
-                throw new IOException("queue name is empty for partition " + partitionId);
+                throw new IOException("queue name is empty for " + key);
             }
             try
             {
@@ -151,13 +151,26 @@ public final class S3QS extends AbstractS3
             catch (RuntimeException e)
             {
                 throw new IOException("failed to create queue " + queueName +
-                        " for partition " + partitionId, e);
+                        " for " + key, e);
             }
         }
 
         queue = openQueue(resolvedQueueUrl);
-        partitionQueues.put(partitionId, queue);
+        partitionQueues.put(key, queue);
         return resolvedQueueUrl;
+    }
+
+    /**
+     * Remove one local queue wrapper without deleting the remote SQS queue.
+     * Remote resources are owned and deleted by the query lifecycle.
+     */
+    public void unregisterQueue(String shuffleId, int partitionId) throws IOException
+    {
+        S3Queue queue = partitionQueues.remove(queueKey(shuffleId, partitionId));
+        if (queue != null)
+        {
+            queue.close();
+        }
     }
 
     public String createQueue(String queueName) throws IOException
@@ -215,14 +228,11 @@ public final class S3QS extends AbstractS3
 
     public Map.Entry<String,PhysicalReader> poll(S3QueueMessage mesg, int timeoutSec) throws IOException
     {
-        S3Queue queue = partitionQueues.get(mesg.getPartitionNum());
-        if(queue == null)
-        {
-            throw new IOException("queue is not registered for partition " + mesg.getPartitionNum());
-        }
+        ShuffleQueueKey key = queueKey(mesg);
+        S3Queue queue = getRegisteredQueue(key);
         if(queue.isClosed())
         {
-            throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
+            throw new IOException("queue " + key + " is closed.");
         }
 
         try
@@ -231,7 +241,7 @@ public final class S3QS extends AbstractS3
         }
         catch (TaskErrorException e)
         {
-            throw new IOException("failed to poll queue for partition " + mesg.getPartitionNum(), e);
+            throw new IOException("failed to poll queue " + key, e);
         }
     }
 
@@ -242,16 +252,13 @@ public final class S3QS extends AbstractS3
      * distinguish DATA messages from producer-end markers before deciding
      * whether to open an S3 object.
      */
-    public S3QueuePollResult pollMessage(S3QueueMessage mesg, int timeoutSec) throws IOException
+    public S3QueuePollResult pollMessage(String shuffleId, int partitionId, int timeoutSec) throws IOException
     {
-        S3Queue queue = partitionQueues.get(mesg.getPartitionNum());
-        if(queue == null)
-        {
-            throw new IOException("queue is not registered for partition " + mesg.getPartitionNum());
-        }
+        ShuffleQueueKey key = queueKey(shuffleId, partitionId);
+        S3Queue queue = getRegisteredQueue(key);
         if(queue.isClosed())
         {
-            throw new IOException("queue " + mesg.getPartitionNum() + " is closed.");
+            throw new IOException("queue " + key + " is closed.");
         }
 
         try
@@ -260,18 +267,14 @@ public final class S3QS extends AbstractS3
         }
         catch (TaskErrorException e)
         {
-            throw new IOException("failed to poll queue for partition " + mesg.getPartitionNum(), e);
+            throw new IOException("failed to poll queue " + key, e);
         }
     }
 
     public int finishWork(S3QueueMessage mesg) throws IOException
     {
         String receiptHandle = mesg.getReceiptHandle();
-        S3Queue queue = partitionQueues.get(mesg.getPartitionNum());
-        if(queue == null)
-        {
-            throw new IOException("queue is not registered for partition " + mesg.getPartitionNum());
-        }
+        S3Queue queue = getRegisteredQueue(queueKey(mesg));
         try
         {
             queue.deleteMessage(receiptHandle);
@@ -282,6 +285,37 @@ public final class S3QS extends AbstractS3
             return 2;
         }
         return 0;
+    }
+
+    private S3Queue getRegisteredQueue(ShuffleQueueKey key) throws IOException
+    {
+        S3Queue queue = partitionQueues.get(key);
+        if (queue == null)
+        {
+            throw new IOException("queue is not registered for " + key);
+        }
+        return queue;
+    }
+
+    private static ShuffleQueueKey queueKey(S3QueueMessage message) throws IOException
+    {
+        if (message == null)
+        {
+            throw new IOException("queue message is null");
+        }
+        return queueKey(message.getShuffleId(), message.getPartitionId());
+    }
+
+    private static ShuffleQueueKey queueKey(String shuffleId, int partitionId) throws IOException
+    {
+        try
+        {
+            return new ShuffleQueueKey(shuffleId, partitionId);
+        }
+        catch (RuntimeException e)
+        {
+            throw new IOException("invalid shuffle queue identity", e);
+        }
     }
     @Override
     public DataInputStream open(String path) throws IOException

@@ -174,7 +174,7 @@ public class WorkerCommon
                 requireNonNull(queue, "shuffle queue is null");
                 checkArgument(queue.getPartitionId() >= 0 && queue.getPartitionId() < shuffleInfo.getNumPartitions(),
                         "shuffle queue partitionId is out of range");
-                String queueUrl = s3qsStorage.registerQueue(queue.getPartitionId(),
+                String queueUrl = s3qsStorage.registerQueue(shuffleInfo.getShuffleId(), queue.getPartitionId(),
                         queue.getQueueName(), queue.getQueueUrl());
                 queue.setQueueUrl(queueUrl);
             }

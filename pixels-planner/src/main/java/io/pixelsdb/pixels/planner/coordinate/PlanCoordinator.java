@@ -20,10 +20,16 @@
 package io.pixelsdb.pixels.planner.coordinate;
 
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleQueueInfo;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -56,6 +62,10 @@ public class PlanCoordinator
      * workers pull coordinator tasks, currently the S3QS shuffle stages.
      */
     private final Map<Integer, StageRuntimeController> stageRuntimeControllers = new HashMap<>();
+    /**
+     * Query-owned shuffle edges keyed by their query-unique shuffle id.
+     */
+    private final Map<String, ShuffleInfo> shuffleInfos = new HashMap<>();
     private final CoordinatorEndpoint coordinatorEndpoint;
     private final StageWorkerLauncher stageWorkerLauncher;
     /**
@@ -180,6 +190,31 @@ public class PlanCoordinator
     }
 
     /**
+     * Register one shuffle edge with this query. Producer and consumer inputs
+     * may reference separate but equivalent metadata objects, so duplicates
+     * are accepted only when all resource-defining fields agree.
+     */
+    public void addShuffleInfo(ShuffleInfo shuffleInfo)
+    {
+        requireNonNull(shuffleInfo, "shuffleInfo is null");
+        String shuffleId = requireNonNull(shuffleInfo.getShuffleId(), "shuffleId is null");
+        checkArgument(!shuffleId.trim().isEmpty(), "shuffleId is empty");
+        ShuffleInfo previous = this.shuffleInfos.get(shuffleId);
+        if (previous == null)
+        {
+            this.shuffleInfos.put(shuffleId, shuffleInfo);
+            return;
+        }
+        checkArgument(sameShuffleResource(previous, shuffleInfo),
+                "conflicting shuffle metadata for shuffleId " + shuffleId);
+    }
+
+    public Collection<ShuffleInfo> getShuffleInfos()
+    {
+        return Collections.unmodifiableCollection(new ArrayList<>(this.shuffleInfos.values()));
+    }
+
+    /**
      * Assign an id for a stage. This should only be called in
      * {@link io.pixelsdb.pixels.planner.plan.physical.Operator#initPlanCoordinator(PlanCoordinator, int, boolean)}
      * when building the plan coordinator for a query plan.
@@ -188,5 +223,38 @@ public class PlanCoordinator
     public int assignStageId()
     {
         return this.stageIdAssigner.getAndIncrement();
+    }
+
+    private static boolean sameShuffleResource(ShuffleInfo left, ShuffleInfo right)
+    {
+        if (!Objects.equals(left.getObjectPathPrefix(), right.getObjectPathPrefix()) ||
+                left.getNumPartitions() != right.getNumPartitions() ||
+                left.getStorageInfo() == null || right.getStorageInfo() == null ||
+                left.getStorageInfo().getScheme() != right.getStorageInfo().getScheme())
+        {
+            return false;
+        }
+        List<ShuffleQueueInfo> leftQueues = left.getQueues();
+        List<ShuffleQueueInfo> rightQueues = right.getQueues();
+        if (leftQueues == null || rightQueues == null || leftQueues.size() != rightQueues.size())
+        {
+            return false;
+        }
+        Map<Integer, ShuffleQueueInfo> rightByPartition = new HashMap<>();
+        for (ShuffleQueueInfo queue : rightQueues)
+        {
+            rightByPartition.put(queue.getPartitionId(), queue);
+        }
+        for (ShuffleQueueInfo leftQueue : leftQueues)
+        {
+            ShuffleQueueInfo rightQueue = rightByPartition.get(leftQueue.getPartitionId());
+            if (rightQueue == null ||
+                    !Objects.equals(leftQueue.getQueueName(), rightQueue.getQueueName()) ||
+                    !Objects.equals(leftQueue.getQueueUrl(), rightQueue.getQueueUrl()))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -65,10 +65,19 @@ public class PlanCoordinatorFactory
     public PlanCoordinator createPlanCoordinator(long transId, Operator planRootOperator,
                                                  CoordinatorEndpoint coordinatorEndpoint)
     {
+        return createPlanCoordinator(transId, planRootOperator, coordinatorEndpoint,
+                new InvokerStageWorkerLauncher());
+    }
+
+    public PlanCoordinator createPlanCoordinator(long transId, Operator planRootOperator,
+                                                 CoordinatorEndpoint coordinatorEndpoint,
+                                                 StageWorkerLauncher stageWorkerLauncher)
+    {
         requireNonNull(planRootOperator, "planRootOperator is null");
         checkState(!this.transIdToPlanCoordinator.containsKey(transId),
                 "plan coordinator already exists for transaction %s", transId);
-        PlanCoordinator planCoordinator = new PlanCoordinator(transId, coordinatorEndpoint);
+        PlanCoordinator planCoordinator = new PlanCoordinator(transId, coordinatorEndpoint,
+                requireNonNull(stageWorkerLauncher, "stageWorkerLauncher is null"));
         planRootOperator.initPlanCoordinator(planCoordinator, -1, false);
         PlanCoordinator previous = this.transIdToPlanCoordinator.putIfAbsent(transId, planCoordinator);
         checkState(previous == null, "plan coordinator already exists for transaction %s", transId);
@@ -83,9 +92,27 @@ public class PlanCoordinatorFactory
     public CoordinatedPlanExecution createPlanExecution(long transId, Operator planRootOperator,
                                                         CoordinatorEndpoint coordinatorEndpoint)
     {
+        return createPlanExecution(transId, planRootOperator, coordinatorEndpoint,
+                new S3QSShuffleResourceLifecycle());
+    }
+
+    public CoordinatedPlanExecution createPlanExecution(long transId, Operator planRootOperator,
+                                                        CoordinatorEndpoint coordinatorEndpoint,
+                                                        ShuffleResourceLifecycle shuffleResourceLifecycle)
+    {
+        return createPlanExecution(transId, planRootOperator, coordinatorEndpoint,
+                shuffleResourceLifecycle, new InvokerStageWorkerLauncher());
+    }
+
+    public CoordinatedPlanExecution createPlanExecution(long transId, Operator planRootOperator,
+                                                        CoordinatorEndpoint coordinatorEndpoint,
+                                                        ShuffleResourceLifecycle shuffleResourceLifecycle,
+                                                        StageWorkerLauncher stageWorkerLauncher)
+    {
         PlanCoordinator planCoordinator =
-                createPlanCoordinator(transId, planRootOperator, coordinatorEndpoint);
-        return new CoordinatedPlanExecution(transId, planRootOperator, planCoordinator, this);
+                createPlanCoordinator(transId, planRootOperator, coordinatorEndpoint, stageWorkerLauncher);
+        return new CoordinatedPlanExecution(transId, planRootOperator, planCoordinator, this,
+                requireNonNull(shuffleResourceLifecycle, "shuffleResourceLifecycle is null"));
     }
 
     /**

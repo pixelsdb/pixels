@@ -25,16 +25,20 @@ import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.planner.plan.physical.input.StageWorkerInput;
+import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class TestStageRuntimeController
 {
@@ -135,6 +139,48 @@ public class TestStageRuntimeController
         assertEquals(1, stage.getPendingTaskCount());
     }
 
+    @Test
+    public void successfulWorkerOutputIsVisibleToOperator() throws Exception
+    {
+        StageCoordinator stage = stageCoordinator(1);
+        RecordingStageWorkerLauncher launcher = new RecordingStageWorkerLauncher();
+        StageRuntimeController controller = controller(stage, launcher);
+
+        CompletableFuture<? extends Output> visibleAttempt = controller.scaleTo(1).get(0);
+        PartitionOutput output = new PartitionOutput();
+        output.setSuccessful(true);
+        launcher.complete(0, output);
+
+        assertSame(output, visibleAttempt.get());
+        assertEquals(0, controller.getStatus().getActiveAttemptCount());
+    }
+
+    @Test
+    public void unsuccessfulWorkerOutputFailsTheVisibleAttempt() throws Exception
+    {
+        StageCoordinator stage = stageCoordinator(1);
+        RecordingStageWorkerLauncher launcher = new RecordingStageWorkerLauncher();
+        StageRuntimeController controller = controller(stage, launcher);
+
+        CompletableFuture<? extends Output> visibleAttempt = controller.scaleTo(1).get(0);
+        PartitionOutput output = new PartitionOutput();
+        output.setSuccessful(false);
+        output.setErrorMessage("partition task failed");
+        launcher.complete(0, output);
+
+        try
+        {
+            visibleAttempt.get();
+            fail("unsuccessful worker output should fail the stage attempt");
+        }
+        catch (ExecutionException e)
+        {
+            assertTrue(e.getCause() instanceof IllegalStateException);
+            assertTrue(e.getCause().getMessage().contains("partition task failed"));
+        }
+        assertEquals(0, controller.getStatus().getActiveAttemptCount());
+    }
+
     private static StageRuntimeController controller(StageCoordinator stage,
                                                      RecordingStageWorkerLauncher launcher)
     {
@@ -164,7 +210,7 @@ public class TestStageRuntimeController
     private static class RecordingStageWorkerLauncher implements StageWorkerLauncher
     {
         private final List<StageWorkerInput> inputs = new ArrayList<>();
-        private final List<CompletableFuture<? extends Output>> futures = new ArrayList<>();
+        private final List<CompletableFuture<Output>> futures = new ArrayList<>();
 
         @Override
         public CompletableFuture<? extends Output> launch(WorkerType workerType, StageWorkerInput input)
@@ -173,6 +219,11 @@ public class TestStageRuntimeController
             CompletableFuture<Output> future = new CompletableFuture<>();
             futures.add(future);
             return future;
+        }
+
+        private void complete(int attemptIndex, Output output)
+        {
+            futures.get(attemptIndex).complete(output);
         }
     }
 }

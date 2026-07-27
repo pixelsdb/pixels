@@ -510,8 +510,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 return result;
             }
         }
-        S3QueueMessage pollRequest = new S3QueueMessage().setPartitionNum(partitionId);
-        S3QueuePollResult result = s3qs.pollMessage(pollRequest, shuffleInfo.getPollTimeoutSeconds());
+        S3QueuePollResult result = s3qs.pollMessage(
+                shuffleInfo.getShuffleId(), partitionId, shuffleInfo.getPollTimeoutSeconds());
         if (result != null)
         {
             validateS3QSMessage(shuffleInfo, partitionId, result.getMessage());

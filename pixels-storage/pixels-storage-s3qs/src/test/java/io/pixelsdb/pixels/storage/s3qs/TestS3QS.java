@@ -27,6 +27,8 @@ import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
+import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
+import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
@@ -38,8 +40,13 @@ import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -47,8 +54,10 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT;
@@ -117,12 +126,102 @@ public class TestS3QS
         SqsClient sqs = mock(SqsClient.class);
         S3QS s3qs = newS3QS(sqs);
 
-        String firstUrl = s3qs.registerQueue(3, "ignored-name", QUEUE_URL);
-        String secondUrl = s3qs.registerQueue(3, "another-name", "another-url");
+        String firstUrl = s3qs.registerQueue("shuffle-idempotent", 3, "ignored-name", QUEUE_URL);
+        String secondUrl = s3qs.registerQueue("shuffle-idempotent", 3, "another-name", QUEUE_URL);
 
         assertEquals(QUEUE_URL, firstUrl);
         assertEquals(QUEUE_URL, secondUrl);
         verify(sqs, never()).createQueue(any(CreateQueueRequest.class));
+    }
+
+    @Test(expected = IOException.class)
+    public void testRegisterQueueRejectsConflictingUrlForSameShufflePartition() throws Exception
+    {
+        S3QS s3qs = newS3QS(mock(SqsClient.class));
+        s3qs.registerQueue("shuffle-conflict", 3, "ignored-name", QUEUE_URL);
+        s3qs.registerQueue("shuffle-conflict", 3, "another-name", "another-url");
+    }
+
+    @Test(expected = IOException.class)
+    public void testRegisterQueueRejectsEmptyShuffleId() throws Exception
+    {
+        S3QS s3qs = newS3QS(mock(SqsClient.class));
+        s3qs.registerQueue(" ", 0, "ignored-name", QUEUE_URL);
+    }
+
+    @Test
+    public void testConcurrentRegistrationCreatesOneQueueForOneShufflePartition() throws Exception
+    {
+        SqsClient sqs = mock(SqsClient.class);
+        when(sqs.getQueueUrl(any(GetQueueUrlRequest.class)))
+                .thenReturn(GetQueueUrlResponse.builder().queueUrl(QUEUE_URL).build());
+        S3QS s3qs = newS3QS(sqs);
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        try
+        {
+            Callable<String> registration =
+                    () -> s3qs.registerQueue("shuffle-concurrent", 0, "concurrent-queue", null);
+            List<Future<String>> results = executor.invokeAll(Collections.nCopies(16, registration));
+
+            for (Future<String> result : results)
+            {
+                assertEquals(QUEUE_URL, result.get());
+            }
+            verify(sqs, times(1)).createQueue(any(CreateQueueRequest.class));
+        }
+        finally
+        {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void testSamePartitionInDifferentShufflesRoutesIndependently() throws Exception
+    {
+        String smallQueueUrl = QUEUE_URL + "-small";
+        String largeQueueUrl = QUEUE_URL + "-large";
+        SqsClient sqs = mock(SqsClient.class);
+        S3QS s3qs = newS3QS(sqs);
+        s3qs.registerQueue("small-shuffle", 0, "small", smallQueueUrl);
+        s3qs.registerQueue("large-shuffle", 0, "large", largeQueueUrl);
+
+        S3QueueMessage small = S3QueueMessage.producerEnd("small-shuffle", 0, 1, 0, 1L);
+        S3QueueMessage large = S3QueueMessage.producerEnd("large-shuffle", 0, 2, 0, 1L);
+        s3qs.publish(small);
+        s3qs.publish(large);
+
+        ArgumentCaptor<SendMessageRequest> sends = ArgumentCaptor.forClass(SendMessageRequest.class);
+        verify(sqs, times(2)).sendMessage(sends.capture());
+        assertEquals(smallQueueUrl, sends.getAllValues().get(0).queueUrl());
+        assertEquals(largeQueueUrl, sends.getAllValues().get(1).queueUrl());
+
+        when(sqs.receiveMessage(any(ReceiveMessageRequest.class))).thenAnswer(invocation ->
+        {
+            ReceiveMessageRequest request = invocation.getArgument(0);
+            if (smallQueueUrl.equals(request.queueUrl()))
+            {
+                return receive("small-receipt", small);
+            }
+            if (largeQueueUrl.equals(request.queueUrl()))
+            {
+                return receive("large-receipt", large);
+            }
+            throw new AssertionError("unexpected queue URL: " + request.queueUrl());
+        });
+
+        S3QueuePollResult smallResult = s3qs.pollMessage("small-shuffle", 0, 1);
+        S3QueuePollResult largeResult = s3qs.pollMessage("large-shuffle", 0, 1);
+        assertEquals("small-shuffle", smallResult.getMessage().getShuffleId());
+        assertEquals("large-shuffle", largeResult.getMessage().getShuffleId());
+
+        smallResult.getMessage().setReceiptHandle(smallResult.getReceiptHandle());
+        largeResult.getMessage().setReceiptHandle(largeResult.getReceiptHandle());
+        assertEquals(0, s3qs.finishWork(smallResult.getMessage()));
+        assertEquals(0, s3qs.finishWork(largeResult.getMessage()));
+        verify(sqs).deleteMessage(DeleteMessageRequest.builder()
+                .queueUrl(smallQueueUrl).receiptHandle("small-receipt").build());
+        verify(sqs).deleteMessage(DeleteMessageRequest.builder()
+                .queueUrl(largeQueueUrl).receiptHandle("large-receipt").build());
     }
 
     @Test
@@ -130,7 +229,7 @@ public class TestS3QS
     {
         SqsClient sqs = mock(SqsClient.class);
         S3QS s3qs = newS3QS(sqs);
-        s3qs.registerQueue(9, "ignored-name", QUEUE_URL);
+        s3qs.registerQueue("shuffle-3", 9, "ignored-name", QUEUE_URL);
 
         S3QueueMessage marker = S3QueueMessage.producerEnd("shuffle-3", 9, 17, 1, 88L);
         s3qs.publish(marker);
@@ -154,7 +253,7 @@ public class TestS3QS
     {
         SqsClient sqs = mock(SqsClient.class);
         S3QS s3qs = newS3QS(sqs);
-        s3qs.registerQueue(4, "ignored-name", QUEUE_URL);
+        s3qs.registerQueue("shuffle-4", 4, "ignored-name", QUEUE_URL);
         S3QueueMessage body = S3QueueMessage.data("shuffle-4", 4, 2, 0, 10L,
                 "bucket/shuffle/4/object");
 
@@ -166,7 +265,7 @@ public class TestS3QS
         when(sqs.receiveMessage(any(ReceiveMessageRequest.class)))
                 .thenReturn(ReceiveMessageResponse.builder().messages(sqsMessage).build());
 
-        S3QueuePollResult result = s3qs.pollMessage(new S3QueueMessage().setPartitionId(4), 99);
+        S3QueuePollResult result = s3qs.pollMessage("shuffle-4", 4, 99);
 
         assertNotNull(result);
         assertEquals("receipt-1", result.getReceiptHandle());
@@ -185,7 +284,7 @@ public class TestS3QS
     {
         SqsClient sqs = mock(SqsClient.class);
         S3QS s3qs = newS3QS(sqs);
-        s3qs.registerQueue(6, "ignored-name", QUEUE_URL);
+        s3qs.registerQueue("shuffle-5", 6, "ignored-name", QUEUE_URL);
         S3QueueMessage body = S3QueueMessage.producerEnd("shuffle-5", 6, 2, 0, 10L);
 
         Message sqsMessage = Message.builder()
@@ -196,7 +295,7 @@ public class TestS3QS
         when(sqs.receiveMessage(any(ReceiveMessageRequest.class)))
                 .thenReturn(ReceiveMessageResponse.builder().messages(sqsMessage).build());
 
-        s3qs.poll(new S3QueueMessage().setPartitionId(6), 1);
+        s3qs.poll(new S3QueueMessage().setShuffleId("shuffle-5").setPartitionId(6), 1);
     }
 
     @Test
@@ -204,9 +303,10 @@ public class TestS3QS
     {
         SqsClient sqs = mock(SqsClient.class);
         S3QS s3qs = newS3QS(sqs);
-        s3qs.registerQueue(8, "ignored-name", QUEUE_URL);
+        s3qs.registerQueue("shuffle-ack", 8, "ignored-name", QUEUE_URL);
 
         int result = s3qs.finishWork(new S3QueueMessage()
+                .setShuffleId("shuffle-ack")
                 .setPartitionId(8)
                 .setReceiptHandle("receipt-finished"));
 
@@ -243,7 +343,7 @@ public class TestS3QS
 
         try
         {
-            queueUrl = s3qs.registerQueue(0, queuePrefix + "-" + suffix, null);
+            queueUrl = s3qs.registerQueue(shuffleId, 0, queuePrefix + "-" + suffix, null);
             byte[] payload = ("payload-" + suffix).getBytes(StandardCharsets.UTF_8);
             S3QueueMessage dataMessage = S3QueueMessage.data(shuffleId, 0, 3, 0, 0L, objectRoot)
                     .setMetadata("schema=raw-bytes");
@@ -252,7 +352,7 @@ public class TestS3QS
             writer.append(payload);
             writer.close();
 
-            S3QueuePollResult dataResult = pollUntilMessage(s3qs, 0, 5);
+            S3QueuePollResult dataResult = pollUntilMessage(s3qs, shuffleId, 0, 5);
             assertNotNull(dataResult);
             assertTrue(dataResult.getMessage().isData());
             assertEquals(shuffleId, dataResult.getMessage().getShuffleId());
@@ -274,7 +374,7 @@ public class TestS3QS
 
             S3QueueMessage endMessage = S3QueueMessage.producerEnd(shuffleId, 0, 3, 0, 1L);
             s3qs.publish(endMessage);
-            S3QueuePollResult endResult = pollUntilMessage(s3qs, 0, 5);
+            S3QueuePollResult endResult = pollUntilMessage(s3qs, shuffleId, 0, 5);
             assertNotNull(endResult);
             assertTrue(endResult.getMessage().isProducerEnd());
             endResult.getMessage().setReceiptHandle(endResult.getReceiptHandle());
@@ -304,18 +404,28 @@ public class TestS3QS
         return Collections.singletonMap(APPROXIMATE_RECEIVE_COUNT, String.valueOf(count));
     }
 
-    private static S3QueuePollResult pollUntilMessage(S3QS s3qs, int partitionId, int attempts) throws IOException
+    private static S3QueuePollResult pollUntilMessage(S3QS s3qs, String shuffleId,
+                                                      int partitionId, int attempts) throws IOException
     {
-        S3QueueMessage request = new S3QueueMessage().setPartitionId(partitionId);
         for (int i = 0; i < attempts; ++i)
         {
-            S3QueuePollResult result = s3qs.pollMessage(request, 1);
+            S3QueuePollResult result = s3qs.pollMessage(shuffleId, partitionId, 1);
             if (result != null)
             {
                 return result;
             }
         }
         return null;
+    }
+
+    private static ReceiveMessageResponse receive(String receiptHandle, S3QueueMessage message) throws IOException
+    {
+        Message sqsMessage = Message.builder()
+                .body(message.toMessageBody())
+                .receiptHandle(receiptHandle)
+                .attributes(receiveCount(1))
+                .build();
+        return ReceiveMessageResponse.builder().messages(sqsMessage).build();
     }
 
     private static String trimSlashes(String value)

@@ -114,7 +114,7 @@ public class TestS3QSConsumerWiring
         S3QS s3qs = newS3QS(sqs);
         try
         {
-            s3qs.registerQueue(0, "ignored-name", "queue-url-0");
+            s3qs.registerQueue("shuffle-1", 0, "ignored-name", "queue-url-0");
             setWorkerCommonS3QS(s3qs);
 
             TypeDescription schema = TypeDescription.createStruct()

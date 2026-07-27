@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -69,6 +70,7 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
     @Override
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
+        registerShuffleResources(planCoordinator);
         super.initPlanCoordinator(planCoordinator, parentStageId, wideDependOnParent);
         if (!smallPartitionInputs.isEmpty())
         {
@@ -79,6 +81,33 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             registerStageRuntimeController(largePartitionStageId, WorkerType.PARTITION_S3QS);
         }
         registerStageRuntimeController(joinStageId, getS3QSJoinWorkerType());
+    }
+
+    private void registerShuffleResources(PlanCoordinator planCoordinator)
+    {
+        for (PartitionInput input : smallPartitionInputs)
+        {
+            planCoordinator.addShuffleInfo(input.getOutput().getShuffleInfo());
+        }
+        for (PartitionInput input : largePartitionInputs)
+        {
+            planCoordinator.addShuffleInfo(input.getOutput().getShuffleInfo());
+        }
+        for (JoinInput input : joinInputs)
+        {
+            if (input instanceof PartitionedJoinInput)
+            {
+                PartitionedJoinInput joinInput = (PartitionedJoinInput) input;
+                planCoordinator.addShuffleInfo(joinInput.getSmallTable().getShuffleInfo());
+                planCoordinator.addShuffleInfo(joinInput.getLargeTable().getShuffleInfo());
+            }
+            else if (input instanceof PartitionedChainJoinInput)
+            {
+                PartitionedChainJoinInput joinInput = (PartitionedChainJoinInput) input;
+                planCoordinator.addShuffleInfo(joinInput.getSmallTable().getShuffleInfo());
+                planCoordinator.addShuffleInfo(joinInput.getLargeTable().getShuffleInfo());
+            }
+        }
     }
 
     @Override
@@ -135,6 +164,41 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             logger.debug("invoke large S3QS partition of " + this.getName());
         }
         return Completed;
+    }
+
+    /**
+     * Wait for every worker attempt started by this S3QS operator before the
+     * query lifecycle is allowed to delete queues and object prefixes. The
+     * inherited collector then reads each future again and propagates the
+     * original worker failure.
+     */
+    @Override
+    public JoinOutputCollection collectOutputs() throws ExecutionException, InterruptedException
+    {
+        waitForAllAttempts(joinOutputs, smallPartitionOutputs, largePartitionOutputs);
+        return super.collectOutputs();
+    }
+
+    @SafeVarargs
+    static void waitForAllAttempts(CompletableFuture<? extends Output>[]... stageAttempts)
+            throws ExecutionException, InterruptedException
+    {
+        List<CompletableFuture<?>> attempts = new ArrayList<>();
+        for (CompletableFuture<? extends Output>[] stage : stageAttempts)
+        {
+            if (stage != null)
+            {
+                for (CompletableFuture<? extends Output> attempt : stage)
+                {
+                    attempts.add(attempt);
+                }
+            }
+        }
+        if (!attempts.isEmpty())
+        {
+            CompletableFuture.allOf(attempts.toArray(new CompletableFuture[0]))
+                    .handle((ignored, failure) -> null).get();
+        }
     }
 
     private CompletableFuture<? extends Output>[] invokePartitionRuntimeWorkers(int partitionStageId)

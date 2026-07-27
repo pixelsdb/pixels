@@ -19,11 +19,18 @@
 package io.pixelsdb.pixels.planner.coordinate;
 
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.planner.plan.physical.Operator;
 import io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.OutputCollection;
 import io.pixelsdb.pixels.planner.plan.physical.ScanOperator.ScanOutputCollection;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleQueueInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -103,6 +110,28 @@ public class TestCoordinatedPlanExecution
         assertNull(factory.getPlanCoordinator(transId));
     }
 
+    @Test
+    public void shuffleResourcesArePreparedBeforeExecutionAndCleanedOnce() throws Exception
+    {
+        long transId = NextTransId.getAndIncrement();
+        PlanCoordinatorFactory factory = PlanCoordinatorFactory.Instance();
+        RecordingOperator operator = new RecordingOperator(transId);
+        operator.shuffleInfo = shuffleInfo("shuffle-lifecycle");
+        RecordingShuffleResourceLifecycle lifecycle = new RecordingShuffleResourceLifecycle();
+        operator.lifecycle = lifecycle;
+        CoordinatedPlanExecution execution = factory.createPlanExecution(transId, operator,
+                new CoordinatorEndpoint("localhost", 18894), lifecycle);
+
+        execution.execute().get();
+        assertTrue(operator.resourcesWerePreparedDuringExecute);
+        assertEquals(1, lifecycle.preparedShuffleCount);
+
+        execution.collectOutputs();
+        execution.close();
+        assertEquals(1, lifecycle.cleanupCount);
+        assertNull(factory.getPlanCoordinator(transId));
+    }
+
     @Test(expected = IllegalStateException.class)
     public void duplicateTransactionCanNotReplaceActiveCoordinator()
     {
@@ -133,12 +162,23 @@ public class TestCoordinatedPlanExecution
         new CoordinatorEndpoint("localhost", 0);
     }
 
+    private static ShuffleInfo shuffleInfo(String shuffleId)
+    {
+        return new ShuffleInfo(shuffleId,
+                new StorageInfo(Storage.Scheme.s3qs, null, null, null, null),
+                "bucket/" + shuffleId + "/", 1, 1, 1, 1,
+                Collections.singletonList(new ShuffleQueueInfo(0, shuffleId + "-p0", null)));
+    }
+
     private static class RecordingOperator extends Operator
     {
         private final long transId;
         private final OutputCollection outputs = new ScanOutputCollection();
         private PlanCoordinator initializedCoordinator;
         private boolean coordinatorWasRegisteredDuringExecute;
+        private boolean resourcesWerePreparedDuringExecute;
+        private ShuffleInfo shuffleInfo;
+        private RecordingShuffleResourceLifecycle lifecycle;
         private CompletableFuture<CompletableFuture<? extends Output>[]> executionFuture =
                 CompletableFuture.completedFuture(new CompletableFuture[0]);
 
@@ -153,6 +193,10 @@ public class TestCoordinatedPlanExecution
                                         boolean wideDependOnParent)
         {
             this.initializedCoordinator = planCoordinator;
+            if (shuffleInfo != null)
+            {
+                planCoordinator.addShuffleInfo(shuffleInfo);
+            }
         }
 
         @Override
@@ -160,6 +204,7 @@ public class TestCoordinatedPlanExecution
         {
             coordinatorWasRegisteredDuringExecute =
                     PlanCoordinatorFactory.Instance().getPlanCoordinator(transId) == initializedCoordinator;
+            resourcesWerePreparedDuringExecute = lifecycle != null && lifecycle.prepared;
             return executionFuture;
         }
 
@@ -173,6 +218,26 @@ public class TestCoordinatedPlanExecution
         public OutputCollection collectOutputs()
         {
             return outputs;
+        }
+    }
+
+    private static class RecordingShuffleResourceLifecycle implements ShuffleResourceLifecycle
+    {
+        private boolean prepared;
+        private int preparedShuffleCount;
+        private int cleanupCount;
+
+        @Override
+        public void prepare(Collection<ShuffleInfo> shuffleInfos)
+        {
+            prepared = true;
+            preparedShuffleCount = shuffleInfos.size();
+        }
+
+        @Override
+        public void cleanup() throws IOException
+        {
+            ++cleanupCount;
         }
     }
 }
