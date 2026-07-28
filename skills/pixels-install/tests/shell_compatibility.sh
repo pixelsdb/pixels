@@ -116,6 +116,56 @@ for remote_output in "$TEST_ROOT/bash-remote-command" "$TEST_ROOT/zsh-remote-com
   grep -Fq 'start' "$remote_output"
 done
 
+# Bash arrays are 0-indexed and Zsh arrays are 1-indexed, so array index
+# arithmetic parses cleanly under both shells while silently skipping a node
+# in one of them. `bash -n`/`zsh -n` cannot catch that, so drive the cluster
+# functions with a stubbed launcher and compare which nodes they act on.
+mkdir -p "$TRINO_HOME_LINK/bin"
+cat > "$TRINO_HOME_LINK/bin/launcher" <<'EOF'
+#!/usr/bin/env bash
+printf 'local %s\n' "$1"
+EOF
+chmod +x "$TRINO_HOME_LINK/bin/launcher"
+
+cluster_order_script='
+source "$1"
+TRINO_HOME_LINK="$2"
+_trino_remote_run() { printf "remote %s %s\n" "$1" "$2"; }
+stop_trino_cluster
+start_trino_cluster
+'
+bash -c "$cluster_order_script" bash "$TRINO_FUNCTIONS_FILE" "$TRINO_HOME_LINK" \
+  > "$TEST_ROOT/bash-cluster-order"
+zsh -f -c "$cluster_order_script" zsh "$TRINO_FUNCTIONS_FILE" "$TRINO_HOME_LINK" \
+  > "$TEST_ROOT/zsh-cluster-order"
+
+cat > "$TEST_ROOT/expected-cluster-order" <<'EOF'
+stopping trino on root@worker-1 (worker, remote)
+remote root@worker-1 stop
+stopping trino on root@worker-2 (worker, remote)
+remote root@worker-2 stop
+stopping trino on root@coordinator (coordinator, local)
+local stop
+trino cluster stopped
+starting trino on root@coordinator (coordinator, local)
+local start
+starting trino on root@worker-1 (worker, remote)
+remote root@worker-1 start
+starting trino on root@worker-2 (worker, remote)
+remote root@worker-2 start
+trino cluster started
+EOF
+if ! cmp -s "$TEST_ROOT/bash-cluster-order" "$TEST_ROOT/expected-cluster-order"; then
+  printf 'the cluster functions act on the wrong nodes under bash\n' >&2
+  diff -u "$TEST_ROOT/expected-cluster-order" "$TEST_ROOT/bash-cluster-order" >&2
+  exit 1
+fi
+if ! cmp -s "$TEST_ROOT/zsh-cluster-order" "$TEST_ROOT/bash-cluster-order"; then
+  printf 'the cluster functions act on different nodes under zsh than under bash\n' >&2
+  diff -u "$TEST_ROOT/bash-cluster-order" "$TEST_ROOT/zsh-cluster-order" >&2
+  exit 1
+fi
+
 mock_bin="$TEST_ROOT/mock-bin"
 mkdir -p "$mock_bin"
 cat > "$mock_bin/ssh" <<'EOF'
