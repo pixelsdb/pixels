@@ -36,8 +36,6 @@ import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.IndexUtils;
-import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
-import io.pixelsdb.pixels.daemon.heartbeat.NodeStatus;
 import io.pixelsdb.pixels.index.IndexProto;
 import io.pixelsdb.pixels.retina.RGVisibility;
 import io.pixelsdb.pixels.retina.RecoveryCheckpoint;
@@ -75,6 +73,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     private final RetinaResourceManager retinaResourceManager;
     private final Striped<Lock> updateLocks = Striped.lock(1024);
     private volatile RetinaStatus status;
+    private volatile Runnable readyListener;
     private IndexOption[] indexOptionPool;
 
     /**
@@ -110,7 +109,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             publishStartupLifecycle(recoveryContext, recoveryResult);
             startRetinaMetricsLogThread();
             boolean ready = this.status.getState() == RetinaState.READY;
-            logger.info(ready ? "Retina service is ready" : "Retina service is recovering");
+            logger.info(ready ? "Retina initialization is ready" : "Retina service is recovering");
         }
         catch (Exception e)
         {
@@ -122,9 +121,28 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .setState(RetinaState.FAILED)
                     .build();
             this.retinaResourceManager.setRecovering(false);
-            HeartbeatWorker.setCurrentStatus(NodeStatus.INIT);
             logger.error("Error while initializing RetinaServerImpl", e);
             throw new IllegalStateException("Failed to initialize RetinaServerImpl", e);
+        }
+    }
+
+    public void setReadyListener(Runnable readyListener)
+    {
+        this.readyListener = readyListener;
+    }
+
+    boolean isReady()
+    {
+        RetinaStatus current = this.status;
+        return current != null && current.getState() == RetinaState.READY;
+    }
+
+    private void notifyReady()
+    {
+        Runnable listener = this.readyListener;
+        if (listener != null && isReady())
+        {
+            listener.run();
         }
     }
 
@@ -357,7 +375,6 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
     private void publishStartupLifecycle(RecoveryContext context, RecoveryResult result) throws RetinaException
     {
         this.retinaResourceManager.setRecovering(true);
-        HeartbeatWorker.setCurrentStatus(NodeStatus.INIT);
         this.status = RetinaStatus.newBuilder()
                 .setState(RetinaState.RECOVERING)
                 .setRecoveryEpoch(context.recoveryEpoch)
@@ -371,7 +388,9 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .setState(RetinaState.READY)
                     .build();
             this.retinaResourceManager.setRecovering(false);
-            HeartbeatWorker.setCurrentStatus(NodeStatus.READY);
+            // Do not notify the ready listener here. RetinaServerImpl finishes
+            // initialization before RetinaServer starts the gRPC server, so
+            // RetinaServer publishes READY only after the RPC server is available.
         }
     }
 
@@ -1065,7 +1084,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                     .setState(RetinaState.READY)
                     .build();
             this.retinaResourceManager.setRecovering(false);
-            HeartbeatWorker.setCurrentStatus(NodeStatus.READY);
+            notifyReady();
         }
         catch (RetinaException e)
         {

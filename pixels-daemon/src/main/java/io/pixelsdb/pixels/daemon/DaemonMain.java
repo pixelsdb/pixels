@@ -6,10 +6,12 @@ import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
 import io.pixelsdb.pixels.daemon.cache.CacheWorker;
 import io.pixelsdb.pixels.daemon.index.IndexServer;
 import io.pixelsdb.pixels.daemon.node.NodeServer;
+import io.pixelsdb.pixels.daemon.retina.RetinaReadyCheck;
 import io.pixelsdb.pixels.daemon.retina.RetinaServer;
 import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatCoordinator;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
+import io.pixelsdb.pixels.daemon.metadata.MetadataReadyCheck;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
 import io.pixelsdb.pixels.daemon.scaling.ScalingMetricsServer;
@@ -108,7 +110,7 @@ public class DaemonMain
                     container.addServer("metadata", metadataServer);
                     // start transaction server
                     TransServer transServer = new TransServer(transServerPort);
-                    container.addServer("transaction", transServer);
+                    container.addServer("transaction", transServer, new RetinaReadyCheck());
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
@@ -174,7 +176,8 @@ public class DaemonMain
                 {
                     // start retina server on worker node
                     RetinaServer retinaServer = new RetinaServer(retinaServerPort);
-                    container.addServer("retina", retinaServer);
+                    container.addServer("retina", retinaServer,
+                            new MetadataReadyCheck());
 
                     if (indexServerEnabled)
                     {
@@ -220,7 +223,7 @@ public class DaemonMain
                         boolean done = true;
                         for (String serverName : container.getServerNames())
                         {
-                            if (container.checkServer(serverName, 0))
+                            if (container.checkServer(serverName))
                             {
                                 done = false;
                                 break;
@@ -253,10 +256,7 @@ public class DaemonMain
                 {
                     for (String serverName : container.getServerNames())
                     {
-                        if (!container.checkServer(serverName))
-                        {
-                            container.startServer(serverName);
-                        }
+                        container.startServer(serverName);
                     }
                     TimeUnit.SECONDS.sleep(1);
                 }

@@ -25,10 +25,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author hank
@@ -37,95 +37,155 @@ public class ServerContainer
 {
     private static Logger log = LogManager.getLogger(ServerContainer.class);
 
-    private Map<String, Server> serverMap = null;
+    private static final class ServerHandle
+    {
+        private final Server server;
+        private final List<StartupCheck> startupChecks;
+        private Thread thread;
+
+        private ServerHandle(Server server, List<StartupCheck> startupChecks)
+        {
+            this.server = server;
+            this.startupChecks = startupChecks;
+        }
+    }
+    private final Map<String, ServerHandle> serverHandles;
 
     public ServerContainer ()
     {
-        this.serverMap = new HashMap<>();
+        this.serverHandles = new HashMap<>();
     }
 
-    public void addServer (String name, Server server)
+    public synchronized void addServer (
+            String name, Server server, StartupCheck... startupChecks)
     {
-        Thread thread = new Thread(server);
-        thread.start();
-        this.serverMap.put(name, server);
+        if (this.serverHandles.containsKey(name))
+        {
+            throw new IllegalArgumentException("server is already registered: " + name);
+        }
+        this.serverHandles.put(name, new ServerHandle(server, Arrays.asList(startupChecks)));
+        startServerThread(name);
     }
 
-    public List<String> getServerNames()
+    public synchronized List<String> getServerNames()
     {
-        return new ArrayList<>(this.serverMap.keySet());
-    }
-
-    /**
-     * retry 3 times by default. sleep one second after each retry.
-     * @param name
-     * @return
-     * @throws NoSuchServerException
-     */
-    public boolean checkServer(String name) throws NoSuchServerException
-    {
-        return this.checkServer(name, 3);
+        return new ArrayList<>(this.serverHandles.keySet());
     }
 
     /**
-     *
-     * @param name
-     * @param retry times to retry, sleep one second after each retry.
-     * @return true if server is running.
-     * @throws NoSuchServerException
+     * Ensure that a server has one thread responsible for its lifecycle.
+     * A server may still be waiting for startup checks while its
+     * {@link Server#isRunning()} method returns false.
      */
-    public boolean checkServer(String name, int retry) throws NoSuchServerException
+    public synchronized void startServer(String name) throws NoSuchServerException
     {
-        Server server = this.serverMap.get(name);
-        if (server == null)
+        ServerHandle handle = this.serverHandles.get(name);
+        if (handle == null)
         {
             throw new NoSuchServerException();
         }
-        boolean serverIsRunning = false;
-        try
+        Thread serverThread = handle.thread;
+        if ((serverThread != null && serverThread.isAlive())
+                || handle.server.isRunning())
         {
-            if (!server.isRunning())
+            log.debug("Server {} is already starting or running, skip duplicate start", name);
+            return;
+        }
+        startServerThread(name);
+    }
+
+    /**
+     * Check whether the thread responsible for a server's lifecycle is alive.
+     */
+    public synchronized boolean checkServer(String name)
+            throws NoSuchServerException
+    {
+        ServerHandle handle = this.serverHandles.get(name);
+        if (handle == null)
+        {
+            throw new NoSuchServerException();
+        }
+        Thread serverThread = handle.thread;
+        return serverThread != null && serverThread.isAlive();
+    }
+
+    public synchronized void shutdownServer(String name) throws NoSuchServerException
+    {
+        ServerHandle handle = this.serverHandles.get(name);
+        if (handle == null)
+        {
+            throw new NoSuchServerException();
+        }
+        if (handle.server.isRunning())
+        {
+            handle.server.shutdown();
+        }
+        Thread serverThread = handle.thread;
+        if (serverThread != null && serverThread.isAlive()
+                && serverThread != Thread.currentThread())
+        {
+            serverThread.interrupt();
+        }
+    }
+
+    private void startServerThread(String name)
+    {
+        ServerHandle handle = this.serverHandles.get(name);
+        if (handle == null)
+        {
+            throw new IllegalStateException("server is not registered: " + name);
+        }
+        Thread existingThread = handle.thread;
+        if (existingThread != null && existingThread.isAlive())
+        {
+            return;
+        }
+
+        handle.thread = new Thread(() ->
+        {
+            try
             {
-                for (int i = 0; i < retry; ++i)
+                long startupDeadline = System.nanoTime() + 60_000_000_000L;
+                for (StartupCheck startupCheck : handle.startupChecks)
                 {
-                    // try 3 times
-                    TimeUnit.SECONDS.sleep(1);
-                    if (server.isRunning())
+                    long remainingNanos = startupDeadline - System.nanoTime();
+                    if (remainingNanos <= 0)
                     {
-                        serverIsRunning = true;
-                        break;
+                        throw new IllegalStateException(
+                                "Timed out waiting for startup checks of " + name
+                                        + " after 60 seconds");
+                    }
+                    log.debug("Server {} is waiting for {}", name, startupCheck.getDescription());
+                    startupCheck.awaitReady(startupDeadline);
+                    if (System.nanoTime() >= startupDeadline)
+                    {
+                        throw new IllegalStateException(
+                                "Timed out waiting for startup checks of " + name
+                                        + " after 60 seconds");
+                    }
+                }
+                handle.server.run();
+            }
+            catch (InterruptedException e)
+            {
+                Thread.currentThread().interrupt();
+                log.info("Server {} startup was interrupted", name);
+            }
+            catch (Throwable e)
+            {
+                log.error("Server {} failed during startup or execution", name, e);
+            }
+            finally
+            {
+                synchronized (ServerContainer.this)
+                {
+                    if (handle.thread == Thread.currentThread())
+                    {
+                        handle.thread = null;
                     }
                 }
             }
-            else
-            {
-                serverIsRunning = true;
-            }
-        } catch (InterruptedException e)
-        {
-            log.error(
-                    "interrupted while checking server.", e);
-        }
-        return serverIsRunning;
-    }
-
-    public void startServer(String name) throws NoSuchServerException
-    {
-        this.shutdownServer(name);
-        Thread serverThread = new Thread(this.serverMap.get(name));
-        serverThread.start();
-    }
-
-    public void shutdownServer(String name) throws NoSuchServerException
-    {
-        Server server = this.serverMap.get(name);
-        if (server == null)
-        {
-            throw new NoSuchServerException();
-        }
-        if (checkServer(name, 0) == true)
-        {
-            server.shutdown();
-        }
+        }, name);
+        handle.thread.start();
     }
 }
