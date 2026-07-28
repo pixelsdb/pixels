@@ -32,7 +32,7 @@ public class NodeServer implements Server
 {
     private static final Logger log = LogManager.getLogger(NodeServer.class);
 
-    private boolean running = false;
+    private volatile boolean running = false;
     private final io.grpc.Server rpcServer;
 
     public NodeServer(int port)

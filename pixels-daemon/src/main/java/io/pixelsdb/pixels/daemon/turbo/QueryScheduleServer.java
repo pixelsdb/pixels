@@ -35,7 +35,7 @@ public class QueryScheduleServer implements Server
 {
     private static final Logger log = LogManager.getLogger(QueryScheduleServer.class);
 
-    private boolean running = false;
+    private volatile boolean running = false;
     private final io.grpc.Server rpcServer;
 
     public QueryScheduleServer(int port)

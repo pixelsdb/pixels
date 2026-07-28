@@ -144,15 +144,18 @@ public class TestServerContainer
             container.addServer("waiting", server, startupCheck);
             assertTrue(startupCheck.entered.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
-            container.shutdownServer("waiting");
+            container.shutdownAll();
 
             assertTrue(startupCheck.interrupted.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             awaitLifecycleStopped(container, "waiting");
             assertEquals(0, server.runCount.get());
+            container.startServer("waiting");
+            assertFalse(server.started.await(
+                    NO_EVENT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
         }
         finally
         {
-            container.shutdownServer("waiting");
+            container.shutdownAll();
             startupCheck.allowReady();
             server.release();
             awaitLifecycleStopped(container, "waiting");
@@ -179,7 +182,7 @@ public class TestServerContainer
         }
         finally
         {
-            container.shutdownServer("async");
+            container.shutdownAll();
         }
         assertEquals(1, server.shutdownCount.get());
         assertFalse(server.isRunning());
@@ -203,13 +206,180 @@ public class TestServerContainer
     }
 
     @Test
+    public void testShutdownPreventsFurtherRestart() throws Exception
+    {
+        RestartableServer server = new RestartableServer();
+        ServerContainer container = new ServerContainer();
+
+        container.addServer("restartable", server);
+        assertTrue(server.firstRun.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        awaitLifecycleStopped(container, "restartable");
+
+        container.shutdownAll();
+        container.startServer("restartable");
+
+        assertFalse(server.secondRun.await(
+                NO_EVENT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
+        assertEquals(1, server.runCount.get());
+    }
+
+    @Test
+    public void testShutdownAllStopsEveryServer() throws Exception
+    {
+        BlockingServer first = new BlockingServer(true);
+        BlockingServer second = new BlockingServer(true);
+        ServerContainer container = new ServerContainer();
+
+        container.addServer("first", first);
+        container.addServer("second", second);
+        assertTrue(first.started.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertTrue(second.started.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        container.shutdownAll();
+
+        assertTrue(container.awaitTermination(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals(1, first.shutdownCount.get());
+        assertEquals(1, second.shutdownCount.get());
+    }
+
+    @Test
+    public void testShutdownAllIsIdempotent() throws Exception
+    {
+        AsyncServer server = new AsyncServer();
+        ServerContainer container = new ServerContainer();
+        container.addServer("async", server);
+        assertTrue(server.started.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        awaitLifecycleStopped(container, "async");
+
+        container.shutdownAll();
+        container.shutdownAll();
+
+        assertTrue(container.awaitTermination(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals(1, server.shutdownCount.get());
+    }
+
+    @Test
+    public void testShutdownAllContinuesAfterServerFailure() throws Exception
+    {
+        FailingShutdownServer failing = new FailingShutdownServer();
+        BlockingServer healthy = new BlockingServer(true);
+        ServerContainer container = new ServerContainer();
+        container.addServer("failing", failing);
+        container.addServer("healthy", healthy);
+        assertTrue(failing.started.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertTrue(healthy.started.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        container.shutdownAll();
+
+        assertTrue(container.awaitTermination(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals(1, failing.shutdownCount.get());
+        assertEquals(1, healthy.shutdownCount.get());
+    }
+
+    @Test
+    public void testAwaitTerminationTimesOutForRunningAsyncServer() throws Exception
+    {
+        UnstoppableAsyncServer server = new UnstoppableAsyncServer();
+        ServerContainer container = new ServerContainer();
+        container.addServer("unstoppable", server);
+        assertTrue(server.started.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        awaitLifecycleStopped(container, "unstoppable");
+
+        container.shutdownAll();
+
+        assertFalse(container.awaitTermination(
+                NO_EVENT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
+        assertEquals(1, server.shutdownCount.get());
+    }
+
+    @Test
+    public void testLateStartingServerIsShutdownAfterGateCloses() throws Exception
+    {
+        LateStartingServer server = new LateStartingServer();
+        ServerContainer container = new ServerContainer();
+        container.addServer("late", server);
+        assertTrue(server.runEntered.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+        try
+        {
+            container.shutdownAll();
+            assertEquals(0, server.shutdownCount.get());
+
+            server.allowRunning();
+            assertTrue(server.runningPublished.await(
+                    WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            awaitLifecycleStopped(container, "late");
+
+            assertTrue(container.awaitTermination(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            assertEquals(1, server.shutdownCount.get());
+            assertFalse(server.isRunning());
+        }
+        finally
+        {
+            server.allowRunning();
+            container.shutdownAll();
+            container.awaitTermination(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    public void testConcurrentStartCannotRestartAfterShutdownBegins() throws Exception
+    {
+        RestartableServer restartable = new RestartableServer();
+        BlockingShutdownServer blocking = new BlockingShutdownServer();
+        ServerContainer container = new ServerContainer();
+        container.addServer("restartable", restartable);
+        container.addServer("blocking", blocking);
+        assertTrue(restartable.firstRun.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertTrue(blocking.started.await(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        awaitLifecycleStopped(container, "restartable");
+
+        Thread shutdownThread = new Thread(container::shutdownAll);
+        shutdownThread.start();
+        try
+        {
+            assertTrue(blocking.shutdownEntered.await(
+                    WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+
+            container.startServer("restartable");
+
+            assertFalse(restartable.secondRun.await(
+                    NO_EVENT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS));
+        }
+        finally
+        {
+            blocking.allowShutdown();
+            shutdownThread.join(TimeUnit.SECONDS.toMillis(WAIT_TIMEOUT_SECONDS));
+        }
+        assertFalse("shutdown thread did not stop", shutdownThread.isAlive());
+        assertTrue(container.awaitTermination(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertEquals(1, restartable.runCount.get());
+    }
+
+    @Test
+    public void testAddServerIsRejectedAfterShutdown()
+    {
+        ServerContainer container = new ServerContainer();
+        container.shutdownAll();
+
+        try
+        {
+            container.addServer("late", new RestartableServer());
+            fail("server registration after shutdown should fail");
+        }
+        catch (IllegalStateException expected)
+        {
+            assertEquals("server container is shutting down", expected.getMessage());
+        }
+    }
+
+    @Test
     public void testUnknownServerOperationsFail() throws Exception
     {
         ServerContainer container = new ServerContainer();
 
         assertNoSuchServer(() -> container.startServer("missing"));
         assertNoSuchServer(() -> container.checkServer("missing"));
-        assertNoSuchServer(() -> container.shutdownServer("missing"));
     }
 
     @Test
@@ -247,7 +417,7 @@ public class TestServerContainer
     {
         try
         {
-            container.shutdownServer(name);
+            container.shutdownAll();
         }
         finally
         {
@@ -441,6 +611,177 @@ public class TestServerContainer
         {
             shutdownCount.incrementAndGet();
             running = false;
+        }
+    }
+
+    private static final class FailingShutdownServer implements Server
+    {
+        private final CountDownLatch started = new CountDownLatch(1);
+        private final CountDownLatch stop = new CountDownLatch(1);
+        private final AtomicInteger shutdownCount = new AtomicInteger();
+        private volatile boolean running;
+
+        @Override
+        public boolean isRunning()
+        {
+            return running;
+        }
+
+        @Override
+        public void run()
+        {
+            running = true;
+            started.countDown();
+            try
+            {
+                stop.await();
+            }
+            catch (InterruptedException e)
+            {
+                Thread.currentThread().interrupt();
+            }
+            finally
+            {
+                running = false;
+            }
+        }
+
+        @Override
+        public void shutdown()
+        {
+            shutdownCount.incrementAndGet();
+            throw new IllegalStateException("expected shutdown failure");
+        }
+    }
+
+    private static final class UnstoppableAsyncServer implements Server
+    {
+        private final CountDownLatch started = new CountDownLatch(1);
+        private final AtomicInteger shutdownCount = new AtomicInteger();
+        private volatile boolean running;
+
+        @Override
+        public boolean isRunning()
+        {
+            return running;
+        }
+
+        @Override
+        public void run()
+        {
+            running = true;
+            started.countDown();
+        }
+
+        @Override
+        public void shutdown()
+        {
+            shutdownCount.incrementAndGet();
+        }
+    }
+
+    private static final class LateStartingServer implements Server
+    {
+        private final CountDownLatch runEntered = new CountDownLatch(1);
+        private final CountDownLatch runningPublished = new CountDownLatch(1);
+        private final CountDownLatch continueRunning = new CountDownLatch(1);
+        private final AtomicInteger shutdownCount = new AtomicInteger();
+        private volatile boolean running;
+
+        @Override
+        public boolean isRunning()
+        {
+            return running;
+        }
+
+        @Override
+        public void run()
+        {
+            runEntered.countDown();
+            boolean allowedToRun = false;
+            while (!allowedToRun)
+            {
+                try
+                {
+                    continueRunning.await();
+                    allowedToRun = true;
+                }
+                catch (InterruptedException ignored)
+                {
+                    // Deliberately ignore interruption to reproduce an in-flight start.
+                }
+            }
+            running = true;
+            runningPublished.countDown();
+        }
+
+        @Override
+        public void shutdown()
+        {
+            shutdownCount.incrementAndGet();
+            running = false;
+        }
+
+        private void allowRunning()
+        {
+            continueRunning.countDown();
+        }
+    }
+
+    private static final class BlockingShutdownServer implements Server
+    {
+        private final CountDownLatch started = new CountDownLatch(1);
+        private final CountDownLatch shutdownEntered = new CountDownLatch(1);
+        private final CountDownLatch continueShutdown = new CountDownLatch(1);
+        private final CountDownLatch stop = new CountDownLatch(1);
+        private volatile boolean running;
+
+        @Override
+        public boolean isRunning()
+        {
+            return running;
+        }
+
+        @Override
+        public void run()
+        {
+            running = true;
+            started.countDown();
+            try
+            {
+                stop.await();
+            }
+            catch (InterruptedException e)
+            {
+                Thread.currentThread().interrupt();
+            }
+            finally
+            {
+                running = false;
+            }
+        }
+
+        @Override
+        public void shutdown()
+        {
+            shutdownEntered.countDown();
+            try
+            {
+                continueShutdown.await();
+            }
+            catch (InterruptedException e)
+            {
+                Thread.currentThread().interrupt();
+            }
+            finally
+            {
+                stop.countDown();
+            }
+        }
+
+        private void allowShutdown()
+        {
+            continueShutdown.countDown();
         }
     }
 

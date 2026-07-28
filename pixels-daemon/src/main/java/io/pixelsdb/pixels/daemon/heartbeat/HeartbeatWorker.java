@@ -66,7 +66,8 @@ public class HeartbeatWorker implements Server
         {
             throw new IllegalArgumentException("status is null");
         }
-        currentStatus.set(status.StatusCode);
+        currentStatus.updateAndGet(current ->
+                current == NodeStatus.EXIT.StatusCode ? current : status.StatusCode);
     }
 
     /**
