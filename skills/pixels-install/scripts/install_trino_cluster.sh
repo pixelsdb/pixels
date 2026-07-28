@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  printf 'ERROR: pixels-install scripts must be executed by Bash; do not run this script with zsh.\n' >&2
+  exit 1
+fi
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  printf 'ERROR: do not source pixels-install installer scripts; execute this script directly with Bash.\n' >&2
+  return 1 2>/dev/null || exit 1
+fi
 set -uo pipefail
 
 # Fans out install_trino.sh across the whole cluster described by
@@ -21,6 +29,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/shell_env.sh
 source "$SCRIPT_DIR/lib/shell_env.sh"
+require_bash_runtime || exit 1
+require_supported_login_shell >/dev/null || exit 1
 
 SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
 STATE_DIR="${STATE_DIR:-$(state_dir)}"
@@ -185,7 +195,7 @@ run_local_coordinator() {
   [[ -n "$PIXELS_TRINO_CONNECTOR_ZIP" ]] && env_args+=(PIXELS_TRINO_CONNECTOR_ZIP="$PIXELS_TRINO_CONNECTOR_ZIP")
   [[ -n "$PIXELS_TRINO_LISTENER_ZIP" ]] && env_args+=(PIXELS_TRINO_LISTENER_ZIP="$PIXELS_TRINO_LISTENER_ZIP")
 
-  if env "${env_args[@]}" "$SCRIPT_DIR/install_trino.sh" >"$log_file" 2>&1; then
+  if env "${env_args[@]}" bash "$SCRIPT_DIR/install_trino.sh" >"$log_file" 2>&1; then
     result_record "node:$name" ok "coordinator install succeeded (log: $log_file)"
   else
     result_record "node:$name" fail "coordinator install failed, see $log_file (tail: $(tail -n 1 "$log_file" 2>/dev/null))"
@@ -213,38 +223,38 @@ launch_worker() {
   scp_opts+=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
   remote_deployment_file="$REMOTE_STATE_DIR/trino-deployment.env"
-  remote_env="TRINO_PIXELS_HOME='$TRINO_PIXELS_HOME' TRINO_PIXELS_CONFIG='$TRINO_PIXELS_CONFIG' TRINO_PIXELS_METADATA_SERVER_HOST='$TRINO_PIXELS_METADATA_SERVER_HOST' TRINO_PIXELS_TRANS_SERVER_HOST='$TRINO_PIXELS_TRANS_SERVER_HOST' TRINO_PIXELS_QUERY_SCHEDULE_SERVER_HOST='$TRINO_PIXELS_QUERY_SCHEDULE_SERVER_HOST' TRINO_PIXELS_ETCD_HOSTS='$TRINO_PIXELS_ETCD_HOSTS' TRINO_PIXELS_METADATA_SERVER_PORT='$TRINO_PIXELS_METADATA_SERVER_PORT' TRINO_PIXELS_TRANS_SERVER_PORT='$TRINO_PIXELS_TRANS_SERVER_PORT' TRINO_PIXELS_QUERY_SCHEDULE_SERVER_PORT='$TRINO_PIXELS_QUERY_SCHEDULE_SERVER_PORT' TRINO_PIXELS_ETCD_PORT='$TRINO_PIXELS_ETCD_PORT'"
+  remote_env="TRINO_PIXELS_HOME=$(shell_quote "$TRINO_PIXELS_HOME") TRINO_PIXELS_CONFIG=$(shell_quote "$TRINO_PIXELS_CONFIG") TRINO_PIXELS_METADATA_SERVER_HOST=$(shell_quote "$TRINO_PIXELS_METADATA_SERVER_HOST") TRINO_PIXELS_TRANS_SERVER_HOST=$(shell_quote "$TRINO_PIXELS_TRANS_SERVER_HOST") TRINO_PIXELS_QUERY_SCHEDULE_SERVER_HOST=$(shell_quote "$TRINO_PIXELS_QUERY_SCHEDULE_SERVER_HOST") TRINO_PIXELS_ETCD_HOSTS=$(shell_quote "$TRINO_PIXELS_ETCD_HOSTS") TRINO_PIXELS_METADATA_SERVER_PORT=$(shell_quote "$TRINO_PIXELS_METADATA_SERVER_PORT") TRINO_PIXELS_TRANS_SERVER_PORT=$(shell_quote "$TRINO_PIXELS_TRANS_SERVER_PORT") TRINO_PIXELS_QUERY_SCHEDULE_SERVER_PORT=$(shell_quote "$TRINO_PIXELS_QUERY_SCHEDULE_SERVER_PORT") TRINO_PIXELS_ETCD_PORT=$(shell_quote "$TRINO_PIXELS_ETCD_PORT")"
   if [[ -f "$TRINO_PIXELS_CONFIG_SOURCE" ]]; then
     remote_pixels_config="$REMOTE_ARTIFACT_DIR/$(basename "$TRINO_PIXELS_CONFIG_SOURCE")"
-    remote_env="$remote_env TRINO_PIXELS_CONFIG_SOURCE='$remote_pixels_config'"
+    remote_env="$remote_env TRINO_PIXELS_CONFIG_SOURCE=$(shell_quote "$remote_pixels_config")"
   fi
 
   if [[ -n "$PIXELS_TRINO_CONNECTOR_ZIP" ]]; then
     remote_connector_zip="$REMOTE_ARTIFACT_DIR/$(basename "$PIXELS_TRINO_CONNECTOR_ZIP")"
     [[ -n "$PIXELS_TRINO_LISTENER_ZIP" ]] && remote_listener_zip="$REMOTE_ARTIFACT_DIR/$(basename "$PIXELS_TRINO_LISTENER_ZIP")"
     remote_script="$REMOTE_SCRIPT_DIR/install_trino.sh"
-    remote_command="mkdir -p '$REMOTE_STATE_DIR' '$REMOTE_SCRIPT_DIR/lib' '$REMOTE_ARTIFACT_DIR' && STATE_DIR='$REMOTE_STATE_DIR' REPO_ROOT='$REMOTE_SCRIPT_DIR' TRINO_ROLE=worker CONFIRM_TRINO_INSTALL=true PIXELS_TRINO_CONNECTOR_ZIP='$remote_connector_zip' PIXELS_TRINO_LISTENER_ZIP='$remote_listener_zip' INSTALL_PIXELS_TRINO_LISTENER='$INSTALL_PIXELS_TRINO_LISTENER' $remote_env '$remote_script'"
+    remote_command="mkdir -p $(shell_quote "$REMOTE_STATE_DIR") $(shell_quote "$REMOTE_SCRIPT_DIR/lib") $(shell_quote "$REMOTE_ARTIFACT_DIR") && STATE_DIR=$(shell_quote "$REMOTE_STATE_DIR") REPO_ROOT=$(shell_quote "$REMOTE_SCRIPT_DIR") TRINO_ROLE=worker CONFIRM_TRINO_INSTALL=true PIXELS_TRINO_CONNECTOR_ZIP=$(shell_quote "$remote_connector_zip") PIXELS_TRINO_LISTENER_ZIP=$(shell_quote "$remote_listener_zip") INSTALL_PIXELS_TRINO_LISTENER=$(shell_quote "$INSTALL_PIXELS_TRINO_LISTENER") $remote_env bash $(shell_quote "$remote_script")"
   else
-    remote_command="cd '$REMOTE_REPO_ROOT' && mkdir -p '$REMOTE_STATE_DIR' '$REMOTE_ARTIFACT_DIR' && if [ -x '$REMOTE_SKILL_SCRIPT' ]; then script='$REMOTE_SKILL_SCRIPT'; elif [ -x '$REMOTE_DEV_SCRIPT' ]; then script='$REMOTE_DEV_SCRIPT'; else echo 'install_trino.sh not found; install the pixels-install skill or set REMOTE_SKILL_SCRIPT' >&2; exit 1; fi; STATE_DIR='$REMOTE_STATE_DIR' REPO_ROOT='$REMOTE_REPO_ROOT' TRINO_ROLE=worker CONFIRM_TRINO_INSTALL=true INSTALL_PIXELS_TRINO_LISTENER='$INSTALL_PIXELS_TRINO_LISTENER' $remote_env \"\$script\""
+    remote_command="cd $(shell_quote "$REMOTE_REPO_ROOT") && mkdir -p $(shell_quote "$REMOTE_STATE_DIR") $(shell_quote "$REMOTE_ARTIFACT_DIR") && if [ -x $(shell_quote "$REMOTE_SKILL_SCRIPT") ]; then script=$(shell_quote "$REMOTE_SKILL_SCRIPT"); elif [ -x $(shell_quote "$REMOTE_DEV_SCRIPT") ]; then script=$(shell_quote "$REMOTE_DEV_SCRIPT"); else echo 'install_trino.sh not found; install the pixels-install skill or set REMOTE_SKILL_SCRIPT' >&2; exit 1; fi; STATE_DIR=$(shell_quote "$REMOTE_STATE_DIR") REPO_ROOT=$(shell_quote "$REMOTE_REPO_ROOT") TRINO_ROLE=worker CONFIRM_TRINO_INSTALL=true INSTALL_PIXELS_TRINO_LISTENER=$(shell_quote "$INSTALL_PIXELS_TRINO_LISTENER") $remote_env bash \"\$script\""
   fi
 
   (
     {
       echo "--- preparing remote state dir on $name ($ssh_target) ---"
-      ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "mkdir -p '$REMOTE_STATE_DIR'" &&
+      ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "mkdir -p $(shell_quote "$REMOTE_STATE_DIR")" &&
       echo "--- copying trino-deployment.env to $name ($ssh_target) ---"
       scp "${scp_opts[@]}" "$TRINO_DEPLOYMENT_FILE" "$(remote_spec "$ssh_target"):$remote_deployment_file" &&
       if [[ -f "$TRINO_PIXELS_CONFIG_SOURCE" ]]; then
         echo "--- copying Trino-side Pixels client config to $name ($ssh_target) ---"
-        ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "mkdir -p '$REMOTE_ARTIFACT_DIR'" &&
+        ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "mkdir -p $(shell_quote "$REMOTE_ARTIFACT_DIR")" &&
         scp "${scp_opts[@]}" "$TRINO_PIXELS_CONFIG_SOURCE" "$(remote_spec "$ssh_target"):$remote_pixels_config"
       fi &&
       if [[ -n "$PIXELS_TRINO_CONNECTOR_ZIP" ]]; then
         echo "--- copying minimal installer to $name ($ssh_target) ---"
-        ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "mkdir -p '$REMOTE_SCRIPT_DIR/lib' '$REMOTE_ARTIFACT_DIR'" &&
+        ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "mkdir -p $(shell_quote "$REMOTE_SCRIPT_DIR/lib") $(shell_quote "$REMOTE_ARTIFACT_DIR")" &&
         scp "${scp_opts[@]}" "$SCRIPT_DIR/install_trino.sh" "$(remote_spec "$ssh_target"):$REMOTE_SCRIPT_DIR/install_trino.sh" &&
         scp "${scp_opts[@]}" "$SCRIPT_DIR/lib/shell_env.sh" "$(remote_spec "$ssh_target"):$REMOTE_SCRIPT_DIR/lib/shell_env.sh" &&
-        ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "chmod +x '$REMOTE_SCRIPT_DIR/install_trino.sh'" &&
+        ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "chmod +x $(shell_quote "$REMOTE_SCRIPT_DIR/install_trino.sh")" &&
         echo "--- copying prebuilt pixels-trino artifacts to $name ($ssh_target) ---" &&
         scp "${scp_opts[@]}" "$PIXELS_TRINO_CONNECTOR_ZIP" "$(remote_spec "$ssh_target"):$remote_connector_zip" &&
         if [[ -n "$PIXELS_TRINO_LISTENER_ZIP" ]]; then
@@ -252,7 +262,7 @@ launch_worker() {
         fi
       fi &&
       echo "--- running install_trino.sh on $name ($ssh_target) ---" &&
-      ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "$remote_command"
+      ssh "${ssh_args[@]}" "$(remote_spec "$ssh_target")" "bash -lc $(shell_quote "$remote_command")"
     } >"$log_file" 2>&1
     echo "$?" > "$marker_file"
   ) &

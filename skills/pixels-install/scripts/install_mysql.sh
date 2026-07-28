@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  printf 'ERROR: pixels-install scripts must be executed by Bash; do not run this script with zsh.\n' >&2
+  exit 1
+fi
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  printf 'ERROR: do not source pixels-install installer scripts; execute this script directly with Bash.\n' >&2
+  return 1 2>/dev/null || exit 1
+fi
 set -euo pipefail
 
 # Installs MySQL, sets the root password, and creates the Pixels metadata
@@ -18,6 +26,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/shell_env.sh
 source "$SCRIPT_DIR/lib/shell_env.sh"
+require_bash_runtime || exit 1
+require_supported_login_shell >/dev/null || exit 1
 SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
 STATE_DIR="${STATE_DIR:-$(state_dir)}"
 REPO_ROOT="${REPO_ROOT:-$(require_repo_root)}"

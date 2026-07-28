@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  printf 'ERROR: pixels-install scripts must be executed by Bash; do not run this script with zsh.\n' >&2
+  exit 1
+fi
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  printf 'ERROR: do not source pixels-install installer scripts; execute this script directly with Bash.\n' >&2
+  return 1 2>/dev/null || exit 1
+fi
 set -uo pipefail
 
 # Verifies the installed layout, configuration, metadata access, etcd
@@ -624,7 +632,7 @@ verify_trino_cluster_status() {
   local -a targets=()
   local -a names=()
   local -a ssh_args=()
-  local i target name output
+  local i target name output remote_status_command
 
   read -r -a targets <<< "${TRINO_WORKER_SSH_TARGETS:-}"
   read -r -a names <<< "${TRINO_WORKER_NAMES:-}"
@@ -637,7 +645,8 @@ verify_trino_cluster_status() {
   for ((i = 0; i < ${#targets[@]}; i++)); do
     target="${targets[$i]}"
     name="${names[$i]:-worker-$i}"
-    if output="$(ssh "${ssh_args[@]}" "$(remote_spec "$target")" "export PIXELS_HOME='$TRINO_PIXELS_HOME'; export PIXELS_CONFIG='$TRINO_PIXELS_CONFIG'; '$TRINO_HOME_LINK/bin/launcher' status" 2>&1)"; then
+    remote_status_command="export PIXELS_HOME=$(shell_quote "$TRINO_PIXELS_HOME"); export PIXELS_CONFIG=$(shell_quote "$TRINO_PIXELS_CONFIG"); $(shell_quote "$TRINO_HOME_LINK/bin/launcher") status"
+    if output="$(ssh "${ssh_args[@]}" "$(remote_spec "$target")" "bash -lc $(shell_quote "$remote_status_command")" 2>&1)"; then
       result_record "trino_status:$name" ok "remote launcher reports running"
     else
       result_record "trino_status:$name" fail "remote launcher status failed on $target: $(printf '%s' "$output" | tail -n 1)"
