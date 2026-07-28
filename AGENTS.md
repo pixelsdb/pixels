@@ -43,4 +43,7 @@
 - For serverless changes, ensure planner/invoker/worker settings remain consistent (input/intermediate/output storage schemes in `pixels-turbo/README.md`).
 
 ## Optional skills
-- For guided Pixels deployment, install and use the `pixels-install` skill from `skills/pixels-install`.
+- For guided Pixels deployment, install and use the `pixels-install` skill from `skills/pixels-install`:
+  - Cursor: `./skills/install.sh --skill pixels-install --tool cursor --scope project`
+  - Codex: `./skills/install.sh --skill pixels-install --tool codex --scope project`
+  - Claude: `./skills/install.sh --skill pixels-install --tool claude --scope project`

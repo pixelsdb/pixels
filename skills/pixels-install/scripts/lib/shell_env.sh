@@ -80,12 +80,16 @@ state_dir() {
   current_skill_dir="$(skill_dir)"
 
   case "$current_skill_dir" in
-    "$HOME/.agents/skills/"*)
+    "$HOME/.agents/skills/"*|"$HOME/.cursor/skills/"*)
       printf '%s/.agents/state/%s\n' "$HOME" "$DEFAULT_SKILL_NAME"
       return 0
       ;;
     */.agents/skills/*)
       printf '%s/.agents/state/%s\n' "${current_skill_dir%%/.agents/skills/*}" "$DEFAULT_SKILL_NAME"
+      return 0
+      ;;
+    */.cursor/skills/*)
+      printf '%s/.agents/state/%s\n' "${current_skill_dir%%/.cursor/skills/*}" "$DEFAULT_SKILL_NAME"
       return 0
       ;;
   esac

@@ -30,6 +30,18 @@ esac
 detected_profile="$(HOME="$HOME" SHELL=/bin/bash bash -c 'source "$1"; detect_profile_file' bash "$SHELL_ENV")"
 [[ "$detected_profile" == "$expected_profile" ]]
 
+# state_dir() must map both Codex (.agents/skills) and Cursor (.cursor/skills)
+# installs onto the shared .agents/state/<skill> location.
+cursor_project_skill="$TEST_ROOT/repo/.cursor/skills/pixels-install"
+agents_project_skill="$TEST_ROOT/repo/.agents/skills/pixels-install"
+cursor_global_skill="$HOME/.cursor/skills/pixels-install"
+agents_global_skill="$HOME/.agents/skills/pixels-install"
+mkdir -p "$cursor_project_skill" "$agents_project_skill" "$cursor_global_skill" "$agents_global_skill"
+[[ "$(SKILL_DIR="$cursor_project_skill" bash -c 'source "$1"; state_dir' bash "$SHELL_ENV")" == "$TEST_ROOT/repo/.agents/state/pixels-install" ]]
+[[ "$(SKILL_DIR="$agents_project_skill" bash -c 'source "$1"; state_dir' bash "$SHELL_ENV")" == "$TEST_ROOT/repo/.agents/state/pixels-install" ]]
+[[ "$(HOME="$HOME" SKILL_DIR="$cursor_global_skill" bash -c 'source "$1"; state_dir' bash "$SHELL_ENV")" == "$HOME/.agents/state/pixels-install" ]]
+[[ "$(HOME="$HOME" SKILL_DIR="$agents_global_skill" bash -c 'source "$1"; state_dir' bash "$SHELL_ENV")" == "$HOME/.agents/state/pixels-install" ]]
+
 if zsh "$SKILL_DIR/scripts/progress.sh" --help >"$TEST_ROOT/zsh-entrypoint-error" 2>&1; then
   printf 'a Bash installer unexpectedly ran under zsh\n' >&2
   exit 1
