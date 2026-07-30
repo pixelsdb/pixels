@@ -41,6 +41,7 @@ public class StageRuntimeController
     private final StageExecutionDescriptor descriptor;
     private final StageWorkerLauncher workerLauncher;
     private final List<CompletableFuture<? extends Output>> activeAttempts = new ArrayList<>();
+    private final StageExecutionHandle executionHandle;
     private int desiredWorkerCount;
 
     public StageRuntimeController(StageCoordinator stageCoordinator,
@@ -55,6 +56,8 @@ public class StageRuntimeController
                 "stage coordinator and execution descriptor have different stage ids");
         this.desiredWorkerCount = 0;
         this.stageCoordinator.setDesiredRuntimeWorkerCount(0);
+        this.executionHandle = new StageExecutionHandle(descriptor.getStageId(),
+                this::getStatus, this::refreshCompletion);
     }
 
     /**
@@ -64,6 +67,13 @@ public class StageRuntimeController
     public synchronized List<CompletableFuture<? extends Output>> scaleTo(int targetWorkerCount)
     {
         checkArgument(targetWorkerCount >= 0, "targetWorkerCount is negative");
+        refreshCompletion();
+        if (executionHandle.isLaunchesClosed())
+        {
+            desiredWorkerCount = 0;
+            stageCoordinator.setDesiredRuntimeWorkerCount(0);
+            return Collections.unmodifiableList(new ArrayList<>(activeAttempts));
+        }
         desiredWorkerCount = targetWorkerCount;
         stageCoordinator.setDesiredRuntimeWorkerCount(targetWorkerCount);
 
@@ -99,27 +109,63 @@ public class StageRuntimeController
                 return output;
             });
             activeAttempts.add(attempt);
+            executionHandle.addAttempt(attempt);
             visibleAttempts.add(attempt);
-            attempt.whenComplete((output, error) -> removeCompletedAttempt(attempt));
+            attempt.whenComplete((output, error) ->
+            {
+                removeCompletedAttempt(attempt);
+                refreshCompletion();
+            });
         }
         return Collections.unmodifiableList(visibleAttempts);
     }
 
     public synchronized StageRuntimeStatus getStatus()
     {
-        return new StageRuntimeStatus(desiredWorkerCount, activeAttempts.size(),
-                stageCoordinator.getActiveRegisteredWorkerCount(),
+        int activeRegisteredWorkerCount = stageCoordinator.getActiveRegisteredWorkerCount();
+        int startingAttemptCount = Math.max(0, activeAttempts.size() - activeRegisteredWorkerCount);
+        return new StageRuntimeStatus(desiredWorkerCount, activeAttempts.size(), startingAttemptCount,
+                activeRegisteredWorkerCount,
                 stageCoordinator.getAcceptingWorkerCount(),
                 stageCoordinator.getDrainingWorkerCount(),
                 stageCoordinator.getPendingTaskCount(),
                 stageCoordinator.getRunningTaskCount(),
                 stageCoordinator.getCompletedTaskCount(),
-                stageCoordinator.getFailedTaskCount());
+                stageCoordinator.getFailedTaskCount(),
+                stageCoordinator.getTotalTaskCount(),
+                stageCoordinator.areLogicalTasksTerminal(),
+                System.currentTimeMillis());
     }
 
     public int getStageId()
     {
         return descriptor.getStageId();
+    }
+
+    public StageExecutionHandle getExecutionHandle()
+    {
+        return executionHandle;
+    }
+
+    synchronized void refreshCompletion()
+    {
+        if (!stageCoordinator.areLogicalTasksTerminal())
+        {
+            return;
+        }
+        desiredWorkerCount = 0;
+        stageCoordinator.setDesiredRuntimeWorkerCount(0);
+        int failedTaskCount = stageCoordinator.getFailedTaskCount();
+        if (failedTaskCount > 0)
+        {
+            executionHandle.closeLaunches(new IllegalStateException(
+                    "stage " + descriptor.getStageId() + " has " + failedTaskCount +
+                            " failed logical task(s)"));
+        }
+        else
+        {
+            executionHandle.closeLaunches();
+        }
     }
 
     private synchronized void removeCompletedAttempt(CompletableFuture<? extends Output> attempt)

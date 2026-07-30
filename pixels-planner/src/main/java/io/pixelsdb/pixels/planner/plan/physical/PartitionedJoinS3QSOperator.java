@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.coordinate.StageExecutionHandle;
 import io.pixelsdb.pixels.planner.coordinate.StageExecutionDescriptor;
 import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionedTableInfo;
@@ -59,6 +60,9 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
 {
     private static final Logger logger = LogManager.getLogger(PartitionedJoinS3QSOperator.class);
     private static final CompletableFuture<Void> Completed = CompletableFuture.completedFuture(null);
+    private StageExecutionHandle smallPartitionExecution;
+    private StageExecutionHandle largePartitionExecution;
+    private StageExecutionHandle joinExecution;
 
     public PartitionedJoinS3QSOperator(String name, List<PartitionInput> smallPartitionInputs,
                                        List<PartitionInput> largePartitionInputs,
@@ -120,7 +124,8 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
                 throw new CompletionException("failed to start the previous S3QS stages", exception);
             }
             validateJoinInputs();
-            joinOutputs = invokeJoinRuntimeWorkers();
+            joinExecution = invokeJoinRuntimeWorkers();
+            joinOutputs = toAttemptArray(joinExecution.getAttemptFutures());
 
             logger.debug("invoke S3QS join " + this.getName());
             return joinOutputs;
@@ -143,14 +148,16 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
             checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
             smallChild.execute();
-            largePartitionOutputs = invokePartitionRuntimeWorkers(largePartitionStageId);
+            largePartitionExecution = invokePartitionRuntimeWorkers(largePartitionStageId);
+            largePartitionOutputs = toAttemptArray(largePartitionExecution.getAttemptFutures());
             logger.debug("invoke large S3QS partition of " + this.getName());
         }
         else if (largeChild != null)
         {
             checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
             checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-            smallPartitionOutputs = invokePartitionRuntimeWorkers(smallPartitionStageId);
+            smallPartitionExecution = invokePartitionRuntimeWorkers(smallPartitionStageId);
+            smallPartitionOutputs = toAttemptArray(smallPartitionExecution.getAttemptFutures());
             logger.debug("invoke small S3QS partition of " + this.getName());
             largeChild.execute();
         }
@@ -158,9 +165,11 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
         {
             checkArgument(!smallPartitionInputs.isEmpty(), "smallPartitionInputs is empty");
             checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-            smallPartitionOutputs = invokePartitionRuntimeWorkers(smallPartitionStageId);
+            smallPartitionExecution = invokePartitionRuntimeWorkers(smallPartitionStageId);
+            smallPartitionOutputs = toAttemptArray(smallPartitionExecution.getAttemptFutures());
             logger.debug("invoke small S3QS partition of " + this.getName());
-            largePartitionOutputs = invokePartitionRuntimeWorkers(largePartitionStageId);
+            largePartitionExecution = invokePartitionRuntimeWorkers(largePartitionStageId);
+            largePartitionOutputs = toAttemptArray(largePartitionExecution.getAttemptFutures());
             logger.debug("invoke large S3QS partition of " + this.getName());
         }
         return Completed;
@@ -175,7 +184,9 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
     @Override
     public JoinOutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
-        waitForAllAttempts(joinOutputs, smallPartitionOutputs, largePartitionOutputs);
+        joinOutputs = completedOutputFutures(joinExecution);
+        smallPartitionOutputs = completedOutputFutures(smallPartitionExecution);
+        largePartitionOutputs = completedOutputFutures(largePartitionExecution);
         return super.collectOutputs();
     }
 
@@ -201,18 +212,38 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
         }
     }
 
-    private CompletableFuture<? extends Output>[] invokePartitionRuntimeWorkers(int partitionStageId)
+    private StageExecutionHandle invokePartitionRuntimeWorkers(int partitionStageId)
     {
         requireControlledStage(partitionStageId, "partition");
-        List<CompletableFuture<? extends Output>> outputFutures = planCoordinator.activateStage(partitionStageId);
-        return outputFutures.toArray(new CompletableFuture[0]);
+        return planCoordinator.activateStageExecution(partitionStageId);
     }
 
-    private CompletableFuture<? extends Output>[] invokeJoinRuntimeWorkers()
+    private StageExecutionHandle invokeJoinRuntimeWorkers()
     {
         requireControlledStage(joinStageId, "join");
-        List<CompletableFuture<? extends Output>> outputFutures = planCoordinator.activateStage(joinStageId);
-        return outputFutures.toArray(new CompletableFuture[0]);
+        return planCoordinator.activateStageExecution(joinStageId);
+    }
+
+    private static CompletableFuture<? extends Output>[] completedOutputFutures(
+            StageExecutionHandle executionHandle) throws ExecutionException, InterruptedException
+    {
+        if (executionHandle == null)
+        {
+            return null;
+        }
+        List<Output> outputs = executionHandle.getCompletionFuture().get();
+        CompletableFuture<? extends Output>[] futures = new CompletableFuture[outputs.size()];
+        for (int i = 0; i < outputs.size(); ++i)
+        {
+            futures[i] = CompletableFuture.completedFuture(outputs.get(i));
+        }
+        return futures;
+    }
+
+    private static CompletableFuture<? extends Output>[] toAttemptArray(
+            List<CompletableFuture<? extends Output>> attempts)
+    {
+        return attempts.toArray(new CompletableFuture[0]);
     }
 
     @Override
@@ -346,8 +377,8 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
                 "%s does not have objectPathPrefix", source);
         checkArgument(shuffleInfo.getNumPartitions() > 0,
                 "%s does not have positive numPartitions", source);
-        checkArgument(shuffleInfo.getProducerCount() > 0,
-                "%s does not have positive producerCount", source);
+        checkArgument(shuffleInfo.getLogicalProducerTaskCount() > 0,
+                "%s does not have positive logicalProducerTaskCount", source);
         checkArgument(shuffleInfo.getConsumerCount() > 0,
                 "%s does not have positive consumerCount", source);
         checkArgument(shuffleInfo.getPollTimeoutSeconds() > 0,

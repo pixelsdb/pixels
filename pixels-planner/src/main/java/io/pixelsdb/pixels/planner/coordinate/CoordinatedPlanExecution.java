@@ -122,6 +122,8 @@ public class CoordinatedPlanExecution implements AutoCloseable
             return;
         }
         closed = true;
+        // No later scaling tick may launch a worker after query cleanup starts.
+        planCoordinator.close();
         IOException cleanupFailure = null;
         try
         {

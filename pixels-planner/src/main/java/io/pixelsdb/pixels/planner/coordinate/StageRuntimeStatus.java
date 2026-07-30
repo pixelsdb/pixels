@@ -25,6 +25,7 @@ public class StageRuntimeStatus
 {
     private final int desiredWorkerCount;
     private final int activeAttemptCount;
+    private final int startingAttemptCount;
     private final int activeRegisteredWorkerCount;
     private final int acceptingWorkerCount;
     private final int drainingWorkerCount;
@@ -32,15 +33,20 @@ public class StageRuntimeStatus
     private final int runningTaskCount;
     private final int completedTaskCount;
     private final int failedTaskCount;
+    private final int totalTaskCount;
+    private final boolean logicalTasksTerminal;
+    private final long sampleTimeMs;
 
-    public StageRuntimeStatus(int desiredWorkerCount, int activeAttemptCount,
+    public StageRuntimeStatus(int desiredWorkerCount, int activeAttemptCount, int startingAttemptCount,
                               int activeRegisteredWorkerCount, int acceptingWorkerCount,
                               int drainingWorkerCount, int pendingTaskCount,
                               int runningTaskCount, int completedTaskCount,
-                              int failedTaskCount)
+                              int failedTaskCount, int totalTaskCount,
+                              boolean logicalTasksTerminal, long sampleTimeMs)
     {
         this.desiredWorkerCount = desiredWorkerCount;
         this.activeAttemptCount = activeAttemptCount;
+        this.startingAttemptCount = startingAttemptCount;
         this.activeRegisteredWorkerCount = activeRegisteredWorkerCount;
         this.acceptingWorkerCount = acceptingWorkerCount;
         this.drainingWorkerCount = drainingWorkerCount;
@@ -48,6 +54,9 @@ public class StageRuntimeStatus
         this.runningTaskCount = runningTaskCount;
         this.completedTaskCount = completedTaskCount;
         this.failedTaskCount = failedTaskCount;
+        this.totalTaskCount = totalTaskCount;
+        this.logicalTasksTerminal = logicalTasksTerminal;
+        this.sampleTimeMs = sampleTimeMs;
     }
 
     public int getDesiredWorkerCount()
@@ -58,6 +67,11 @@ public class StageRuntimeStatus
     public int getActiveAttemptCount()
     {
         return activeAttemptCount;
+    }
+
+    public int getStartingAttemptCount()
+    {
+        return startingAttemptCount;
     }
 
     public int getActiveRegisteredWorkerCount()
@@ -93,5 +107,20 @@ public class StageRuntimeStatus
     public int getFailedTaskCount()
     {
         return failedTaskCount;
+    }
+
+    public int getTotalTaskCount()
+    {
+        return totalTaskCount;
+    }
+
+    public boolean isLogicalTasksTerminal()
+    {
+        return logicalTasksTerminal;
+    }
+
+    public long getSampleTimeMs()
+    {
+        return sampleTimeMs;
     }
 }

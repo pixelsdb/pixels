@@ -74,6 +74,11 @@ public class StageCoordinator
      */
     private final TaskQueue<Task> taskQueue;
     /**
+     * Maximum number of logical tasks reserved by one worker request. S3QS
+     * runtime stages set this to one so later scale-out can still claim work.
+     */
+    private int taskBatchSize;
+    /**
      * Mapping from worker index to worker.
      */
     private final Map<Long, Worker<CFWorkerInfo>> workerIdToWorkers = new ConcurrentHashMap<>();
@@ -125,6 +130,7 @@ public class StageCoordinator
         this.isQueued = false;
         this.fixedWorkerNum = workerNum;
         this.taskQueue = null;
+        this.taskBatchSize = 0;
         this.downStreamWorkerNum = 0;
         this.workerIndexAssigner = 0;
         this.leftChildWorkerNum = 0;
@@ -143,6 +149,7 @@ public class StageCoordinator
         this.isQueued = false;
         this.fixedWorkerNum = workerNum;
         this.taskQueue = null;
+        this.taskBatchSize = 0;
         this.downStreamWorkerNum = 0;
         this.workerIndexAssigner = workerIndexBegin;
         this.leftChildWorkerNum = 0;
@@ -163,6 +170,7 @@ public class StageCoordinator
         this.isQueued = true;
         this.fixedWorkerNum = 0;
         this.taskQueue = new TaskQueue<>(pendingTasks);
+        this.taskBatchSize = WorkerTaskParallelism;
         this.downStreamWorkerNum = 0;
         this.workerIndexAssigner = 0;
         this.leftChildWorkerNum = 0;
@@ -181,6 +189,7 @@ public class StageCoordinator
         this.isQueued = true;
         this.fixedWorkerNum = 0;
         this.taskQueue = new TaskQueue<>(pendingTasks);
+        this.taskBatchSize = WorkerTaskParallelism;
         this.downStreamWorkerNum = 0;
         this.workerIndexAssigner = workerIndexBegin;
         this.leftChildWorkerNum = 0;
@@ -244,8 +253,8 @@ public class StageCoordinator
             {
                 return Collections.emptyList();
             }
-            List<Task> tasks = new ArrayList<>(WorkerTaskParallelism);
-            for (int i = 0; i < WorkerTaskParallelism; ++i)
+            List<Task> tasks = new ArrayList<>(taskBatchSize);
+            for (int i = 0; i < taskBatchSize; ++i)
             {
                 Task task = this.taskQueue.pollPendingAndRun(worker);
                 if (task == null)
@@ -403,6 +412,32 @@ public class StageCoordinator
         }
     }
 
+    /**
+     * Configure how many pending logical tasks one worker may reserve in one
+     * coordinator request. This must be set before workers register.
+     */
+    public void setTaskBatchSize(int taskBatchSize)
+    {
+        checkArgument(this.isQueued, "non-queued stage does not have task batches");
+        checkArgument(taskBatchSize > 0, "taskBatchSize must be positive");
+        synchronized (this.lock)
+        {
+            checkArgument(this.workers.isEmpty(), "taskBatchSize can not change after workers register");
+            checkArgument(this.taskQueue.getRunningTaskCount() == 0,
+                    "taskBatchSize can not change after tasks start");
+            this.taskBatchSize = taskBatchSize;
+        }
+    }
+
+    public int getTaskBatchSize()
+    {
+        checkArgument(this.isQueued, "non-queued stage does not have task batches");
+        synchronized (this.lock)
+        {
+            return taskBatchSize;
+        }
+    }
+
     public int getActiveRegisteredWorkerCount()
     {
         synchronized (this.lock)
@@ -494,6 +529,15 @@ public class StageCoordinator
         checkArgument(this.isQueued && this.taskQueue != null,
                 "non-queued stage does not have task queue");
         return this.taskQueue.getFailedTaskCount();
+    }
+
+    public boolean areLogicalTasksTerminal()
+    {
+        checkArgument(this.isQueued && this.taskQueue != null,
+                "non-queued stage does not have task queue");
+        int terminalTasks = getCompletedTaskCount() + getFailedTaskCount();
+        return terminalTasks == getTotalTaskCount() &&
+                getPendingTaskCount() == 0 && getRunningTaskCount() == 0;
     }
 
     public void setDownStreamWorkerNum(int downStreamWorkerNum)

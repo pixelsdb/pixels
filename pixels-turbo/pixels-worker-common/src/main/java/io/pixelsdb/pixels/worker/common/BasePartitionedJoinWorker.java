@@ -554,13 +554,13 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                                              S3QSDataHandler dataHandler) throws Exception
     {
         S3QS s3qs = getS3QSStorage();
-        Set<Integer> endedProducers = new HashSet<>(shuffleInfo.getProducerCount());
+        Set<Integer> endedProducers = new HashSet<>(shuffleInfo.getLogicalProducerTaskCount());
         while (true)
         {
             S3QueuePollResult result = pollS3QSMessage(s3qs, shuffleInfo, partitionId, pendingMessages);
             if (result == null)
             {
-                if (endedProducers.size() >= shuffleInfo.getProducerCount())
+                if (endedProducers.size() >= shuffleInfo.getLogicalProducerTaskCount())
                 {
                     return;
                 }

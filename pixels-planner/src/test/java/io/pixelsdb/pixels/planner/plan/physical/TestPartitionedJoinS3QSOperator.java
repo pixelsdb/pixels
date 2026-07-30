@@ -36,6 +36,8 @@ import io.pixelsdb.pixels.planner.coordinate.CoordinatorEndpoint;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.StageRuntimeController;
+import io.pixelsdb.pixels.planner.coordinate.StageScalingConfig;
+import io.pixelsdb.pixels.planner.coordinate.StageWorkerLauncher;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
@@ -48,6 +50,8 @@ import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.StageWorkerInput;
+import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
+import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
 import org.junit.Test;
 
 import java.lang.reflect.Field;
@@ -282,6 +286,69 @@ public class TestPartitionedJoinS3QSOperator
         assertTrue(collectionBarrier.isDone());
     }
 
+    @Test
+    public void operatorCollectsOutputsFromWorkersAddedAfterStageActivation() throws Exception
+    {
+        ShuffleInfo smallShuffle = validShuffleInfo("small-dynamic-shuffle", 2);
+        ShuffleInfo largeShuffle = validShuffleInfo("large-dynamic-shuffle", 1);
+        PartitionInput firstSmallTask = partitionInput(0, smallShuffle);
+        firstSmallTask.setTableInfo(scanTableInfo("small-0"));
+        PartitionInput secondSmallTask = partitionInput(1, smallShuffle);
+        secondSmallTask.setTableInfo(scanTableInfo("small-1"));
+        PartitionInput largeTask = partitionInput(0, largeShuffle);
+        largeTask.setTableInfo(scanTableInfo("large"));
+
+        PartitionedJoinS3QSOperator operator = new PartitionedJoinS3QSOperator("s3qs-dynamic-join",
+                java.util.Arrays.asList(firstSmallTask, secondSmallTask),
+                Collections.singletonList(largeTask),
+                Collections.<JoinInput>singletonList(joinInput(smallShuffle, largeShuffle)),
+                JoinAlgorithm.PARTITIONED);
+        RecordingStageWorkerLauncher launcher = new RecordingStageWorkerLauncher();
+        CoordinatorEndpoint endpoint = new CoordinatorEndpoint("coordinator.internal", 19000);
+        StageScalingConfig scalingConfig =
+                new StageScalingConfig(true, 60000L, 1, 1, 8, 1, 4, 1, 3, 5000L);
+        PlanCoordinator planCoordinator =
+                new PlanCoordinator(100L, endpoint, launcher, scalingConfig);
+        operator.initPlanCoordinator(planCoordinator, -1, false);
+
+        operator.execute().get();
+        assertEquals(3, launcher.inputs.size());
+
+        planCoordinator.scaleStage(operator.smallPartitionStageId, 2);
+        assertEquals(4, launcher.inputs.size());
+
+        for (int i = 0; i < launcher.inputs.size(); ++i)
+        {
+            StageWorkerInput workerInput = launcher.inputs.get(i);
+            StageCoordinator stage = planCoordinator.getStageCoordinator(workerInput.getStageId());
+            String operatorName = workerInput.getWorkerType() == WorkerType.PARTITION_S3QS ?
+                    Constants.PARTITION_OPERATOR_NAME : Constants.PARTITION_JOIN_OPERATOR_NAME;
+            Worker<CFWorkerInfo> worker = new Worker<>(i + 1L,
+                    new Lease(System.currentTimeMillis(), 60000L), 0,
+                    new CFWorkerInfo("localhost", -1, 100L, workerInput.getStageId(),
+                            operatorName, Collections.emptyList()));
+            stage.addWorker(worker);
+            List<Task> tasks = stage.getTasksToRun(worker.getWorkerId());
+            assertEquals(1, tasks.size());
+            stage.completeTask(tasks.get(0).getTaskId(), true);
+
+            Output output = workerInput.getWorkerType() == WorkerType.PARTITION_S3QS ?
+                    new PartitionOutput() : new JoinOutput();
+            output.setSuccessful(true);
+            output.setRequestId("runtime-attempt-" + i);
+            launcher.complete(i, output);
+        }
+
+        PartitionedJoinOperator.PartitionedJoinOutputCollection outputs =
+                (PartitionedJoinOperator.PartitionedJoinOutputCollection) operator.collectOutputs();
+        assertEquals(2, outputs.getSmallPartitionOutputs().length);
+        assertEquals(1, outputs.getLargePartitionOutputs().length);
+        assertEquals(1, outputs.getJoinOutputs().length);
+        assertEquals(2, planCoordinator.getStageCoordinator(
+                operator.smallPartitionStageId).getCompletedTaskCount());
+        planCoordinator.close();
+    }
+
     private static ShuffleInfo validShuffleInfo()
     {
         return validShuffleInfo("shuffle-1");
@@ -289,10 +356,15 @@ public class TestPartitionedJoinS3QSOperator
 
     private static ShuffleInfo validShuffleInfo(String shuffleId)
     {
+        return validShuffleInfo(shuffleId, 1);
+    }
+
+    private static ShuffleInfo validShuffleInfo(String shuffleId, int logicalProducerTaskCount)
+    {
         return new ShuffleInfo(shuffleId,
                 new StorageInfo(Storage.Scheme.s3qs, null, null, null, null),
                 "s3qs://bucket/shuffle/" + shuffleId + "/",
-                1, 1, 1, 1,
+                1, logicalProducerTaskCount, 1, 1,
                 Collections.singletonList(new ShuffleQueueInfo(0, shuffleId + "-p0", null)));
     }
 
@@ -414,6 +486,26 @@ public class TestPartitionedJoinS3QSOperator
         public int getMemoryMB()
         {
             return 0;
+        }
+    }
+
+    private static class RecordingStageWorkerLauncher implements StageWorkerLauncher
+    {
+        private final List<StageWorkerInput> inputs = new ArrayList<>();
+        private final List<CompletableFuture<Output>> futures = new ArrayList<>();
+
+        @Override
+        public CompletableFuture<? extends Output> launch(WorkerType workerType, StageWorkerInput input)
+        {
+            inputs.add(input);
+            CompletableFuture<Output> future = new CompletableFuture<>();
+            futures.add(future);
+            return future;
+        }
+
+        private void complete(int attemptIndex, Output output)
+        {
+            futures.get(attemptIndex).complete(output);
         }
     }
 

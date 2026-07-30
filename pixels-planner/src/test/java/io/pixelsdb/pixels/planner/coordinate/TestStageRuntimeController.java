@@ -30,9 +30,12 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -179,6 +182,74 @@ public class TestStageRuntimeController
             assertTrue(e.getCause().getMessage().contains("partition task failed"));
         }
         assertEquals(0, controller.getStatus().getActiveAttemptCount());
+    }
+
+    @Test
+    public void autoScalingPreservesLogicalTasksAndCollectsLaterWorkerOutputs() throws Exception
+    {
+        StageCoordinator stage = stageCoordinator(6);
+        RecordingStageWorkerLauncher launcher = new RecordingStageWorkerLauncher();
+        CoordinatorEndpoint endpoint = new CoordinatorEndpoint("localhost", 18894);
+        StageScalingConfig scalingConfig =
+                new StageScalingConfig(true, 60000L, 1, 1, 8, 1, 4, 1, 3, 5000L);
+        PlanCoordinator planCoordinator =
+                new PlanCoordinator(1277L, endpoint, launcher, scalingConfig);
+        planCoordinator.addStageCoordinator(stage, new StageDependency(17, -1, false));
+        planCoordinator.addStageRuntimeController(new StageExecutionDescriptor(
+                1277L, 1000L, 17, "s3qs-stage", WorkerType.PARTITION_S3QS, endpoint));
+
+        StageExecutionHandle execution = planCoordinator.activateStageExecution(17);
+        assertEquals(1, launcher.inputs.size());
+        assertEquals(1, stage.getTaskBatchSize());
+
+        StageScalingDecision scaleOut = planCoordinator.runStageScalingOnce(17, 1000L);
+        assertEquals(StageScalingDecision.Direction.SCALE_OUT, scaleOut.getDirection());
+        assertEquals(5, scaleOut.getTargetWorkerCount());
+        assertEquals(5, launcher.inputs.size());
+
+        List<Worker<CFWorkerInfo>> workers = new ArrayList<>();
+        Set<Integer> claimedTaskIds = new HashSet<>();
+        for (int i = 0; i < 5; ++i)
+        {
+            Worker<CFWorkerInfo> worker = worker(i + 1L);
+            workers.add(worker);
+            stage.addWorker(worker);
+            List<Task> claimed = stage.getTasksToRun(worker.getWorkerId());
+            assertEquals(1, claimed.size());
+            assertTrue(claimedTaskIds.add(claimed.get(0).getTaskId()));
+        }
+        assertEquals(5, stage.getRunningTaskCount());
+        assertEquals(1, stage.getPendingTaskCount());
+
+        for (Integer taskId : new ArrayList<>(claimedTaskIds))
+        {
+            stage.completeTask(taskId, true);
+        }
+        List<Task> finalClaim = stage.getTasksToRun(workers.get(0).getWorkerId());
+        assertEquals(1, finalClaim.size());
+        assertTrue(claimedTaskIds.add(finalClaim.get(0).getTaskId()));
+        stage.completeTask(finalClaim.get(0).getTaskId(), true);
+        assertEquals(6, claimedTaskIds.size());
+        assertTrue(stage.areLogicalTasksTerminal());
+
+        planCoordinator.runStageScalingOnce(17, 2000L);
+        for (int i = 0; i < launcher.futures.size(); ++i)
+        {
+            PartitionOutput output = new PartitionOutput();
+            output.setSuccessful(true);
+            output.setRequestId("attempt-" + i);
+            launcher.complete(i, output);
+        }
+
+        List<Output> outputs = execution.getCompletionFuture().get(5, TimeUnit.SECONDS);
+        assertEquals(5, outputs.size());
+        for (int i = 0; i < outputs.size(); ++i)
+        {
+            assertEquals("attempt-" + i, outputs.get(i).getRequestId());
+        }
+        assertEquals(0, execution.getStatus().getDesiredWorkerCount());
+        assertEquals(6, execution.getStatus().getCompletedTaskCount());
+        planCoordinator.close();
     }
 
     private static StageRuntimeController controller(StageCoordinator stage,

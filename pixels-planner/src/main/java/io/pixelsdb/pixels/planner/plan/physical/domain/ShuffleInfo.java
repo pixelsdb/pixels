@@ -48,9 +48,10 @@ public class ShuffleInfo
      */
     private int numPartitions;
     /**
-     * The number of producer workers expected for this shuffle.
+     * The number of immutable logical producer tasks expected for this shuffle.
+     * Physical workers may scale independently and execute these tasks.
      */
-    private int producerCount;
+    private int logicalProducerTaskCount;
     /**
      * The number of consumer workers expected for this shuffle.
      */
@@ -70,14 +71,14 @@ public class ShuffleInfo
     public ShuffleInfo() { }
 
     public ShuffleInfo(String shuffleId, StorageInfo storageInfo, String objectPathPrefix,
-                       int numPartitions, int producerCount, int consumerCount,
+                       int numPartitions, int logicalProducerTaskCount, int consumerCount,
                        int pollTimeoutSeconds, List<ShuffleQueueInfo> queues)
     {
         this.shuffleId = shuffleId;
         this.storageInfo = storageInfo;
         this.objectPathPrefix = objectPathPrefix;
         this.numPartitions = numPartitions;
-        this.producerCount = producerCount;
+        this.logicalProducerTaskCount = logicalProducerTaskCount;
         this.consumerCount = consumerCount;
         this.pollTimeoutSeconds = pollTimeoutSeconds;
         this.queues = queues == null ? null : ImmutableList.copyOf(queues);
@@ -123,14 +124,14 @@ public class ShuffleInfo
         this.numPartitions = numPartitions;
     }
 
-    public int getProducerCount()
+    public int getLogicalProducerTaskCount()
     {
-        return producerCount;
+        return logicalProducerTaskCount;
     }
 
-    public void setProducerCount(int producerCount)
+    public void setLogicalProducerTaskCount(int logicalProducerTaskCount)
     {
-        this.producerCount = producerCount;
+        this.logicalProducerTaskCount = logicalProducerTaskCount;
     }
 
     public int getConsumerCount()

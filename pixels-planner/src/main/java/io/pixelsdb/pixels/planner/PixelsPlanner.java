@@ -232,7 +232,8 @@ public class PixelsPlanner
         }
     }
 
-    private ShuffleInfo createShuffleInfo(Table inputTable, String outputBase, int numPartitions, int producerCount)
+    private ShuffleInfo createShuffleInfo(Table inputTable, String outputBase, int numPartitions,
+                                          int logicalProducerTaskCount)
     {
         String objectPathPrefix = outputBase.endsWith("/") ? outputBase : outputBase + "/";
         String shuffleSuffix = Integer.toUnsignedString(objectPathPrefix.hashCode());
@@ -244,7 +245,7 @@ public class PixelsPlanner
             queues.add(new ShuffleQueueInfo(i, buildShuffleQueueName(shuffleSuffix, i), null));
         }
         return new ShuffleInfo(shuffleId, ShuffleStorageInfo, objectPathPrefix, numPartitions,
-                producerCount, numPartitions, 20, queues.build());
+                logicalProducerTaskCount, numPartitions, 20, queues.build());
     }
 
     private String buildShuffleQueueName(String shuffleSuffix, int partitionId)
@@ -1470,9 +1471,10 @@ public class PixelsPlanner
     {
         ImmutableList.Builder<PartitionInput> partitionInputsBuilder = ImmutableList.builder();
         int outputId = 0;
-        int producerCount = (inputSplits.size() + IntraWorkerParallelism - 1) / IntraWorkerParallelism;
+        int logicalProducerTaskCount =
+                (inputSplits.size() + IntraWorkerParallelism - 1) / IntraWorkerParallelism;
         ShuffleInfo shuffleInfo = isS3QSShuffleEnabled() ?
-                createShuffleInfo(inputTable, outputBase, numPartition, producerCount) : null;
+                createShuffleInfo(inputTable, outputBase, numPartition, logicalProducerTaskCount) : null;
         for (int i = 0; i < inputSplits.size();)
         {
             PartitionInput partitionInput = new PartitionInput();

@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -62,12 +64,15 @@ public class PlanCoordinator
      * workers pull coordinator tasks, currently the S3QS shuffle stages.
      */
     private final Map<Integer, StageRuntimeController> stageRuntimeControllers = new HashMap<>();
+    private final Map<Integer, StageAutoScaler> stageAutoScalers = new HashMap<>();
     /**
      * Query-owned shuffle edges keyed by their query-unique shuffle id.
      */
     private final Map<String, ShuffleInfo> shuffleInfos = new HashMap<>();
     private final CoordinatorEndpoint coordinatorEndpoint;
     private final StageWorkerLauncher stageWorkerLauncher;
+    private final StageScalingConfig stageScalingConfig;
+    private ScheduledExecutorService scalingExecutor;
     /**
      * The assigner of stage id.
      */
@@ -75,25 +80,36 @@ public class PlanCoordinator
 
     public PlanCoordinator(long transId)
     {
-        this(transId, CoordinatorEndpoint.fromConfig(), new InvokerStageWorkerLauncher());
+        this(transId, CoordinatorEndpoint.fromConfig(), new InvokerStageWorkerLauncher(),
+                StageScalingConfig.fromConfig());
     }
 
     public PlanCoordinator(long transId, StageWorkerLauncher stageWorkerLauncher)
     {
-        this(transId, CoordinatorEndpoint.fromConfig(), stageWorkerLauncher);
+        this(transId, CoordinatorEndpoint.fromConfig(), stageWorkerLauncher,
+                StageScalingConfig.fromConfig());
     }
 
     public PlanCoordinator(long transId, CoordinatorEndpoint coordinatorEndpoint)
     {
-        this(transId, coordinatorEndpoint, new InvokerStageWorkerLauncher());
+        this(transId, coordinatorEndpoint, new InvokerStageWorkerLauncher(),
+                StageScalingConfig.fromConfig());
     }
 
     public PlanCoordinator(long transId, CoordinatorEndpoint coordinatorEndpoint,
                            StageWorkerLauncher stageWorkerLauncher)
     {
+        this(transId, coordinatorEndpoint, stageWorkerLauncher, StageScalingConfig.fromConfig());
+    }
+
+    public PlanCoordinator(long transId, CoordinatorEndpoint coordinatorEndpoint,
+                           StageWorkerLauncher stageWorkerLauncher,
+                           StageScalingConfig stageScalingConfig)
+    {
         this.transId = transId;
         this.coordinatorEndpoint = requireNonNull(coordinatorEndpoint, "coordinatorEndpoint is null");
         this.stageWorkerLauncher = requireNonNull(stageWorkerLauncher, "stageWorkerLauncher is null");
+        this.stageScalingConfig = requireNonNull(stageScalingConfig, "stageScalingConfig is null");
     }
 
     /**
@@ -136,6 +152,10 @@ public class PlanCoordinator
                 "stage coordinator is not found");
         checkArgument(!this.stageRuntimeControllers.containsKey(stageId),
                 "stage runtime controller already exists");
+        // Runtime S3QS workers claim one task at a time. This keeps unstarted
+        // work visible to the autoscaler and prevents one worker from
+        // reserving the whole logical task queue.
+        stageCoordinator.setTaskBatchSize(1);
         this.stageRuntimeControllers.put(stageId,
                 new StageRuntimeController(stageCoordinator, descriptor, this.stageWorkerLauncher));
     }
@@ -151,9 +171,44 @@ public class PlanCoordinator
      */
     public List<CompletableFuture<? extends Output>> activateStage(int stageId)
     {
+        return activateStageExecution(stageId).getAttemptFutures();
+    }
+
+    /**
+     * Activate a queued stage and return a stable handle that also observes
+     * worker attempts launched by later scaling decisions.
+     */
+    public synchronized StageExecutionHandle activateStageExecution(int stageId)
+    {
+        StageRuntimeController runtimeController = requireNonNull(
+                this.stageRuntimeControllers.get(stageId), "stage runtime controller is not found");
+        StageExecutionHandle handle = runtimeController.getExecutionHandle();
+        if (!handle.getAttemptFutures().isEmpty() || this.stageAutoScalers.containsKey(stageId))
+        {
+            return handle;
+        }
+
         StageCoordinator stageCoordinator = requireNonNull(this.stageCoordinators.get(stageId),
                 "stage coordinator is not found");
-        return scaleStage(stageId, stageCoordinator.getPendingTaskCount());
+        int pendingTasks = stageCoordinator.getPendingTaskCount();
+        if (stageScalingConfig.isEnabled())
+        {
+            int initialTarget = Math.min(pendingTasks,
+                    Math.min(stageScalingConfig.getMaxWorkers(),
+                            Math.max(stageScalingConfig.getMinWorkers(),
+                                    stageScalingConfig.getInitialWorkers())));
+            runtimeController.scaleTo(initialTarget);
+            StageAutoScaler autoScaler = new StageAutoScaler(runtimeController,
+                    new PendingTaskScalingPolicy(), stageScalingConfig);
+            this.stageAutoScalers.put(stageId, autoScaler);
+            autoScaler.start(getOrCreateScalingExecutor());
+            handle.getCompletionFuture().whenComplete((outputs, failure) -> stopStageAutoScaler(stageId));
+        }
+        else
+        {
+            runtimeController.scaleTo(pendingTasks);
+        }
+        return handle;
     }
 
     /**
@@ -164,6 +219,37 @@ public class PlanCoordinator
         StageRuntimeController runtimeController = requireNonNull(this.stageRuntimeControllers.get(stageId),
                 "stage runtime controller is not found");
         return runtimeController.scaleTo(targetWorkerCount);
+    }
+
+    public StageExecutionHandle getStageExecutionHandle(int stageId)
+    {
+        StageRuntimeController runtimeController = this.stageRuntimeControllers.get(stageId);
+        return runtimeController == null ? null : runtimeController.getExecutionHandle();
+    }
+
+    StageScalingDecision runStageScalingOnce(int stageId, long currentTimeMs)
+    {
+        StageAutoScaler autoScaler;
+        synchronized (this)
+        {
+            autoScaler = requireNonNull(this.stageAutoScalers.get(stageId),
+                    "stage auto scaler is not active");
+        }
+        return autoScaler.runOnce(currentTimeMs);
+    }
+
+    public synchronized void close()
+    {
+        for (StageAutoScaler autoScaler : this.stageAutoScalers.values())
+        {
+            autoScaler.close();
+        }
+        this.stageAutoScalers.clear();
+        if (this.scalingExecutor != null)
+        {
+            this.scalingExecutor.shutdownNow();
+            this.scalingExecutor = null;
+        }
     }
 
     /**
@@ -223,6 +309,29 @@ public class PlanCoordinator
     public int assignStageId()
     {
         return this.stageIdAssigner.getAndIncrement();
+    }
+
+    private synchronized ScheduledExecutorService getOrCreateScalingExecutor()
+    {
+        if (this.scalingExecutor == null)
+        {
+            this.scalingExecutor = Executors.newSingleThreadScheduledExecutor(runnable ->
+            {
+                Thread thread = new Thread(runnable, "s3qs-stage-scaler-" + transId);
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+        return this.scalingExecutor;
+    }
+
+    private synchronized void stopStageAutoScaler(int stageId)
+    {
+        StageAutoScaler autoScaler = this.stageAutoScalers.remove(stageId);
+        if (autoScaler != null)
+        {
+            autoScaler.close();
+        }
     }
 
     private static boolean sameShuffleResource(ShuffleInfo left, ShuffleInfo right)
