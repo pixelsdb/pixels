@@ -118,4 +118,13 @@ public class TestPixelsRecordReaderBufferImpl
         }
         Assertions.assertEquals(exceptedBatchNum, readBatchNum);
     }
+
+    @Test
+    public void testNormalizeRetinaBufferStorageFolder()
+    {
+        String expected = "minio://pixels/retina-buffer/";
+        Assertions.assertEquals(expected, PixelsRecordReaderBufferImpl.normalizeRetinaBufferStorageFolder(
+                "minio://pixels/retina-buffer"));
+        Assertions.assertEquals(expected, PixelsRecordReaderBufferImpl.normalizeRetinaBufferStorageFolder(expected));
+    }
 }

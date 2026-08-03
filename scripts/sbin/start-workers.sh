@@ -11,7 +11,7 @@ DEFAULT_PIXELS_HOME=$PIXELS_HOME
 while read -r worker home
 do
     home="${home:-${DEFAULT_PIXELS_HOME}}"
-    REMOTE_SCRIPT="export PIXELS_HOME=${home} && $PIXELS_HOME/bin/start-daemon.sh worker -daemon"
+    REMOTE_SCRIPT="export PIXELS_HOME=${home} && \$PIXELS_HOME/bin/start-daemon.sh worker -daemon"
     echo "Starting worker on ${worker}..."
     ssh -n "${worker}" "${REMOTE_SCRIPT}"
 done < $PIXELS_HOME/etc/workers
