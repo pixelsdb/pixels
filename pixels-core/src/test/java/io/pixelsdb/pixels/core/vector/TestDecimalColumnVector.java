@@ -19,7 +19,10 @@
  */
 package io.pixelsdb.pixels.core.vector;
 
+import io.pixelsdb.pixels.core.TypeDescription;
 import org.junit.Test;
+
+import static org.junit.Assert.assertArrayEquals;
 
 /**
  * Created at: 06/03/2022
@@ -27,6 +30,21 @@ import org.junit.Test;
  */
 public class TestDecimalColumnVector
 {
+    @Test
+    public void testAddCanonicalBytes()
+    {
+        String[] values = {"5755.94", "-283.84", "0", "-2"};
+        TypeDescription type = TypeDescription.createDecimal(15, 2);
+        DecimalColumnVector fromBytes = new DecimalColumnVector(values.length, 15, 2);
+        DecimalColumnVector fromStrings = new DecimalColumnVector(values.length, 15, 2);
+        for (String value : values)
+        {
+            fromBytes.add(type.convertSqlStringToByte(value));
+            fromStrings.add(value);
+        }
+        assertArrayEquals(fromStrings.vector, fromBytes.vector);
+    }
+
     @Test
     public void testAddStringVal()
     {

@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -150,6 +151,28 @@ public class DecimalColumnVector extends ColumnVector
             flattenRepeatingNulls(selectedInUse, sel, size);
         }
         flattenNoNulls(selectedInUse, sel, size);
+    }
+
+    @Override
+    public void add(byte[] bytes)
+    {
+        if (checkBytesNull(bytes))
+        {
+            return;
+        }
+        if (bytes.length != Long.BYTES)
+        {
+            throw new IllegalArgumentException(
+                    "Short decimal requires exactly " + Long.BYTES + " bytes, got: " + bytes.length);
+        }
+        if (writeIndex >= getLength())
+        {
+            ensureSize(writeIndex * 2, true);
+        }
+        int index = writeIndex++;
+        // The bytes are the big-endian unscaled value of the decimal at this column's scale.
+        vector[index] = ByteBuffer.wrap(bytes).getLong();
+        isNull[index] = false;
     }
 
     @Override
