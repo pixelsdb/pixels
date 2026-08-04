@@ -26,9 +26,12 @@ import org.junit.Test;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.Random;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
 /**
  * pixels
@@ -67,6 +70,59 @@ public class TestEncoding
         {
             e.printStackTrace();
         }
+    }
+
+    @Test
+    public void runLengthByteTest() throws IOException
+    {
+        System.out.println("=== RunLenByte empty ===");
+        RunLenByteEncoder emptyEncoder = new RunLenByteEncoder();
+        byte[] emptyEncoded = emptyEncoder.encode(new byte[0]);
+        emptyEncoder.close();
+        System.out.println("encoded length: " + emptyEncoded.length);
+        assertEquals(0, emptyEncoded.length);
+        try (RunLenByteDecoder emptyDecoder = new RunLenByteDecoder(new ByteArrayInputStream(emptyEncoded)))
+        {
+            assertFalse(emptyDecoder.hasNext());
+            System.out.println("decoder.hasNext(): false (ok)");
+        }
+
+        System.out.println("=== RunLenByte mixed round-trip ===");
+        // mixed: literals, repeats across BYTE_RLE_MAX_REPEAT_SIZE, and boundary values
+        byte[] values = new byte[200];
+        Arrays.fill(values, 0, 5, (byte) 1);
+        Arrays.fill(values, 5, 140, (byte) 7); // crosses 130-repeat boundary
+        values[140] = (byte) -128;
+        values[141] = 0;
+        values[142] = 127;
+        for (int i = 143; i < values.length; i++)
+        {
+            values[i] = (byte) i;
+        }
+        System.out.println("input rows: " + values.length
+                + " (5x1, 135x7 across 130-repeat boundary, then -128/0/127 + literals)");
+        System.out.println("input sample [0..9]: " + Arrays.toString(Arrays.copyOfRange(values, 0, 10)));
+        System.out.println("input sample [138..149]: " + Arrays.toString(Arrays.copyOfRange(values, 138, 150)));
+
+        RunLenByteEncoder encoder = new RunLenByteEncoder();
+        byte[] encoded = encoder.encode(values);
+        encoder.close();
+        System.out.println("encoded bytes: " + encoded.length
+                + " (compression ratio " + String.format("%.2f", (double) encoded.length / values.length) + ")");
+
+        byte[] decoded = new byte[values.length];
+        try (RunLenByteDecoder decoder = new RunLenByteDecoder(new ByteArrayInputStream(encoded)))
+        {
+            for (int i = 0; i < values.length; i++)
+            {
+                decoded[i] = decoder.next();
+            }
+            assertFalse(decoder.hasNext());
+        }
+        System.out.println("decoded sample [0..9]: " + Arrays.toString(Arrays.copyOfRange(decoded, 0, 10)));
+        System.out.println("decoded sample [138..149]: " + Arrays.toString(Arrays.copyOfRange(decoded, 138, 150)));
+        assertArrayEquals(values, decoded);
+        System.out.println("round-trip OK");
     }
 
     @Test

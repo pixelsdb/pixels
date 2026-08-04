@@ -19,24 +19,22 @@
  */
 package io.pixelsdb.pixels.core.encoding;
 
+import io.pixelsdb.pixels.common.utils.Constants;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 /**
  * A encoder for a sequence of bytes.
- * A control byte is written before each run with positive values 0 to 127 meaning 2 to 129 repetitions.
+ * A control byte is written before each run with positive values 0 to 127 meaning 3 to 130 repetitions.
  * If the bytes is -1 to -128, 1 to 128 literal byte values follow.
  *
  * @author guodong
  */
 public class RunLenByteEncoder extends Encoder
 {
-    private static final int MIN_REPEAT_SIZE = 3;
-    private static final int MAX_LITERAL_SIZE = 128;
-    private static final int MAX_REPEAT_SIZE = 127 + MIN_REPEAT_SIZE;
-
     private final ByteArrayOutputStream output;
-    private final byte[] literals = new byte[MAX_LITERAL_SIZE];
+    private final byte[] literals = new byte[Constants.BYTE_RLE_MAX_LITERAL_SIZE];
     private int numLiterals = 0;
     private boolean repeat = false;
     private int tailRunLength = 0;
@@ -87,7 +85,7 @@ public class RunLenByteEncoder extends Encoder
         {
             if (repeat)
             {
-                output.write(numLiterals - MIN_REPEAT_SIZE);
+                output.write(numLiterals - Constants.RLE_MIN_REPEAT);
                 output.write(literals, 0, 1);
             }
             else
@@ -120,7 +118,7 @@ public class RunLenByteEncoder extends Encoder
             if (value == literals[0])
             {
                 numLiterals += 1;
-                if (numLiterals == MAX_REPEAT_SIZE)
+                if (numLiterals == Constants.BYTE_RLE_MAX_REPEAT_SIZE)
                 {
                     writeValues();
                 }
@@ -142,26 +140,26 @@ public class RunLenByteEncoder extends Encoder
             {
                 tailRunLength = 1;
             }
-            if (tailRunLength == MIN_REPEAT_SIZE)
+            if (tailRunLength == Constants.RLE_MIN_REPEAT)
             {
-                if (numLiterals + 1 == MIN_REPEAT_SIZE)
+                if (numLiterals + 1 == Constants.RLE_MIN_REPEAT)
                 {
                     repeat = true;
                     numLiterals += 1;
                 }
                 else
                 {
-                    numLiterals -= MIN_REPEAT_SIZE - 1;
+                    numLiterals -= Constants.RLE_MIN_REPEAT - 1;
                     writeValues();
                     literals[0] = value;
                     repeat = true;
-                    numLiterals = MIN_REPEAT_SIZE;
+                    numLiterals = Constants.RLE_MIN_REPEAT;
                 }
             }
             else
             {
                 literals[numLiterals++] = value;
-                if (numLiterals == MAX_LITERAL_SIZE)
+                if (numLiterals == Constants.BYTE_RLE_MAX_LITERAL_SIZE)
                 {
                     writeValues();
                 }

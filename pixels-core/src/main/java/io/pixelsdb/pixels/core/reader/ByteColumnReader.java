@@ -21,17 +21,31 @@ package io.pixelsdb.pixels.core.reader;
 
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.encoding.RunLenByteDecoder;
+import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.utils.ByteBufferInputStream;
+import io.pixelsdb.pixels.core.vector.ByteColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Arrays;
 
 /**
+ * Column reader for byte / tinyint columns.
+ *
  * @author guodong
+ * @author hank
  */
 public class ByteColumnReader extends ColumnReader
 {
+    private RunLenByteDecoder decoder;
+    private ByteBuffer inputBuffer;
+    private InputStream inputStream;
+
     ByteColumnReader(TypeDescription type)
     {
         super(type);
@@ -53,6 +67,13 @@ public class ByteColumnReader extends ColumnReader
     @Override
     public void close() throws IOException
     {
+        if (this.decoder != null)
+        {
+            // inputStream is closed inside decoder.close();
+            this.decoder.close();
+            this.decoder = null;
+        }
+        this.inputBuffer = null;
     }
 
     /**
@@ -70,9 +91,99 @@ public class ByteColumnReader extends ColumnReader
     @Override
     public void read(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                      int offset, int size, int pixelStride, final int vectorIndex,
-                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex)
+                     ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
-        throw new UnsupportedOperationException("Not implemented yet.");
+        ByteColumnVector columnVector = (ByteColumnVector) vector;
+        boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+        // if read from start, init the stream and decoder
+        if (offset == 0)
+        {
+            if (inputStream != null)
+            {
+                inputStream.close();
+            }
+            this.inputBuffer = input;
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
+            decoder = new RunLenByteDecoder(inputStream);
+            // isNull
+            isNullOffset = inputBuffer.position() + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
+            // re-init
+            hasNull = true;
+            elementIndex = 0;
+        }
+
+        // read without copying the de-compacted content and isNull
+        int numLeft = size, numToRead, bytesToDeCompact;
+        boolean endOfPixel;
+        for (int i = vectorIndex; numLeft > 0; )
+        {
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+            {
+                // read to the end of the current pixel
+                numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
+            }
+            else
+            {
+                numToRead = numLeft;
+                endOfPixel = false;
+            }
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            if (hasNull)
+            {
+                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
+                        inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
+                isNullOffset += bytesToDeCompact;
+                isNullSkipBits =  endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
+                columnVector.noNulls = false;
+            }
+            else
+            {
+                Arrays.fill(columnVector.isNull, i, i + numToRead, false);
+            }
+            // read content
+            if (decoding)
+            {
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (!(hasNull && columnVector.isNull[j]))
+                    {
+                        columnVector.vector[j] = decoder.next();
+                    }
+                }
+            }
+            else
+            {
+                if (nullsPadding)
+                {
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        columnVector.vector[j] = inputBuffer.get();
+                    }
+                }
+                else
+                {
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (!(hasNull && columnVector.isNull[j]))
+                        {
+                            columnVector.vector[j] = inputBuffer.get();
+                        }
+                    }
+                }
+            }
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
+        }
     }
 
     /**
@@ -92,8 +203,156 @@ public class ByteColumnReader extends ColumnReader
     @Override
     public void readSelected(ByteBuffer input, PixelsProto.ColumnEncoding encoding,
                              int offset, int size, int pixelStride, final int vectorIndex,
-                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected)
+                             ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected) throws IOException
     {
-        throw new UnsupportedOperationException("Not implemented yet.");
+        ByteColumnVector columnVector = (ByteColumnVector) vector;
+        boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
+        boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
+        // if read from start, init the stream and decoder
+        if (offset == 0)
+        {
+            if (inputStream != null)
+            {
+                inputStream.close();
+            }
+            this.inputBuffer = input;
+            this.inputBuffer.order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
+            inputStream = new ByteBufferInputStream(inputBuffer, inputBuffer.position(), inputBuffer.limit());
+            decoder = new RunLenByteDecoder(inputStream);
+            // isNull
+            isNullOffset = inputBuffer.position() + chunkIndex.getIsNullOffset();
+            isNullSkipBits = 0;
+            // re-init
+            hasNull = true;
+            elementIndex = 0;
+        }
+
+        // read without copying the de-compacted content and isNull
+        int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
+        boolean[] isNull = null;
+        boolean endOfPixel;
+        if (decoding || !nullsPadding)
+        {
+            isNull = new boolean[size];
+        }
+        for (int i = vectorIndex; numLeft > 0; )
+        {
+            if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
+            {
+                // read to the end of the current pixel
+                numToRead = pixelStride - elementIndex % pixelStride;
+                endOfPixel = true;
+            }
+            else
+            {
+                numToRead = numLeft;
+                endOfPixel = false;
+            }
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
+
+            // read isNull
+            int pixelId = elementIndex / pixelStride;
+            hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
+            if (hasNull)
+            {
+                if (!decoding && nullsPadding)
+                {
+                    // read isNull directly into the vector of the column chunk
+                    BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian, selected, i - vectorIndex);
+                }
+                else
+                {
+                    // need to keep isNull for later use
+                    BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
+                            isNullOffset, isNullSkipBits, littleEndian);
+                    // update columnVector.isNull
+                    int k = vectorWriteIndex;
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.isNull[k++] = isNull[j - vectorIndex];
+                        }
+                    }
+                }
+                isNullOffset += bytesToDeCompact;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
+                columnVector.noNulls = false;
+            }
+            else
+            {
+                if (decoding || !nullsPadding)
+                {
+                    Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
+                }
+                // update columnVector.isNull later to avoid bitmap unnecessary traversal
+            }
+
+            // read content
+            int originalVectorWriteIndex = vectorWriteIndex;
+            if (decoding)
+            {
+                for (int j = i; j < i + numToRead; ++j)
+                {
+                    if (!(hasNull && isNull[j - vectorIndex]))
+                    {
+                        byte value = decoder.next();
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.vector[vectorWriteIndex++] = value;
+                        }
+                    }
+                    else if (selected.get(j - vectorIndex))
+                    {
+                        vectorWriteIndex++;
+                    }
+                }
+            }
+            else
+            {
+                if (nullsPadding)
+                {
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        byte value = inputBuffer.get();
+                        if (selected.get(j - vectorIndex))
+                        {
+                            columnVector.vector[vectorWriteIndex++] = value;
+                        }
+                    }
+                }
+                else
+                {
+                    for (int j = i; j < i + numToRead; ++j)
+                    {
+                        if (!(hasNull && isNull[j - vectorIndex]))
+                        {
+                            byte value = inputBuffer.get();
+                            if (selected.get(j - vectorIndex))
+                            {
+                                columnVector.vector[vectorWriteIndex++] = value;
+                            }
+                        }
+                        else if (selected.get(j - vectorIndex))
+                        {
+                            vectorWriteIndex++;
+                        }
+                    }
+                }
+            }
+
+            // update columnVector.isNull if has no nulls
+            if (!hasNull)
+            {
+                Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
+            }
+
+            // update variables
+            numLeft -= numToRead;
+            elementIndex += numToRead;
+            i += numToRead;
+        }
     }
 }

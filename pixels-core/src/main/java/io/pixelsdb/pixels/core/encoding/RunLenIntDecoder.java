@@ -41,7 +41,7 @@ public class RunLenIntDecoder extends IntDecoder
 
     private final InputStream inputStream;
     private final boolean isSigned;
-    private final long[] literals = new long[Constants.MAX_SCOPE];
+    private final long[] literals = new long[Constants.INT_RLE_MAX_SCOPE];
     private final EncodingUtils encodingUtils = new EncodingUtils();
 
     private boolean isRepeating = false;
@@ -128,8 +128,8 @@ public class RunLenIntDecoder extends IntDecoder
 
         // read the run length
         int len = firstByte & 0x07;
-        // run length values are stored only after MIN_REPEAT value is met
-        len += Constants.MIN_REPEAT;
+        // run length values are stored only after RLE_MIN_REPEAT value is met
+        len += Constants.RLE_MIN_REPEAT;
 
         // read the repeated value which is stored using fixed bytes
         long val = bytesToLongBE(inputStream, size);
