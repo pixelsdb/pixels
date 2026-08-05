@@ -55,11 +55,12 @@ message TransactionMetadata {
   string id = 2;
   int64 event_count = 3;
   repeated DataCollection data_collections = 4;  
-  int64 timestamp = 5;              
+  int64 timestamp = 5;
 }
 
 message ColumnValue {
     bytes value = 1;
+    bool is_null = 2;
 }
     
 
