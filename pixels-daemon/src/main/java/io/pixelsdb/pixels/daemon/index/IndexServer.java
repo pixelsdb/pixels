@@ -36,7 +36,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class IndexServer implements Server
 {
     private static final Logger log = LogManager.getLogger(IndexServer.class);
-    private boolean running = false;
+    private volatile boolean running = false;
     private final io.grpc.Server rpcServer;
 
     public IndexServer(int port)

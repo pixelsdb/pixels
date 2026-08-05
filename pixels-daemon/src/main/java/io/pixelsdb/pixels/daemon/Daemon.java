@@ -67,7 +67,7 @@ public class Daemon
             if (myLock == null)
             {
                 // this process has been started
-                this.clean();
+                this.releaseLock();
                 log.info("another daemon process is holding lock on " + lockFilePath + ", exiting...");
                 this.running = false;
                 System.exit(0);
@@ -82,8 +82,8 @@ public class Daemon
              * Issue #181:
              * We should not bind the SIGTERM handler.
              * If it is bind, the shutdown hooks will not be called.
-             * Daemon.shutdown() will be called in the shutdown hook in DaemonMain,
-             * instead of in the signal handler.
+             * Daemon shutdown is coordinated by the shutdown hook in DaemonMain,
+             * instead of by the signal handler.
              */
             // bind handler for SIGTERM(15) signal.
             //this.shutdownHandler = new ShutdownHandler(this);
@@ -91,45 +91,65 @@ public class Daemon
         } catch (IOException e)
         {
             log.error("I/O exception when creating lock file channels.", e);
-            this.clean();
+            this.releaseLock();
         }
     }
 
-    public void clean ()
+    /**
+     * Stop the daemon main loop without releasing the process lock.
+     */
+    public void requestShutdown()
     {
+        this.running = false;
+    }
+
+    /**
+     * Release the process lock after all managed servers have been stopped.
+     */
+    public synchronized void releaseLock()
+    {
+        if (this.cleaned)
+        {
+            return;
+        }
+        log.info("releasing daemon lock and cleaning the file channel...");
         try
         {
-            if (myLock != null)
+            if (this.myLock != null && this.myLock.isValid())
             {
-                myLock.release();
+                this.myLock.release();
             }
         } catch (IOException e1)
         {
-            log.error("error when releasing daemon lock");
+            log.error("error when releasing daemon lock", e1);
         }
 
-        try
+        if (this.myChannel != null)
         {
-            if (this.myChannel != null)
+            try
             {
                 this.myChannel.truncate(0);
+            }
+            catch (IOException e)
+            {
+                log.error("error when truncating my own channel", e);
+            }
+            try
+            {
                 this.myChannel.close();
             }
-        } catch (IOException e)
-        {
-            log.error("error when closing my own channel.", e);
+            catch (IOException e)
+            {
+                log.error("error when closing my own channel", e);
+            }
         }
         this.cleaned = true;
     }
 
     public void shutdown()
     {
-        this.running = false;
-        while (!this.cleaned)
-        {
-            log.info("the daemon thread is stopped, cleaning the file channels...");
-            this.clean();
-        }
+        this.requestShutdown();
+        this.releaseLock();
     }
 
     public boolean isRunning()
@@ -153,8 +173,15 @@ public class Daemon
         {
             if (signal.getNumber() == 15)
             {
-                this.daemon.shutdown();
-                this.executor.run();
+                this.daemon.requestShutdown();
+                try
+                {
+                    this.executor.run();
+                }
+                finally
+                {
+                    this.daemon.releaseLock();
+                }
             }
         }
     }

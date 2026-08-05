@@ -23,12 +23,13 @@ available_skills() {
 usage() {
   cat <<EOF
 Usage:
-  $0 --skill <name> --tool <codex|claude> --scope <project|global>
+  $0 --skill <name> --tool <codex|claude|cursor> --scope <project|global>
 
 Required arguments:
   --skill <name>          Skill directory name under skills/.
                            --agent is accepted as a deprecated alias.
-  --tool <codex|claude>   Target AI tool.
+  --tool <codex|claude|cursor>
+                           Target AI tool.
   --scope <project|global>
                            project: install into this repository.
                            global: install into the current user's tool config.
@@ -37,6 +38,8 @@ Examples:
   $0 --skill pixels-install --tool codex --scope project
   $0 --skill pixels-install --tool codex --scope global
   $0 --skill pixels-install --tool claude --scope project
+  $0 --skill pixels-install --tool cursor --scope project
+  $0 --skill pixels-install --tool cursor --scope global
 
 Available skills:
 $(available_skills)
@@ -107,7 +110,7 @@ parse_args() {
   done
 
   [ -n "$SKILL" ] || ERRORS+=("missing --skill <name>")
-  [ -n "$TOOL" ] || ERRORS+=("missing --tool <codex|claude>")
+  [ -n "$TOOL" ] || ERRORS+=("missing --tool <codex|claude|cursor>")
   [ -n "$SCOPE" ] || ERRORS+=("missing --scope <project|global>")
 
   if [ -n "$SKILL" ]; then
@@ -116,8 +119,8 @@ parse_args() {
 
   if [ -n "$TOOL" ]; then
     case "$TOOL" in
-      codex|claude) ;;
-      *) ERRORS+=("--tool must be codex or claude") ;;
+      codex|claude|cursor) ;;
+      *) ERRORS+=("--tool must be codex, claude, or cursor") ;;
     esac
   fi
 
@@ -180,6 +183,14 @@ codex_target_dir() {
   fi
 }
 
+cursor_target_dir() {
+  if [ "$SCOPE" = "project" ]; then
+    printf '%s/.cursor/skills/%s\n' "$(project_root)" "$SKILL"
+  else
+    printf '%s/.cursor/skills/%s\n' "$HOME" "$SKILL"
+  fi
+}
+
 claude_agent_target() {
   if [ "$SCOPE" = "project" ]; then
     printf '%s/.claude/agents/%s.md\n' "$(project_root)" "$SKILL"
@@ -210,6 +221,33 @@ install_codex() {
   copy_common_assets "$source_dir" "$target_dir"
 
   echo "Installed Codex skill '$SKILL' to $target_dir"
+}
+
+install_cursor() {
+  local source_dir target_dir source_skill
+  source_dir="$(skill_dir)"
+  source_skill="$source_dir/cursor/SKILL.md"
+  target_dir="$(cursor_target_dir)"
+
+  # Prefer a Cursor-specific entrypoint; fall back to the Codex SKILL.md,
+  # which already uses Cursor-compatible YAML frontmatter.
+  if [ ! -f "$source_skill" ]; then
+    source_skill="$source_dir/codex/SKILL.md"
+  fi
+  [ -f "$source_skill" ] || fail_with_usage "Cursor SKILL.md not found: $source_dir/cursor/SKILL.md (or codex/SKILL.md)"
+
+  case "$target_dir" in
+    */.cursor/skills-cursor/*|*/.cursor/skills-cursor)
+      fail_with_usage "refusing to install into .cursor/skills-cursor (reserved for Cursor built-in skills)"
+      ;;
+  esac
+
+  rm -rf "$target_dir"
+  mkdir -p "$target_dir"
+  cp "$source_skill" "$target_dir/SKILL.md"
+  copy_common_assets "$source_dir" "$target_dir"
+
+  echo "Installed Cursor skill '$SKILL' to $target_dir"
 }
 
 install_claude() {
@@ -272,4 +310,5 @@ ensure_skill_exists
 case "$TOOL" in
   codex) install_codex ;;
   claude) install_claude ;;
+  cursor) install_cursor ;;
 esac

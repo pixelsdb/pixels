@@ -40,7 +40,7 @@ public class MetadataServer implements Server
 {
     private static final Logger log = LogManager.getLogger(MetadataServer.class);
 
-    private boolean running = false;
+    private volatile boolean running = false;
     private final io.grpc.Server rpcServer;
     private final HealthStatusManager health = new HealthStatusManager();
 

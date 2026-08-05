@@ -6,10 +6,11 @@ import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
 import io.pixelsdb.pixels.daemon.cache.CacheWorker;
 import io.pixelsdb.pixels.daemon.index.IndexServer;
 import io.pixelsdb.pixels.daemon.node.NodeServer;
+import io.pixelsdb.pixels.daemon.retina.RetinaReadyCheck;
 import io.pixelsdb.pixels.daemon.retina.RetinaServer;
-import io.pixelsdb.pixels.daemon.exception.NoSuchServerException;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatCoordinator;
 import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
+import io.pixelsdb.pixels.daemon.metadata.MetadataReadyCheck;
 import io.pixelsdb.pixels.daemon.metadata.MetadataServer;
 import io.pixelsdb.pixels.daemon.metrics.MetricsServer;
 import io.pixelsdb.pixels.daemon.scaling.ScalingMetricsServer;
@@ -108,7 +109,7 @@ public class DaemonMain
                     container.addServer("metadata", metadataServer);
                     // start transaction server
                     TransServer transServer = new TransServer(transServerPort);
-                    container.addServer("transaction", transServer);
+                    container.addServer("transaction", transServer, new RetinaReadyCheck());
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
@@ -174,7 +175,8 @@ public class DaemonMain
                 {
                     // start retina server on worker node
                     RetinaServer retinaServer = new RetinaServer(retinaServerPort);
-                    container.addServer("retina", retinaServer);
+                    container.addServer("retina", retinaServer,
+                            new MetadataReadyCheck());
 
                     if (indexServerEnabled)
                     {
@@ -202,47 +204,27 @@ public class DaemonMain
             // The shutdown hook ensures the servers are shutdown graceful
             // if this main daemon is terminated by SIGTERM(15) signal.
             ShutdownHookManager.Instance().registerShutdownHook(DaemonMain.class, false, () -> {
-                for (String serverName : container.getServerNames())
+                // Stop the watchdog before shutting down servers, but retain the
+                // process lock until all server shutdown attempts have completed.
+                mainDaemon.requestShutdown();
+                try
                 {
-                    // shutdown the server threads.
-                    try
+                    container.shutdownAll();
+                    if (!container.awaitTermination(30, TimeUnit.SECONDS))
                     {
-                        container.shutdownServer(serverName);
-                    } catch (NoSuchServerException e)
-                    {
-                        log.error("error when stopping server threads", e);
+                        log.warn("not all servers stopped before the shutdown timeout");
                     }
                 }
-                for (int i = 60; i > 0; --i)
+                catch (InterruptedException e)
                 {
-                    try
-                    {
-                        boolean done = true;
-                        for (String serverName : container.getServerNames())
-                        {
-                            if (container.checkServer(serverName, 0))
-                            {
-                                done = false;
-                                break;
-                            }
-                        }
-                        if (done)
-                        {
-                            break;
-                        }
-                        TimeUnit.SECONDS.sleep(1);
-                    }
-                    catch (Throwable e)
-                    {
-                        log.error("error when waiting server threads shutdown", e);
-                    }
+                    Thread.currentThread().interrupt();
+                    log.warn("interrupted while waiting for servers to stop", e);
                 }
-                /**
-                 * Issue #181:
-                 * Shutdown the daemon thread here instead of using the SIGTERM handler.
-                 */
-                mainDaemon.shutdown();
-                log.info("all the servers are shutdown, bye...");
+                finally
+                {
+                    mainDaemon.releaseLock();
+                }
+                log.info("daemon shutdown completed, bye...");
             });
 
             // continue the main thread, start and check the server threads.
@@ -253,10 +235,7 @@ public class DaemonMain
                 {
                     for (String serverName : container.getServerNames())
                     {
-                        if (!container.checkServer(serverName))
-                        {
-                            container.startServer(serverName);
-                        }
+                        container.startServer(serverName);
                     }
                     TimeUnit.SECONDS.sleep(1);
                 }

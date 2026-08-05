@@ -32,7 +32,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class ScalingMetricsServer implements Server
 {
     private static final Logger log = LogManager.getLogger(ScalingMetricsServer.class);
-    private boolean running = false;
+    private volatile boolean running = false;
     private final io.grpc.Server rpcServer;
     private final int port;
 

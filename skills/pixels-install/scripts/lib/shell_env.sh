@@ -80,12 +80,16 @@ state_dir() {
   current_skill_dir="$(skill_dir)"
 
   case "$current_skill_dir" in
-    "$HOME/.agents/skills/"*)
+    "$HOME/.agents/skills/"*|"$HOME/.cursor/skills/"*)
       printf '%s/.agents/state/%s\n' "$HOME" "$DEFAULT_SKILL_NAME"
       return 0
       ;;
     */.agents/skills/*)
       printf '%s/.agents/state/%s\n' "${current_skill_dir%%/.agents/skills/*}" "$DEFAULT_SKILL_NAME"
+      return 0
+      ;;
+    */.cursor/skills/*)
+      printf '%s/.agents/state/%s\n' "${current_skill_dir%%/.cursor/skills/*}" "$DEFAULT_SKILL_NAME"
       return 0
       ;;
   esac
@@ -103,23 +107,114 @@ state_dir() {
 DEFAULT_STATE_DIR="$(state_dir)"
 DEFAULT_TOOLCHAIN_ENV_FILE="$DEFAULT_STATE_DIR/toolchain.env"
 
+# Return the login shell configured for the account running the installer.
+# `$SHELL` can describe the parent agent/SSH process instead of the target
+# account, so passwd/NSS is authoritative whenever it is available.
+login_shell_path() {
+  local user="${LOGIN_SHELL_USER:-${DEPLOYMENT_USER:-$(id -un 2>/dev/null || printf '%s' "${USER:-}")}}"
+  local shell_path=""
+  local passwd_lookup_available=false
+
+  if command -v getent >/dev/null 2>&1 && [[ -n "$user" ]]; then
+    passwd_lookup_available=true
+    shell_path="$(getent passwd "$user" 2>/dev/null | awk -F: 'NR == 1 { print $7; exit }')"
+  fi
+  if [[ -z "$shell_path" && -r /etc/passwd && -n "$user" ]]; then
+    passwd_lookup_available=true
+    shell_path="$(awk -F: -v account="$user" '$1 == account { print $7; exit }' /etc/passwd)"
+  fi
+  if [[ -z "$shell_path" && "$passwd_lookup_available" == "false" ]]; then
+    shell_path="${SHELL:-}"
+  fi
+
+  [[ -n "$shell_path" ]] || {
+    printf 'ERROR: could not determine the login shell for account %s\n' "${user:-unknown}" >&2
+    return 1
+  }
+  printf '%s\n' "$shell_path"
+}
+
+login_shell_name() {
+  local shell_path
+  shell_path="$(login_shell_path)" || return 1
+
+  case "$(basename "$shell_path")" in
+    bash|zsh)
+      basename "$shell_path"
+      ;;
+    *)
+      printf 'ERROR: unsupported login shell %s; pixels-install supports bash or zsh only\n' "$shell_path" >&2
+      return 1
+      ;;
+  esac
+}
+
+require_bash_runtime() {
+  [[ -n "${BASH_VERSION:-}" ]] || {
+    printf 'ERROR: pixels-install scripts must be executed by Bash; run the script directly instead of with zsh or source\n' >&2
+    return 1
+  }
+  command -v bash >/dev/null 2>&1 || {
+    printf 'ERROR: Bash is required on the deployment node but was not found on PATH\n' >&2
+    return 1
+  }
+}
+
+require_supported_login_shell() {
+  local shell_name
+  shell_name="$(login_shell_name)" || return 1
+  command -v "$shell_name" >/dev/null 2>&1 || {
+    printf 'ERROR: configured login shell %s is not executable on this node\n' "$shell_name" >&2
+    return 1
+  }
+  printf '%s\n' "$shell_name"
+}
+
+# Quote a literal value for a shell assignment. This is used for toolchain.env
+# and for values embedded in remote shell commands.
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+# Quote a profile value while preserving the intentional $HOME/$PIXELS_HOME
+# expressions emitted by profile_path_value() and install_trino.sh.
+profile_value_quote() {
+  local value="$1"
+  local variable
+  local suffix
+
+  for variable in '$HOME' '$PIXELS_HOME'; do
+    if [[ "$value" == "$variable" ]]; then
+      printf '%s\n' "$variable"
+      return
+    fi
+    if [[ "$value" == "$variable/"* ]]; then
+      suffix="${value#"$variable"}"
+      printf '%s%s\n' "$variable" "$(shell_quote "$suffix")"
+      return
+    fi
+  done
+
+  shell_quote "$value"
+}
+
 # Print the profile file that should receive persisted exports.
-# Honors an explicit PROFILE_FILE override; otherwise picks the rc file
-# matching the user's current login shell ($SHELL).
+# Honors an explicit PROFILE_FILE override, but still validates the actual
+# account login shell before returning.
 detect_profile_file() {
+  local shell_name
+  shell_name="$(require_supported_login_shell)" || return 1
+
   if [[ -n "${PROFILE_FILE:-}" ]]; then
     printf '%s\n' "$PROFILE_FILE"
     return
   fi
 
-  local shell_name
-  shell_name="$(basename "${SHELL:-bash}")"
-
   case "$shell_name" in
     zsh)
       printf '%s\n' "$HOME/.zshrc"
       ;;
-    *)
+    bash)
       printf '%s\n' "$HOME/.bashrc"
       ;;
   esac
@@ -146,7 +241,7 @@ persist_export() {
   local profile_file="$1"
   local name="$2"
   local value="$3"
-  local desired_line="export ${name}=${value}"
+  local desired_line="export ${name}=$(profile_value_quote "$value")"
   local tmp
 
   touch "$profile_file"
@@ -211,7 +306,7 @@ persist_toolchain_var() {
   touch "$file"
   tmp="$(mktemp "${file}.XXXXXX")"
   grep -v "^export ${name}=" "$file" > "$tmp" 2>/dev/null || true
-  printf 'export %s=%s\n' "$name" "$value" >> "$tmp"
+  printf 'export %s=%s\n' "$name" "$(shell_quote "$value")" >> "$tmp"
   mv "$tmp" "$file"
 }
 
@@ -219,6 +314,9 @@ persist_toolchain_var() {
 # bin directories it set onto PATH, so a script invoked as a fresh process
 # can still find `java`/`mvn`/`etcdctl` installed by an earlier step.
 load_toolchain_env() {
+  require_bash_runtime || return 1
+  require_supported_login_shell >/dev/null || return 1
+
   local file="${TOOLCHAIN_ENV_FILE:-$DEFAULT_TOOLCHAIN_ENV_FILE}"
   local java_home_was_set=false java_home_value=""
   local maven_home_was_set=false maven_home_value=""
@@ -264,6 +362,32 @@ load_toolchain_env() {
   fi
   if [[ -n "${ETCD:-}" ]]; then
     export PATH="$PATH:$ETCD"
+  fi
+}
+
+# Validate a generated file that will be sourced by the user's interactive
+# shell. The installer itself remains Bash-only, but generated helpers must
+# parse in both supported login shells.
+validate_shell_compatibility() {
+  local file="$1"
+
+  [[ -f "$file" ]] || {
+    printf 'ERROR: generated shell file not found: %s\n' "$file" >&2
+    return 1
+  }
+  bash -n "$file" || {
+    printf 'ERROR: generated shell file is invalid Bash: %s\n' "$file" >&2
+    return 1
+  }
+
+  if command -v zsh >/dev/null 2>&1; then
+    zsh -n "$file" || {
+      printf 'ERROR: generated shell file is invalid Zsh: %s\n' "$file" >&2
+      return 1
+    }
+  elif [[ "$(login_shell_name)" == "zsh" ]]; then
+    printf 'ERROR: the login shell is Zsh, but zsh was not found to validate %s\n' "$file" >&2
+    return 1
   fi
 }
 

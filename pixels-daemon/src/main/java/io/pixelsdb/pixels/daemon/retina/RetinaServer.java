@@ -19,15 +19,10 @@
  */
 package io.pixelsdb.pixels.daemon.retina;
 
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.ServerBuilder;
-import io.grpc.StatusRuntimeException;
-import io.grpc.health.v1.HealthCheckRequest;
-import io.grpc.health.v1.HealthCheckResponse;
-import io.grpc.health.v1.HealthGrpc;
 import io.pixelsdb.pixels.common.server.Server;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.daemon.heartbeat.HeartbeatWorker;
+import io.pixelsdb.pixels.daemon.heartbeat.NodeStatus;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -44,16 +39,14 @@ public class RetinaServer implements Server
 {
     private static final Logger log = LogManager.getLogger(RetinaServer.class);
 
-    private boolean running = false;
-    private final io.grpc.Server rpcServer;
+    private volatile boolean running = false;
+    private final int port;
+    private volatile io.grpc.Server rpcServer;
 
     public RetinaServer(int port)
     {
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
-        // Issue #935: ensure metadata server has been already started
-        waitForMetadataServer();
-        this.rpcServer = ServerBuilder.forPort(port)
-                .addService(new RetinaServerImpl()).build();
+        this.port = port;
     }
 
     @Override
@@ -66,12 +59,16 @@ public class RetinaServer implements Server
     public void shutdown()
     {
         this.running = false;
-        try
+        io.grpc.Server server = this.rpcServer;
+        if (server != null)
         {
-            this.rpcServer.shutdown().awaitTermination(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e)
-        {
-            log.error("Interrupted when shutdown rpc server", e);
+            try
+            {
+                server.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e)
+            {
+                log.error("Interrupted when shutdown rpc server", e);
+            }
         }
     }
 
@@ -80,9 +77,16 @@ public class RetinaServer implements Server
     {
         try
         {
-            this.rpcServer.start();
+            HeartbeatWorker.setCurrentStatus(NodeStatus.INIT);
+            RetinaServerImpl service = new RetinaServerImpl();
+            service.setReadyListener(() -> publishReady(service));
+            io.grpc.Server server = ServerBuilder.forPort(port)
+                    .addService(service).build();
+            this.rpcServer = server;
+            server.start();
             this.running = true;
-            this.rpcServer.awaitTermination();
+            publishReady(service);
+            server.awaitTermination();
         } catch (IOException e)
         {
             log.error("I/O error when running", e);
@@ -95,49 +99,12 @@ public class RetinaServer implements Server
         }
     }
 
-    private void waitForMetadataServer()
+    private void publishReady(RetinaServerImpl service)
     {
-        ConfigFactory config = ConfigFactory.Instance();
-        String metadataHost = config.getProperty("metadata.server.host");
-        int metadataPort = Integer.parseInt(config.getProperty("metadata.server.port"));
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(metadataHost, metadataPort)
-                .usePlaintext().build();
-
-        HealthGrpc.HealthBlockingStub stub = HealthGrpc.newBlockingStub(channel);
-        int retry = 0;
-        int maxRetry = 30;
-
-        while (retry < maxRetry)
+        if (this.running && service.isReady())
         {
-            try
-            {
-                HealthCheckResponse response = stub.check(HealthCheckRequest.newBuilder().setService("metadata").build());
-                if (response.getStatus() == HealthCheckResponse.ServingStatus.SERVING)
-                {
-                    log.info("Metadata server is ready");
-                    channel.shutdown();
-                    return;
-                }
-            } catch (StatusRuntimeException e)
-            {
-                log.info("Metadata health check failed, sleep one second and retry");
-            }
-
-            retry++;
-            try
-            {
-                Thread.sleep(1000);
-            } catch (InterruptedException e)
-            {
-                log.error("Failed to sleep for retry to check metadata server status", e);
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-        channel.shutdown();
-        if (retry >= maxRetry)
-        {
-            log.error("Timeout waiting for metadata server to be ready");
+            HeartbeatWorker.setCurrentStatus(NodeStatus.READY);
+            log.info("Retina service is ready");
         }
     }
 }

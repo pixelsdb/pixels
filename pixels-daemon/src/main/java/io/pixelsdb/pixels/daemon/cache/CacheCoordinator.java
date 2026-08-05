@@ -72,7 +72,7 @@ public class CacheCoordinator implements Server
     private Storage storage = null;
     private boolean initializeSuccess = false;
     private CountDownLatch runningLatch;
-    private boolean running = false;
+    private volatile boolean running = false;
 
     public CacheCoordinator()
     {
@@ -154,6 +154,7 @@ public class CacheCoordinator implements Server
             return;
         }
 
+        CountDownLatch lifecycleLatch = new CountDownLatch(1);
         synchronized (this) 
         {
             if (this.running)
@@ -162,12 +163,12 @@ public class CacheCoordinator implements Server
             } 
             else 
             {
+                this.runningLatch = lifecycleLatch;
                 this.running = true;
             }
         }
         
         logger.info("Starting cache coordinator");
-        runningLatch = new CountDownLatch(1);
         // watch layout version change, and update the cache plan and the local cache version
         Watch.Watcher watcher = EtcdUtil.Instance().getClient().getWatchClient().watch(
                 ByteSequence.from(Constants.LAYOUT_VERSION_LITERAL, StandardCharsets.UTF_8),
@@ -209,7 +210,7 @@ public class CacheCoordinator implements Server
         {
             // Wait for this coordinator to be shutdown
             logger.info("Cache coordinator is running");
-            runningLatch.await();
+            lifecycleLatch.await();
         }
         catch (InterruptedException e)
         {
@@ -217,6 +218,7 @@ public class CacheCoordinator implements Server
         }
         finally
         {
+            this.running = false;
             if (watcher != null)
             {
                 watcher.close();

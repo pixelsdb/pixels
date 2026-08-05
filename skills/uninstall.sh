@@ -6,12 +6,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
   cat <<EOF
 Usage:
-  $0 --skill <name> --tool <codex|claude> --scope <project|global>
+  $0 --skill <name> --tool <codex|claude|cursor> --scope <project|global>
 
 Required arguments:
   --skill <name>          Skill name to remove.
                            --agent is accepted as a deprecated alias.
-  --tool <codex|claude>   Target AI tool.
+  --tool <codex|claude|cursor>
+                           Target AI tool.
   --scope <project|global>
                            project: remove from this repository.
                            global: remove from the current user's tool config.
@@ -19,6 +20,7 @@ Required arguments:
 Examples:
   $0 --skill pixels-install --tool codex --scope project
   $0 --skill pixels-install --tool claude --scope global
+  $0 --skill pixels-install --tool cursor --scope project
 EOF
 }
 
@@ -86,7 +88,7 @@ parse_args() {
   done
 
   [ -n "$SKILL" ] || ERRORS+=("missing --skill <name>")
-  [ -n "$TOOL" ] || ERRORS+=("missing --tool <codex|claude>")
+  [ -n "$TOOL" ] || ERRORS+=("missing --tool <codex|claude|cursor>")
   [ -n "$SCOPE" ] || ERRORS+=("missing --scope <project|global>")
 
   if [ -n "$SKILL" ]; then
@@ -95,8 +97,8 @@ parse_args() {
 
   if [ -n "$TOOL" ]; then
     case "$TOOL" in
-      codex|claude) ;;
-      *) ERRORS+=("--tool must be codex or claude") ;;
+      codex|claude|cursor) ;;
+      *) ERRORS+=("--tool must be codex, claude, or cursor") ;;
     esac
   fi
 
@@ -121,6 +123,14 @@ codex_target_dir() {
     printf '%s/.agents/skills/%s\n' "$(project_root)" "$SKILL"
   else
     printf '%s/.agents/skills/%s\n' "$HOME" "$SKILL"
+  fi
+}
+
+cursor_target_dir() {
+  if [ "$SCOPE" = "project" ]; then
+    printf '%s/.cursor/skills/%s\n' "$(project_root)" "$SKILL"
+  else
+    printf '%s/.cursor/skills/%s\n' "$HOME" "$SKILL"
   fi
 }
 
@@ -156,6 +166,17 @@ uninstall_codex() {
   remove_path "Codex skill '$SKILL'" "$(codex_target_dir)"
 }
 
+uninstall_cursor() {
+  local target_dir
+  target_dir="$(cursor_target_dir)"
+  case "$target_dir" in
+    */.cursor/skills-cursor/*|*/.cursor/skills-cursor)
+      fail_with_usage "refusing to remove .cursor/skills-cursor (reserved for Cursor built-in skills)"
+      ;;
+  esac
+  remove_path "Cursor skill '$SKILL'" "$target_dir"
+}
+
 uninstall_claude() {
   remove_path "Claude agent '$SKILL'" "$(claude_agent_target)"
   remove_path "Claude companion assets for '$SKILL'" "$(claude_assets_target)"
@@ -166,4 +187,5 @@ parse_args "$@"
 case "$TOOL" in
   codex) uninstall_codex ;;
   claude) uninstall_claude ;;
+  cursor) uninstall_cursor ;;
 esac

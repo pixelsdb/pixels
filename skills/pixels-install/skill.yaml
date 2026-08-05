@@ -4,6 +4,7 @@ version: 1.0.0
 entrypoints:
   claude: claude/agent.md
   codex: codex/SKILL.md
+  cursor: cursor/SKILL.md
 scripts:
   prepare: scripts/prepare_deployment.sh
   check: scripts/check_prerequisites.sh

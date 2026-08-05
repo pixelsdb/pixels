@@ -42,7 +42,7 @@ public class MetricsServer implements Server
 {
     private static Logger log = LogManager.getLogger(MetricsServer.class);
 
-    private boolean running = false;
+    private volatile boolean running = false;
 
     @Override
     public boolean isRunning()

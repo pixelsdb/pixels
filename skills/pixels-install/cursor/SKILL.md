@@ -14,7 +14,7 @@ Treat `docs/INSTALL.md` as the source of truth for the installation flow. Use th
 - Skill directory: use the directory containing this `SKILL.md`.
 - Helper scripts: `scripts/`.
 - Shared helper scripts: `shared-scripts/`.
-- Runtime state: `STATE_DIR` when set; otherwise the scripts resolve it to `.agents/state/pixels-install` for project use or `$HOME/.agents/state/pixels-install` for global installs.
+- Runtime state: `STATE_DIR` when set; otherwise the scripts resolve it to `<repo>/.agents/state/pixels-install` for project installs (from either `.cursor/skills/` or `.agents/skills/`) or `$HOME/.agents/state/pixels-install` for global installs.
 - Pixels source tree: `REPO_ROOT` when set; otherwise scripts try to discover the current Git repository root and fail with a clear message if they cannot.
 
 ### Helper scripts

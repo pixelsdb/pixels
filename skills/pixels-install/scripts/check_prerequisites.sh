@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  printf 'ERROR: pixels-install scripts must be executed by Bash; do not run this script with zsh.\n' >&2
+  exit 1
+fi
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  printf 'ERROR: do not source pixels-install installer scripts; execute this script directly with Bash.\n' >&2
+  return 1 2>/dev/null || exit 1
+fi
 set -uo pipefail
 
 # Validates OS, architecture, memory, disk, ports, host resolution,
@@ -27,6 +35,29 @@ log() {
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
+}
+
+check_shell() {
+  local shell_path shell_name
+
+  shell_path="$(login_shell_path 2>/dev/null || true)"
+  if [[ -z "$shell_path" ]]; then
+    result_record shell fail "could not determine the current account's login shell"
+    return
+  fi
+
+  shell_name="$(login_shell_name 2>/dev/null || true)"
+  if [[ -z "$shell_name" ]]; then
+    result_record shell fail "unsupported login shell: $shell_path (only bash and zsh are supported)"
+    return
+  fi
+
+  if ! command -v bash >/dev/null 2>&1; then
+    result_record shell fail "Bash is required to run pixels-install scripts but was not found on PATH"
+    return
+  fi
+
+  result_record shell ok "$shell_name login shell detected at $shell_path; Bash runtime is available"
 }
 
 require_command() {
@@ -173,10 +204,33 @@ check_ssh_hosts() {
   fi
 
   for host in $CHECK_SSH_HOSTS; do
-    if ssh "${ssh_args[@]}" "$(ssh_target "$host")" true >/dev/null 2>&1; then
-      result_record "ssh:$host" ok "reachable"
+    if ssh "${ssh_args[@]}" "$(ssh_target "$host")" 'bash -s' >/dev/null 2>&1 <<'REMOTE'
+set -euo pipefail
+
+user="$(id -un)"
+shell_path=""
+if command -v getent >/dev/null 2>&1; then
+  shell_path="$(getent passwd "$user" 2>/dev/null | awk -F: 'NR == 1 { print $7; exit }')"
+fi
+if [[ -z "$shell_path" && -r /etc/passwd ]]; then
+  shell_path="$(awk -F: -v account="$user" '$1 == account { print $7; exit }' /etc/passwd)"
+fi
+
+[[ -n "$shell_path" ]] || exit 1
+case "$(basename "$shell_path")" in
+  bash|zsh)
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+command -v "$(basename "$shell_path")" >/dev/null 2>&1
+command -v bash >/dev/null 2>&1
+REMOTE
+    then
+      result_record "ssh:$host" ok "reachable; remote login shell is bash or zsh and Bash is available"
     else
-      result_record "ssh:$host" fail "SSH check failed"
+      result_record "ssh:$host" fail "SSH or remote shell validation failed"
     fi
   done
 }
@@ -189,6 +243,7 @@ main() {
   result_reset
   log "checking prerequisites"
 
+  check_shell
   check_os
   check_memory
   check_disk

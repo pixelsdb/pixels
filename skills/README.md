@@ -10,6 +10,8 @@ Pixels; users explicitly install a skill with `skills/install.sh`.
 - `skills/<skill-name>/`: One independent skill development directory.
 - `skills/<skill-name>/skill.yaml`: Skill metadata, script map, and phase list.
 - `skills/<skill-name>/codex/SKILL.md`: Codex skill entrypoint.
+- `skills/<skill-name>/cursor/SKILL.md`: Cursor skill entrypoint (falls back to
+  `codex/SKILL.md` when absent).
 - `skills/<skill-name>/claude/agent.md`: Claude Code agent entrypoint, when supported.
 - `skills/<skill-name>/scripts/`: Runtime scripts bundled with the installed skill.
 - `skills/<skill-name>/scripts/lib/`: Shell helpers sourced by that skill's own scripts.
@@ -19,8 +21,8 @@ Pixels; users explicitly install a skill with `skills/install.sh`.
 ### Commands
 
 - `./skills/list.sh`: List skill directories that contain `skill.yaml`.
-- `./skills/install.sh --skill <name> --tool <codex|claude> --scope <project|global>`: Install a skill for the selected tool and scope.
-- `./skills/uninstall.sh --skill <name> --tool <codex|claude> --scope <project|global>`: Remove an installed skill for the selected tool and scope.
+- `./skills/install.sh --skill <name> --tool <codex|claude|cursor> --scope <project|global>`: Install a skill for the selected tool and scope.
+- `./skills/uninstall.sh --skill <name> --tool <codex|claude|cursor> --scope <project|global>`: Remove an installed skill for the selected tool and scope.
 
 `--agent <name>` is accepted by install/uninstall as a deprecated alias for
 `--skill <name>` during the migration from the old `agents/` layout.
@@ -41,6 +43,23 @@ discovery path:
 $HOME/.agents/skills/<skill-name>/
 ```
 
+Cursor project-scope installs copy the selected skill into Cursor's project
+skill discovery path:
+
+```text
+<repo>/.cursor/skills/<skill-name>/
+```
+
+Cursor global-scope installs copy the selected skill into Cursor's personal
+skill discovery path:
+
+```text
+$HOME/.cursor/skills/<skill-name>/
+```
+
+Cursor installs never write into `.cursor/skills-cursor/`, which is reserved
+for Cursor's built-in skills.
+
 Claude project/global installs copy the Claude markdown agent to the matching
 `.claude/agents/` directory and copy scripts/references to a companion assets
 directory:
@@ -58,4 +77,6 @@ installed skill bundle. The pixels-install scripts default to:
 $HOME/.agents/state/pixels-install/
 ```
 
-Override with `STATE_DIR=<path>` when a different state location is required.
+That state location is shared across Codex and Cursor installs of the same
+skill so progress/config stay in one place. Override with `STATE_DIR=<path>`
+when a different state location is required.

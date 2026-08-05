@@ -25,6 +25,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,95 +38,316 @@ public class ServerContainer
 {
     private static Logger log = LogManager.getLogger(ServerContainer.class);
 
-    private Map<String, Server> serverMap = null;
+    private static final class ServerHandle
+    {
+        private final Server server;
+        private final List<StartupCheck> startupChecks;
+        private Thread thread;
+        private boolean shutdownInvoked;
+
+        private ServerHandle(Server server, List<StartupCheck> startupChecks)
+        {
+            this.server = server;
+            this.startupChecks = startupChecks;
+        }
+    }
+    private final Map<String, ServerHandle> serverHandles;
+    /**
+     * Once shutdown begins, no server thread can be (re)started in this container,
+     * otherwise the daemon main loop would resurrect the servers that are being shutdown.
+     */
+    private boolean shuttingDown = false;
 
     public ServerContainer ()
     {
-        this.serverMap = new HashMap<>();
+        this.serverHandles = new HashMap<>();
     }
 
-    public void addServer (String name, Server server)
+    public synchronized void addServer (
+            String name, Server server, StartupCheck... startupChecks)
     {
-        Thread thread = new Thread(server);
-        thread.start();
-        this.serverMap.put(name, server);
+        if (this.shuttingDown)
+        {
+            throw new IllegalStateException("server container is shutting down");
+        }
+        if (this.serverHandles.containsKey(name))
+        {
+            throw new IllegalArgumentException("server is already registered: " + name);
+        }
+        this.serverHandles.put(name, new ServerHandle(server, Arrays.asList(startupChecks)));
+        startServerThread(name);
     }
 
-    public List<String> getServerNames()
+    public synchronized List<String> getServerNames()
     {
-        return new ArrayList<>(this.serverMap.keySet());
-    }
-
-    /**
-     * retry 3 times by default. sleep one second after each retry.
-     * @param name
-     * @return
-     * @throws NoSuchServerException
-     */
-    public boolean checkServer(String name) throws NoSuchServerException
-    {
-        return this.checkServer(name, 3);
+        return new ArrayList<>(this.serverHandles.keySet());
     }
 
     /**
-     *
-     * @param name
-     * @param retry times to retry, sleep one second after each retry.
-     * @return true if server is running.
-     * @throws NoSuchServerException
+     * Ensure that a server has one thread responsible for its lifecycle.
+     * A server may still be waiting for startup checks while its
+     * {@link Server#isRunning()} method returns false.
      */
-    public boolean checkServer(String name, int retry) throws NoSuchServerException
+    public synchronized void startServer(String name) throws NoSuchServerException
     {
-        Server server = this.serverMap.get(name);
-        if (server == null)
+        ServerHandle handle = this.serverHandles.get(name);
+        if (handle == null)
         {
             throw new NoSuchServerException();
         }
-        boolean serverIsRunning = false;
-        try
+        if (this.shuttingDown)
         {
-            if (!server.isRunning())
+            log.debug("Server container is shutting down, skip starting {}", name);
+            return;
+        }
+        Thread serverThread = handle.thread;
+        if ((serverThread != null && serverThread.isAlive())
+                || handle.server.isRunning())
+        {
+            log.debug("Server {} is already starting or running, skip duplicate start", name);
+            return;
+        }
+        startServerThread(name);
+    }
+
+    /**
+     * Check whether the thread responsible for a server's lifecycle is alive.
+     */
+    public synchronized boolean checkServer(String name)
+            throws NoSuchServerException
+    {
+        ServerHandle handle = this.serverHandles.get(name);
+        if (handle == null)
+        {
+            throw new NoSuchServerException();
+        }
+        Thread serverThread = handle.thread;
+        return serverThread != null && serverThread.isAlive();
+    }
+
+    /**
+     * Atomically prevent new server starts and initiate shutdown of every registered server.
+     */
+    public void shutdownAll()
+    {
+        Map<String, ServerHandle> handlesToShutdown;
+        synchronized (this)
+        {
+            if (this.shuttingDown)
             {
-                for (int i = 0; i < retry; ++i)
+                return;
+            }
+            this.shuttingDown = true;
+            handlesToShutdown = new HashMap<>(this.serverHandles);
+        }
+
+        for (Map.Entry<String, ServerHandle> entry : handlesToShutdown.entrySet())
+        {
+            shutdownServer(entry.getKey(), entry.getValue());
+        }
+    }
+
+    /**
+     * Wait until all lifecycle threads have exited and all servers report stopped.
+     *
+     * @return true if every server stopped before the timeout, false otherwise
+     */
+    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException
+    {
+        if (timeout < 0)
+        {
+            throw new IllegalArgumentException("timeout is negative");
+        }
+        long timeoutNanos = unit.toNanos(timeout);
+        long startNanos = System.nanoTime();
+
+        while (true)
+        {
+            Map<String, ServerHandle> handles;
+            boolean shutdownStarted;
+            synchronized (this)
+            {
+                handles = new HashMap<>(this.serverHandles);
+                shutdownStarted = this.shuttingDown;
+            }
+
+            List<String> unterminatedServers = new ArrayList<>();
+            for (Map.Entry<String, ServerHandle> entry : handles.entrySet())
+            {
+                String name = entry.getKey();
+                ServerHandle handle = entry.getValue();
+                boolean running = isServerRunning(name, handle);
+                if (shutdownStarted && running)
                 {
-                    // try 3 times
-                    TimeUnit.SECONDS.sleep(1);
-                    if (server.isRunning())
-                    {
-                        serverIsRunning = true;
-                        break;
-                    }
+                    invokeShutdown(name, handle);
+                }
+                Thread serverThread = getServerThread(handle);
+                if ((serverThread != null && serverThread.isAlive()) || running)
+                {
+                    unterminatedServers.add(name);
                 }
             }
-            else
+
+            if (unterminatedServers.isEmpty())
             {
-                serverIsRunning = true;
+                return true;
             }
-        } catch (InterruptedException e)
-        {
-            log.error(
-                    "interrupted while checking server.", e);
+
+            long remainingNanos = timeoutNanos - (System.nanoTime() - startNanos);
+            if (remainingNanos <= 0)
+            {
+                log.warn("Timed out waiting for servers to stop: {}", unterminatedServers);
+                return false;
+            }
+
+            synchronized (this)
+            {
+                TimeUnit.NANOSECONDS.timedWait(
+                        this, Math.min(remainingNanos, TimeUnit.MILLISECONDS.toNanos(100)));
+            }
         }
-        return serverIsRunning;
     }
 
-    public void startServer(String name) throws NoSuchServerException
+    private void shutdownServer(String name, ServerHandle handle)
     {
-        this.shutdownServer(name);
-        Thread serverThread = new Thread(this.serverMap.get(name));
-        serverThread.start();
+        if (isServerRunning(name, handle))
+        {
+            invokeShutdown(name, handle);
+        }
+        else
+        {
+            interruptServerThread(handle);
+        }
     }
 
-    public void shutdownServer(String name) throws NoSuchServerException
+    private void invokeShutdown(String name, ServerHandle handle)
     {
-        Server server = this.serverMap.get(name);
-        if (server == null)
+        synchronized (this)
         {
-            throw new NoSuchServerException();
+            if (handle.shutdownInvoked)
+            {
+                return;
+            }
+            handle.shutdownInvoked = true;
         }
-        if (checkServer(name, 0) == true)
+        try
         {
-            server.shutdown();
+            handle.server.shutdown();
         }
+        catch (Throwable e)
+        {
+            log.error("Failed to shutdown server {}", name, e);
+        }
+        finally
+        {
+            interruptServerThread(handle);
+        }
+    }
+
+    private boolean isServerRunning(String name, ServerHandle handle)
+    {
+        try
+        {
+            return handle.server.isRunning();
+        }
+        catch (Throwable e)
+        {
+            log.error("Failed to check whether server {} is running", name, e);
+            return true;
+        }
+    }
+
+    private synchronized Thread getServerThread(ServerHandle handle)
+    {
+        return handle.thread;
+    }
+
+    private void interruptServerThread(ServerHandle handle)
+    {
+        Thread serverThread = getServerThread(handle);
+        if (serverThread != null && serverThread.isAlive()
+                && serverThread != Thread.currentThread())
+        {
+            serverThread.interrupt();
+        }
+    }
+
+    private void startServerThread(String name)
+    {
+        ServerHandle handle = this.serverHandles.get(name);
+        if (handle == null)
+        {
+            throw new IllegalStateException("server is not registered: " + name);
+        }
+        Thread existingThread = handle.thread;
+        if (existingThread != null && existingThread.isAlive())
+        {
+            return;
+        }
+
+        handle.thread = new Thread(() ->
+        {
+            try
+            {
+                long startupDeadline = System.nanoTime() + 60_000_000_000L;
+                for (StartupCheck startupCheck : handle.startupChecks)
+                {
+                    long remainingNanos = startupDeadline - System.nanoTime();
+                    if (remainingNanos <= 0)
+                    {
+                        throw new IllegalStateException(
+                                "Timed out waiting for startup checks of " + name
+                                        + " after 60 seconds");
+                    }
+                    log.debug("Server {} is waiting for {}", name, startupCheck.getDescription());
+                    startupCheck.awaitReady(startupDeadline);
+                    if (System.nanoTime() >= startupDeadline)
+                    {
+                        throw new IllegalStateException(
+                                "Timed out waiting for startup checks of " + name
+                                        + " after 60 seconds");
+                    }
+                }
+                synchronized (ServerContainer.this)
+                {
+                    if (ServerContainer.this.shuttingDown
+                            || Thread.currentThread().isInterrupted())
+                    {
+                        return;
+                    }
+                }
+                handle.server.run();
+            }
+            catch (InterruptedException e)
+            {
+                Thread.currentThread().interrupt();
+                log.info("Server {} startup was interrupted", name);
+            }
+            catch (Throwable e)
+            {
+                log.error("Server {} failed during startup or execution", name, e);
+            }
+            finally
+            {
+                boolean shutdownStarted;
+                synchronized (ServerContainer.this)
+                {
+                    shutdownStarted = ServerContainer.this.shuttingDown;
+                }
+                if (shutdownStarted)
+                {
+                    invokeShutdown(name, handle);
+                }
+                synchronized (ServerContainer.this)
+                {
+                    if (handle.thread == Thread.currentThread())
+                    {
+                        handle.thread = null;
+                    }
+                    ServerContainer.this.notifyAll();
+                }
+            }
+        }, name);
+        handle.thread.start();
     }
 }

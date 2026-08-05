@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  printf 'ERROR: pixels-install scripts must be executed by Bash; do not run this script with zsh.\n' >&2
+  exit 1
+fi
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  printf 'ERROR: do not source pixels-install installer scripts; execute this script directly with Bash.\n' >&2
+  return 1 2>/dev/null || exit 1
+fi
 set -euo pipefail
 
 # Run this script on your local machine. It logs in to each remote server,
 # ensures an SSH key exists, updates /etc/hosts, and distributes public keys.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../scripts/lib/shell_env.sh
+source "$SCRIPT_DIR/../scripts/lib/shell_env.sh"
+require_bash_runtime || exit 1
+require_supported_login_shell >/dev/null || exit 1
 
 SSH_USER="${SSH_USER:-root}"      # Set to empty if SSH_TARGETS already contains user@host or uses ssh config User.
 SSH_PORT="${SSH_PORT:-}"          # Leave empty to use ssh config / default port 22.
@@ -328,6 +342,48 @@ run_scp_to_remote() {
   scp "${args[@]}" "$source_file" "$(remote_spec "$target"):$remote_file"
 }
 
+check_remote_shell() {
+  local target="$1"
+  local remote_user="$2"
+
+  run_ssh "$target" 'bash -s' -- "$remote_user" <<'REMOTE'
+set -euo pipefail
+
+remote_user="$1"
+shell_path=""
+if command -v getent >/dev/null 2>&1; then
+  shell_path="$(getent passwd "$remote_user" 2>/dev/null | awk -F: 'NR == 1 { print $7; exit }')"
+fi
+if [[ -z "$shell_path" && -r /etc/passwd ]]; then
+  shell_path="$(awk -F: -v account="$remote_user" '$1 == account { print $7; exit }' /etc/passwd)"
+fi
+
+[[ -n "$shell_path" ]] || {
+  echo "could not determine login shell for user '$remote_user' on $(hostname)" >&2
+  exit 1
+}
+
+case "$(basename "$shell_path")" in
+  bash|zsh)
+    ;;
+  *)
+    echo "unsupported login shell '$shell_path' for user '$remote_user' on $(hostname); expected bash or zsh" >&2
+    exit 1
+    ;;
+esac
+
+command -v "$(basename "$shell_path")" >/dev/null 2>&1 || {
+  echo "configured login shell '$shell_path' is not executable on $(hostname)" >&2
+  exit 1
+}
+command -v bash >/dev/null 2>&1 || {
+  echo "Bash is required on $(hostname) to run pixels-install scripts" >&2
+  exit 1
+}
+echo "remote account '$remote_user' uses $(basename "$shell_path"); Bash runtime is available" >&2
+REMOTE
+}
+
 validate_config() {
   local count="${#SSH_TARGETS[@]}"
   local i
@@ -642,6 +698,25 @@ main() {
   check_local_connectivity
 
   local server_count="${#SSH_TARGETS[@]}"
+  local -a failed_shells=()
+  local i target hostname user
+
+  log "checking remote login shells and Bash runtime"
+  for ((i = 0; i < server_count; i++)); do
+    target="${SSH_TARGETS[$i]}"
+    hostname="${HOST_NAMES[$i]}"
+    user="${HOST_USERS[$i]}"
+    if ! check_remote_shell "$target" "$user"; then
+      failed_shells+=("$hostname (target: $target, user: $user)")
+    fi
+  done
+  if [[ "${#failed_shells[@]}" -gt 0 ]]; then
+    printf '\nRemote shell validation failed for these servers:\n' >&2
+    for item in "${failed_shells[@]}"; do
+      printf '  - %s\n' "$item" >&2
+    done
+    exit 1
+  fi
 
   WORKDIR="$(mktemp -d /tmp/setup_cluster_ssh.XXXXXX)"
   trap cleanup EXIT
@@ -651,7 +726,7 @@ main() {
   local pubkeys_file="$WORKDIR/public_keys"
   local -a hostnames=()
   local -a remote_login_failures=()
-  local i target hostname user pubkey failure
+  local pubkey failure
 
   {
     printf '%s\n' "$MANAGED_BEGIN"

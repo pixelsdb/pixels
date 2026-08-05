@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  printf 'ERROR: pixels-install scripts must be executed by Bash; do not run this script with zsh.\n' >&2
+  exit 1
+fi
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then
+  printf 'ERROR: do not source pixels-install installer scripts; execute this script directly with Bash.\n' >&2
+  return 1 2>/dev/null || exit 1
+fi
 set -euo pipefail
 
 # Optional convenience step (asks before doing anything): installs
@@ -41,6 +49,7 @@ TRINO_HTTP_PORT="${TRINO_HTTP_PORT:-8080}"
 TRINO_FUNCTIONS_FILE="${TRINO_FUNCTIONS_FILE:-}"
 TRINO_PIXELS_HOME="${TRINO_PIXELS_HOME:-${PIXELS_HOME:-$HOME/opt/pixels}}"
 TRINO_PIXELS_CONFIG="${TRINO_PIXELS_CONFIG:-${PIXELS_CONFIG:-$TRINO_PIXELS_HOME/etc/pixels.properties}}"
+TRINO_DEFAULT_HOME_LINK="${TRINO_HOME_LINK:-$HOME/opt/trino-server}"
 TRINO_SHELL_HELPERS_TARGET="${TRINO_SHELL_HELPERS_TARGET:-coordinator}"
 REMOTE_STATE_DIR="${REMOTE_STATE_DIR:-.agents/state/pixels-install}"
 REMOTE_SCRIPT_DIR="${REMOTE_SCRIPT_DIR:-.agents/skills/pixels-install/scripts}"
@@ -148,11 +157,13 @@ target_description() {
 # worker (operated over SSH from the coordinator).
 build_node_list() {
   local node
+  local -a worker_targets=()
 
   coordinator_target >/dev/null
 
   TRINO_NODE_LIST=("$(remote_spec "$TRINO_COORDINATOR_SSH_TARGET")")
-  for node in ${TRINO_WORKER_SSH_TARGETS:-}; do
+  read -r -a worker_targets <<< "${TRINO_WORKER_SSH_TARGETS:-}"
+  for node in "${worker_targets[@]}"; do
     TRINO_NODE_LIST+=("$(remote_spec "$node")")
   done
 }
@@ -163,13 +174,13 @@ local_functions_file() {
 
 write_functions_file() {
   local functions_file="$1"
-  local nodes_literal node default_pixels_home default_pixels_config
+  local nodes_literal node default_home_link default_pixels_home default_pixels_config
 
   nodes_literal=""
   for node in "${TRINO_NODE_LIST[@]}"; do
-    nodes_literal+="  \"$node\"
-"
+    nodes_literal+="  $(shell_quote "$node")"$'\n'
   done
+  default_home_link="$(shell_quote "$TRINO_DEFAULT_HOME_LINK")"
   default_pixels_home="$(shell_quote "$TRINO_PIXELS_HOME")"
   default_pixels_config="$(shell_quote "$TRINO_PIXELS_CONFIG")"
 
@@ -186,12 +197,13 @@ write_functions_file() {
 TRINO_NODES=(
 $nodes_literal)
 
-TRINO_REMOTE_HOME_LINK="\${TRINO_REMOTE_HOME_LINK:-${TRINO_HOME_LINK:-$HOME/opt/trino-server}}"
+TRINO_DEFAULT_HOME_LINK=$default_home_link
+TRINO_REMOTE_HOME_LINK="\${TRINO_REMOTE_HOME_LINK:-\$TRINO_DEFAULT_HOME_LINK}"
 TRINO_DEFAULT_PIXELS_HOME=$default_pixels_home
 TRINO_DEFAULT_PIXELS_CONFIG=$default_pixels_config
 
 _trino_home() {
-  printf '%s\n' "\${TRINO_HOME_LINK:-\$HOME/opt/trino-server}"
+  printf '%s\n' "\${TRINO_HOME_LINK:-\$TRINO_DEFAULT_HOME_LINK}"
 }
 
 _trino_pixels_home() {
@@ -219,13 +231,20 @@ _trino_remote_launcher() {
   printf '%s/bin/launcher' "\$TRINO_REMOTE_HOME_LINK"
 }
 
+_trino_shell_quote() {
+  printf '%q' "\$1"
+}
+
 _trino_remote_run() {
   local node="\$1"
   local action="\$2"
-  local pixels_home pixels_config
+  local pixels_home pixels_config remote_launcher remote_command remote_bash_command
   pixels_home="\$(_trino_pixels_home)"
   pixels_config="\$(_trino_pixels_config)"
-  ssh -n "\$node" "export PIXELS_HOME='\$pixels_home'; export PIXELS_CONFIG='\$pixels_config'; \\"\$(_trino_remote_launcher)\\" \$action"
+  remote_launcher="\$(_trino_remote_launcher)"
+  remote_command="export PIXELS_HOME=\$(_trino_shell_quote "\$pixels_home"); export PIXELS_CONFIG=\$(_trino_shell_quote "\$pixels_config"); \$(_trino_shell_quote "\$remote_launcher") \$(_trino_shell_quote "\$action")"
+  remote_bash_command="bash -lc \$(_trino_shell_quote "\$remote_command")"
+  ssh -n -o BatchMode=yes -o ConnectTimeout=10 "\$node" "\$remote_bash_command"
 }
 
 start_trino_cluster() {
@@ -246,20 +265,25 @@ start_trino_cluster() {
   echo "trino cluster started"
 }
 
+# This file is sourced into the user's login shell, which may be zsh, where
+# arrays are 1-indexed. Iterate over elements instead of numeric indices so
+# the coordinator/worker split is identical under bash and zsh.
 stop_trino_cluster() {
-  local idx node
+  local node coordinator="" first=true
 
-  for ((idx = \${#TRINO_NODES[@]} - 1; idx >= 0; idx--)); do
-    node="\${TRINO_NODES[\$idx]}"
-    if (( idx > 0 )); then
-      echo "stopping trino on \$node (worker, remote)"
-      _trino_remote_run "\$node" stop || { echo "failed to stop worker \$node" >&2; return 1; }
-    else
-      echo "stopping trino on \$node (coordinator, local)"
-      _export_trino_pixels_env
-      "\$(_trino_home)/bin/launcher" stop || { echo "failed to stop coordinator \$node" >&2; return 1; }
+  for node in "\${TRINO_NODES[@]}"; do
+    if [[ "\$first" == "true" ]]; then
+      coordinator="\$node"
+      first=false
+      continue
     fi
+    echo "stopping trino on \$node (worker, remote)"
+    _trino_remote_run "\$node" stop || { echo "failed to stop worker \$node" >&2; return 1; }
   done
+
+  echo "stopping trino on \$coordinator (coordinator, local)"
+  _export_trino_pixels_env
+  "\$(_trino_home)/bin/launcher" stop || { echo "failed to stop coordinator \$coordinator" >&2; return 1; }
 
   echo "trino cluster stopped"
 }
@@ -297,7 +321,8 @@ install_local() {
   build_node_list
   functions_file="$(local_functions_file)"
   write_functions_file "$functions_file"
-  bash -n "$functions_file" || fail "generated functions file has a syntax error: $functions_file"
+  validate_shell_compatibility "$functions_file" ||
+    fail "generated functions file is not compatible with Bash and Zsh: $functions_file"
   persist_source_line "$functions_file"
 
   log "trino shell helpers installed on current host: start_trino_cluster, stop_trino_cluster, restart_trino_cluster, trino_cli"
@@ -338,9 +363,12 @@ install_remote_coordinator() {
   if [[ -n "$TRINO_FUNCTIONS_FILE" ]]; then
     remote_env+=("TRINO_FUNCTIONS_FILE=$(shell_quote "$TRINO_FUNCTIONS_FILE")")
   fi
+  if [[ -n "${PROFILE_FILE:-}" ]]; then
+    remote_env+=("PROFILE_FILE=$(shell_quote "$PROFILE_FILE")")
+  fi
 
   remote_env_string="$(printf '%s ' "${remote_env[@]}")"
-  ssh "${ssh_args[@]}" "$remote" "chmod +x $(shell_quote "$REMOTE_SCRIPT_DIR/install_trino_shell_helpers.sh") && env $remote_env_string $(shell_quote "$REMOTE_SCRIPT_DIR/install_trino_shell_helpers.sh")"
+  ssh "${ssh_args[@]}" "$remote" "chmod +x $(shell_quote "$REMOTE_SCRIPT_DIR/install_trino_shell_helpers.sh") && command -v bash >/dev/null 2>&1 && env $remote_env_string bash $(shell_quote "$REMOTE_SCRIPT_DIR/install_trino_shell_helpers.sh")"
 }
 
 main() {

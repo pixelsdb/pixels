@@ -49,15 +49,21 @@ public class ObjectStorageManager
         }
         this.path = folder;
 
-        String storageScheme = config.getProperty("retina.buffer.object.storage.scheme");
         try
         {
-            if (!Storage.Scheme.minio.equals(storageScheme) && !Storage.Scheme.s3.equals(storageScheme))
+            Storage.Scheme scheme = Storage.Scheme.fromPath(folder);
+            if (scheme == null)
+            {
+                throw new RetinaException("retina.buffer.object.storage.folder must include a storage scheme prefix, " +
+                        "e.g., s3://bucket/path/");
+            }
+            if (!Storage.Scheme.minio.equals(scheme) && !Storage.Scheme.s3.equals(scheme)
+                    && !Storage.Scheme.cos.equals(scheme))
             {
                 logger.warn("ObjectStorageManager is configured with non-standard storage scheme '{}'; " +
-                        "expected production schemes are 's3' or 'minio'", storageScheme);
+                        "expected production schemes are 's3', 'minio' or 'cos'", scheme);
             }
-            this.storage = StorageFactory.Instance().getStorage(storageScheme);
+            this.storage = StorageFactory.Instance().getStorage(folder);
         } catch (IOException e)
         {
             throw new RetinaException("Failed to get storage", e);
