@@ -60,10 +60,10 @@ public class RunLenIntEncoder extends Encoder
 
     private long min;
 
-    private final long[] literals = new long[Constants.MAX_SCOPE];
-    private final long[] zigzagLiterals = new long[Constants.MAX_SCOPE];
-    private final long[] baseRedLiterals = new long[Constants.MAX_SCOPE];
-    private final long[] adjDeltas = new long[Constants.MAX_SCOPE];
+    private final long[] literals = new long[Constants.INT_RLE_MAX_SCOPE];
+    private final long[] zigzagLiterals = new long[Constants.INT_RLE_MAX_SCOPE];
+    private final long[] baseRedLiterals = new long[Constants.INT_RLE_MAX_SCOPE];
+    private final long[] adjDeltas = new long[Constants.INT_RLE_MAX_SCOPE];
 
     private ByteArrayOutputStream outputStream;
     private EncodingUtils encodingUtils;
@@ -140,7 +140,7 @@ public class RunLenIntEncoder extends Encoder
         zzBits100p = percentileBits(zigzagLiterals, 0, numLiterals, 1.0);
 
         // not a big win for shorter runs to determine encoding
-        if (numLiterals <= Constants.MIN_REPEAT)
+        if (numLiterals <= Constants.RLE_MIN_REPEAT)
         {
             encodingType = EncodingType.DIRECT;
             return;
@@ -462,12 +462,12 @@ public class RunLenIntEncoder extends Encoder
 
                     // if fixed run meets the minimum repeat condition and if variable run is non-zero,
                     // then flush the variable run and shift the tail fixed runs to the start of the buffer
-                    if (fixedRunLength >= Constants.MIN_REPEAT && variableRunLength > 0)
+                    if (fixedRunLength >= Constants.RLE_MIN_REPEAT && variableRunLength > 0)
                     {
-                        numLiterals -= Constants.MIN_REPEAT;
-                        variableRunLength -= Constants.MIN_REPEAT - 1;
-                        long[] tailVals = new long[Constants.MIN_REPEAT];
-                        System.arraycopy(literals, numLiterals, tailVals, 0, Constants.MIN_REPEAT);
+                        numLiterals -= Constants.RLE_MIN_REPEAT;
+                        variableRunLength -= Constants.RLE_MIN_REPEAT - 1;
+                        long[] tailVals = new long[Constants.RLE_MIN_REPEAT];
+                        System.arraycopy(literals, numLiterals, tailVals, 0, Constants.RLE_MIN_REPEAT);
 
                         determineEncoding();
                         writeValues();
@@ -478,7 +478,7 @@ public class RunLenIntEncoder extends Encoder
                         }
                     }
 
-                    if (fixedRunLength == Constants.MAX_SCOPE)
+                    if (fixedRunLength == Constants.INT_RLE_MAX_SCOPE)
                     {
                         determineEncoding();
                         writeValues();
@@ -490,9 +490,9 @@ public class RunLenIntEncoder extends Encoder
                     // if fixed run length is non-zero and if it satisfies the minimum repeat
                     // and the short repeat condition, then write the values as short repeats
                     // else use delta encoding
-                    if (fixedRunLength >= Constants.MIN_REPEAT)
+                    if (fixedRunLength >= Constants.RLE_MIN_REPEAT)
                     {
-                        if (fixedRunLength <= Constants.MAX_SHORT_REPEAT_LENGTH)
+                        if (fixedRunLength <= Constants.INT_RLE_MAX_SHORT_REPEAT)
                         {
                             encodingType = EncodingType.SHORT_REPEAT;
                             writeValues();
@@ -505,10 +505,10 @@ public class RunLenIntEncoder extends Encoder
                         }
                     }
 
-                    // if fixed run length is smaller than MIN_REPEAT
+                    // if fixed run length is smaller than RLE_MIN_REPEAT
                     // and current value is different from previous
                     // then treat it as variable run
-                    if (fixedRunLength > 0 && fixedRunLength < Constants.MIN_REPEAT)
+                    if (fixedRunLength > 0 && fixedRunLength < Constants.RLE_MIN_REPEAT)
                     {
                         if (value != literals[numLiterals - 1])
                         {
@@ -530,7 +530,7 @@ public class RunLenIntEncoder extends Encoder
                         variableRunLength += 1;
 
                         // if variable run length reach the max scope, write it
-                        if (variableRunLength == Constants.MAX_SCOPE)
+                        if (variableRunLength == Constants.INT_RLE_MAX_SCOPE)
                         {
                             determineEncoding();
                             writeValues();
@@ -552,15 +552,15 @@ public class RunLenIntEncoder extends Encoder
             }
             else if (fixedRunLength != 0)
             {
-                if (fixedRunLength < Constants.MIN_REPEAT)
+                if (fixedRunLength < Constants.RLE_MIN_REPEAT)
                 {
                     variableRunLength = fixedRunLength;
                     fixedRunLength = 0;
                     determineEncoding();
                     writeValues();
                 }
-                else if (fixedRunLength >= Constants.MIN_REPEAT
-                        && fixedRunLength <= Constants.MAX_SHORT_REPEAT_LENGTH)
+                else if (fixedRunLength >= Constants.RLE_MIN_REPEAT
+                        && fixedRunLength <= Constants.INT_RLE_MAX_SHORT_REPEAT)
                 {
                     encodingType = EncodingType.SHORT_REPEAT;
                     writeValues();
@@ -598,7 +598,7 @@ public class RunLenIntEncoder extends Encoder
         //   repeat count(3 bytes, 3 to 10 values)
         int header = getOpcode();
         header |= ((numBytesRepeatVal - 1) << 3);
-        fixedRunLength -= Constants.MIN_REPEAT;
+        fixedRunLength -= Constants.RLE_MIN_REPEAT;
         header |= fixedRunLength;
 
         // write header
@@ -739,7 +739,7 @@ public class RunLenIntEncoder extends Encoder
             // if fixed run length is greater than threshold then it will be fixed
             // delta sequence with delta value 0 else fixed delta sequence with
             // non-zero delta value
-            if (fixedRunLength > Constants.MIN_REPEAT)
+            if (fixedRunLength > Constants.RLE_MIN_REPEAT)
             {
                 // ex. sequence: 2 2 2 2 2 2 2 2
                 len = fixedRunLength - 1;

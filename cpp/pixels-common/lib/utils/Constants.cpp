@@ -34,9 +34,9 @@ int Constants::S3_BUFFER_SIZE = 8 * 1024 * 1024;
 int Constants::REDIS_BUFFER_SIZE = 8 * 1024 * 1024;
 int Constants::GCS_BUFFER_SIZE = 8 * 1024 * 1024;
 
-int Constants::MIN_REPEAT = 3;
-int Constants::MAX_SCOPE = 512;
-int Constants::MAX_SHORT_REPEAT_LENGTH = 10;
+int Constants::RLE_MIN_REPEAT = 3;
+int Constants::INT_RLE_MAX_SCOPE = 512;
+int Constants::INT_RLE_MAX_SHORT_REPEAT = 10;
 float Constants::DICT_KEY_SIZE_THRESHOLD = 0.1F;
 int Constants::INIT_DICT_SIZE = 4096;
 

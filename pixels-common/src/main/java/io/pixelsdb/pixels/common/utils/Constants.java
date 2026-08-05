@@ -39,9 +39,12 @@ public final class Constants
     public static final int STREAM_READER_RG_BUFFER_SIZE = 1024 * 1024;
     public static final int STREAM_READER_RG_FOOTER_BUFFER_SIZE = 1024;
 
-    public static final int MIN_REPEAT = 3;
-    public static final int MAX_SCOPE = 512;
-    public static final int MAX_SHORT_REPEAT_LENGTH = 10;
+    public static final int RLE_MIN_REPEAT = 3;
+    public static final int INT_RLE_MAX_SCOPE = 512;
+    public static final int INT_RLE_MAX_SHORT_REPEAT = 10;
+    public static final int BYTE_RLE_MAX_LITERAL_SIZE = 128;
+    public static final int BYTE_RLE_MAX_REPEAT_SIZE = 127 + RLE_MIN_REPEAT;
+
     public static final float DICT_KEY_SIZE_THRESHOLD = 0.1F;
     public static final int INIT_DICT_SIZE = 4096;
     public static final int MAX_STREAM_RETRY_COUNT = 100;

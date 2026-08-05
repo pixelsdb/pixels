@@ -26,7 +26,7 @@
 
 RunLenIntDecoder::RunLenIntDecoder(const std::shared_ptr <ByteBuffer> &bb, bool isSigned)
 {
-    literals = new long[Constants::MAX_SCOPE];
+    literals = new long[Constants::INT_RLE_MAX_SCOPE];
     inputStream = bb;
     this->isSigned = isSigned;
     numLiterals = 0;
@@ -308,8 +308,8 @@ void RunLenIntDecoder::readShortRepeatValues(int firstByte)
 
     // read the run length
     int len = firstByte & 0x07;
-    // run length values are stored only after MIN_REPEAT value is met
-    len += Constants::MIN_REPEAT;
+    // run length values are stored only after RLE_MIN_REPEAT value is met
+    len += Constants::RLE_MIN_REPEAT;
 
     // read the repeated value which is stored using fixed bytes
     long val = bytesToLongBE(inputStream, size);

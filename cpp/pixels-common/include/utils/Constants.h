@@ -40,9 +40,9 @@ public:
     static int REDIS_BUFFER_SIZE;
     static int GCS_BUFFER_SIZE;
 
-    static int MIN_REPEAT;
-    static int MAX_SCOPE;
-    static int MAX_SHORT_REPEAT_LENGTH;
+    static int RLE_MIN_REPEAT;
+    static int INT_RLE_MAX_SCOPE;
+    static int INT_RLE_MAX_SHORT_REPEAT;
     static float DICT_KEY_SIZE_THRESHOLD;
     static int INIT_DICT_SIZE;
 
