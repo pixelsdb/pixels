@@ -22,6 +22,7 @@
         <dep.lambda.java.core.version>1.2.1</dep.lambda.java.core.version>
         <dep.lambda.java.log4j2.version>1.5.1</dep.lambda.java.log4j2.version>
         <dep.gson.version>2.9.0</dep.gson.version>
+        <dep.log4j2.transformer.version>2.13.0</dep.log4j2.transformer.version>
     </properties>
 
     <dependencies>
@@ -128,14 +129,35 @@
                     <dependency>
                         <groupId>com.github.edwgiz</groupId>
                         <artifactId>maven-shade-plugin.log4j2-cachefile-transformer</artifactId>
-                        <version>2.13.0</version>
+                        <version>${dep.log4j2.transformer.version}</version>
+                        <exclusions>
+                            <exclusion>
+                                <groupId>org.apache.logging.log4j</groupId>
+                                <artifactId>log4j-api</artifactId>
+                            </exclusion>
+                            <exclusion>
+                                <groupId>org.apache.logging.log4j</groupId>
+                                <artifactId>log4j-core</artifactId>
+                            </exclusion>
+                        </exclusions>
+                    </dependency>
+                    <!-- plugin deps do not inherit dependencyManagement; pin to global log4j -->
+                    <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-api</artifactId>
+                        <version>${dep.log4j.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-core</artifactId>
+                        <version>${dep.log4j.version}</version>
                     </dependency>
                 </dependencies>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.5.0</version>
+                <version>${maven.plugin.assembly.version}</version>
                 <executions>
                     <execution>
                         <id>pixels-worker-lambda-deps</id>
