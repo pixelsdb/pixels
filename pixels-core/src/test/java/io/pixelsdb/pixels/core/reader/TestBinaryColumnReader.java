@@ -26,7 +26,6 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.writer.BinaryColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
-import io.pixelsdb.pixels.core.writer.VarbinaryColumnWriter;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -39,77 +38,87 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 /**
- * Round-trip tests for {@link BinaryColumnReader} / {@link BinaryColumnWriter}.
- * {@link VarbinaryColumnReader} is covered by a thin smoke test because it only
- * subclasses the binary reader/writer.
+ * Memory round-trip tests for BINARY.
+ * <p>
+ * Sample values are slices with non-zero starts so the round trip verifies
+ * {@link BinaryColumnVector#start} / {@link BinaryColumnVector#lens}.
+ * On-disk layout is a 4-byte endian-aware length prefix plus payload; nulls
+ * write no content bytes and {@link BinaryColumnWriter} always disables nulls padding.
+ *
+ * @author gengdy
+ * @create 2026-08-07
  */
 public class TestBinaryColumnReader
 {
-    private static final int PIXEL_STRIDE = 4;
+    private static final int BINARY_MAX_LENGTH = 32;
+    private static final int PIXEL_STRIDE = 10;
+    private static final int NUM_ROWS = 22;
 
-    private static String formatCell(BinaryColumnVector vector, int i)
+    private static TypeDescription binaryType()
     {
-        if (!vector.noNulls && vector.isNull[i])
-        {
-            return "NULL";
-        }
-        byte[] bytes = Arrays.copyOfRange(vector.vector[i],
-                vector.start[i], vector.start[i] + vector.lens[i]);
-        return Arrays.toString(bytes);
+        return TypeDescription.createBinary(BINARY_MAX_LENGTH);
     }
 
-    private static void printVector(String label, BinaryColumnVector vector, int from, int numRows)
+    private static TypeDescription binaryType(int maxLength)
     {
-        StringBuilder sb = new StringBuilder(label).append(" [");
-        for (int i = 0; i < numRows; ++i)
-        {
-            if (i > 0)
-            {
-                sb.append(", ");
-            }
-            sb.append(formatCell(vector, from + i));
-        }
-        sb.append(']');
-        System.out.println(sb);
+        return TypeDescription.createBinary(maxLength);
     }
 
-    private static void assertVectorsEqual(String caseName, BinaryColumnVector expected,
-                                           BinaryColumnVector actual, int actualOffset, int numRows)
+    private static void addBytes(BinaryColumnVector vector, byte[] value)
     {
-        System.out.println("--- " + caseName + " ---");
-        printVector("expected", expected, 0, numRows);
-        printVector("actual  ", actual, actualOffset, numRows);
+        byte[] backing = new byte[value.length + 2];
+        backing[0] = (byte) 0xA5;
+        System.arraycopy(value, 0, backing, 1, value.length);
+        backing[backing.length - 1] = (byte) 0x5A;
+        vector.setRef(vector.getWriteIndex(), backing, 1, value.length);
+    }
+
+    private static BinaryColumnVector createSampleVector(int numRows)
+    {
+        BinaryColumnVector vector = new BinaryColumnVector(numRows);
+        addBytes(vector, new byte[] {});
+        addBytes(vector, new byte[] {0});
+        addBytes(vector, new byte[] {1, 2, 3});
+        addBytes(vector, new byte[] {(byte) 0xFF, (byte) 0x00, (byte) 0x7F});
+        vector.addNull();
+        addBytes(vector, new byte[] {10, 20, 30, 40, 50});
+        addBytes(vector, new byte[] {'a', 'b'});
+        addBytes(vector, new byte[] {9});
+        vector.addNull();
+        addBytes(vector, new byte[] {1, 1, 1, 1});
+        addBytes(vector, new byte[] {5, 5, 5});
+        addBytes(vector, new byte[] {6, 5, 6});
+        addBytes(vector, new byte[] {2, 3, 4});
+        addBytes(vector, new byte[] {6, 7, 5});
+        addBytes(vector, new byte[] {2, 3, 5});
+        addBytes(vector, new byte[BINARY_MAX_LENGTH]);
+        vector.addNull();
+        addBytes(vector, new byte[] {6});
+        addBytes(vector, new byte[] {7});
+        addBytes(vector, new byte[] {(byte) 0x80, (byte) 0x81, (byte) 0xFE, (byte) 0xFF});
+        addBytes(vector, new byte[] {34, 34});
+        addBytes(vector, new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
+        return vector;
+    }
+
+    private static byte[] valueAt(BinaryColumnVector vector, int i)
+    {
+        return Arrays.copyOfRange(vector.vector[i], vector.start[i], vector.start[i] + vector.lens[i]);
+    }
+
+    private static void assertVectorsEqual(BinaryColumnVector expected, BinaryColumnVector actual,
+                                           int actualOffset, int numRows)
+    {
         for (int i = 0; i < numRows; ++i)
         {
             assertEquals("isNull mismatch at row " + i,
                     expected.isNull[i], actual.isNull[actualOffset + i]);
-            if (!expected.isNull[i])
+            if (expected.noNulls || !expected.isNull[i])
             {
                 assertArrayEquals("value mismatch at row " + i,
-                        Arrays.copyOfRange(expected.vector[i],
-                                expected.start[i], expected.start[i] + expected.lens[i]),
-                        Arrays.copyOfRange(actual.vector[actualOffset + i],
-                                actual.start[actualOffset + i],
-                                actual.start[actualOffset + i] + actual.lens[actualOffset + i]));
+                        valueAt(expected, i), valueAt(actual, actualOffset + i));
             }
         }
-        System.out.println("OK: all " + numRows + " rows match");
-    }
-
-    private static BinaryColumnVector createSampleVector()
-    {
-        // Mix empty, null, short and longer payloads across multiple pixels (stride=4).
-        BinaryColumnVector vector = new BinaryColumnVector(9);
-        vector.add(new byte[] {1, 2, 3});
-        vector.addNull();
-        vector.add(new byte[0]);
-        vector.add(new byte[] {(byte) 0xFF, 0x00});
-        vector.add(new byte[] {10, 11, 12, 13, 14});
-        vector.add(new byte[] {42});
-        vector.addNull();
-        vector.add(new byte[] {7, 8});
-        vector.add(new byte[] {9});
-        return vector;
     }
 
     private static class Chunk
@@ -129,15 +138,16 @@ public class TestBinaryColumnReader
         }
     }
 
-    private static Chunk writeChunk(BinaryColumnVector source, int numRows,
-                                    TypeDescription type, ByteOrder byteOrder) throws IOException
+    private static Chunk writeChunk(BinaryColumnVector source, int numRows, TypeDescription type,
+                                    int pixelStride, ByteOrder byteOrder, boolean nullsPadding)
+            throws IOException
     {
         BinaryColumnWriter writer = new BinaryColumnWriter(type,
                 new PixelsWriterOption()
-                        .pixelStride(PIXEL_STRIDE)
+                        .pixelStride(pixelStride)
                         .byteOrder(byteOrder)
                         .encodingLevel(EncodingLevel.EL0)
-                        .nullsPadding(true));
+                        .nullsPadding(nullsPadding));
         writer.write(source, numRows);
         writer.flush();
         return new Chunk(writer.getColumnChunkContent(),
@@ -146,14 +156,8 @@ public class TestBinaryColumnReader
                 writer);
     }
 
-    private static ByteBuffer toHeapBuffer(byte[] content)
-    {
-        return ByteBuffer.wrap(content);
-    }
-
     private static ByteBuffer toDirectBufferWithOffset(byte[] content)
     {
-        // Pad one leading byte so position != 0, covering the direct-buffer copy path.
         ByteBuffer buffer = ByteBuffer.allocateDirect(content.length + 1);
         buffer.put((byte) 0xAB);
         buffer.put(content);
@@ -162,69 +166,191 @@ public class TestBinaryColumnReader
         return buffer;
     }
 
-    @Test
-    public void testRoundTripLittleEndian() throws IOException
+    private static void assertSelectedRoundTrip(ByteOrder byteOrder) throws IOException
     {
-        TypeDescription type = TypeDescription.createBinary(64);
-        BinaryColumnVector origin = createSampleVector();
-        int numRows = origin.getLength();
-        Chunk chunk = writeChunk(origin, numRows, type, ByteOrder.LITTLE_ENDIAN);
-
-        System.out.println("encoding=" + chunk.encoding.getKind()
-                + ", littleEndian=" + chunk.chunkIndex.getLittleEndian()
-                + ", nullsPadding=" + chunk.chunkIndex.getNullsPadding()
-                + ", isNullOffset=" + chunk.chunkIndex.getIsNullOffset()
-                + ", chunkBytes=" + chunk.content.length
-                + ", pixelStride=" + PIXEL_STRIDE);
+        int vectorIndex = 3;
+        BinaryColumnVector origin = createSampleVector(NUM_ROWS);
+        Chunk chunk = writeChunk(origin, NUM_ROWS, binaryType(), PIXEL_STRIDE, byteOrder, false);
         assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, chunk.encoding.getKind());
         assertFalse(chunk.chunkIndex.getNullsPadding());
-        // First value length prefix: 3 in little endian.
-        assertArrayEquals(new byte[] {3, 0, 0, 0},
+
+        Bitmap selected = new Bitmap(NUM_ROWS, true);
+        selected.clear(0);
+        selected.clear(2);
+        selected.clear(4);
+        selected.clear(5);
+        selected.clear(10);
+        selected.clear(14);
+        selected.clear(16);
+        selected.clear(20);
+
+        BinaryColumnReader reader = new BinaryColumnReader(binaryType());
+        BinaryColumnVector target = new BinaryColumnVector(vectorIndex + NUM_ROWS);
+        reader.readSelected(ByteBuffer.wrap(chunk.content), chunk.encoding, 0, NUM_ROWS,
+                PIXEL_STRIDE, vectorIndex, target, chunk.chunkIndex, selected);
+        reader.close();
+        chunk.writer.close();
+
+        int targetIndex = vectorIndex;
+        for (int i = 0; i < NUM_ROWS; ++i)
+        {
+            if (selected.get(i))
+            {
+                assertEquals("isNull mismatch at selected src=" + i + " dst=" + targetIndex,
+                        origin.isNull[i], target.isNull[targetIndex]);
+                if (!origin.isNull[i])
+                {
+                    assertArrayEquals("value mismatch at selected src=" + i + " dst=" + targetIndex,
+                            valueAt(origin, i), valueAt(target, targetIndex));
+                }
+                targetIndex++;
+            }
+        }
+    }
+
+    @Test
+    public void testNullsPaddingOptionIgnored() throws IOException
+    {
+        // Writer always disables nulls padding; requesting true must still round-trip and record false.
+        BinaryColumnVector origin = createSampleVector(NUM_ROWS);
+        Chunk chunk = writeChunk(origin, NUM_ROWS, binaryType(), PIXEL_STRIDE,
+                ByteOrder.LITTLE_ENDIAN, true);
+        assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, chunk.encoding.getKind());
+        assertFalse(chunk.chunkIndex.getNullsPadding());
+        assertArrayEquals(new byte[] {0, 0, 0, 0},
                 Arrays.copyOfRange(chunk.content, 0, Integer.BYTES));
 
-        BinaryColumnReader reader = new BinaryColumnReader(type);
-        BinaryColumnVector target = new BinaryColumnVector(numRows);
-        reader.read(toHeapBuffer(chunk.content), chunk.encoding, 0, numRows,
+        BinaryColumnReader reader = new BinaryColumnReader(binaryType());
+        BinaryColumnVector target = new BinaryColumnVector(NUM_ROWS);
+        reader.read(ByteBuffer.wrap(chunk.content), chunk.encoding, 0, NUM_ROWS,
                 PIXEL_STRIDE, 0, target, chunk.chunkIndex);
         reader.close();
         chunk.writer.close();
 
-        assertVectorsEqual("BINARY little-endian heap round-trip", origin, target, 0, numRows);
+        assertVectorsEqual(origin, target, 0, NUM_ROWS);
+    }
+
+    @Test
+    public void testWithoutNullsPadding() throws IOException
+    {
+        BinaryColumnVector origin = createSampleVector(NUM_ROWS);
+        Chunk chunk = writeChunk(origin, NUM_ROWS, binaryType(), PIXEL_STRIDE,
+                ByteOrder.LITTLE_ENDIAN, false);
+        assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, chunk.encoding.getKind());
+        assertFalse(chunk.chunkIndex.getNullsPadding());
+
+        BinaryColumnReader reader = new BinaryColumnReader(binaryType());
+        BinaryColumnVector target = new BinaryColumnVector(NUM_ROWS);
+        reader.read(ByteBuffer.wrap(chunk.content), chunk.encoding, 0, NUM_ROWS,
+                PIXEL_STRIDE, 0, target, chunk.chunkIndex);
+        reader.close();
+        chunk.writer.close();
+
+        assertVectorsEqual(origin, target, 0, NUM_ROWS);
     }
 
     @Test
     public void testBigEndianDirectBuffer() throws IOException
     {
-        TypeDescription type = TypeDescription.createBinary(64);
-        BinaryColumnVector origin = createSampleVector();
-        int numRows = origin.getLength();
-        Chunk chunk = writeChunk(origin, numRows, type, ByteOrder.BIG_ENDIAN);
-
-        System.out.println("encoding=" + chunk.encoding.getKind()
-                + ", littleEndian=" + chunk.chunkIndex.getLittleEndian()
-                + ", chunkBytes=" + chunk.content.length
-                + ", buffer=direct+offset");
-        assertArrayEquals(new byte[] {0, 0, 0, 3},
+        BinaryColumnVector origin = createSampleVector(NUM_ROWS);
+        Chunk chunk = writeChunk(origin, NUM_ROWS, binaryType(), PIXEL_STRIDE,
+                ByteOrder.BIG_ENDIAN, false);
+        assertFalse(chunk.chunkIndex.getLittleEndian());
+        assertArrayEquals(new byte[] {0, 0, 0, 0},
                 Arrays.copyOfRange(chunk.content, 0, Integer.BYTES));
 
-        BinaryColumnReader reader = new BinaryColumnReader(type);
-        BinaryColumnVector target = new BinaryColumnVector(numRows);
-        ByteBuffer input = toDirectBufferWithOffset(chunk.content);
-        System.out.println("input.hasArray=" + input.hasArray()
-                + ", input.position=" + input.position()
-                + ", input.remaining=" + input.remaining());
-        reader.read(input, chunk.encoding, 0, numRows,
+        BinaryColumnReader reader = new BinaryColumnReader(binaryType());
+        BinaryColumnVector target = new BinaryColumnVector(NUM_ROWS);
+        reader.read(toDirectBufferWithOffset(chunk.content), chunk.encoding, 0, NUM_ROWS,
                 PIXEL_STRIDE, 0, target, chunk.chunkIndex);
         reader.close();
         chunk.writer.close();
 
-        assertVectorsEqual("BINARY big-endian direct-buffer round-trip", origin, target, 0, numRows);
+        assertVectorsEqual(origin, target, 0, NUM_ROWS);
+    }
+
+    @Test
+    public void testSelected() throws IOException
+    {
+        BinaryColumnVector origin = createSampleVector(NUM_ROWS);
+        Chunk chunk = writeChunk(origin, NUM_ROWS, binaryType(), PIXEL_STRIDE,
+                ByteOrder.LITTLE_ENDIAN, false);
+
+        Bitmap selected = new Bitmap(NUM_ROWS, true);
+        selected.clear(0);
+        selected.clear(10);
+        selected.clear(20);
+
+        BinaryColumnReader reader = new BinaryColumnReader(binaryType());
+        BinaryColumnVector target = new BinaryColumnVector(NUM_ROWS);
+        reader.readSelected(ByteBuffer.wrap(chunk.content), chunk.encoding, 0, NUM_ROWS,
+                PIXEL_STRIDE, 0, target, chunk.chunkIndex, selected);
+        reader.close();
+        chunk.writer.close();
+
+        for (int i = 0, j = 0; i < NUM_ROWS; ++i)
+        {
+            if (i % 10 != 0)
+            {
+                assertEquals(origin.isNull[i], target.isNull[j]);
+                if (origin.noNulls || !origin.isNull[i])
+                {
+                    assertArrayEquals(valueAt(origin, i), valueAt(target, j));
+                }
+                j++;
+            }
+        }
+    }
+
+    @Test
+    public void testSelectedAtNonZeroVectorIndex() throws IOException
+    {
+        assertSelectedRoundTrip(ByteOrder.LITTLE_ENDIAN);
+    }
+
+    @Test
+    public void testSelectedAtNonZeroVectorIndexBigEndianDirect() throws IOException
+    {
+        int vectorIndex = 3;
+        BinaryColumnVector origin = createSampleVector(NUM_ROWS);
+        Chunk chunk = writeChunk(origin, NUM_ROWS, binaryType(), PIXEL_STRIDE,
+                ByteOrder.BIG_ENDIAN, false);
+
+        Bitmap selected = new Bitmap(NUM_ROWS, false);
+        int[] selectedRows = new int[] {0, 1, 3, 5, 6, 8, 15, 21};
+        for (int row : selectedRows)
+        {
+            selected.set(row);
+        }
+
+        BinaryColumnReader reader = new BinaryColumnReader(binaryType());
+        BinaryColumnVector target = new BinaryColumnVector(vectorIndex + NUM_ROWS);
+        reader.readSelected(toDirectBufferWithOffset(chunk.content), chunk.encoding, 0, NUM_ROWS,
+                PIXEL_STRIDE, vectorIndex, target, chunk.chunkIndex, selected);
+        reader.close();
+        chunk.writer.close();
+
+        int targetIndex = vectorIndex;
+        for (int i = 0; i < NUM_ROWS; ++i)
+        {
+            if (!selected.get(i))
+            {
+                continue;
+            }
+            assertEquals(origin.isNull[i], target.isNull[targetIndex]);
+            if (!origin.isNull[i])
+            {
+                assertArrayEquals(valueAt(origin, i), valueAt(target, targetIndex));
+            }
+            targetIndex++;
+        }
     }
 
     @Test
     public void testTruncationAndVectorSlice() throws IOException
     {
-        TypeDescription type = TypeDescription.createBinary(4);
+        int maxLength = 4;
+        TypeDescription type = binaryType(maxLength);
         BinaryColumnWriter writer = new BinaryColumnWriter(type,
                 new PixelsWriterOption()
                         .pixelStride(PIXEL_STRIDE)
@@ -233,7 +359,6 @@ public class TestBinaryColumnReader
                         .nullsPadding(false));
 
         BinaryColumnVector source = new BinaryColumnVector(4);
-        // Values are slices into larger arrays; second value is truncated to maxLength=4.
         byte[] first = new byte[] {99, 1, 2, 3, 4, 98};
         byte[] second = new byte[] {97, 96, 5, 6, 7, 8, 9, 10, 95};
         source.setRef(0, first, 1, 4);
@@ -241,19 +366,12 @@ public class TestBinaryColumnReader
         source.setRef(2, new byte[] {42}, 1, 0);
         source.addNull();
 
-        System.out.println("write maxLength=4, source lens="
-                + Arrays.toString(Arrays.copyOf(source.lens, 4)));
-        printVector("source before write", source, 0, 4);
-
         writer.write(source, 4);
         writer.flush();
         byte[] content = writer.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = writer.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = writer.getColumnChunkEncoding().build();
 
-        System.out.println("numTruncated=" + writer.getNumTruncated()
-                + ", binarySum=" + writer.getColumnChunkStat().getBinaryStatistics().getSum()
-                + ", chunkBytes=" + content.length);
         assertEquals(1, writer.getNumTruncated());
         assertEquals(8, writer.getColumnChunkStat().getBinaryStatistics().getSum());
         assertArrayEquals(new byte[] {0, 0, 0, 4, 1, 2, 3, 4},
@@ -269,10 +387,9 @@ public class TestBinaryColumnReader
         expected.add(new byte[] {5, 6, 7, 8});
         expected.add(new byte[0]);
         expected.addNull();
-        assertVectorsEqual("truncation + setRef slices", expected, target, 0, 4);
+        assertVectorsEqual(expected, target, 0, 4);
 
         writer.reset();
-        System.out.println("after reset, numTruncated=" + writer.getNumTruncated());
         assertEquals(0, writer.getNumTruncated());
         writer.close();
     }
@@ -280,130 +397,81 @@ public class TestBinaryColumnReader
     @Test
     public void testFragmentedRead() throws IOException
     {
-        TypeDescription type = TypeDescription.createBinary(32);
-        BinaryColumnVector origin = createSampleVector();
-        int numRows = origin.getLength();
-        Chunk chunk = writeChunk(origin, numRows, type, ByteOrder.LITTLE_ENDIAN);
+        int pixelStride = 4;
+        BinaryColumnVector origin = createSampleVector(NUM_ROWS);
+        Chunk chunk = writeChunk(origin, NUM_ROWS, binaryType(), pixelStride,
+                ByteOrder.LITTLE_ENDIAN, false);
 
         int vectorIndex = 2;
-        BinaryColumnReader reader = new BinaryColumnReader(type);
-        BinaryColumnVector target = new BinaryColumnVector(vectorIndex + numRows);
+        BinaryColumnReader reader = new BinaryColumnReader(binaryType());
+        BinaryColumnVector target = new BinaryColumnVector(vectorIndex + NUM_ROWS);
         ByteBuffer buffer = ByteBuffer.wrap(chunk.content);
-
-        System.out.println("fragmented read: batches [0,3), [3,7), [7,9) into vectorIndex=" + vectorIndex);
-        reader.read(buffer, chunk.encoding, 0, 3, PIXEL_STRIDE, vectorIndex, target, chunk.chunkIndex);
-        System.out.println("after batch1, element range written=[" + vectorIndex + ", " + (vectorIndex + 3) + ")");
-        reader.read(buffer, chunk.encoding, 3, 4, PIXEL_STRIDE, vectorIndex + 3, target, chunk.chunkIndex);
-        System.out.println("after batch2, element range written=[" + (vectorIndex + 3) + ", " + (vectorIndex + 7) + ")");
-        reader.read(buffer, chunk.encoding, 7, 2, PIXEL_STRIDE, vectorIndex + 7, target, chunk.chunkIndex);
-        System.out.println("after batch3, element range written=[" + (vectorIndex + 7) + ", " + (vectorIndex + 9) + ")");
+        reader.read(buffer, chunk.encoding, 0, 3, pixelStride, vectorIndex, target, chunk.chunkIndex);
+        reader.read(buffer, chunk.encoding, 3, 7, pixelStride, vectorIndex + 3, target, chunk.chunkIndex);
+        reader.read(buffer, chunk.encoding, 10, NUM_ROWS - 10, pixelStride,
+                vectorIndex + 10, target, chunk.chunkIndex);
         reader.close();
         chunk.writer.close();
 
-        assertVectorsEqual("fragmented read across pixels", origin, target, vectorIndex, numRows);
+        assertVectorsEqual(origin, target, vectorIndex, NUM_ROWS);
     }
 
     @Test
-    public void testReadSelected() throws IOException
+    public void testLargeFragmented() throws IOException
     {
-        TypeDescription type = TypeDescription.createBinary(32);
-        BinaryColumnVector origin = createSampleVector();
-        int numRows = origin.getLength();
-        Chunk chunk = writeChunk(origin, numRows, type, ByteOrder.LITTLE_ENDIAN);
-
-        int vectorIndex = 3;
-        Bitmap selected = new Bitmap(numRows, false);
-        // Include both null and non-null rows; skipped non-nulls must still advance the content cursor.
-        int[] selectedRows = new int[] {0, 1, 3, 5, 6, 8};
-        for (int row : selectedRows)
-        {
-            selected.set(row);
-        }
-
-        System.out.println("readSelected: vectorIndex=" + vectorIndex
-                + ", chunkBytes=" + chunk.content.length
-                + ", buffer=direct+offset");
-        System.out.print("selected rows: ");
-        for (int row : selectedRows)
-        {
-            System.out.print(row + " ");
-        }
-        System.out.println();
-        printVector("origin  ", origin, 0, numRows);
-
-        BinaryColumnReader reader = new BinaryColumnReader(type);
-        BinaryColumnVector target = new BinaryColumnVector(vectorIndex + numRows);
-        reader.readSelected(toDirectBufferWithOffset(chunk.content), chunk.encoding, 0, numRows,
-                PIXEL_STRIDE, vectorIndex, target, chunk.chunkIndex, selected);
-        reader.close();
-        chunk.writer.close();
-
-        int targetIndex = vectorIndex;
-        StringBuilder expectedSel = new StringBuilder("expected selected [");
-        StringBuilder actualSel = new StringBuilder("actual selected   [");
-        boolean first = true;
-        for (int i = 0; i < numRows; ++i)
-        {
-            if (!selected.get(i))
-            {
-                continue;
-            }
-            if (!first)
-            {
-                expectedSel.append(", ");
-                actualSel.append(", ");
-            }
-            first = false;
-            expectedSel.append(formatCell(origin, i));
-            actualSel.append(formatCell(target, targetIndex));
-            assertEquals("isNull mismatch at selected src=" + i + " dst=" + targetIndex,
-                    origin.isNull[i], target.isNull[targetIndex]);
-            if (!origin.isNull[i])
-            {
-                assertArrayEquals("value mismatch at selected src=" + i + " dst=" + targetIndex,
-                        Arrays.copyOfRange(origin.vector[i],
-                                origin.start[i], origin.start[i] + origin.lens[i]),
-                        Arrays.copyOfRange(target.vector[targetIndex],
-                                target.start[targetIndex],
-                                target.start[targetIndex] + target.lens[targetIndex]));
-            }
-            targetIndex++;
-        }
-        System.out.println(expectedSel.append(']'));
-        System.out.println(actualSel.append(']'));
-        System.out.println("OK: selected rows match, written from vectorIndex=" + vectorIndex);
-    }
-
-    @Test
-    public void testVarbinarySmoke() throws IOException
-    {
-        // Varbinary reader/writer are thin subclasses of binary; one smoke case is enough.
-        TypeDescription type = TypeDescription.createVarbinary(32);
-        BinaryColumnVector origin = new BinaryColumnVector(3);
-        origin.add(new byte[] {1, 2});
-        origin.addNull();
-        origin.add(new byte[] {3});
-
-        VarbinaryColumnWriter writer = new VarbinaryColumnWriter(type,
+        int numBatches = 15;
+        int numRows = 1024;
+        int pixelStride = 10000;
+        BinaryColumnWriter writer = new BinaryColumnWriter(binaryType(),
                 new PixelsWriterOption()
-                        .pixelStride(PIXEL_STRIDE)
+                        .pixelStride(pixelStride)
                         .byteOrder(ByteOrder.LITTLE_ENDIAN)
                         .encodingLevel(EncodingLevel.EL0)
                         .nullsPadding(false));
-        writer.write(origin, 3);
+
+        BinaryColumnVector origin = new BinaryColumnVector(numRows);
+        for (int j = 0; j < numRows; j++)
+        {
+            if (j % 100 == 0)
+            {
+                origin.addNull();
+            }
+            else
+            {
+                addBytes(origin, new byte[] {(byte) (j & 0xFF), (byte) ((j >> 8) & 0xFF), 3, 4});
+            }
+        }
+
+        for (int i = 0; i < numBatches; i++)
+        {
+            writer.write(origin, numRows);
+        }
         writer.flush();
+        writer.close();
+
         byte[] content = writer.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = writer.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = writer.getColumnChunkEncoding().build();
+        assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, encoding.getKind());
 
-        System.out.println("VARBINARY smoke: encoding=" + encoding.getKind()
-                + ", chunkBytes=" + content.length);
-        VarbinaryColumnReader reader = new VarbinaryColumnReader(type);
-        BinaryColumnVector target = new BinaryColumnVector(3);
-        reader.read(ByteBuffer.wrap(content), encoding, 0, 3, PIXEL_STRIDE, 0, target, chunkIndex);
+        int totalRows = numBatches * numRows;
+        BinaryColumnReader reader = new BinaryColumnReader(binaryType());
+        BinaryColumnVector target = new BinaryColumnVector(totalRows);
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        reader.read(buffer, encoding, 0, 123, pixelStride, 0, target, chunkIndex);
+        reader.read(buffer, encoding, 123, 456, pixelStride, 123, target, chunkIndex);
+        reader.read(buffer, encoding, 123 + 456, totalRows - 123 - 456,
+                pixelStride, 123 + 456, target, chunkIndex);
         reader.close();
-        writer.close();
 
-        assertVectorsEqual("VARBINARY smoke round-trip", origin, target, 0, 3);
+        for (int i = 0; i < totalRows; i++)
+        {
+            int j = i % numRows;
+            assertEquals(origin.isNull[j], target.isNull[i]);
+            if (target.noNulls || !target.isNull[i])
+            {
+                assertArrayEquals(valueAt(origin, j), valueAt(target, i));
+            }
+        }
     }
 }

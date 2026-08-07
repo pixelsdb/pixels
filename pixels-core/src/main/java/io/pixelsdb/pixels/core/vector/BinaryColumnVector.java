@@ -789,7 +789,7 @@ public class BinaryColumnVector extends ColumnVector
                 {
                     System.arraycopy(oldVector, 0, vector, 0, oldVector.length);
                     System.arraycopy(oldStart, 0, start, 0, oldStart.length);
-                    System.arraycopy(oldLength, 0, length, 0, oldLength.length);
+                    System.arraycopy(oldLength, 0, lens, 0, oldLength.length);
                 }
             }
         }
