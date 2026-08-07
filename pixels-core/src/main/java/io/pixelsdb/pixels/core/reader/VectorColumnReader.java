@@ -60,7 +60,13 @@ public class VectorColumnReader extends ColumnReader
                      int vectorIndex, ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
         VectorColumnVector vectorColumnVector = (VectorColumnVector) vector;
-        ((VectorColumnVector) vector).vector = new double[vector.getLength()][((VectorColumnVector) vector).dimension];
+        for (int i = vectorIndex; i < vectorIndex + size; ++i)
+        {
+            if (vectorColumnVector.vector[i] == null)
+            {
+                vectorColumnVector.vector[i] = new double[vectorColumnVector.dimension];
+            }
+        }
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
         if (offset == 0)
@@ -167,7 +173,10 @@ public class VectorColumnReader extends ColumnReader
         // keep origin content
         for (int i = vectorIndex; i < vector.getLength(); ++i)
         {
-            ((VectorColumnVector) vector).vector[i] = new double[((VectorColumnVector) vector).dimension];
+            if (vectorColumnVector.vector[i] == null)
+            {
+                vectorColumnVector.vector[i] = new double[vectorColumnVector.dimension];
+            }
         }
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
