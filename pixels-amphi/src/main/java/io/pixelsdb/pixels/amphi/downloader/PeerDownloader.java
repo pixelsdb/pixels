@@ -361,7 +361,13 @@ public class PeerDownloader
                     record.put(columns.get(i).getName(), bcv.vector[rowIdx]);
                     break;
                 case SHORT:
+                    ShortColumnVector scv = (ShortColumnVector) columnVectors.get(i);
+                    record.put(columns.get(i).getName(), (int) scv.vector[rowIdx]);
+                    break;
                 case INT:
+                    IntColumnVector icv = (IntColumnVector) columnVectors.get(i);
+                    record.put(columns.get(i).getName(), icv.vector[rowIdx]);
+                    break;
                 case LONG:
                     LongColumnVector lcv = (LongColumnVector) columnVectors.get(i);
                     record.put(columns.get(i).getName(), lcv.vector[rowIdx]);

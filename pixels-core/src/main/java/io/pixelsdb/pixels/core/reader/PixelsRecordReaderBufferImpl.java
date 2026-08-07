@@ -58,7 +58,6 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     private final boolean retinaEnabled;
     private final TypeDescription typeDescription;
     private final int colNum;
-    private final int typeMode = TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT;
     private static ExecutorService prefetchExecutor; // Thread pool for I/O and deserialization
     private final BlockingQueue<VectorizedRowBatch> prefetchQueue; // Queue for completed batches
     private final AtomicInteger pendingTasks = new AtomicInteger(0); // Counter for submitted but unfinished tasks
@@ -328,7 +327,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
     private VectorizedRowBatch createEmptyRowBatch(int size)
     {
         TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0, this.typeMode);
+        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0);
         resultRowBatch.projectionSize = 0;
         resultRowBatch.endOfFile = this.endOfFile;
         resultRowBatch.size = size;

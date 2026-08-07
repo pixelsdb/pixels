@@ -54,7 +54,7 @@ public class TestPixelsWriter
             Storage storage = StorageFactory.Instance().getStorage("file");
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
-            LongColumnVector va = (LongColumnVector) rowBatch.cols[0];              // int
+            IntColumnVector va = (IntColumnVector) rowBatch.cols[0];                // int
             DoubleColumnVector vb = (DoubleColumnVector) rowBatch.cols[1];          // float
             DoubleColumnVector vc = (DoubleColumnVector) rowBatch.cols[2];          // double
             TimestampColumnVector vd = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
@@ -167,11 +167,11 @@ public class TestPixelsWriter
             Storage storage = StorageFactory.Instance().getStorage("hdfs");
             TypeDescription schema = TypeDescription.fromString(TestParams.schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
-            LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
+            IntColumnVector a = (IntColumnVector) rowBatch.cols[0];                  // int
             DoubleColumnVector b = (DoubleColumnVector) rowBatch.cols[1];          // float
             DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
             TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
-            LongColumnVector e = (LongColumnVector) rowBatch.cols[4];              // boolean
+            ByteColumnVector e = (ByteColumnVector) rowBatch.cols[4];               // boolean
             BinaryColumnVector z = (BinaryColumnVector) rowBatch.cols[5];            // string
 
             PixelsWriter pixelsWriter =
@@ -201,7 +201,7 @@ public class TestPixelsWriter
                 c.isNull[row] = false;
                 d.set(row, timestamp);
                 d.isNull[row] = false;
-                e.vector[row] = i > 25000 ? 1 : 0;
+                e.vector[row] = (byte) (i > 25000 ? 1 : 0);
                 e.isNull[row] = false;
                 z.setVal(row, String.valueOf(i).getBytes());
                 z.isNull[row] = false;
@@ -251,7 +251,7 @@ public class TestPixelsWriter
                     .build();
             PixelsRecordReader recordReader = pixelsReader.read(option);
             rowBatch = recordReader.readBatch();
-            LongColumnVector acv = (LongColumnVector) rowBatch.cols[0];
+            IntColumnVector acv = (IntColumnVector) rowBatch.cols[0];
             DoubleColumnVector bcv = (DoubleColumnVector) rowBatch.cols[1];
             DoubleColumnVector ccv = (DoubleColumnVector) rowBatch.cols[2];
             TimestampColumnVector dcv = (TimestampColumnVector) rowBatch.cols[3];

@@ -57,7 +57,7 @@ import io.pixelsdb.pixels.core.PixelsWriter;
                                  ConcurrentLinkedQueue<LoadedInfo> loadedInfos)
      {
          super(queue, parameters, loadedInfos);
-         this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
+         this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride);
      }
 
      @Override

@@ -79,7 +79,12 @@ public abstract class Encoder implements AutoCloseable
         throw new PixelsEncodingException("Encoding int values is not supported");
     }
 
-    public byte[] encode(short[] values)
+    public byte[] encode(short[] values) throws IOException
+    {
+        throw new PixelsEncodingException("Encoding short values is not supported");
+    }
+
+    public byte[] encode(short[] values, int offset, int length) throws IOException
     {
         throw new PixelsEncodingException("Encoding short values is not supported");
     }

@@ -93,6 +93,11 @@ table IntColumnVectorFlat {
     vector : [int];
 }
 
+table ShortColumnVectorFlat {
+    base : ColumnVectorBaseFlat;
+    vector : [short];
+}
+
 table LongColumnVectorFlat {
     base : ColumnVectorBaseFlat;
     vector : [long];
@@ -138,7 +143,8 @@ union ColumnVectorFlat {
     LongDecimalColumnVectorFlat,
     TimeColumnVectorFlat,
     TimestampColumnVectorFlat,
-    VectorColumnVectorFlat
+    VectorColumnVectorFlat,
+    ShortColumnVectorFlat
 }
 
 table VectorizedRowBatchFlat {

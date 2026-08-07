@@ -199,8 +199,8 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
          */
         BOOLEAN(true, boolean.class, byte.class, "boolean"),
         BYTE(true, byte.class, byte.class, "tinyint", "byte"),
-        SHORT(true, short.class, long.class, "smallint", "short"),
-        INT(true, int.class, long.class, "integer", "int"),
+        SHORT(true, short.class, short.class, "smallint", "short"),
+        INT(true, int.class, int.class, "integer", "int"),
         LONG(true, long.class, long.class, "bigint", "long"),
         FLOAT(true, float.class, long.class, "float", "real"),
         DOUBLE(true, double.class, long.class, "double"),
@@ -1222,7 +1222,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         return maxId;
     }
 
-    private ColumnVector createColumn(int maxSize, int mode, boolean... useEncodedVector)
+    private ColumnVector createColumn(int maxSize, boolean... useEncodedVector)
     {
         requireNonNull(useEncodedVector, "columnsEncoded should not be null");
         // the length of useEncodedVector is already checked, not need to check again.
@@ -1232,15 +1232,9 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             case BYTE:
                 return new ByteColumnVector(maxSize);
             case SHORT:
+                return new ShortColumnVector(maxSize);
             case INT:
-                if (Mode.match(mode, Mode.CREATE_INT_VECTOR_FOR_INT))
-                {
-                    return new IntColumnVector(maxSize);
-                }
-                else
-                {
-                    return new LongColumnVector(maxSize);
-                }
+                return new IntColumnVector(maxSize);
             case LONG:
                 return new LongColumnVector(maxSize);
             case DATE:
@@ -1276,7 +1270,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                 ColumnVector[] fieldVector = new ColumnVector[children.size()];
                 for (int i = 0; i < fieldVector.length; ++i)
                 {
-                    fieldVector[i] = children.get(i).createColumn(maxSize, mode, useEncodedVector[i]);
+                    fieldVector[i] = children.get(i).createColumn(maxSize, useEncodedVector[i]);
                 }
                 return new StructColumnVector(maxSize, fieldVector);
             }
@@ -1287,7 +1281,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         }
     }
 
-    public VectorizedRowBatch createRowBatch(int maxSize, int mode, boolean... useEncodedVector)
+    public VectorizedRowBatch createRowBatch(int maxSize, boolean... useEncodedVector)
     {
         VectorizedRowBatch result;
         if (category == Category.STRUCT)
@@ -1299,7 +1293,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             for (int i = 0; i < result.cols.length; ++i)
             {
                 String fieldName = fieldNames.get(i);
-                ColumnVector cv = children.get(i).createColumn(maxSize, mode,
+                ColumnVector cv = children.get(i).createColumn(maxSize,
                         useEncodedVector.length != 0 && useEncodedVector[i]);
                 int originId = columnNames.indexOf(fieldName);
                 if (originId >= 0)
@@ -1319,7 +1313,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             checkArgument(useEncodedVector.length == 0 || useEncodedVector.length == 1,
                     "for null structure type, there can be only 0 or 1 elements in useEncodedVector");
             result = new VectorizedRowBatch(1, maxSize);
-            result.cols[0] = createColumn(maxSize, mode,
+            result.cols[0] = createColumn(maxSize,
                     useEncodedVector.length == 1 && useEncodedVector[0]);
         }
         result.reset();
@@ -1328,15 +1322,10 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
 
     public VectorizedRowBatch createRowBatch()
     {
-        return createRowBatch(VectorizedRowBatch.DEFAULT_SIZE, Mode.NONE);
+        return createRowBatch(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
-    public VectorizedRowBatch createRowBatch(int size)
-    {
-        return createRowBatch(size, Mode.NONE);
-    }
-
-    public VectorizedRowBatch createRowBatchWithHiddenColumn(int maxSize, int mode, boolean... useEncodedVector)
+    public VectorizedRowBatch createRowBatchWithHiddenColumn(int maxSize, boolean... useEncodedVector)
     {
         VectorizedRowBatch result;
         if (category == Category.STRUCT)
@@ -1349,7 +1338,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             for (int i = 0; i < result.cols.length - 1; ++i)
             {
                 String fieldName = fieldNames.get(i);
-                ColumnVector cv = children.get(i).createColumn(maxSize, mode,
+                ColumnVector cv = children.get(i).createColumn(maxSize,
                         useEncodedVector.length != 0 && useEncodedVector[i]);
                 int originId = columnNames.indexOf(fieldName);
                 if (originId >= 0)
@@ -1371,7 +1360,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             checkArgument(useEncodedVector.length == 0 || useEncodedVector.length == 1,
                     "for null structure type, there can be only 0 or 1 elements in useEncodedVector");
             result = new VectorizedRowBatch(2, maxSize);
-            result.cols[0] = createColumn(maxSize, mode,
+            result.cols[0] = createColumn(maxSize,
                     useEncodedVector.length == 1 && useEncodedVector[0]);
             result.cols[1] = new LongColumnVector(maxSize);
         }
@@ -1381,7 +1370,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
 
     public VectorizedRowBatch createRowBatchWithHiddenColumn()
     {
-        return createRowBatchWithHiddenColumn(VectorizedRowBatch.DEFAULT_SIZE, Mode.NONE);
+        return createRowBatchWithHiddenColumn(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
     /**
@@ -1675,23 +1664,6 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
     }
 
     /**
-     * The type related modes used when creating column vectors and row batches.
-     */
-    public static final class Mode
-    {
-        public static final int NONE = 0;
-        /**
-         * Create {@link IntColumnVector} for INT type.
-         */
-        public static final int CREATE_INT_VECTOR_FOR_INT = 0x01;
-
-        public static boolean match(int mode1, int mode2)
-        {
-            return (mode1 & mode2) != 0;
-        }
-    }
-
-    /**
      * Serializes one cell from a {@link ColumnVector} at the given row index into
      * the canonical byte format, using the same encoding as {@link #convertSqlStringToByte}.
      */
@@ -1708,19 +1680,18 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             case BYTE:
                 return new byte[]{((ByteColumnVector) col).vector[row]};
             case SHORT:
+                return ByteBuffer.allocate(Integer.BYTES)
+                        .putInt(((ShortColumnVector) col).vector[row]).array();
             case INT:
-            {
-                int value = col instanceof IntColumnVector ?
-                        ((IntColumnVector) col).vector[row] :
-                        (int) ((LongColumnVector) col).vector[row];
-                return ByteBuffer.allocate(Integer.BYTES).putInt(value).array();
-            }
+                return ByteBuffer.allocate(Integer.BYTES)
+                        .putInt(((IntColumnVector) col).vector[row]).array();
             case LONG:
                 return ByteBuffer.allocate(Long.BYTES).putLong(((LongColumnVector) col).vector[row]).array();
             case DATE:
                 return ByteBuffer.allocate(Integer.BYTES).putInt(((DateColumnVector) col).dates[row]).array();
             case TIME:
-                return ByteBuffer.allocate(Integer.BYTES).putInt(((TimeColumnVector) col).times[row]).array();
+                return ByteBuffer.allocate(Integer.BYTES)
+                        .putInt(((TimeColumnVector) col).times[row]).array();
             case TIMESTAMP:
                 return ByteBuffer.allocate(Long.BYTES).putLong(((TimestampColumnVector) col).times[row]).array();
             case FLOAT:

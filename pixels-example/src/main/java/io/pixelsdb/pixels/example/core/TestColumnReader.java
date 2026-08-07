@@ -55,7 +55,7 @@ public class TestColumnReader
             DecimalColumnVector c = (DecimalColumnVector) rowBatch.cols[2]; // decimal
             DoubleColumnVector d = (DoubleColumnVector) rowBatch.cols[3]; // double
             FloatColumnVector e = (FloatColumnVector) rowBatch.cols[4]; // float
-            LongColumnVector f = (LongColumnVector) rowBatch.cols[5]; // int
+            IntColumnVector f = (IntColumnVector) rowBatch.cols[5]; // int
             LongDecimalColumnVector g = (LongDecimalColumnVector) rowBatch.cols[6]; // long decimal
             BinaryColumnVector h = (BinaryColumnVector) rowBatch.cols[7]; // string
             TimeColumnVector m = (TimeColumnVector) rowBatch.cols[8]; // time

@@ -78,7 +78,6 @@ public class TestPixelsRecordReaderBufferImpl
         option.skipCorruptRecords(true);
         option.tolerantSchemaEvolution(true);
         option.enableEncodedColumnVector(true);
-        option.readIntColumnAsIntVector(true);
         option.includeCols(includeCols);
         option.transId(transId);
         option.transTimestamp(timeStamp);

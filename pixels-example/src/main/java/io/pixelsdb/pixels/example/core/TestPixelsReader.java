@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.vector.IntColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
@@ -143,17 +144,17 @@ public class TestPixelsReader
         for (int batch = 0; batch < NUM_BATCHES; batch++)
         {
             VectorizedRowBatch rowBatch = schema.createRowBatchWithHiddenColumn();
-            LongColumnVector x = (LongColumnVector) rowBatch.cols[0];
-            LongColumnVector y = (LongColumnVector) rowBatch.cols[1];
+            IntColumnVector x = (IntColumnVector) rowBatch.cols[0];
+            IntColumnVector y = (IntColumnVector) rowBatch.cols[1];
             LongColumnVector hidden = (LongColumnVector) rowBatch.cols[2];
 
             for (int i = 0; i < ROWS_PER_BATCH; i++)
             {
                 int g = batch * ROWS_PER_BATCH + i;
                 int row = rowBatch.size++;
-                x.vector[row] = g * 100L;
+                x.vector[row] = g * 100;
                 x.isNull[row] = false;
-                y.vector[row] = g * 200L;
+                y.vector[row] = g * 200;
                 y.isNull[row] = false;
                 hidden.vector[row] = expectedTimestamp(g);
                 hidden.isNull[row] = false;
@@ -183,14 +184,14 @@ public class TestPixelsReader
                 .build();
 
         VectorizedRowBatch rowBatch = schema.createRowBatch(ROWS_PER_BATCH);
-        LongColumnVector x = (LongColumnVector) rowBatch.cols[0];
-        LongColumnVector y = (LongColumnVector) rowBatch.cols[1];
+        IntColumnVector x = (IntColumnVector) rowBatch.cols[0];
+        IntColumnVector y = (IntColumnVector) rowBatch.cols[1];
         for (int i = 0; i < ROWS_PER_BATCH; i++)
         {
             int row = rowBatch.size++;
-            x.vector[row] = i * 100L;
+            x.vector[row] = i * 100;
             x.isNull[row] = false;
-            y.vector[row] = i * 200L;
+            y.vector[row] = i * 200;
             y.isNull[row] = false;
         }
         writer.addRowBatch(rowBatch);
@@ -300,8 +301,8 @@ public class TestPixelsReader
                 "T3: expected " + EXPECTED_FILTERED_ROWS + " rows, got " + batch.size);
         check(batch.cols.length == 2, "T3: expected 2 user columns, got " + batch.cols.length);
 
-        LongColumnVector xCol = (LongColumnVector) batch.cols[0];
-        LongColumnVector yCol = (LongColumnVector) batch.cols[1];
+        IntColumnVector xCol = (IntColumnVector) batch.cols[0];
+        IntColumnVector yCol = (IntColumnVector) batch.cols[1];
         LongColumnVector hv = batch.getHiddenColumnVector();
         check(hv != null, "T3: hiddenColumnVector should not be null");
 
@@ -342,7 +343,7 @@ public class TestPixelsReader
         check(batch.size == TOTAL_ROWS, "T4: expected " + TOTAL_ROWS + " rows, got " + batch.size);
         check(batch.cols.length == 1, "T4: expected 1 user column, got " + batch.cols.length);
 
-        LongColumnVector xCol = (LongColumnVector) batch.cols[0];
+        IntColumnVector xCol = (IntColumnVector) batch.cols[0];
         LongColumnVector hv = batch.getHiddenColumnVector();
         check(hv != null, "T4: hiddenColumnVector should not be null");
 
@@ -393,7 +394,7 @@ public class TestPixelsReader
                 break;
             }
 
-            LongColumnVector xCol = (LongColumnVector) batch.cols[0];
+            IntColumnVector xCol = (IntColumnVector) batch.cols[0];
             LongColumnVector hv = batch.getHiddenColumnVector();
             check(hv != null, "T5: hiddenColumnVector should not be null in batch starting at row " + totalRead);
 
@@ -444,7 +445,7 @@ public class TestPixelsReader
         check(batch.getHiddenColumnVector() == null,
                 "T6: hiddenColumnVector should be null (exposeHiddenColumn not set)");
 
-        LongColumnVector xCol = (LongColumnVector) batch.cols[0];
+        IntColumnVector xCol = (IntColumnVector) batch.cols[0];
         for (int i = 0; i < batch.size; i++)
         {
             check(xCol.vector[i] == i * 100L,
@@ -546,7 +547,7 @@ public class TestPixelsReader
         check(batch.getHiddenColumnVector() == null,
                 "T9: hiddenColumnVector should be null when exposeHiddenColumn is false");
 
-        LongColumnVector xCol = (LongColumnVector) batch.cols[0];
+        IntColumnVector xCol = (IntColumnVector) batch.cols[0];
         for (int i = 0; i < batch.size; i++)
         {
             check(xCol.vector[i] == i * 100L,
@@ -589,7 +590,7 @@ public class TestPixelsReader
         check(batch.size == expectedAfterFilter,
                 "T10: expected " + expectedAfterFilter + " rows after filter, got " + batch.size);
 
-        LongColumnVector xCol = (LongColumnVector) batch.cols[0];
+        IntColumnVector xCol = (IntColumnVector) batch.cols[0];
         LongColumnVector hv = batch.getHiddenColumnVector();
         check(hv != null, "T10: hiddenColumnVector should survive applyFilter");
 

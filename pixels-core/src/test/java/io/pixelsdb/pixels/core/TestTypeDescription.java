@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DateColumnVector;
 import io.pixelsdb.pixels.core.vector.IntColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
+import io.pixelsdb.pixels.core.vector.ShortColumnVector;
 import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 import org.junit.Test;
@@ -114,20 +115,15 @@ public class TestTypeDescription
         byteCol.vector[0] = -12;
         assertConvert(TypeDescription.createByte(), byteCol, 0, "-12", new byte[]{-12});
 
-        // SHORT/INT support both IntColumnVector and LongColumnVector modes.
-        IntColumnVector intMode = new IntColumnVector(1);
-        intMode.vector[0] = -1234;
-        assertConvert(TypeDescription.createShort(), intMode, 0, "-1234",
-                ByteBuffer.allocate(Integer.BYTES).putInt(-1234).array());
-        assertConvert(TypeDescription.createInt(), intMode, 0, "-1234",
+        ShortColumnVector shortCol = new ShortColumnVector(1);
+        shortCol.vector[0] = -1234;
+        assertConvert(TypeDescription.createShort(), shortCol, 0, "-1234",
                 ByteBuffer.allocate(Integer.BYTES).putInt(-1234).array());
 
-        LongColumnVector longMode = new LongColumnVector(1);
-        longMode.vector[0] = 42;
-        assertConvert(TypeDescription.createShort(), longMode, 0, "42",
-                ByteBuffer.allocate(Integer.BYTES).putInt(42).array());
-        assertConvert(TypeDescription.createInt(), longMode, 0, "42",
-                ByteBuffer.allocate(Integer.BYTES).putInt(42).array());
+        IntColumnVector intCol = new IntColumnVector(1);
+        intCol.vector[0] = -1234;
+        assertConvert(TypeDescription.createInt(), intCol, 0, "-1234",
+                ByteBuffer.allocate(Integer.BYTES).putInt(-1234).array());
 
         LongColumnVector longCol = new LongColumnVector(1);
         longCol.vector[0] = Long.MAX_VALUE;

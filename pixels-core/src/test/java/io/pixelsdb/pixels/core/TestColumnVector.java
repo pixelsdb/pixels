@@ -22,7 +22,9 @@ package io.pixelsdb.pixels.core;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.IntColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
+import io.pixelsdb.pixels.core.vector.ShortColumnVector;
 import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
@@ -83,28 +85,32 @@ public class TestColumnVector
     public void testCVCopyFrom()
     {
         int testNum = 1000_000;
-        String mockSchema = "struct<a:int,b:double,c:string,d:timestamp>";
+        String mockSchema = "struct<a:short,b:int,c:long,d:double,e:string,f:timestamp>";
 
-        VectorizedRowBatch srcRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(
-                testNum, TypeDescription.Mode.NONE);
-        LongColumnVector src0 = (LongColumnVector) srcRowBatch.cols[0];
-        DoubleColumnVector src1 = (DoubleColumnVector) srcRowBatch.cols[1];
-        BinaryColumnVector src2 = (BinaryColumnVector) srcRowBatch.cols[2];
-        TimestampColumnVector src3 = (TimestampColumnVector) srcRowBatch.cols[3];
+        VectorizedRowBatch srcRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
+        ShortColumnVector src0 = (ShortColumnVector) srcRowBatch.cols[0];
+        IntColumnVector src1 = (IntColumnVector) srcRowBatch.cols[1];
+        LongColumnVector src2 = (LongColumnVector) srcRowBatch.cols[2];
+        DoubleColumnVector src3 = (DoubleColumnVector) srcRowBatch.cols[3];
+        BinaryColumnVector src4 = (BinaryColumnVector) srcRowBatch.cols[4];
+        TimestampColumnVector src5 = (TimestampColumnVector) srcRowBatch.cols[5];
 
-        VectorizedRowBatch dstRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(
-                testNum, TypeDescription.Mode.NONE);
-        LongColumnVector dst0 = (LongColumnVector) dstRowBatch.cols[0];
-        DoubleColumnVector dst1 = (DoubleColumnVector) dstRowBatch.cols[1];
-        BinaryColumnVector dst2 = (BinaryColumnVector) dstRowBatch.cols[2];
-        TimestampColumnVector dst3 = (TimestampColumnVector) dstRowBatch.cols[3];
+        VectorizedRowBatch dstRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
+        ShortColumnVector dst0 = (ShortColumnVector) dstRowBatch.cols[0];
+        IntColumnVector dst1 = (IntColumnVector) dstRowBatch.cols[1];
+        LongColumnVector dst2 = (LongColumnVector) dstRowBatch.cols[2];
+        DoubleColumnVector dst3 = (DoubleColumnVector) dstRowBatch.cols[3];
+        BinaryColumnVector dst4 = (BinaryColumnVector) dstRowBatch.cols[4];
+        TimestampColumnVector dst5 = (TimestampColumnVector) dstRowBatch.cols[5];
 
         for (int i = 0; i < testNum; i++)
         {
-            src0.vector[i] = i;
+            src0.vector[i] = (short) i;
             src1.vector[i] = i;
-            src2.setVal(i, String.valueOf(i).getBytes());
-            src3.set(i, Timestamp.valueOf("2018-05-07 20:39:20"));
+            src2.vector[i] = i;
+            src3.vector[i] = i;
+            src4.setVal(i, String.valueOf(i).getBytes());
+            src5.set(i, Timestamp.valueOf("2018-05-07 20:39:20"));
         }
 
         long begin = System.nanoTime();
@@ -112,15 +118,19 @@ public class TestColumnVector
         dst1.duplicate(src1);
         dst2.duplicate(src2);
         dst3.duplicate(src3);
+        dst4.duplicate(src4);
+        dst5.duplicate(src5);
         long end = System.nanoTime();
         System.out.println("Copy cost: " + (end - begin));
 
         for (int i = 0; i < testNum; i++)
         {
-            assert dst0.vector[i] == i;
-            assert i * 1.0d == dst1.vector[i];
-            assertEquals(String.valueOf(i), dst2.toString(i));
-            assertEquals(Timestamp.valueOf("2018-05-07 20:39:20"), dst3.asScratchTimestamp(i));
+            assertEquals((short) i, dst0.vector[i]);
+            assertEquals(i, dst1.vector[i]);
+            assertEquals(i, dst2.vector[i]);
+            assertEquals(i * 1.0d, dst3.vector[i], 0);
+            assertEquals(String.valueOf(i), dst4.toString(i));
+            assertEquals(Timestamp.valueOf("2018-05-07 20:39:20"), dst5.asScratchTimestamp(i));
         }
     }
 

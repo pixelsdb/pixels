@@ -50,7 +50,7 @@ public class TestPixelsWriter
         {
             TypeDescription schema = TypeDescription.fromString(schemaStr);
             VectorizedRowBatch rowBatch = schema.createRowBatch();
-            LongColumnVector a = (LongColumnVector) rowBatch.cols[0];              // int
+            IntColumnVector a = (IntColumnVector) rowBatch.cols[0];                // int
             FloatColumnVector b = (FloatColumnVector) rowBatch.cols[1];          // float
             DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
             TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp

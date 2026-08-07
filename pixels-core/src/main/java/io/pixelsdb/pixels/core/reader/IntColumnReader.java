@@ -27,7 +27,6 @@ import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.ByteBufferInputStream;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.IntColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,14 +36,10 @@ import java.util.Arrays;
 
 /**
  * This is the column reader for integer (int32) columns.
- * In some query engines (e.g., Trino 405 and Presto 0.279), the integer column should be read into long[]
- * (i.e., {@link LongColumnVector}) in memory. In this case, the integer column should be read by
- * {@link LongColumnReader} instead of {@link IntColumnReader}.
- *
- * However, in some other query engines (e.g., Trino 466), the integer column should be read into int[]
- * (i.e., {@link IntColumnVector}) by {@link IntColumnReader}.
- * @author hank
- * @create 2024-12-02
+ * 
+ * @author hank, gengdy
+ * @create 2021-04-26
+ * @update 2026-08-07
  */
 public class IntColumnReader extends ColumnReader
 {
@@ -333,7 +328,7 @@ public class IntColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        if (!(hasNull && isNull[j]))
+                        if (!(hasNull && isNull[j - vectorIndex]))
                         {
                             int value = inputBuffer.getInt();
                             if (selected.get(j - vectorIndex))

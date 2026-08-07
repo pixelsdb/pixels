@@ -114,6 +114,19 @@ public class RunLenIntEncoder extends Encoder
     }
 
     @Override
+    public byte[] encode(short[] values, int offset, int length) throws IOException
+    {
+        for (int i = 0; i < length; i++)
+        {
+            this.write(values[i+offset]);
+        }
+        flush();
+        byte[] result = outputStream.toByteArray();
+        outputStream.reset();
+        return result;
+    }
+
+    @Override
     public byte[] encode(long[] values) throws IOException
     {
         return encode(values, 0, values.length);
@@ -121,6 +134,12 @@ public class RunLenIntEncoder extends Encoder
 
     @Override
     public byte[] encode(int[] values) throws IOException
+    {
+        return encode(values, 0, values.length);
+    }
+
+    @Override
+    public byte[] encode(short[] values) throws IOException
     {
         return encode(values, 0, values.length);
     }

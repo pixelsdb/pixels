@@ -24,7 +24,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
-import io.pixelsdb.pixels.core.writer.IntegerColumnWriter;
+import io.pixelsdb.pixels.core.writer.LongColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import org.junit.Test;
 
@@ -39,63 +39,6 @@ import java.nio.ByteOrder;
 public class TestLongColumnReader
 {
     @Test
-    public void testNullsPaddingInt() throws IOException
-    {
-        int pixelsStride = 10;
-        int numRows = 22;
-        PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
-                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        LongColumnVector longColumnVector = new LongColumnVector(numRows);
-        longColumnVector.add(100);
-        longColumnVector.add(103);
-        longColumnVector.add(106);
-        longColumnVector.add(34);
-        longColumnVector.addNull();
-        longColumnVector.add(54);
-        longColumnVector.add(55);
-        longColumnVector.add(67);
-        longColumnVector.addNull();
-        longColumnVector.add(34);
-        longColumnVector.add(555);
-        longColumnVector.add(565);
-        longColumnVector.add(234);
-        longColumnVector.add(675);
-        longColumnVector.add(235);
-        longColumnVector.add(32434);
-        longColumnVector.addNull();
-        longColumnVector.add(6);
-        longColumnVector.add(7);
-        longColumnVector.add(65656565);
-        longColumnVector.add(3434);
-        longColumnVector.add(54578);
-        columnWriter.write(longColumnVector, numRows);
-        columnWriter.flush();
-        columnWriter.close();
-
-        byte[] content = columnWriter.getColumnChunkContent();
-        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
-        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        LongColumnReader columnReader = new LongColumnReader(TypeDescription.createInt());
-        LongColumnVector longColumnVector1 = new LongColumnVector(numRows);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
-                pixelsStride, 0, longColumnVector1, chunkIndex);
-        columnReader.close();
-
-        for (int i = 0; i < numRows; ++i)
-        {
-            assert longColumnVector1.noNulls == longColumnVector.noNulls;
-            assert longColumnVector1.isNull[i] == longColumnVector.isNull[i];
-            if (longColumnVector.noNulls || !longColumnVector.isNull[i])
-            {
-                assert longColumnVector1.vector[i] == longColumnVector.vector[i];
-            }
-        }
-    }
-
-    @Test
     public void testNullsPaddingLong() throws IOException
     {
         int pixelsStride = 10;
@@ -103,7 +46,7 @@ public class TestLongColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        LongColumnWriter columnWriter = new LongColumnWriter(
                 TypeDescription.createLong(), writerOption);
         LongColumnVector longColumnVector = new LongColumnVector(numRows);
         longColumnVector.add(100);
@@ -160,7 +103,7 @@ public class TestLongColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        LongColumnWriter columnWriter = new LongColumnWriter(
                 TypeDescription.createLong(), writerOption);
         LongColumnVector longColumnVector = new LongColumnVector(numRows);
         longColumnVector.add(100);
@@ -217,7 +160,7 @@ public class TestLongColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        LongColumnWriter columnWriter = new LongColumnWriter(
                 TypeDescription.createLong(), writerOption);
         LongColumnVector longColumnVector = new LongColumnVector(numRows);
         longColumnVector.add(100);
@@ -282,7 +225,7 @@ public class TestLongColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        LongColumnWriter columnWriter = new LongColumnWriter(
                 TypeDescription.createLong(), writerOption);
 
         LongColumnVector originVector = new LongColumnVector(numRows);
@@ -335,7 +278,7 @@ public class TestLongColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        LongColumnWriter columnWriter = new LongColumnWriter(
                 TypeDescription.createLong(), writerOption);
 
         LongColumnVector originVector = new LongColumnVector(numRows);

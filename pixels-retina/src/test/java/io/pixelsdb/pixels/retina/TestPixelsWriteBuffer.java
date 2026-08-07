@@ -154,8 +154,7 @@ public class TestPixelsWriteBuffer
     {
         TypeDescription schema = TypeDescription.createSchemaFromStrings(
                 Arrays.asList("id"), Arrays.asList("int"));
-        return new MemTable(0L, schema, size,
-                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, 100L, 0, size);
+        return new MemTable(0L, schema, size, 100L, 0, size);
     }
 
     private static byte[][] row(int value)

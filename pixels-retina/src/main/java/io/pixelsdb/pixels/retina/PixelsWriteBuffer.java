@@ -181,8 +181,7 @@ public class PixelsWriteBuffer
                 idCounter, this.memTableSize * this.maxMemTableCount, retinaHostName, virtualNodeId);
         this.ingestFilePublisher = new IngestFilePublisher(this.currentFileWriterManager.getFirstBlockId());
 
-        this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
-                TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT, this.currentFileWriterManager.getFileId(),
+        this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize, this.currentFileWriterManager.getFileId(),
                 0, this.memTableSize);
         this.idCounter++;
         this.currentMemTableCount = 1;
@@ -298,9 +297,7 @@ public class PixelsWriteBuffer
         MemTable oldMemTable = this.activeMemTable;
         SuperVersion oldVersion = this.currentVersion;
         this.immutableMemTables.add(this.activeMemTable);
-        this.activeMemTable = new MemTable(this.idCounter, this.schema,
-                this.memTableSize, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT,
-                this.currentFileWriterManager.getFileId(),
+        this.activeMemTable = new MemTable(this.idCounter, this.schema, this.memTableSize, this.currentFileWriterManager.getFileId(),
                 this.currentMemTableCount * this.memTableSize,
                 this.memTableSize);
         this.currentMemTableCount += 1;

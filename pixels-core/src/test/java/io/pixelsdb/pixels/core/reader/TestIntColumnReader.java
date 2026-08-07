@@ -24,8 +24,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.IntColumnVector;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
-import io.pixelsdb.pixels.core.writer.IntegerColumnWriter;
+import io.pixelsdb.pixels.core.writer.IntColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import org.junit.Test;
 
@@ -47,32 +46,32 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        IntColumnWriter columnWriter = new IntColumnWriter(
                 TypeDescription.createInt(), writerOption);
-        LongColumnVector longColumnVector = new LongColumnVector(numRows);
-        longColumnVector.add(100);
-        longColumnVector.add(103);
-        longColumnVector.add(106);
-        longColumnVector.add(34);
-        longColumnVector.addNull();
-        longColumnVector.add(54);
-        longColumnVector.add(55);
-        longColumnVector.add(67);
-        longColumnVector.addNull();
-        longColumnVector.add(34);
-        longColumnVector.add(555);
-        longColumnVector.add(565);
-        longColumnVector.add(234);
-        longColumnVector.add(675);
-        longColumnVector.add(235);
-        longColumnVector.add(32434);
-        longColumnVector.addNull();
-        longColumnVector.add(6);
-        longColumnVector.add(7);
-        longColumnVector.add(65656565);
-        longColumnVector.add(3434);
-        longColumnVector.add(54578);
-        columnWriter.write(longColumnVector, numRows);
+        IntColumnVector sourceVector = new IntColumnVector(numRows);
+        sourceVector.add(100);
+        sourceVector.add(103);
+        sourceVector.add(106);
+        sourceVector.add(34);
+        sourceVector.addNull();
+        sourceVector.add(54);
+        sourceVector.add(55);
+        sourceVector.add(67);
+        sourceVector.addNull();
+        sourceVector.add(34);
+        sourceVector.add(555);
+        sourceVector.add(565);
+        sourceVector.add(234);
+        sourceVector.add(675);
+        sourceVector.add(235);
+        sourceVector.add(32434);
+        sourceVector.addNull();
+        sourceVector.add(6);
+        sourceVector.add(7);
+        sourceVector.add(65656565);
+        sourceVector.add(3434);
+        sourceVector.add(54578);
+        columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
 
@@ -87,11 +86,11 @@ public class TestIntColumnReader
 
         for (int i = 0; i < numRows; ++i)
         {
-            assert intColumnVector.noNulls == longColumnVector.noNulls;
-            assert intColumnVector.isNull[i] == longColumnVector.isNull[i];
-            if (longColumnVector.noNulls || !longColumnVector.isNull[i])
+            assert intColumnVector.noNulls == sourceVector.noNulls;
+            assert intColumnVector.isNull[i] == sourceVector.isNull[i];
+            if (sourceVector.noNulls || !sourceVector.isNull[i])
             {
-                assert intColumnVector.vector[i] == longColumnVector.vector[i];
+                assert intColumnVector.vector[i] == sourceVector.vector[i];
             }
         }
     }
@@ -104,32 +103,32 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        IntColumnWriter columnWriter = new IntColumnWriter(
                 TypeDescription.createInt(), writerOption);
-        LongColumnVector longColumnVector = new LongColumnVector(numRows);
-        longColumnVector.add(100);
-        longColumnVector.add(103);
-        longColumnVector.add(106);
-        longColumnVector.add(34);
-        longColumnVector.addNull();
-        longColumnVector.add(54);
-        longColumnVector.add(55);
-        longColumnVector.add(67);
-        longColumnVector.addNull();
-        longColumnVector.add(34);
-        longColumnVector.add(555);
-        longColumnVector.add(565);
-        longColumnVector.add(234);
-        longColumnVector.add(675);
-        longColumnVector.add(235);
-        longColumnVector.add(32434);
-        longColumnVector.addNull();
-        longColumnVector.add(6);
-        longColumnVector.add(7);
-        longColumnVector.add(65656565);
-        longColumnVector.add(3434);
-        longColumnVector.add(54578);
-        columnWriter.write(longColumnVector, numRows);
+        IntColumnVector sourceVector = new IntColumnVector(numRows);
+        sourceVector.add(100);
+        sourceVector.add(103);
+        sourceVector.add(106);
+        sourceVector.add(34);
+        sourceVector.addNull();
+        sourceVector.add(54);
+        sourceVector.add(55);
+        sourceVector.add(67);
+        sourceVector.addNull();
+        sourceVector.add(34);
+        sourceVector.add(555);
+        sourceVector.add(565);
+        sourceVector.add(234);
+        sourceVector.add(675);
+        sourceVector.add(235);
+        sourceVector.add(32434);
+        sourceVector.addNull();
+        sourceVector.add(6);
+        sourceVector.add(7);
+        sourceVector.add(65656565);
+        sourceVector.add(3434);
+        sourceVector.add(54578);
+        columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
 
@@ -144,11 +143,11 @@ public class TestIntColumnReader
 
         for (int i = 0; i < numRows; ++i)
         {
-            assert intColumnVector.noNulls == longColumnVector.noNulls;
-            assert intColumnVector.isNull[i] == longColumnVector.isNull[i];
-            if (longColumnVector.noNulls || !longColumnVector.isNull[i])
+            assert intColumnVector.noNulls == sourceVector.noNulls;
+            assert intColumnVector.isNull[i] == sourceVector.isNull[i];
+            if (sourceVector.noNulls || !sourceVector.isNull[i])
             {
-                assert intColumnVector.vector[i] == longColumnVector.vector[i];
+                assert intColumnVector.vector[i] == sourceVector.vector[i];
             }
         }
     }
@@ -161,32 +160,32 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        IntColumnWriter columnWriter = new IntColumnWriter(
                 TypeDescription.createInt(), writerOption);
-        LongColumnVector longColumnVector = new LongColumnVector(numRows);
-        longColumnVector.add(100);
-        longColumnVector.add(103);
-        longColumnVector.add(106);
-        longColumnVector.add(34);
-        longColumnVector.addNull();
-        longColumnVector.add(54);
-        longColumnVector.add(55);
-        longColumnVector.add(67);
-        longColumnVector.addNull();
-        longColumnVector.add(34);
-        longColumnVector.add(555);
-        longColumnVector.add(565);
-        longColumnVector.add(234);
-        longColumnVector.add(675);
-        longColumnVector.add(235);
-        longColumnVector.add(32434);
-        longColumnVector.addNull();
-        longColumnVector.add(6);
-        longColumnVector.add(7);
-        longColumnVector.add(65656565);
-        longColumnVector.add(3434);
-        longColumnVector.add(54578);
-        columnWriter.write(longColumnVector, numRows);
+        IntColumnVector sourceVector = new IntColumnVector(numRows);
+        sourceVector.add(100);
+        sourceVector.add(103);
+        sourceVector.add(106);
+        sourceVector.add(34);
+        sourceVector.addNull();
+        sourceVector.add(54);
+        sourceVector.add(55);
+        sourceVector.add(67);
+        sourceVector.addNull();
+        sourceVector.add(34);
+        sourceVector.add(555);
+        sourceVector.add(565);
+        sourceVector.add(234);
+        sourceVector.add(675);
+        sourceVector.add(235);
+        sourceVector.add(32434);
+        sourceVector.addNull();
+        sourceVector.add(6);
+        sourceVector.add(7);
+        sourceVector.add(65656565);
+        sourceVector.add(3434);
+        sourceVector.add(54578);
+        columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
 
@@ -207,11 +206,11 @@ public class TestIntColumnReader
         {
             if (i % 10 != 0)
             {
-                assert intColumnVector.noNulls == longColumnVector.noNulls;
-                assert intColumnVector.isNull[j] == longColumnVector.isNull[i];
-                if (longColumnVector.noNulls || !longColumnVector.isNull[i])
+                assert intColumnVector.noNulls == sourceVector.noNulls;
+                assert intColumnVector.isNull[j] == sourceVector.isNull[i];
+                if (sourceVector.noNulls || !sourceVector.isNull[i])
                 {
-                    assert intColumnVector.vector[j] == longColumnVector.vector[i];
+                    assert intColumnVector.vector[j] == sourceVector.vector[i];
                 }
                 j++;
             }
@@ -226,10 +225,10 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        IntColumnWriter columnWriter = new IntColumnWriter(
                 TypeDescription.createInt(), writerOption);
 
-        LongColumnVector originVector = new LongColumnVector(numRows);
+        IntColumnVector originVector = new IntColumnVector(numRows);
         for (int j = 0; j < numRows; j++)
         {
             if (j % 100 == 0)
@@ -238,7 +237,7 @@ public class TestIntColumnReader
             }
             else
             {
-                originVector.add(1000L);
+                originVector.add(1000);
             }
         }
 
@@ -279,10 +278,10 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntegerColumnWriter columnWriter = new IntegerColumnWriter(
+        IntColumnWriter columnWriter = new IntColumnWriter(
                 TypeDescription.createInt(), writerOption);
 
-        LongColumnVector originVector = new LongColumnVector(numRows);
+        IntColumnVector originVector = new IntColumnVector(numRows);
         for (int j = 0; j < numRows; j++)
         {
             if (j % 100 == 0)
@@ -291,7 +290,7 @@ public class TestIntColumnReader
             }
             else
             {
-                originVector.add(1000L);
+                originVector.add(1000);
             }
         }
 
