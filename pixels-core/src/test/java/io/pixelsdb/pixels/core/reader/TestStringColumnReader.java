@@ -24,6 +24,7 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
+import io.pixelsdb.pixels.core.vector.DictionaryColumnVector;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import io.pixelsdb.pixels.core.writer.StringColumnWriter;
 import org.junit.Test;
@@ -31,6 +32,8 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author hank
@@ -221,6 +224,65 @@ public class TestStringColumnReader
                 j++;
             }
         }
+    }
+
+    @Test
+    public void testDictionaryReadWithVectorOffset() throws IOException
+    {
+        int numRows = 6;
+        int vectorIndex = 2;
+        String[] values = {"a", "b", "a", "b", "a", "b"};
+        BinaryColumnVector source = new BinaryColumnVector(numRows);
+        for (String value : values)
+        {
+            source.add(value);
+        }
+
+        StringColumnWriter writer = new StringColumnWriter(TypeDescription.createString(),
+                new PixelsWriterOption()
+                        .pixelStride(10)
+                        .byteOrder(ByteOrder.LITTLE_ENDIAN)
+                        .encodingLevel(EncodingLevel.EL2)
+                        .nullsPadding(false));
+        writer.write(source, numRows);
+        writer.flush();
+
+        byte[] content = writer.getColumnChunkContent();
+        PixelsProto.ColumnChunkIndex chunkIndex = writer.getColumnChunkIndex().build();
+        PixelsProto.ColumnEncoding encoding = writer.getColumnChunkEncoding().build();
+        assertEquals(PixelsProto.ColumnEncoding.Kind.DICTIONARY, encoding.getKind());
+
+        DictionaryColumnVector target = new DictionaryColumnVector(vectorIndex + numRows);
+        StringColumnReader reader = new StringColumnReader(TypeDescription.createString());
+        reader.read(ByteBuffer.wrap(content), encoding, 0, numRows, 10,
+                vectorIndex, target, chunkIndex);
+        for (int i = 0; i < numRows; ++i)
+        {
+            assertEquals(values[i], dictionaryValue(target, vectorIndex + i));
+        }
+        reader.close();
+
+        Bitmap selected = new Bitmap(numRows, true);
+        selected.clear(1);
+        selected.clear(4);
+        target = new DictionaryColumnVector(vectorIndex + numRows);
+        reader = new StringColumnReader(TypeDescription.createString());
+        reader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows, 10,
+                vectorIndex, target, chunkIndex, selected);
+        String[] selectedValues = {"a", "a", "b", "b"};
+        for (int i = 0; i < selectedValues.length; ++i)
+        {
+            assertEquals(selectedValues[i], dictionaryValue(target, vectorIndex + i));
+        }
+        reader.close();
+        writer.close();
+    }
+
+    private static String dictionaryValue(DictionaryColumnVector vector, int index)
+    {
+        int start = vector.dictOffsets[vector.ids[index]];
+        int length = vector.dictOffsets[vector.ids[index] + 1] - start;
+        return new String(vector.dictArray, start, length);
     }
 
     @Test
