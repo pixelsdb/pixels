@@ -20,20 +20,29 @@
 package io.pixelsdb.pixels.core.writer;
 
 import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.core.utils.DynamicIntArray;
+import io.pixelsdb.pixels.core.utils.EncodingUtils;
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
  * Column writer for BINARY and VARBINARY.
- * Each non-null value is stored as a 4-byte little/big-endian length followed by its payload.
- * Null values write no content bytes. Values longer than the type max length are truncated.
+ * <p>
+ * The binary column chunk consists of three fields:
+ * 1. content field (the payloads of the non-null values, concatenated without any padding)
+ * 2. starts field (the start offset of each non-null value in the content field, plus the content length)
+ * 3. starts field offset (an integer value indicating offset of the starts field in the chunk)
+ * <p>
+ * Null values write no content bytes and no start offset. Values longer than the type max length
+ * are truncated.
  *
  * @author guodong, hank, gengdy
  * @update 2023-08-16 Chamonix: support nulls padding
- * @update 2026-08-05: use 4-byte length prefix, honor vector start/lens, and disable nulls padding
+ * @update 2026-08-08: use content and starts fields, honor vector start/lens, and disable nulls padding
  */
 public class BinaryColumnWriter extends BaseColumnWriter
 {
@@ -41,12 +50,20 @@ public class BinaryColumnWriter extends BaseColumnWriter
      * Max length of binary. It is recorded in the file footer's schema.
      */
     private final int maxLength;
+    private final DynamicIntArray startsArray;
+    private final EncodingUtils encodingUtils;
     private int numTruncated;
+    /**
+     * The start offset of the current value in the content field.
+     */
+    private int startOffset = 0;
 
     public BinaryColumnWriter(TypeDescription type,  PixelsWriterOption writerOption)
     {
         super(type, writerOption);
         this.maxLength = type.getMaxLength();
+        this.startsArray = new DynamicIntArray();
+        this.encodingUtils = new EncodingUtils();
         this.numTruncated = 0;
     }
 
@@ -90,8 +107,9 @@ public class BinaryColumnWriter extends BaseColumnWriter
                 byte[] bytes = columnVector.vector[index];
                 int start = columnVector.start[index];
                 int length = Math.min(columnVector.lens[index], maxLength);
-                writeLength(length);
                 outputStream.write(bytes, start, length);
+                startsArray.add(startOffset);
+                startOffset += length;
                 if (columnVector.lens[index] > maxLength)
                 {
                     numTruncated++;
@@ -104,6 +122,15 @@ public class BinaryColumnWriter extends BaseColumnWriter
     }
 
     @Override
+    public void flush() throws IOException
+    {
+        // flush out pixels field
+        super.flush();
+        // flush out the starts field
+        flushStarts();
+    }
+
+    @Override
     public boolean decideNullsPadding(PixelsWriterOption writerOption)
     {
         return false;
@@ -113,7 +140,16 @@ public class BinaryColumnWriter extends BaseColumnWriter
     public void reset()
     {
         super.reset();
+        this.startsArray.clear();
+        this.startOffset = 0;
         this.numTruncated = 0;
+    }
+
+    @Override
+    public void close() throws IOException
+    {
+        this.startsArray.clear();
+        super.close();
     }
 
     /**
@@ -124,21 +160,29 @@ public class BinaryColumnWriter extends BaseColumnWriter
         return this.numTruncated;
     }
 
-    private void writeLength(int length)
+    private void flushStarts() throws IOException
     {
+        int startsFieldOffset = outputStream.size();
+        startsArray.add(startOffset); // add the last start offset
         if (byteOrder.equals(ByteOrder.LITTLE_ENDIAN))
         {
-            outputStream.write(length);
-            outputStream.write(length >>> 8);
-            outputStream.write(length >>> 16);
-            outputStream.write(length >>> 24);
+            for (int i = 0; i < startsArray.size(); i++)
+            {
+                encodingUtils.writeIntLE(outputStream, startsArray.get(i));
+            }
         }
         else
         {
-            outputStream.write(length >>> 24);
-            outputStream.write(length >>> 16);
-            outputStream.write(length >>> 8);
-            outputStream.write(length);
+            for (int i = 0; i < startsArray.size(); i++)
+            {
+                encodingUtils.writeIntBE(outputStream, startsArray.get(i));
+            }
         }
+        startsArray.clear();
+
+        ByteBuffer offsetBuf = ByteBuffer.allocate(Integer.BYTES);
+        offsetBuf.order(byteOrder);
+        offsetBuf.putInt(startsFieldOffset);
+        outputStream.write(offsetBuf.array());
     }
 }

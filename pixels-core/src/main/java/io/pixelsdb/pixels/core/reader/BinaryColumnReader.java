@@ -33,14 +33,31 @@ import java.util.Arrays;
 
 /**
  * Column reader for BINARY and VARBINARY.
- * Each non-null value is stored as a 4-byte little/big-endian length followed by its payload.
- * Null values have no content bytes.
+ * The payloads of the non-null values are concatenated in the content field, and their start offsets
+ * are stored in the starts field, which is located by the integer at the end of the column chunk.
+ * Null values have no content bytes and no start offset.
  *
  * @author guodong, gengdy
  */
 public class BinaryColumnReader extends ColumnReader
 {
     private ByteBuffer inputBuffer;
+    /**
+     * The start offset of the column chunk in the input buffer.
+     */
+    private int contentStart;
+    /**
+     * The offset in the input buffer of the next start offset to read from the starts field.
+     */
+    private int startsReadIndex;
+    /**
+     * The start offset of the current value in the content field.
+     */
+    private int currentStart;
+    /**
+     * The start offset of the next value in the content field.
+     */
+    private int nextStart;
 
     BinaryColumnReader(TypeDescription type)
     {
@@ -64,6 +81,10 @@ public class BinaryColumnReader extends ColumnReader
     public void close() throws IOException
     {
         this.inputBuffer = null;
+        this.contentStart = 0;
+        this.startsReadIndex = 0;
+        this.currentStart = 0;
+        this.nextStart = 0;
     }
 
     /**
@@ -85,22 +106,31 @@ public class BinaryColumnReader extends ColumnReader
     {
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
-        // if read from start, init the input buffer
+        // if read from start, init the input buffer and locate the starts field
         if (offset == 0)
         {
             ByteOrder byteOrder = littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
             int inputOffset = input.position();
+            int chunkLength = input.remaining();
             if (input.hasArray())
             {
                 inputBuffer = input.order(byteOrder);
             }
             else
             {
-                byte[] chunkArray = new byte[input.remaining()];
+                byte[] chunkArray = new byte[chunkLength];
                 input.duplicate().get(chunkArray);
                 inputBuffer = ByteBuffer.wrap(chunkArray).order(byteOrder);
                 inputOffset = 0;
             }
+            contentStart = inputOffset;
+            // the starts field offset is the last integer of the column chunk
+            int startsFieldOffset = inputBuffer.getInt(contentStart + chunkLength - Integer.BYTES);
+            startsReadIndex = contentStart + startsFieldOffset;
+            currentStart = 0;
+            // read out the first start offset, which is 0
+            nextStart = inputBuffer.getInt(startsReadIndex);
+            startsReadIndex += Integer.BYTES;
             isNullOffset = inputOffset + chunkIndex.getIsNullOffset();
             isNullSkipBits = 0;
             elementIndex = 0;
@@ -108,7 +138,7 @@ public class BinaryColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         byte[] contentArray = inputBuffer.array();
-        int contentArrayOffset = inputBuffer.arrayOffset();
+        int contentArrayOffset = inputBuffer.arrayOffset() + contentStart;
         int numLeft = size, numToRead, bytesToDeCompact;
         boolean endOfPixel;
         for (int i = vectorIndex; numLeft > 0; )
@@ -147,11 +177,11 @@ public class BinaryColumnReader extends ColumnReader
                 {
                     continue;
                 }
-                int length = inputBuffer.getInt();
-                int payloadStart = inputBuffer.position();
+                currentStart = nextStart;
+                nextStart = inputBuffer.getInt(startsReadIndex);
+                startsReadIndex += Integer.BYTES;
                 // use setRef instead of setVal to reduce memory copy
-                columnVector.setRef(j, contentArray, contentArrayOffset + payloadStart, length);
-                inputBuffer.position(payloadStart + length);
+                columnVector.setRef(j, contentArray, contentArrayOffset + currentStart, nextStart - currentStart);
             }
             // update variables
             numLeft -= numToRead;
@@ -181,22 +211,31 @@ public class BinaryColumnReader extends ColumnReader
     {
         BinaryColumnVector columnVector = (BinaryColumnVector) vector;
         boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
-        // if read from start, init the input buffer
+        // if read from start, init the input buffer and locate the starts field
         if (offset == 0)
         {
             ByteOrder byteOrder = littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN;
             int inputOffset = input.position();
+            int chunkLength = input.remaining();
             if (input.hasArray())
             {
                 inputBuffer = input.order(byteOrder);
             }
             else
             {
-                byte[] chunkArray = new byte[input.remaining()];
+                byte[] chunkArray = new byte[chunkLength];
                 input.duplicate().get(chunkArray);
                 inputBuffer = ByteBuffer.wrap(chunkArray).order(byteOrder);
                 inputOffset = 0;
             }
+            contentStart = inputOffset;
+            // the starts field offset is the last integer of the column chunk
+            int startsFieldOffset = inputBuffer.getInt(contentStart + chunkLength - Integer.BYTES);
+            startsReadIndex = contentStart + startsFieldOffset;
+            currentStart = 0;
+            // read out the first start offset, which is 0
+            nextStart = inputBuffer.getInt(startsReadIndex);
+            startsReadIndex += Integer.BYTES;
             isNullOffset = inputOffset + chunkIndex.getIsNullOffset();
             isNullSkipBits = 0;
             elementIndex = 0;
@@ -204,7 +243,7 @@ public class BinaryColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         byte[] contentArray = inputBuffer.array();
-        int contentArrayOffset = inputBuffer.arrayOffset();
+        int contentArrayOffset = inputBuffer.arrayOffset() + contentStart;
         int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
         boolean[] isNull = new boolean[size];
         boolean endOfPixel;
@@ -262,16 +301,16 @@ public class BinaryColumnReader extends ColumnReader
                     continue;
                 }
 
-                int length = inputBuffer.getInt();
-                int payloadStart = inputBuffer.position();
+                // always consume the start offset so that the content cursor stays aligned
+                currentStart = nextStart;
+                nextStart = inputBuffer.getInt(startsReadIndex);
+                startsReadIndex += Integer.BYTES;
                 if (selected.get(j - vectorIndex))
                 {
                     // use setRef instead of setVal to reduce memory copy
                     columnVector.setRef(vectorWriteIndex++, contentArray,
-                            contentArrayOffset + payloadStart, length);
+                            contentArrayOffset + currentStart, nextStart - currentStart);
                 }
-                // Always skip the payload so the content cursor stays aligned.
-                inputBuffer.position(payloadStart + length);
             }
 
             // update columnVector.isNull if has no nulls

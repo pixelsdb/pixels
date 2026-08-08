@@ -42,11 +42,12 @@ import static org.junit.Assert.assertFalse;
  * <p>
  * Sample values are slices with non-zero starts so the round trip verifies
  * {@link BinaryColumnVector#start} / {@link BinaryColumnVector#lens}.
- * On-disk layout is a 4-byte endian-aware length prefix plus payload; nulls
- * write no content bytes and {@link BinaryColumnWriter} always disables nulls padding.
+ * On-disk layout is a content field of concatenated payloads followed by an
+ * endian-aware starts field; nulls write no content bytes and no start offset, and
+ * {@link BinaryColumnWriter} always disables nulls padding.
  *
  * @author gengdy
- * @create 2026-08-07
+ * @create 2026-08-08
  */
 public class TestBinaryColumnReader
 {
@@ -99,6 +100,22 @@ public class TestBinaryColumnReader
         addBytes(vector, new byte[] {34, 34});
         addBytes(vector, new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
         return vector;
+    }
+
+    /**
+     * Read the starts field, which is located by the integer at the end of the column chunk.
+     */
+    private static int[] readStarts(byte[] content, ByteOrder byteOrder)
+    {
+        ByteBuffer buffer = ByteBuffer.wrap(content).order(byteOrder);
+        int startsFieldOffset = buffer.getInt(content.length - Integer.BYTES);
+        int numStarts = (content.length - Integer.BYTES - startsFieldOffset) / Integer.BYTES;
+        int[] starts = new int[numStarts];
+        for (int i = 0; i < numStarts; ++i)
+        {
+            starts[i] = buffer.getInt(startsFieldOffset + i * Integer.BYTES);
+        }
+        return starts;
     }
 
     private static byte[] valueAt(BinaryColumnVector vector, int i)
@@ -217,8 +234,10 @@ public class TestBinaryColumnReader
                 ByteOrder.LITTLE_ENDIAN, true);
         assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, chunk.encoding.getKind());
         assertFalse(chunk.chunkIndex.getNullsPadding());
-        assertArrayEquals(new byte[] {0, 0, 0, 0},
-                Arrays.copyOfRange(chunk.content, 0, Integer.BYTES));
+        // the first value is empty, hence it contributes no content byte
+        int[] starts = readStarts(chunk.content, ByteOrder.LITTLE_ENDIAN);
+        assertEquals(0, starts[0]);
+        assertEquals(0, starts[1]);
 
         BinaryColumnReader reader = new BinaryColumnReader(binaryType());
         BinaryColumnVector target = new BinaryColumnVector(NUM_ROWS);
@@ -256,8 +275,18 @@ public class TestBinaryColumnReader
         Chunk chunk = writeChunk(origin, NUM_ROWS, binaryType(), PIXEL_STRIDE,
                 ByteOrder.BIG_ENDIAN, false);
         assertFalse(chunk.chunkIndex.getLittleEndian());
-        assertArrayEquals(new byte[] {0, 0, 0, 0},
-                Arrays.copyOfRange(chunk.content, 0, Integer.BYTES));
+        // the starts field is written in big endian, and the last start offset is the content length
+        int[] starts = readStarts(chunk.content, ByteOrder.BIG_ENDIAN);
+        int contentLength = 0;
+        for (int i = 0; i < NUM_ROWS; ++i)
+        {
+            if (!origin.isNull[i])
+            {
+                contentLength += origin.lens[i];
+            }
+        }
+        assertEquals(0, starts[0]);
+        assertEquals(contentLength, starts[starts.length - 1]);
 
         BinaryColumnReader reader = new BinaryColumnReader(binaryType());
         BinaryColumnVector target = new BinaryColumnVector(NUM_ROWS);
@@ -374,8 +403,9 @@ public class TestBinaryColumnReader
 
         assertEquals(1, writer.getNumTruncated());
         assertEquals(8, writer.getColumnChunkStat().getBinaryStatistics().getSum());
-        assertArrayEquals(new byte[] {0, 0, 0, 4, 1, 2, 3, 4},
+        assertArrayEquals(new byte[] {1, 2, 3, 4, 5, 6, 7, 8},
                 Arrays.copyOfRange(content, 0, 8));
+        assertArrayEquals(new int[] {0, 4, 8, 8}, readStarts(content, ByteOrder.BIG_ENDIAN));
 
         BinaryColumnReader reader = new BinaryColumnReader(type);
         BinaryColumnVector target = new BinaryColumnVector(4);

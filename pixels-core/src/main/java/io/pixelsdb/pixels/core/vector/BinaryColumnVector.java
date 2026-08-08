@@ -942,14 +942,6 @@ public class BinaryColumnVector extends ColumnVector
         return BinaryColumnVectorFlat.endBinaryColumnVectorFlat(builder);
     }
 
-    public static byte[] getBytesFromFlatArray(ByteArray byteArray)
-    {
-        ByteBuffer bbuf = byteArray.bytesAsByteBuffer();
-        byte[] result = new byte[bbuf.remaining()];
-        bbuf.get(result);
-        return result;
-    }
-
     public static BinaryColumnVector deserialize(BinaryColumnVectorFlat flat)
     {
         BinaryColumnVector vector = new BinaryColumnVector(flat.base().length());
@@ -967,8 +959,10 @@ public class BinaryColumnVector extends ColumnVector
         byte[][] physical = new byte[physicalCount][];
         for (int i = 0; i < physicalCount; ++i)
         {
-            ByteArray arr = flat.physicalBuffer(i);
-            physical[i] = getBytesFromFlatArray(arr);
+            ByteBuffer bbuf = flat.physicalBuffer(i).bytesAsByteBuffer();
+            byte[] result = new byte[bbuf.remaining()];
+            bbuf.get(result);
+            physical[i] = result;
         }
 
         int bufferIndex = flat.buffer();
