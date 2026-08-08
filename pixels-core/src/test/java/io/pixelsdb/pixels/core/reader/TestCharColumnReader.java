@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2026 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -23,8 +23,8 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import io.pixelsdb.pixels.core.vector.IntColumnVector;
-import io.pixelsdb.pixels.core.writer.IntColumnWriter;
+import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
+import io.pixelsdb.pixels.core.writer.CharColumnWriter;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import org.junit.Test;
 
@@ -35,43 +35,51 @@ import java.nio.ByteOrder;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Memory round-trip tests for INT after the integer-type split.
+ * Memory round-trip tests for CHAR. CharColumnWriter does not pad with trailing zeros;
+ * values longer than maxLength are truncated by VarcharColumnWriter before encoding.
  *
- * @author hank, gengdy
- * @create 2024-12-07
- * @update 2026-08-08
+ * @author gengdy
+ * @create 2026-08-07
  */
-public class TestIntColumnReader
+public class TestCharColumnReader
 {
-    private static IntColumnVector createSampleVector(int numRows)
+    private static final int CHAR_MAX_LENGTH = 8;
+
+    private static TypeDescription charType()
     {
-        IntColumnVector vector = new IntColumnVector(numRows);
-        vector.add(100);
-        vector.add(103);
-        vector.add(106);
-        vector.add(34);
+        return TypeDescription.createChar(CHAR_MAX_LENGTH);
+    }
+
+    private static BinaryColumnVector createSampleVector(int numRows)
+    {
+        BinaryColumnVector vector = new BinaryColumnVector(numRows);
+        // All non-null values are within CHAR_MAX_LENGTH; include empty and max-length boundary.
+        vector.add("");
+        vector.add("a");
+        vector.add("ab");
+        vector.add("abcdefg");
         vector.addNull();
-        vector.add(54);
-        vector.add(55);
-        vector.add(67);
+        vector.add("abcdefgh"); // exactly maxLength
+        vector.add("xy");
+        vector.add("z");
         vector.addNull();
-        vector.add(34);
-        vector.add(555);
-        vector.add(565);
-        vector.add(234);
-        vector.add(675);
-        vector.add(235);
-        vector.add(32434);
+        vector.add("bound");
+        vector.add("555");
+        vector.add("565");
+        vector.add("234");
+        vector.add("675");
+        vector.add("235");
+        vector.add("32434"); // length 5
         vector.addNull();
-        vector.add(6);
-        vector.add(7);
-        vector.add(Integer.MAX_VALUE);
-        vector.add(3434);
-        vector.add(Integer.MIN_VALUE);
+        vector.add("6");
+        vector.add("7");
+        vector.add("maxchar!"); // exactly 8
+        vector.add("3434");
+        vector.add("end");
         return vector;
     }
 
-    private static void assertVectorsEqual(IntColumnVector expected, IntColumnVector actual, int numRows)
+    private static void assertVectorsEqual(BinaryColumnVector expected, BinaryColumnVector actual, int numRows)
     {
         assertEquals(expected.noNulls, actual.noNulls);
         for (int i = 0; i < numRows; ++i)
@@ -79,24 +87,23 @@ public class TestIntColumnReader
             assertEquals("isNull mismatch at row " + i, expected.isNull[i], actual.isNull[i]);
             if (expected.noNulls || !expected.isNull[i])
             {
-                assertEquals("value mismatch at row " + i, expected.vector[i], actual.vector[i]);
+                String e = new String(expected.vector[i], expected.start[i], expected.lens[i]);
+                String a = new String(actual.vector[i], actual.start[i], actual.lens[i]);
+                assertEquals("value mismatch at row " + i, e, a);
             }
         }
     }
 
-    private static void assertSelectedRoundTrip(EncodingLevel encodingLevel, boolean nullsPadding,
-                                                PixelsProto.ColumnEncoding.Kind expectedEncoding)
-            throws IOException
+    private static void assertSelectedRoundTrip(boolean nullsPadding) throws IOException
     {
         int pixelsStride = 10;
         int numRows = 22;
         int vectorIndex = 3;
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
-                .encodingLevel(encodingLevel).nullsPadding(nullsPadding);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector originVector = createSampleVector(numRows);
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(nullsPadding);
+        CharColumnWriter columnWriter = new CharColumnWriter(charType(), writerOption);
+        BinaryColumnVector originVector = createSampleVector(numRows);
         columnWriter.write(originVector, numRows);
         columnWriter.flush();
         columnWriter.close();
@@ -104,7 +111,7 @@ public class TestIntColumnReader
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        assertEquals(expectedEncoding, encoding.getKind());
+        assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, encoding.getKind());
 
         Bitmap selected = new Bitmap(numRows, true);
         selected.clear(0);
@@ -116,8 +123,8 @@ public class TestIntColumnReader
         selected.clear(16);
         selected.clear(20);
 
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(vectorIndex + numRows);
+        CharColumnReader columnReader = new CharColumnReader(charType());
+        BinaryColumnVector targetVector = new BinaryColumnVector(vectorIndex + numRows);
         columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, vectorIndex, targetVector, chunkIndex, selected);
         columnReader.close();
@@ -131,8 +138,10 @@ public class TestIntColumnReader
                         originVector.isNull[i], targetVector.isNull[targetIndex]);
                 if (!originVector.isNull[i])
                 {
-                    assertEquals("value mismatch at selected src=" + i + " dst=" + targetIndex,
-                            originVector.vector[i], targetVector.vector[targetIndex]);
+                    String e = new String(originVector.vector[i], originVector.start[i], originVector.lens[i]);
+                    String a = new String(targetVector.vector[targetIndex],
+                            targetVector.start[targetIndex], targetVector.lens[targetIndex]);
+                    assertEquals("value mismatch at selected src=" + i + " dst=" + targetIndex, e, a);
                 }
                 targetIndex++;
             }
@@ -147,9 +156,8 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector sourceVector = createSampleVector(numRows);
+        CharColumnWriter columnWriter = new CharColumnWriter(charType(), writerOption);
+        BinaryColumnVector sourceVector = createSampleVector(numRows);
         columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
@@ -158,8 +166,8 @@ public class TestIntColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, encoding.getKind());
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(numRows);
+        CharColumnReader columnReader = new CharColumnReader(charType());
+        BinaryColumnVector targetVector = new BinaryColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, targetVector, chunkIndex);
         columnReader.close();
@@ -175,9 +183,8 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector sourceVector = createSampleVector(numRows);
+        CharColumnWriter columnWriter = new CharColumnWriter(charType(), writerOption);
+        BinaryColumnVector sourceVector = createSampleVector(numRows);
         columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
@@ -186,63 +193,13 @@ public class TestIntColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, encoding.getKind());
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(numRows);
+        CharColumnReader columnReader = new CharColumnReader(charType());
+        BinaryColumnVector targetVector = new BinaryColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, targetVector, chunkIndex);
         columnReader.close();
 
         assertVectorsEqual(sourceVector, targetVector, numRows);
-    }
-
-    @Test
-    public void testRunLength() throws IOException
-    {
-        int pixelsStride = 10;
-        int numRows = 22;
-        PixelsWriterOption writerOption = new PixelsWriterOption()
-                .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
-                .encodingLevel(EncodingLevel.EL2).nullsPadding(false);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector originVector = new IntColumnVector(numRows);
-        originVector.add(5);
-        originVector.add(5);
-        originVector.add(5);
-        originVector.add(5);
-        originVector.addNull();
-        originVector.add(5);
-        originVector.add(5);
-        originVector.add(7);
-        originVector.addNull();
-        originVector.add(7);
-        originVector.add(1);
-        originVector.add(2);
-        originVector.add(3);
-        originVector.add(9);
-        originVector.add(9);
-        originVector.add(9);
-        originVector.addNull();
-        originVector.add(9);
-        originVector.add(9);
-        originVector.add(Integer.MIN_VALUE);
-        originVector.add(Integer.MAX_VALUE);
-        originVector.add(0);
-        columnWriter.write(originVector, numRows);
-        columnWriter.flush();
-        columnWriter.close();
-
-        byte[] content = columnWriter.getColumnChunkContent();
-        PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
-        PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        assertEquals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH, encoding.getKind());
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(numRows);
-        columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
-                pixelsStride, 0, targetVector, chunkIndex);
-        columnReader.close();
-
-        assertVectorsEqual(originVector, targetVector, numRows);
     }
 
     @Test
@@ -253,9 +210,8 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector sourceVector = createSampleVector(numRows);
+        CharColumnWriter columnWriter = new CharColumnWriter(charType(), writerOption);
+        BinaryColumnVector sourceVector = createSampleVector(numRows);
         columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
@@ -263,8 +219,8 @@ public class TestIntColumnReader
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(numRows);
+        CharColumnReader columnReader = new CharColumnReader(charType());
+        BinaryColumnVector targetVector = new BinaryColumnVector(numRows);
         Bitmap selected = new Bitmap(numRows, true);
         selected.clear(0);
         selected.clear(10);
@@ -280,7 +236,9 @@ public class TestIntColumnReader
                 assertEquals(sourceVector.isNull[i], targetVector.isNull[j]);
                 if (sourceVector.noNulls || !sourceVector.isNull[i])
                 {
-                    assertEquals(sourceVector.vector[i], targetVector.vector[j]);
+                    String e = new String(sourceVector.vector[i], sourceVector.start[i], sourceVector.lens[i]);
+                    String a = new String(targetVector.vector[j], targetVector.start[j], targetVector.lens[j]);
+                    assertEquals(e, a);
                 }
                 j++;
             }
@@ -290,13 +248,13 @@ public class TestIntColumnReader
     @Test
     public void testSelectedWithoutNullsPaddingAtNonZeroVectorIndex() throws IOException
     {
-        assertSelectedRoundTrip(EncodingLevel.EL0, false, PixelsProto.ColumnEncoding.Kind.NONE);
+        assertSelectedRoundTrip(false);
     }
 
     @Test
-    public void testSelectedRunLengthAtNonZeroVectorIndex() throws IOException
+    public void testSelectedWithNullsPaddingAtNonZeroVectorIndex() throws IOException
     {
-        assertSelectedRoundTrip(EncodingLevel.EL2, false, PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
+        assertSelectedRoundTrip(true);
     }
 
     @Test
@@ -306,11 +264,10 @@ public class TestIntColumnReader
         int numRows = 1024;
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
-                .encodingLevel(EncodingLevel.EL2).nullsPadding(false);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
+        CharColumnWriter columnWriter = new CharColumnWriter(charType(), writerOption);
 
-        IntColumnVector originVector = new IntColumnVector(numRows);
+        BinaryColumnVector originVector = new BinaryColumnVector(numRows);
         for (int j = 0; j < numRows; j++)
         {
             if (j % 100 == 0)
@@ -319,7 +276,8 @@ public class TestIntColumnReader
             }
             else
             {
-                originVector.add((j / 200) % 4);
+                // Keep within CHAR_MAX_LENGTH.
+                originVector.add("v" + (j % 10000));
             }
         }
 
@@ -333,10 +291,10 @@ public class TestIntColumnReader
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        assertEquals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH, encoding.getKind());
+        assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, encoding.getKind());
         int totalRows = numBatches * numRows;
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(totalRows);
+        CharColumnReader columnReader = new CharColumnReader(charType());
+        BinaryColumnVector targetVector = new BinaryColumnVector(totalRows);
         ByteBuffer buffer = ByteBuffer.wrap(content);
         columnReader.read(buffer, encoding, 0, 123,
                 10000, 0, targetVector, chunkIndex);
@@ -348,10 +306,13 @@ public class TestIntColumnReader
 
         for (int i = 0; i < totalRows; i++)
         {
-            assertEquals(originVector.isNull[i % numRows], targetVector.isNull[i]);
+            int j = i % numRows;
+            assertEquals(originVector.isNull[j], targetVector.isNull[i]);
             if (targetVector.noNulls || !targetVector.isNull[i])
             {
-                assertEquals(originVector.vector[i % numRows], targetVector.vector[i]);
+                String e = new String(originVector.vector[j], originVector.start[j], originVector.lens[j]);
+                String a = new String(targetVector.vector[i], targetVector.start[i], targetVector.lens[i]);
+                assertEquals(e, a);
             }
         }
     }

@@ -25,87 +25,69 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
-import io.pixelsdb.pixels.core.exception.PixelsWriterException;
-import io.pixelsdb.pixels.core.vector.*;
-
-import java.io.IOException;
-import java.sql.Timestamp;
+import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
+import io.pixelsdb.pixels.core.vector.IntColumnVector;
+import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 
 /**
+ * Minimal example showing how to write a Pixels file to the local file system.
+ * <p>
+ * The flow is: build a {@link PixelsWriter} against a {@link TypeDescription} schema,
+ * fill {@link VectorizedRowBatch}es column by column, add them to the writer, and close.
+ * <p>
+ * For an end-to-end write-then-read example with per-value verification across all
+ * column types, see {@code TestPixelsReadWrite}.
+ *
  * @author hank
  * @create 2018-11-19
  */
 public class TestPixelsWriter
 {
-    public static void main(String[] args) throws IOException
+    private static final String SCHEMA_STRING = "struct<id:int,name:string>";
+    private static final int ROW_NUM = 1000;
+
+    public static void main(String[] args) throws Exception
     {
-        // Note you may need to restart intellij to let it pick up the updated environment variable value
-        // example path: s3://bucket-name/test-file.pxl
-        String pixelsFile = System.getenv("PIXELS_S3_TEST_BUCKET_PATH") + "test.pxl";
-        Storage storage = StorageFactory.Instance().getStorage("s3");
+        String pixelsFile = "/tmp/pixels-writer-example.pxl";
+        Storage storage = StorageFactory.Instance().getStorage(Storage.Scheme.file);
 
-        String schemaStr = "struct<a:int,b:float,c:double,d:timestamp,e:boolean,z:string>";
+        TypeDescription schema = TypeDescription.fromString(SCHEMA_STRING);
+        PixelsWriter writer = PixelsWriterImpl.newBuilder()
+                .setSchema(schema)
+                .setPixelStride(10000)
+                .setRowGroupSize(64 * 1024 * 1024)
+                .setStorage(storage)
+                .setPath(pixelsFile)
+                .setBlockSize(256 * 1024 * 1024)
+                .setReplication((short) 1)
+                .setBlockPadding(true)
+                .setEncodingLevel(EncodingLevel.EL2)
+                .setCompressionBlockSize(1)
+                .build();
 
-        try
+        VectorizedRowBatch rowBatch = schema.createRowBatch();
+        IntColumnVector id = (IntColumnVector) rowBatch.cols[0];
+        BinaryColumnVector name = (BinaryColumnVector) rowBatch.cols[1];
+
+        for (int i = 0; i < ROW_NUM; i++)
         {
-            TypeDescription schema = TypeDescription.fromString(schemaStr);
-            VectorizedRowBatch rowBatch = schema.createRowBatch();
-            IntColumnVector a = (IntColumnVector) rowBatch.cols[0];                // int
-            FloatColumnVector b = (FloatColumnVector) rowBatch.cols[1];          // float
-            DoubleColumnVector c = (DoubleColumnVector) rowBatch.cols[2];          // double
-            TimestampColumnVector d = (TimestampColumnVector) rowBatch.cols[3];    // timestamp
-            ByteColumnVector e = (ByteColumnVector) rowBatch.cols[4];              // boolean
-            BinaryColumnVector z = (BinaryColumnVector) rowBatch.cols[5];            // string
-
-            PixelsWriter pixelsWriter =
-                    PixelsWriterImpl.newBuilder()
-                            .setSchema(schema)
-                            .setPixelStride(10000)
-                            .setRowGroupSize(64 * 1024 * 1024)
-                            .setStorage(storage)
-                            .setPath(pixelsFile)
-                            .setBlockSize(256 * 1024 * 1024)
-                            .setReplication((short) 3)
-                            .setBlockPadding(true)
-                            .setEncodingLevel(EncodingLevel.EL2)
-                            .setCompressionBlockSize(1)
-                            .build();
-
-            long curT = System.currentTimeMillis();
-            Timestamp timestamp = new Timestamp(curT);
-            for (int i = 0; i < 1; i++)
+            int row = rowBatch.size++;
+            id.vector[row] = i;
+            id.isNull[row] = false;
+            name.setVal(row, ("row-" + i).getBytes());
+            name.isNull[row] = false;
+            if (rowBatch.size == rowBatch.getMaxSize())
             {
-                int row = rowBatch.size++;
-                a.vector[row] = i;
-                a.isNull[row] = false;
-                b.vector[row] = Float.floatToIntBits(i * 3.1415f);
-                b.isNull[row] = false;
-                c.vector[row] = Double.doubleToLongBits(i * 3.14159d);
-                c.isNull[row] = false;
-                d.set(row, timestamp);
-                d.isNull[row] = false;
-                e.vector[row] = (byte) (i > 25000 ? 1 : 0);
-                e.isNull[row] = false;
-                z.setVal(row, String.valueOf(i).getBytes());
-                z.isNull[row] = false;
-                if (rowBatch.size == rowBatch.getMaxSize())
-                {
-                    pixelsWriter.addRowBatch(rowBatch);
-                    rowBatch.reset();
-                }
-            }
-
-            if (rowBatch.size != 0)
-            {
-                pixelsWriter.addRowBatch(rowBatch);
-                System.out.println("A rowBatch of size " + rowBatch.size + " has been written to " + pixelsFile);
+                writer.addRowBatch(rowBatch);
                 rowBatch.reset();
             }
-
-            pixelsWriter.close();
-        } catch (IOException | PixelsWriterException e)
-        {
-            e.printStackTrace();
         }
+        if (rowBatch.size != 0)
+        {
+            writer.addRowBatch(rowBatch);
+            rowBatch.reset();
+        }
+        writer.close();
+        System.out.println("Written " + ROW_NUM + " rows to " + pixelsFile);
     }
 }

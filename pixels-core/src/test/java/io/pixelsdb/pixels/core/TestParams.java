@@ -21,19 +21,42 @@ package io.pixelsdb.pixels.core;
 
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 
-public class TestParams {
+/**
+ * Shared constants for pixels-core tests.
+ */
+public class TestParams
+{
+    /**
+     * Placeholder for manual/IT tests that need an external path.
+     */
     public static String filePath = "";
+
     public static int rowNum = 10;
 
-    public final static String schemaStr = "__table";
-    public final static long blockSize = 1024;
+    /**
+     * Shared compact schema for tests that need a multi-column TypeDescription.
+     */
+    public static final String SIMPLE_SCHEMA =
+            "struct<" +
+                    "a:int," +
+                    "b:float," +
+                    "c:double," +
+                    "d:timestamp," +
+                    "e:boolean," +
+                    "f:date," +
+                    "g:time," +
+                    "h:string," +
+                    "i:decimal(18,2)," +
+                    "j:decimal(38,10)" +
+                    ">";
+
+    public final static String schemaStr = SIMPLE_SCHEMA;
+
+    public final static long blockSize = 1024 * 1024;
     public final static int pixelStride = 16;
-
-    public final static int rowGroupSize = 16;
-
-    public final static short blockReplication = 4;
+    public final static int rowGroupSize = 64 * 1024;
+    public final static short blockReplication = 1;
     public final static boolean blockPadding = true;
     public final static EncodingLevel encodingLevel = EncodingLevel.EL0;
-
-    public final static int compressionBlockSize = 16;
+    public final static int compressionBlockSize = 1;
 }
