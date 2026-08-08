@@ -1680,8 +1680,8 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             case BYTE:
                 return new byte[]{((ByteColumnVector) col).vector[row]};
             case SHORT:
-                return ByteBuffer.allocate(Integer.BYTES)
-                        .putInt(((ShortColumnVector) col).vector[row]).array();
+                return ByteBuffer.allocate(Short.BYTES)
+                        .putShort(((ShortColumnVector) col).vector[row]).array();
             case INT:
                 return ByteBuffer.allocate(Integer.BYTES)
                         .putInt(((IntColumnVector) col).vector[row]).array();
@@ -1752,6 +1752,11 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                 return new byte[]{parsedByte};
             }
             case SHORT:
+            {
+                short shortValue = Short.parseShort(value);
+                bytes = ByteBuffer.allocate(Short.BYTES).putShort(shortValue).array();
+                break;
+            }
             case INT:
             {
                 int intValue = Integer.parseInt(value);

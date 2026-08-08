@@ -110,9 +110,9 @@ public class ShortColumnVector extends ColumnVector
         {
             return;
         }
-        if (value.length != Integer.BYTES)
+        if (value.length != Short.BYTES)
         {
-            throw new IllegalArgumentException("Only byte[4] supported for serialization to short");
+            throw new IllegalArgumentException("Only byte[2] supported for serialization to short");
         }
         short v = ByteBuffer.wrap(value).getShort();
         add(v);

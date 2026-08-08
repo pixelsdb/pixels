@@ -118,7 +118,7 @@ public class TestTypeDescription
         ShortColumnVector shortCol = new ShortColumnVector(1);
         shortCol.vector[0] = -1234;
         assertConvert(TypeDescription.createShort(), shortCol, 0, "-1234",
-                ByteBuffer.allocate(Integer.BYTES).putInt(-1234).array());
+                ByteBuffer.allocate(Short.BYTES).putShort((short) -1234).array());
 
         IntColumnVector intCol = new IntColumnVector(1);
         intCol.vector[0] = -1234;
