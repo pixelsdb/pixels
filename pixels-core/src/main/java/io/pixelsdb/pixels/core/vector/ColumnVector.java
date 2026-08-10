@@ -517,11 +517,7 @@ public abstract class ColumnVector implements AutoCloseable
     {
         if (value == null || value.length == 0)
         {
-            if(writeIndex >= getLength())
-            {
-                ensureSize(writeIndex * 2, true);
-            }
-            isNull[writeIndex++] = true;
+            addNull();
             return true;
         }
         return false;

@@ -222,6 +222,11 @@ public class BinaryColumnVector extends ColumnVector
     @Override
     public void add(byte[] v)
     {
+        if (v == null)
+        {
+            addNull();
+            return;
+        }
         if (writeIndex >= getLength())
         {
             ensureSize(writeIndex * 2, true);
@@ -232,6 +237,11 @@ public class BinaryColumnVector extends ColumnVector
     @Override
     public void add(String value)
     {
+        if (value == null)
+        {
+            addNull();
+            return;
+        }
         add(value.getBytes(StandardCharsets.UTF_8));
     }
 

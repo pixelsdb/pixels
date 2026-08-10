@@ -25,6 +25,26 @@ import org.junit.Test;
 public class TestBinaryColumnVector
 {
     @Test
+    public void testNullAndEmptyValuesAreDistinct()
+    {
+        BinaryColumnVector columnVector = new BinaryColumnVector(4);
+        columnVector.add((byte[]) null);
+        columnVector.add((String) null);
+        columnVector.add(new byte[0]);
+        columnVector.add("");
+
+        Assert.assertEquals(4, columnVector.getWriteIndex());
+        Assert.assertTrue(columnVector.isNull[0]);
+        Assert.assertTrue(columnVector.isNull[1]);
+        Assert.assertFalse(columnVector.isNull[2]);
+        Assert.assertFalse(columnVector.isNull[3]);
+        Assert.assertEquals(0, columnVector.lens[2]);
+        Assert.assertEquals(0, columnVector.lens[3]);
+        Assert.assertFalse(columnVector.noNulls);
+        columnVector.close();
+    }
+
+    @Test
     public void testSerialize()
     {
         VectorizedRowBatch vectorizedRowBatch = new VectorizedRowBatch(1, 10240);

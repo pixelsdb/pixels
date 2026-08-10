@@ -81,26 +81,15 @@ public class ByteColumnVector extends ColumnVector
         }
         if (value.length != Byte.BYTES)
         {
-            add(new String(value));
-        } else
-        {
-            add(value[0]);
+            throw new IllegalArgumentException("Only byte[1] supported for serialization to byte");
         }
+        add(value[0]);
     }
 
     @Override
     public void add(String value)
     {
-        assert value != null && value.length() > 0;
-        char c = value.charAt(0);
-        if (c == '0' || c == '1')
-        {
-            add(Byte.parseByte(value));
-        }
-        else
-        {
-            add(Boolean.parseBoolean(value));
-        }
+        add(Byte.parseByte(value));
     }
 
     @Override
