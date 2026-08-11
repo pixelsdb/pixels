@@ -680,10 +680,28 @@ public class RetinaResourceManager
             List<io.pixelsdb.pixels.common.metadata.domain.Path> orderedPaths = latestLayout.getOrderedPaths();
             List<io.pixelsdb.pixels.common.metadata.domain.Path> compactPaths = latestLayout.getCompactPaths();
 
-            // get schema
+            // Build the file schema in layout order while retaining a mapping from
+            // layout positions to the metadata order used by Retina RPC values.
             List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
-            List<String> columnNames = columns.stream().map(Column::getName).collect(Collectors.toList());
-            List<String> columnTypes = columns.stream().map(Column::getType).collect(Collectors.toList());
+            List<String> layoutColumnOrder = latestLayout.getOrdered().getColumnOrder();
+            List<String> metadataColumnNames = new ArrayList<>(columns.size());
+            for (Column column : columns)
+            {
+                metadataColumnNames.add(column.getName());
+            }
+            int[] orderMapping = new int[layoutColumnOrder.size()];
+            for (int i = 0; i < layoutColumnOrder.size(); ++i)
+            {
+                orderMapping[i] = metadataColumnNames.indexOf(layoutColumnOrder.get(i));
+            }
+            List<String> columnNames = new ArrayList<>(columns.size());
+            List<String> columnTypes = new ArrayList<>(columns.size());
+            for (int metadataColumnIndex : orderMapping)
+            {
+                Column column = columns.get(metadataColumnIndex);
+                columnNames.add(column.getName());
+                columnTypes.add(column.getType());
+            }
             TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
 
             String writeBufferKey = RetinaUtils.buildWriteBufferKey(schemaName, tableName);
@@ -693,7 +711,7 @@ public class RetinaResourceManager
             for (int i = 0; i < totalVirtualNodeNum; i++)
             {
                 PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(latestLayout.getTableId(),
-                        schema, orderedPaths.get(0), compactPaths.get(0), retinaHostName, i);
+                        schema, orderMapping, orderedPaths.get(0), compactPaths.get(0), retinaHostName, i);
                 nodeBuffers.put(i, pixelsWriteBuffer);
             }
         } catch (Exception e)

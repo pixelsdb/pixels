@@ -69,7 +69,14 @@ public class TestPixelsWriteBuffer
     {
         try
         {
-            buffer = new PixelsWriteBuffer(0L, schema, targetOrderDirPath, targetCompactDirPath, "localhost", 0);  // table id get from mysql `TBLS` table
+            int[] orderMapping = new int[schema.getChildren().size()];
+            for (int i = 0; i < orderMapping.length; ++i)
+            {
+                orderMapping[i] = i;
+            }
+            // table id get from mysql `TBLS` table
+            buffer = new PixelsWriteBuffer(0L, schema, orderMapping, targetOrderDirPath,
+                    targetCompactDirPath, "localhost", 0);
         } catch (Exception e)
         {
             System.out.println("setup error: " + e);
@@ -154,7 +161,9 @@ public class TestPixelsWriteBuffer
     {
         TypeDescription schema = TypeDescription.createSchemaFromStrings(
                 Arrays.asList("id"), Arrays.asList("int"));
-        return new MemTable(0L, schema, size, 100L, 0, size);
+        int[] orderMapping = new int[] {0};
+        return new MemTable(0L, schema, size, TypeDescription.VectorLayout.NONE,
+            orderMapping, 100L, 0, size);
     }
 
     private static byte[][] row(int value)
