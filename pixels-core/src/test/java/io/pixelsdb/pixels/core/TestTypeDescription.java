@@ -234,6 +234,19 @@ public class TestTypeDescription
         }
     }
 
+    private static void assertSqlConversionFails(TypeDescription type, String sql)
+    {
+        try
+        {
+            type.convertSqlStringToByte(sql);
+            fail("Expected SQL conversion failure for type " + type + " value: " + sql);
+        }
+        catch (IllegalArgumentException expected)
+        {
+            // expected, NumberFormatException from numeric parsers is a subclass of it
+        }
+    }
+
     private static void assertConvert(TypeDescription type, ColumnVector col, int row,
                                       String sqlValue, byte[] expected)
     {
