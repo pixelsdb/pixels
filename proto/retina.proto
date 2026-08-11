@@ -91,9 +91,12 @@ message DeleteData {
 // - `indexKeys[0]` must be the primary index key
 // - `indexKeys[1..n]` are the secondary index keys
 // - `colValues` are the column values of the inserted row, in the order defined by the table schema
+// - `isNull[i]` true means colValues[i] is SQL NULL. Empty/absent isNull means no NULLs.
+//   Empty colValues bytes are empty values (not NULL); numeric types still require valid encodings.
 message InsertData {
     repeated index.proto.IndexKey indexKeys = 1;
     repeated bytes colValues = 2;
+    repeated bool isNull = 3;
 }
 
 // UpdateData: describes the updated rows in a table
@@ -101,9 +104,11 @@ message InsertData {
 // - `indexKeys[0]` must be the primary index key
 // - `indexKeys[1..n]` are the secondary index keys
 // - `colValues` are the new column values of the updated row, in the order defined by the table schema
+// - `isNull`: same semantics as InsertData.isNull
 message UpdateData {
     repeated index.proto.IndexKey indexKeys = 1;
     repeated bytes colValues = 2;
+    repeated bool isNull = 3;
 }
 
 message TableUpdateData {

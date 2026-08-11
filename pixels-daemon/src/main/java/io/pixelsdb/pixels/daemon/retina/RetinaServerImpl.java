@@ -806,7 +806,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             String schemaName, String tableName, int virtualNodeId,
             List<T> subList,
             java.util.function.Function<T, List<IndexProto.IndexKey>> keyListExtractor,
-            java.util.function.Function<T, List<ByteString>> colValuesExtractor,
+            java.util.function.Function<T, byte[][]> valuesExtractor,
             long primaryIndexId, long timestamp, IndexOption option) throws Exception
     {
         List<IndexProto.PrimaryIndexEntry> primaryEntries = new ArrayList<>(subList.size());
@@ -817,8 +817,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
         {
             for (T data : subList)
             {
-                byte[][] values = colValuesExtractor.apply(data).stream()
-                        .map(ByteString::toByteArray).toArray(byte[][]::new);
+                byte[][] values = valuesExtractor.apply(data);
                 IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(
                         schemaName, tableName, values, timestamp, virtualNodeId);
                 builder.setIndexKey(keyListExtractor.apply(data).get(0));
@@ -861,7 +860,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             int bucketId,
             List<T> subList,
             java.util.function.Function<T, List<IndexProto.IndexKey>> keyListExtractor,
-            java.util.function.Function<T, List<ByteString>> colValuesExtractor,
+            java.util.function.Function<T, byte[][]> valuesExtractor,
             long primaryIndexId, long timestamp, IndexOption option) throws Exception
     {
         List<IndexProto.PrimaryIndexEntry> primaryEntries = new ArrayList<>(subList.size());
@@ -901,8 +900,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
 
                 for (T data : subList)
                 {
-                    byte[][] values = colValuesExtractor.apply(data).stream()
-                            .map(ByteString::toByteArray).toArray(byte[][]::new);
+                    byte[][] values = valuesExtractor.apply(data);
                     IndexProto.PrimaryIndexEntry.Builder builder = retinaResourceManager.insertRecord(
                             schemaName, tableName, values, timestamp, virtualNodeId);
                     builder.setIndexKey(keyListExtractor.apply(data).get(0));
@@ -992,7 +990,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 executeParallelByBucket(insertDataList, d -> d.getIndexKeys(0), (bucketId, subList, option) ->
                         executeStagedInsertPhase(schemaName, tableName, virtualNodeId, subList,
                                 RetinaProto.InsertData::getIndexKeysList,
-                                RetinaProto.InsertData::getColValuesList,
+                                d -> toColumnValues(d.getColValuesList(), d.getIsNullList()),
                                 primaryIndexId, timestamp, option));
             }
             // =================================================================
@@ -1009,10 +1007,31 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
                 executeParallelByBucket(updateDataList, d -> d.getIndexKeys(0), (bucketId, subList, option) ->
                         executeStagedUpdatePhase(schemaName, tableName, virtualNodeId, bucketId, subList,
                                 RetinaProto.UpdateData::getIndexKeysList,
-                                RetinaProto.UpdateData::getColValuesList,
+                                d -> toColumnValues(d.getColValuesList(), d.getIsNullList()),
                                 primaryIndexId, timestamp, option));
             }
         }
+    }
+
+    /**
+     * Map wire colValues + isNull into Java byte[][] where SQL NULL is {@code null}.
+     * Empty/absent isNull means no NULLs. Empty bytes are empty values, not NULL.
+     */
+    static byte[][] toColumnValues(List<ByteString> colValues, List<Boolean> isNull)
+    {
+        byte[][] values = new byte[colValues.size()][];
+        for (int i = 0; i < colValues.size(); i++)
+        {
+            if (i < isNull.size() && Boolean.TRUE.equals(isNull.get(i)))
+            {
+                values[i] = null;
+            }
+            else
+            {
+                values[i] = colValues.get(i).toByteArray();
+            }
+        }
+        return values;
     }
 
     /**

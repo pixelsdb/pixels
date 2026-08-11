@@ -507,7 +507,8 @@ public abstract class ColumnVector implements AutoCloseable
     }
 
     /**
-     * Check if the given byte array is null.
+     * Check if the given byte array is SQL NULL ({@code null} reference).
+     * Empty arrays are values (or type-specific decode errors), not NULL.
      * If null, mark the current write index as null and ensure enough capacity.
      *
      * @param value the byte array to check
@@ -515,7 +516,7 @@ public abstract class ColumnVector implements AutoCloseable
      */
     protected boolean checkBytesNull(byte[] value)
     {
-        if (value == null || value.length == 0)
+        if (value == null)
         {
             addNull();
             return true;

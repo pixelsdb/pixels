@@ -51,14 +51,22 @@ public class TestByteColumnVector
         ByteColumnVector vector = new ByteColumnVector(4);
         vector.add(new byte[]{42});
         vector.add((byte[]) null);
-        vector.add(new byte[0]);
 
-        assertEquals(3, vector.getWriteIndex());
+        assertEquals(2, vector.getWriteIndex());
         assertEquals(42, vector.vector[0]);
         assertFalse(vector.isNull[0]);
         assertTrue(vector.isNull[1]);
-        assertTrue(vector.isNull[2]);
         assertFalse(vector.noNulls);
+
+        try
+        {
+            vector.add(new byte[0]);
+            throw new AssertionError("empty byte[] must not be treated as NULL");
+        }
+        catch (IllegalArgumentException expected)
+        {
+            // empty payload is invalid for BYTE, not SQL NULL
+        }
         vector.close();
     }
 }

@@ -68,7 +68,14 @@ public class MemTable implements Referenceable
         }
         for (int i = 0; i < values.length; ++i)
         {
-            this.rowBatch.cols[i].add(values[i]);
+            if (values[i] == null)
+            {
+                this.rowBatch.cols[i].addNull();
+            }
+            else
+            {
+                this.rowBatch.cols[i].add(values[i]);
+            }
         }
         this.rowBatch.cols[schema.getChildren().size()].add(timestamp);
         return this.rowBatch.size++;
