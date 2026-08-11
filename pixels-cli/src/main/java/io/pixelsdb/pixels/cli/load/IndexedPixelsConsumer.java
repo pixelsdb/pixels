@@ -39,6 +39,7 @@
  import io.pixelsdb.pixels.common.utils.RetinaUtils;
  import io.pixelsdb.pixels.core.PixelsWriter;
  import io.pixelsdb.pixels.core.TypeDescription;
+ import io.pixelsdb.pixels.core.utils.PrimaryKeyBytes;
  import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
  import io.pixelsdb.pixels.daemon.NodeProto;
  import io.pixelsdb.pixels.index.IndexProto;
@@ -47,7 +48,6 @@
  import java.io.DataInputStream;
  import java.io.IOException;
  import java.io.InputStreamReader;
- import java.nio.ByteBuffer;
  import java.util.ArrayList;
  import java.util.List;
  import java.util.Map;
@@ -218,9 +218,7 @@
              throw new IllegalArgumentException("Primary key mapping does not match primary key schema.");
          }
 
-         List<byte[]> pkBytes = new ArrayList<>(pkMapping.length);
-         int indexKeySize = 0;
-
+         String[] pkValues = new String[pkMapping.length];
          for (int i = 0; i < pkMapping.length; i++)
          {
              int pkColumnId = pkMapping[i];
@@ -233,30 +231,14 @@
 
              String rawValue = colsInLine[pkColumnId];
              // Align with LOAD dialect: \N -> NULL (forbidden for PK).
-             // Empty field for text/binary PK -> empty key bytes via convertSqlStringToByte;
-             // empty field for numeric/temporal PK -> null -> rejected below.
              if (rawValue != null && rawValue.equalsIgnoreCase("\\N"))
              {
                  throw new IllegalArgumentException("Primary key column '" + pkName +
                          "' at ordinal " + i + " cannot be NULL.");
              }
-
-             byte[] bytes = pkTypes.get(i).convertSqlStringToByte(rawValue);
-             if (bytes == null)
-             {
-                 throw new IllegalArgumentException("Primary key column '" + pkName +
-                         "' at ordinal " + i + " cannot be NULL.");
-             }
-             pkBytes.add(bytes);
-             indexKeySize += bytes.length;
+             pkValues[i] = rawValue;
          }
-
-         ByteBuffer indexKeyBuffer = ByteBuffer.allocate(indexKeySize);
-         for (byte[] pkByte : pkBytes)
-         {
-             indexKeyBuffer.put(pkByte);
-         }
-         return ByteString.copyFrom((ByteBuffer) indexKeyBuffer.rewind());
+         return ByteString.copyFrom(PrimaryKeyBytes.fromSqlStrings(pkTypes, pkValues));
      }
 
      private void updateIndexEntry(PerVirtualNodeWriter bucketWriter, ByteString pkByteString, int indexBucketId) throws IndexException
