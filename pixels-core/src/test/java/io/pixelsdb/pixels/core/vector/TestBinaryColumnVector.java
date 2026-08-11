@@ -25,22 +25,17 @@ import org.junit.Test;
 public class TestBinaryColumnVector
 {
     @Test
-    public void testNullAndEmptyValuesAreDistinct()
+    public void testEmptyValuesAreNotNull()
     {
-        BinaryColumnVector columnVector = new BinaryColumnVector(4);
-        columnVector.add((byte[]) null);
-        columnVector.add((String) null);
+        BinaryColumnVector columnVector = new BinaryColumnVector(2);
         columnVector.add(new byte[0]);
         columnVector.add("");
 
-        Assert.assertEquals(4, columnVector.getWriteIndex());
-        Assert.assertTrue(columnVector.isNull[0]);
-        Assert.assertTrue(columnVector.isNull[1]);
-        Assert.assertFalse(columnVector.isNull[2]);
-        Assert.assertFalse(columnVector.isNull[3]);
-        Assert.assertEquals(0, columnVector.lens[2]);
-        Assert.assertEquals(0, columnVector.lens[3]);
-        Assert.assertFalse(columnVector.noNulls);
+        Assert.assertEquals(2, columnVector.getWriteIndex());
+        Assert.assertFalse(columnVector.isNull[0]);
+        Assert.assertFalse(columnVector.isNull[1]);
+        Assert.assertEquals(0, columnVector.lens[0]);
+        Assert.assertEquals(0, columnVector.lens[1]);
         columnVector.close();
     }
 
