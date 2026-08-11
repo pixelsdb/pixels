@@ -32,8 +32,9 @@ import static java.util.Objects.requireNonNull;
 /**
  * ByteColumnVector
  * <p>
- *     This class represents a nullable byte column vector.
- *     It can be used for operations on all boolean/byte types
+ *     This class represents a nullable byte column vector for tinyint/byte values.
+ *     Boolean columns use {@link BooleanColumnVector}, which extends this class and
+ *     reuses the same {@code byte[]} storage with boolean string semantics.
  * </p>
  *
  * @author guodong

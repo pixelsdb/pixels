@@ -1229,6 +1229,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         switch (category)
         {
             case BOOLEAN:
+                return new BooleanColumnVector(maxSize);
             case BYTE:
                 return new ByteColumnVector(maxSize);
             case SHORT:

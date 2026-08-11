@@ -35,10 +35,16 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.daemon.NodeProto;
 import net.sourceforge.argparse4j.inf.Namespace;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author hank
@@ -67,27 +73,26 @@ public class LoadExecutor implements CommandExecutor
         }
 
         TransService transService = TransService.Instance();
-        TransContext context;
-        context = transService.beginTrans(false);
-
-        Storage storage = StorageFactory.Instance().getStorage(origin);
+        TransContext context = transService.beginTrans(false);
         MetadataService metadataService = MetadataService.Instance();
-
-        Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex,
-                encodingLevel, nullsPadding, metadataService, context.getTransId(), context.getTimestamp());
-
-        // source already exist, producer option is false, add list of source to the queue
-        List<String> fileList = storage.listPaths(origin);
-        BlockingQueue<String> inputFiles = new LinkedBlockingQueue<>(fileList.size());
         ConcurrentLinkedQueue<LoadedInfo> loadedInfos = new ConcurrentLinkedQueue<>();
-        for (String filePath : fileList)
-        {
-            inputFiles.add(storage.ensureSchemePrefix(filePath));
-        }
-
         long startTime = System.currentTimeMillis();
-        if (startConsumers(threadNum, inputFiles, parameters, loadedInfos))
+        try
         {
+            Storage storage = StorageFactory.Instance().getStorage(origin);
+            Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex,
+                    encodingLevel, nullsPadding, metadataService, context.getTransId(), context.getTimestamp());
+
+            // source already exist, producer option is false, add list of source to the queue
+            List<String> fileList = storage.listPaths(origin);
+            BlockingQueue<String> inputFiles = new LinkedBlockingQueue<>(fileList.size());
+            for (String filePath : fileList)
+            {
+                inputFiles.add(storage.ensureSchemePrefix(filePath));
+            }
+
+            startConsumers(threadNum, inputFiles, parameters, loadedInfos);
+
             int retinaServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
             for(LoadedInfo loadedInfo : loadedInfos)
             {
@@ -121,17 +126,48 @@ public class LoadExecutor implements CommandExecutor
                     System.out.println("add visibility for ordered file '" + file + "' failed");
                 }
             }
+
+            transService.commitTrans(context.getTransId(), false);
             System.out.println(command + " is successful");
-        } else
+        } catch (Exception failure)
         {
             System.err.println(command + " failed");
+            List<Long> fileIds = new ArrayList<>();
+            for (LoadedInfo loadedInfo : loadedInfos)
+            {
+                if (loadedInfo.loadedFile != null)
+                {
+                    fileIds.add(loadedInfo.loadedFile.getId());
+                }
+            }
+            if (!fileIds.isEmpty())
+            {
+                try
+                {
+                    if (!metadataService.deleteFiles(fileIds))
+                    {
+                        failure.addSuppressed(new MetadataException(
+                                "failed to delete unpublished load files " + fileIds));
+                    }
+                } catch (Exception cleanupFailure)
+                {
+                    failure.addSuppressed(cleanupFailure);
+                }
+            }
+            try
+            {
+                transService.rollbackTrans(context.getTransId(), false);
+            } catch (Exception rollbackFailure)
+            {
+                failure.addSuppressed(rollbackFailure);
+            }
+            throw failure;
+        } finally
+        {
+            long endTime = System.currentTimeMillis();
+            System.out.println("Text files in '" + origin + "' are loaded by " + threadNum +
+                        " threads in " + (endTime - startTime) / 1000.0 + "s.");
         }
-
-        transService.commitTrans(context.getTransId(), false);
-
-        long endTime = System.currentTimeMillis();
-        System.out.println("Text files in '" + origin + "' are loaded by " + threadNum +
-                " threads in " + (endTime - startTime) / 1000.0 + "s.");
     }
 
     /**
@@ -140,65 +176,53 @@ public class LoadExecutor implements CommandExecutor
      * @param inputFiles the queue of the paths of input files
      * @param parameters the parameters for data loading, e.g., the schema name and table name
      * @param loadedInfos the information of the loaded pixels files
-     * @return true if consumers complete successfully
+     * @throws Exception if parameters cannot be initialized or a consumer fails
      */
-    private boolean startConsumers(int concurrency, BlockingQueue<String> inputFiles, Parameters parameters,
-                                   ConcurrentLinkedQueue<LoadedInfo> loadedInfos)
+    private void startConsumers(int concurrency, BlockingQueue<String> inputFiles, Parameters parameters,
+                                ConcurrentLinkedQueue<LoadedInfo> loadedInfos) throws Exception
     {
-        boolean success = false;
-        try
+        if (!parameters.initExtra())
         {
-            // initialize the extra parameters for data loading
-            success = parameters.initExtra();
-        } catch (MetadataException | InterruptedException e)
-        {
-            e.printStackTrace();
+            throw new IllegalStateException("Parameters initialization error.");
         }
 
-        boolean res = false;
-        if (success)
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+        List<Future<?>> futures = new ArrayList<>(concurrency);
+        try
         {
-            Consumer[] consumers = new Consumer[concurrency];
-            try
+            for (int i = 0; i < concurrency; i++)
             {
-                for (int i = 0; i < concurrency; i++)
+                Consumer consumer;
+                if (parameters.getIndex() == null)
                 {
-                    AbstractPixelsConsumer pixelsConsumer;
-                    if(parameters.getIndex() == null)
-                    {
-                        pixelsConsumer = new SimplePixelsConsumer(inputFiles, parameters, loadedInfos);
-                    } else
-                    {
-                        pixelsConsumer = new IndexedPixelsConsumer(inputFiles, parameters, loadedInfos);
-                    }
-                    consumers[i] = pixelsConsumer;
-                    pixelsConsumer.start();
+                    consumer = new SimplePixelsConsumer(inputFiles, parameters, loadedInfos);
+                } else
+                {
+                    consumer = new IndexedPixelsConsumer(inputFiles, parameters, loadedInfos);
                 }
-                for (Consumer c : consumers)
-                {
-                    try
-                    {
-                        c.join();
-                    } catch (InterruptedException e)
-                    {
-                        throw new Exception("Consumer InterruptedException, " + e.getMessage());
-                    }
-                }
-                res = true;
-            } catch (Exception e)
-            {
-                try
-                {
-                    throw new Exception("Consumer Error, " + e.getMessage());
-                } catch (Exception e1)
-                {
-                    e1.printStackTrace();
-                }
+                futures.add(executor.submit(consumer));
             }
-        } else
+
+            for (Future<?> future : futures)
+            {
+                future.get();
+            }
+        } catch (ExecutionException e)
         {
-            System.err.println("Parameters initialization error.");
+            Throwable cause = e.getCause() == null ? e : e.getCause();
+            throw new Exception(cause.getClass().getSimpleName() +
+                    (cause.getMessage() == null ? " failed" : " failed: " + cause.getMessage()), cause);
+        } catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+            throw new Exception("Interrupted while waiting for consumers.", e);
+        } finally
+        {
+            executor.shutdownNow();
+            if (!executor.awaitTermination(60, TimeUnit.SECONDS))
+            {
+                System.err.println("Timed out waiting for consumer threads to terminate.");
+            }
         }
-        return res;
     }
 }
