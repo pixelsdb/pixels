@@ -24,7 +24,9 @@ import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.cli.Main;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
+import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
+import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -72,17 +74,33 @@ public class StatExecutor implements CommandExecutor
                 {
                     String[] orderedPaths = layout.getOrderedPathUris();
                     Main.validateOrderedOrCompactPaths(orderedPaths);
-                    Storage storage = StorageFactory.Instance().getStorage(orderedPaths[0]);
-                    files.addAll(storage.listPaths(orderedPaths));
+                    for (Path path : layout.getOrderedPaths())
+                    {
+                        for (File file : metadataService.getRegularFiles(path.getId()))
+                        {
+                            files.add(File.getFilePath(path, file));
+                        }
+                    }
                 }
                 if (compactEnabled)
                 {
                     String[] compactPaths = layout.getCompactPathUris();
                     Main.validateOrderedOrCompactPaths(compactPaths);
-                    Storage storage = StorageFactory.Instance().getStorage(compactPaths[0]);
-                    files.addAll(storage.listPaths(compactPaths));
+                    for (Path path : layout.getCompactPaths())
+                    {
+                        for (File file : metadataService.getRegularFiles(path.getId()))
+                        {
+                            files.add(File.getFilePath(path, file));
+                        }
+                    }
                 }
             }
+        }
+
+        if (files.isEmpty())
+        {
+            System.out.println("No regular files found; statistics were not updated.");
+            return;
         }
 
         // get the statistics.
