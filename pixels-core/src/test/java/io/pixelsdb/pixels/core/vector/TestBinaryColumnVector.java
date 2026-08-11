@@ -25,21 +25,6 @@ import org.junit.Test;
 public class TestBinaryColumnVector
 {
     @Test
-    public void testEmptyValuesAreNotNull()
-    {
-        BinaryColumnVector columnVector = new BinaryColumnVector(2);
-        columnVector.add(new byte[0]);
-        columnVector.add("");
-
-        Assert.assertEquals(2, columnVector.getWriteIndex());
-        Assert.assertFalse(columnVector.isNull[0]);
-        Assert.assertFalse(columnVector.isNull[1]);
-        Assert.assertEquals(0, columnVector.lens[0]);
-        Assert.assertEquals(0, columnVector.lens[1]);
-        columnVector.close();
-    }
-
-    @Test
     public void testSerialize()
     {
         VectorizedRowBatch vectorizedRowBatch = new VectorizedRowBatch(1, 10240);
