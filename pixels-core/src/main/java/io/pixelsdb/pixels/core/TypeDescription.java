@@ -1236,19 +1236,13 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                 {
                     return new LongColumnVector(maxSize);
                 }
-                else
-                {
-                    return new ShortColumnVector(maxSize);
-                }
+                return new ShortColumnVector(maxSize);
             case INT:
                 if (VectorLayout.match(vectorLayout, VectorLayout.INT_AS_LONG))
                 {
                     return new LongColumnVector(maxSize);
                 }
-                else
-                {
-                    return new IntColumnVector(maxSize);
-                }
+                return new IntColumnVector(maxSize);
             case LONG:
                 return new LongColumnVector(maxSize);
             case DATE:
