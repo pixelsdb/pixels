@@ -1249,6 +1249,10 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
             case DATE:
                 return new DateColumnVector(maxSize);
             case TIME:
+                if (VectorLayout.match(vectorLayout, VectorLayout.TIME_AS_PICO_LONG))
+                {
+                    return new LongColumnVector(maxSize);
+                }
                 return new TimeColumnVector(maxSize, precision);
             case TIMESTAMP:
                 return new TimestampColumnVector(maxSize, precision);
@@ -1414,6 +1418,10 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
          * instead of {@link io.pixelsdb.pixels.core.vector.IntColumnVector}.
          */
         public static final int INT_AS_LONG = 0x02;
+        /**
+         * Create {@link io.pixelsdb.pixels.core.vector.LongColumnVector} containing picoseconds for TIME type.
+         */
+        public static final int TIME_AS_PICO_LONG = 0x04;
 
         public static boolean match(int layout1, int layout2)
         {

@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.core.utils.BitUtils;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.ByteBufferInputStream;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 
 import java.io.IOException;
@@ -33,6 +34,8 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOSECONDS_PER_MILLISECOND;
 
 /**
  * Pixels time column reader.
@@ -84,7 +87,8 @@ public class TimeColumnReader extends ColumnReader
      * @param size     number of values to read
      * @param pixelStride the stride (number of rows) in a pixels.
      * @param vectorIndex the index from where we start reading values into the vector
-     * @param vector   vector to read values into
+     * @param vector   vector to read values into, it is a {@link LongColumnVector} of picoseconds of day
+     *                 if the read option requires the time column to be read as a long vector
      * @param chunkIndex the metadata of the column chunk to read.
      * @throws IOException
      */
@@ -93,7 +97,9 @@ public class TimeColumnReader extends ColumnReader
                      int offset, int size, int pixelStride, final int vectorIndex,
                      ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex) throws IOException
     {
-        TimeColumnVector columnVector = (TimeColumnVector) vector;
+        // longColumnVector is not null if the time values are to be stored as picoseconds of day.
+        LongColumnVector longColumnVector = vector instanceof LongColumnVector ? (LongColumnVector) vector : null;
+        TimeColumnVector timeColumnVector = longColumnVector == null ? (TimeColumnVector) vector : null;
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
         boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
@@ -135,24 +141,37 @@ public class TimeColumnReader extends ColumnReader
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
             if (hasNull)
             {
-                BitUtils.bitWiseDeCompact(columnVector.isNull, i, numToRead,
+                BitUtils.bitWiseDeCompact(vector.isNull, i, numToRead,
                         inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
                 isNullSkipBits = endOfPixels ? 0 : (numToRead + isNullSkipBits) % 8;
-                columnVector.noNulls = false;
+                vector.noNulls = false;
             }
             else
             {
-                Arrays.fill(columnVector.isNull, i, i + numToRead, false);
+                Arrays.fill(vector.isNull, i, i + numToRead, false);
             }
             // read content
             if (decoding)
             {
                 for (int j = i; j < i + numToRead; ++j)
                 {
-                    if (!(hasNull && columnVector.isNull[j]))
+                    if (!(hasNull && vector.isNull[j]))
                     {
-                        columnVector.set(j, (int) decoder.next());
+                        int millis = (int) decoder.next();
+                        if (longColumnVector != null)
+                        {
+                            longColumnVector.vector[j] = millis * PICOSECONDS_PER_MILLISECOND;
+                            longColumnVector.isNull[j] = false;
+                            if (j >= longColumnVector.getWriteIndex())
+                            {
+                                longColumnVector.setWriteIndex(j + 1);
+                            }
+                        }
+                        else
+                        {
+                            timeColumnVector.set(j, millis);
+                        }
                     }
                 }
             }
@@ -163,17 +182,38 @@ public class TimeColumnReader extends ColumnReader
                     for (int j = i; j < i + numToRead; ++j)
                     {
                         // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
-                        columnVector.times[j] = inputBuffer.getInt();
+                        int millis = inputBuffer.getInt();
+                        if (longColumnVector != null)
+                        {
+                            longColumnVector.vector[j] = millis * PICOSECONDS_PER_MILLISECOND;
+                        }
+                        else
+                        {
+                            timeColumnVector.times[j] = millis;
+                        }
                     }
                 }
                 else
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        if (!(hasNull && columnVector.isNull[j]))
+                        if (!(hasNull && vector.isNull[j]))
                         {
                             // If time column is not encoded, it is written as integers instead of longs.
-                            columnVector.set(j, inputBuffer.getInt());
+                            int millis = inputBuffer.getInt();
+                            if (longColumnVector != null)
+                            {
+                                longColumnVector.vector[j] = millis * PICOSECONDS_PER_MILLISECOND;
+                                longColumnVector.isNull[j] = false;
+                                if (j >= longColumnVector.getWriteIndex())
+                                {
+                                    longColumnVector.setWriteIndex(j + 1);
+                                }
+                            }
+                            else
+                            {
+                                timeColumnVector.set(j, millis);
+                            }
                         }
                     }
                 }
@@ -194,7 +234,8 @@ public class TimeColumnReader extends ColumnReader
      * @param size     number of values to read
      * @param pixelStride the stride (number of rows) in a pixels.
      * @param vectorIndex the index from where we start reading values into the vector
-     * @param vector   vector to read values into
+     * @param vector   vector to read values into, it is a {@link LongColumnVector} of picoseconds of day
+     *                 if the read option requires the time column to be read as a long vector
      * @param chunkIndex the metadata of the column chunk to read.
      * @param selected whether the value is selected, use the vectorIndex as the 0 offset of the selected
      * @throws IOException
@@ -204,7 +245,9 @@ public class TimeColumnReader extends ColumnReader
                              int offset, int size, int pixelStride, final int vectorIndex,
                              ColumnVector vector, PixelsProto.ColumnChunkIndex chunkIndex, Bitmap selected) throws IOException
     {
-        TimeColumnVector columnVector = (TimeColumnVector) vector;
+        // longColumnVector is not null if the time values are to be stored as picoseconds of day.
+        LongColumnVector longColumnVector = vector instanceof LongColumnVector ? (LongColumnVector) vector : null;
+        TimeColumnVector timeColumnVector = longColumnVector == null ? (TimeColumnVector) vector : null;
         boolean nullsPadding = chunkIndex.hasNullsPadding() && chunkIndex.getNullsPadding();
         boolean decoding = encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH);
         boolean littleEndian = chunkIndex.hasLittleEndian() && chunkIndex.getLittleEndian();
@@ -227,7 +270,7 @@ public class TimeColumnReader extends ColumnReader
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
         boolean[] isNull = null;
-        boolean endOfPixel;
+        boolean endOfPixels;
         if (decoding || !nullsPadding)
         {
             isNull = new boolean[size];
@@ -238,14 +281,14 @@ public class TimeColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-                endOfPixel = true;
+                endOfPixels = true;
             }
             else
             {
                 numToRead = numLeft;
-                endOfPixel = false;
+                endOfPixels = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixels ? 7 : 0)) / 8;
 
             // read isNull
             int pixelId = elementIndex / pixelStride;
@@ -255,7 +298,7 @@ public class TimeColumnReader extends ColumnReader
                 if (!decoding && nullsPadding)
                 {
                     // read isNull directly into the vector of the column chunk
-                    BitUtils.bitWiseDeCompact(columnVector.isNull, vectorWriteIndex, numToRead, inputBuffer,
+                    BitUtils.bitWiseDeCompact(vector.isNull, vectorWriteIndex, numToRead, inputBuffer,
                             isNullOffset, isNullSkipBits, littleEndian, selected, i - vectorIndex);
                 }
                 else
@@ -263,19 +306,19 @@ public class TimeColumnReader extends ColumnReader
                     // need to keep isNull for later use
                     BitUtils.bitWiseDeCompact(isNull, i - vectorIndex, numToRead, inputBuffer,
                             isNullOffset, isNullSkipBits, littleEndian);
-                    // update columnVector.isNull
+                    // update vector.isNull
                     int k = vectorWriteIndex;
                     for (int j = i; j < i + numToRead; ++j)
                     {
                         if (selected.get(j - vectorIndex))
                         {
-                            columnVector.isNull[k++] = isNull[j - vectorIndex];
+                            vector.isNull[k++] = isNull[j - vectorIndex];
                         }
                     }
                 }
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
-                columnVector.noNulls = false;
+                isNullSkipBits = endOfPixels ? 0 : (numToRead + isNullSkipBits) % 8;
+                vector.noNulls = false;
             }
             else
             {
@@ -283,7 +326,7 @@ public class TimeColumnReader extends ColumnReader
                 {
                     Arrays.fill(isNull, i - vectorIndex, i - vectorIndex + numToRead, false);
                 }
-                // update columnVector.isNull later to avoid bitmap unnecessary traversal
+                // update vector.isNull later to avoid bitmap unnecessary traversal
             }
 
             // read content
@@ -294,10 +337,23 @@ public class TimeColumnReader extends ColumnReader
                 {
                     if (!(hasNull && isNull[j - vectorIndex]))
                     {
-                        int value = (int) decoder.next();
+                        int millis = (int) decoder.next();
                         if (selected.get(j - vectorIndex))
                         {
-                            columnVector.set(vectorWriteIndex++, value);
+                            if (longColumnVector != null)
+                            {
+                                longColumnVector.vector[vectorWriteIndex] = millis * PICOSECONDS_PER_MILLISECOND;
+                                longColumnVector.isNull[vectorWriteIndex] = false;
+                                if (vectorWriteIndex >= longColumnVector.getWriteIndex())
+                                {
+                                    longColumnVector.setWriteIndex(vectorWriteIndex + 1);
+                                }
+                                vectorWriteIndex++;
+                            }
+                            else
+                            {
+                                timeColumnVector.set(vectorWriteIndex++, millis);
+                            }
                         }
                     }
                     else if (selected.get(j - vectorIndex))
@@ -312,11 +368,18 @@ public class TimeColumnReader extends ColumnReader
                 {
                     for (int j = i; j < i + numToRead; ++j)
                     {
-                        int value = inputBuffer.getInt();
+                        int millis = inputBuffer.getInt();
                         if (selected.get(j - vectorIndex))
                         {
                             // Issue #791: do not call the set() method, as it may clear the isNull flag of null values.
-                            columnVector.times[vectorWriteIndex++] = value;
+                            if (longColumnVector != null)
+                            {
+                                longColumnVector.vector[vectorWriteIndex++] = millis * PICOSECONDS_PER_MILLISECOND;
+                            }
+                            else
+                            {
+                                timeColumnVector.times[vectorWriteIndex++] = millis;
+                            }
                         }
                     }
                 }
@@ -326,11 +389,24 @@ public class TimeColumnReader extends ColumnReader
                     {
                         if (!(hasNull && isNull[j - vectorIndex]))
                         {
-                            int value = inputBuffer.getInt();
+                            // If time column is not encoded, it is written as integers instead of longs.
+                            int millis = inputBuffer.getInt();
                             if (selected.get(j - vectorIndex))
                             {
-                                // If time column is not encoded, it is written as integers instead of longs.
-                                columnVector.set(vectorWriteIndex++, value);
+                                if (longColumnVector != null)
+                                {
+                                    longColumnVector.vector[vectorWriteIndex] = millis * PICOSECONDS_PER_MILLISECOND;
+                                    longColumnVector.isNull[vectorWriteIndex] = false;
+                                    if (vectorWriteIndex >= longColumnVector.getWriteIndex())
+                                    {
+                                        longColumnVector.setWriteIndex(vectorWriteIndex + 1);
+                                    }
+                                    vectorWriteIndex++;
+                                }
+                                else
+                                {
+                                    timeColumnVector.set(vectorWriteIndex++, millis);
+                                }
                             }
                         }
                         else if (selected.get(j - vectorIndex))
@@ -341,10 +417,10 @@ public class TimeColumnReader extends ColumnReader
                 }
             }
 
-            // update columnVector.isNull if has no nulls
+            // update vector.isNull if has no nulls
             if (!hasNull)
             {
-                Arrays.fill(columnVector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
+                Arrays.fill(vector.isNull, originalVectorWriteIndex, vectorWriteIndex, false);
             }
 
             // update variables

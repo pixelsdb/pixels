@@ -118,7 +118,8 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
 
         this.option = option;
         this.vectorLayout = (option.isReadIntColumnAsLongVector() ? TypeDescription.VectorLayout.INT_AS_LONG : 0) |
-                (option.isReadShortColumnAsLongVector() ? TypeDescription.VectorLayout.SHORT_AS_LONG : 0);
+                (option.isReadShortColumnAsLongVector() ? TypeDescription.VectorLayout.SHORT_AS_LONG : 0) |
+                (option.isReadTimeColumnAsLongVector() ? TypeDescription.VectorLayout.TIME_AS_PICO_LONG : 0);
         this.activeMemtableData = activeMemtableData;
         this.fileIds = fileIds;
         this.storage = storage;
@@ -171,7 +172,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
                 {
                     memoryUsage.addAndGet(activeMemtableData.length);
                     ByteBuffer buffer = ByteBuffer.wrap(activeMemtableData);
-                    VectorizedRowBatch batch = VectorizedRowBatch.deserialize(buffer);
+                    VectorizedRowBatch batch = VectorizedRowBatch.deserialize(buffer, vectorLayout);
                     memoryUsage.addAndGet(batch.getMemoryUsage());
                     prefetchQueue.put(batch);
                 } catch (Exception e)
@@ -219,7 +220,7 @@ public class PixelsRecordReaderBufferImpl implements PixelsRecordReader
                         buffer = getMemtableDataFromStorage(path);
 
                         // CPU Intensive Operation
-                        VectorizedRowBatch batch = VectorizedRowBatch.deserialize(buffer);
+                        VectorizedRowBatch batch = VectorizedRowBatch.deserialize(buffer, vectorLayout);
                         memoryUsage.addAndGet(batch.getMemoryUsage());
                         // Put result into the queue (blocks if queue is full)
                         prefetchQueue.put(batch);

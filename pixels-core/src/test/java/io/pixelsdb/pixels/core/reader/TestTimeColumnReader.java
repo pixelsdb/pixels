@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.Bitmap;
+import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.TimeColumnVector;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
 import io.pixelsdb.pixels.core.writer.TimeColumnWriter;
@@ -31,6 +32,11 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOSECONDS_PER_MILLISECOND;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author hank
@@ -215,6 +221,95 @@ public class TestTimeColumnReader
                 j++;
             }
         }
+    }
+
+    @Test
+    public void testLongVectorPicoseconds() throws IOException
+    {
+        int pixelStride = 4;
+        int[] millis = {0, 1, 3_723_004, 86_399_999};
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(pixelStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL2).nullsPadding(false);
+        TimeColumnWriter columnWriter = new TimeColumnWriter(
+                TypeDescription.createTime(3), writerOption);
+        TimeColumnVector source = new TimeColumnVector(millis.length + 1, 3);
+        for (int value : millis)
+        {
+            source.add(value);
+        }
+        source.addNull();
+        columnWriter.write(source, millis.length + 1);
+        columnWriter.flush();
+        columnWriter.close();
+
+        TypeDescription timeType = TypeDescription.createTime(3);
+        assertTrue(timeType.createRowBatch(
+                millis.length + 1, TypeDescription.VectorLayout.TIME_AS_PICO_LONG)
+                .cols[0] instanceof LongColumnVector);
+
+        LongColumnVector target = new LongColumnVector(millis.length + 1);
+        TimeColumnReader reader = new TimeColumnReader(timeType);
+        reader.read(
+                ByteBuffer.wrap(columnWriter.getColumnChunkContent()),
+                columnWriter.getColumnChunkEncoding().build(),
+                0,
+                millis.length + 1,
+                pixelStride,
+                0,
+                target,
+                columnWriter.getColumnChunkIndex().build());
+        reader.close();
+
+        for (int i = 0; i < millis.length; ++i)
+        {
+            assertFalse(target.isNull[i]);
+            assertEquals((long) millis[i] * PICOSECONDS_PER_MILLISECOND, target.vector[i]);
+        }
+        assertTrue(target.isNull[millis.length]);
+    }
+
+    @Test
+    public void testSelectedLongVectorWithNullPadding() throws IOException
+    {
+        int pixelStride = 4;
+        int[] millis = {10, 20, 30, 40, 50};
+        PixelsWriterOption writerOption = new PixelsWriterOption()
+                .pixelStride(pixelStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
+                .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
+        TimeColumnWriter columnWriter = new TimeColumnWriter(
+                TypeDescription.createTime(3), writerOption);
+        TimeColumnVector source = new TimeColumnVector(millis.length, 3);
+        source.add(millis[0]);
+        source.addNull();
+        for (int i = 2; i < millis.length; ++i)
+        {
+            source.add(millis[i]);
+        }
+        columnWriter.write(source, millis.length);
+        columnWriter.flush();
+        columnWriter.close();
+
+        Bitmap selected = new Bitmap(millis.length, true);
+        selected.clear(0);
+        selected.clear(3);
+        LongColumnVector target = new LongColumnVector(3);
+        TimeColumnReader reader = new TimeColumnReader(TypeDescription.createTime(3));
+        reader.readSelected(
+                ByteBuffer.wrap(columnWriter.getColumnChunkContent()),
+                columnWriter.getColumnChunkEncoding().build(),
+                0,
+                millis.length,
+                pixelStride,
+                0,
+                target,
+                columnWriter.getColumnChunkIndex().build(),
+                selected);
+        reader.close();
+
+        assertTrue(target.isNull[0]);
+        assertEquals((long) millis[2] * PICOSECONDS_PER_MILLISECOND, target.vector[1]);
+        assertEquals((long) millis[4] * PICOSECONDS_PER_MILLISECOND, target.vector[2]);
     }
 
     @Test

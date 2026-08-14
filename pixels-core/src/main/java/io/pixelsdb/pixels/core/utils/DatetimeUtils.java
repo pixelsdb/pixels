@@ -42,6 +42,7 @@ public class DatetimeUtils
     private static final long NANOS_PER_MILLIS = 1000_000L;
     private static final long MICROS_PER_SEC = 1000_000L;
     private static final long NANOS_PER_MICROS = 1000L;
+    public static final long PICOSECONDS_PER_MILLISECOND = 1_000_000_000L;
 
     public static long microsToMillis(long micros)
     {
