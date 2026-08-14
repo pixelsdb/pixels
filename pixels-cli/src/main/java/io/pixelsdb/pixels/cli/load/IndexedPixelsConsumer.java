@@ -144,7 +144,8 @@
                  }
              }
          }
-         originStorage.close();
+         // Do not close originStorage: StorageFactory caches one Storage instance per scheme, and the same
+         // instance is used by flushRemainingData() to write the data files when they share the scheme.
      }
 
      @Override
@@ -263,8 +264,6 @@
                  queue.clear();
              }
          }
-         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),
-                 bucketWriter.currFile.getId(), true, bucketWriter.defaultIndexOption);
      }
 
      private void closePixelsFile(PerVirtualNodeWriter bucketWriter) throws IOException, IndexException
@@ -274,6 +273,10 @@
          {
              flushRowBatch(bucketWriter);
          }
+
+         // The main index of a file can only be flushed once, hence it is flushed here instead of in flushRowBatch()
+         bucketWriter.indexService.flushIndexEntriesOfFile(index.getTableId(), index.getId(),
+                 bucketWriter.currFile.getId(), true, bucketWriter.defaultIndexOption);
 
          closeWriterAndAddFile(bucketWriter.pixelsWriter, bucketWriter.currFile, bucketWriter.currTargetPath, bucketWriter.targetNode);
      }
