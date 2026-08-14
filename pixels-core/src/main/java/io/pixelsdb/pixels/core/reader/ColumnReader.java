@@ -64,9 +64,23 @@ public abstract class ColumnReader implements Closeable
             case BYTE:
                 return new ByteColumnReader(type);
             case SHORT:
-                return new ShortColumnReader(type);
+                if (option.isReadShortColumnAsLongVector())
+                {
+                    return new LongColumnReader(type);
+                }
+                else
+                {
+                    return new ShortColumnReader(type);
+                }
             case INT:
-                return new IntColumnReader(type);
+                if (option.isReadIntColumnAsLongVector())
+                {
+                    return new LongColumnReader(type);
+                }
+                else
+                {
+                    return new IntColumnReader(type);
+                }
             case LONG:
                 return new LongColumnReader(type);
             case DOUBLE:

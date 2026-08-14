@@ -36,7 +36,16 @@ import java.util.Arrays;
 
 /**
  * This is the column reader for short (int16) columns.
- * 
+ * <p>
+ * In some query engines (e.g., Trino 405 and Presto 0.279), the short column
+ * should be read into {@code long[]} (i.e., {@link LongColumnVector}) in memory.
+ * In that case, set {@link PixelsReaderOption#readShortColumnAsLongVector(boolean)}
+ * to {@code true} so that {@link LongColumnReader} is used instead of this reader.
+ * <p>
+ * However, in some other query engines (e.g., Trino 466), the short column
+ * should be read into {@code short[]} (i.e., {@link ShortColumnVector})
+ * by this reader, which is the default behavior.
+ *
  * @author gengdy
  * @create 2026-08-07
  */

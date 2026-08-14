@@ -133,6 +133,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private ColumnReader[] readers;        // column readers for each target columns
     private long[][] rgVisibilityBitmaps;  // bitmaps of row group visibility
     private final boolean enableEncodedVector;
+    private final int vectorLayout;
 
     private long diskReadBytes = 0L;
     private long cacheReadBytes = 0L;
@@ -171,6 +172,8 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.RGStart = option.getRGStart();
         this.RGLen = option.getRGLen();
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
+        this.vectorLayout = (option.isReadIntColumnAsLongVector() ? TypeDescription.VectorLayout.INT_AS_LONG : 0) |
+                (option.isReadShortColumnAsLongVector() ? TypeDescription.VectorLayout.SHORT_AS_LONG : 0);
         this.enableMetrics = enableMetrics;
         this.metricsDir = metricsDir;
         this.readPerfMetrics = new ReadPerfMetrics();
@@ -1031,7 +1034,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private VectorizedRowBatch createEmptyEOFRowBatch(int size)
     {
         TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0);
+        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0, vectorLayout);
         resultRowBatch.projectionSize = 0;
         resultRowBatch.endOfFile = true;
         resultRowBatch.size = size;
@@ -1094,7 +1097,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         {
             if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != resultColumns.length)
             {
-                this.resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
+                this.resultRowBatch = resultSchema.createRowBatch(batchSize, vectorLayout, resultColumnsEncoded);
                 this.resultRowBatch.projectionSize = resultColumns.length;
                 if (option.isExposeHiddenColumn())
                 {
@@ -1110,7 +1113,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             resultRowBatch = this.resultRowBatch;
         } else
         {
-            resultRowBatch = resultSchema.createRowBatch(batchSize, resultColumnsEncoded);
+            resultRowBatch = resultSchema.createRowBatch(batchSize, vectorLayout, resultColumnsEncoded);
             resultRowBatch.projectionSize = resultColumns.length;
             if (option.isExposeHiddenColumn())
             {

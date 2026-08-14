@@ -33,6 +33,8 @@ public class PixelsReaderOption
     private boolean skipCorruptRecords = false;
     private boolean tolerantSchemaEvolution = true;    // this may lead to column missing due to schema evolution
     private boolean enableEncodedColumnVector = false; // whether read encoded column vectors directly when possible
+    private boolean readIntColumnAsLongVector = false; // whether read int32 columns as long column vectors, for backward compatibility of old query engines
+    private boolean readShortColumnAsLongVector = false; // whether read int16 columns as long column vectors, for backward compatibility of old query engines
     private boolean exposeHiddenColumn = false; // whether expose the hidden commit timestamp column in the result batch
     private long transId = -1L;
     private long transTimestamp = -1L; // -1 means no need to consider the timestamp when reading data
@@ -142,6 +144,38 @@ public class PixelsReaderOption
     public boolean isEnableEncodedColumnVector()
     {
         return enableEncodedColumnVector;
+    }
+
+    /**
+     * Whether to read int32 (integer) columns as {@link io.pixelsdb.pixels.core.vector.LongColumnVector}
+     * instead of {@link io.pixelsdb.pixels.core.vector.IntColumnVector}. Old query engines such as
+     * Trino 405 and Presto 0.279 expect integer columns in {@code long[]}, so they should set this
+     * to {@code true}. By default, integer columns are read into int vectors.
+     */
+    public void readIntColumnAsLongVector(boolean readIntColumnAsLongVector)
+    {
+        this.readIntColumnAsLongVector = readIntColumnAsLongVector;
+    }
+
+    public boolean isReadIntColumnAsLongVector()
+    {
+        return readIntColumnAsLongVector;
+    }
+
+    /**
+     * Whether to read int16 (smallint) columns as {@link io.pixelsdb.pixels.core.vector.LongColumnVector}
+     * instead of {@link io.pixelsdb.pixels.core.vector.ShortColumnVector}. Old query engines such as
+     * Trino 405 and Presto 0.279 expect short columns in {@code long[]}, so they should set this
+     * to {@code true}. By default, short columns are read into short vectors.
+     */
+    public void readShortColumnAsLongVector(boolean readShortColumnAsLongVector)
+    {
+        this.readShortColumnAsLongVector = readShortColumnAsLongVector;
+    }
+
+    public boolean isReadShortColumnAsLongVector()
+    {
+        return readShortColumnAsLongVector;
     }
 
     public PixelsReaderOption exposeHiddenColumn(boolean exposeHiddenColumn)
