@@ -296,7 +296,7 @@ public class StringColumnReader extends ColumnReader
                         else
                         {
                             int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
-                            columnVector.setId(j + vectorIndex, originId);
+                            columnVector.setId(j, originId);
                         }
                     }
                     // update variables
@@ -593,7 +593,7 @@ public class StringColumnReader extends ColumnReader
                             int originId = cascadeRLE ? (int) contentDecoder.next() : contentBuf.readInt();
                             if (selected.get(j - vectorIndex))
                             {
-                                columnVector.setId(vectorWriteIndex + vectorIndex, originId);
+                                columnVector.setId(vectorWriteIndex, originId);
                                 vectorWriteIndex++;
                             }
                         }
