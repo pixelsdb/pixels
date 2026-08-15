@@ -32,8 +32,9 @@ import static java.util.Objects.requireNonNull;
 /**
  * ByteColumnVector
  * <p>
- *     This class represents a nullable byte column vector.
- *     It can be used for operations on all boolean/byte types
+ *     This class represents a nullable byte column vector for tinyint/byte values.
+ *     Boolean columns use {@link BooleanColumnVector}, which extends this class and
+ *     reuses the same {@code byte[]} storage with boolean string semantics.
  * </p>
  *
  * @author guodong
@@ -81,26 +82,15 @@ public class ByteColumnVector extends ColumnVector
         }
         if (value.length != Byte.BYTES)
         {
-            add(new String(value));
-        } else
-        {
-            add(value[0]);
+            throw new IllegalArgumentException("Only byte[1] supported for serialization to byte");
         }
+        add(value[0]);
     }
 
     @Override
     public void add(String value)
     {
-        assert value != null && value.length() > 0;
-        char c = value.charAt(0);
-        if (c == '0' || c == '1')
-        {
-            add(Byte.parseByte(value));
-        }
-        else
-        {
-            add(Boolean.parseBoolean(value));
-        }
+        add(Byte.parseByte(value));
     }
 
     @Override

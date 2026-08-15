@@ -19,6 +19,6 @@
  */
 package io.pixelsdb.pixels.cli.load;
 
-public abstract class Consumer extends Thread
+public abstract class Consumer implements Runnable
 {
 }

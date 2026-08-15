@@ -1229,6 +1229,7 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
         switch (category)
         {
             case BOOLEAN:
+                return new BooleanColumnVector(maxSize);
             case BYTE:
                 return new ByteColumnVector(maxSize);
             case SHORT:
@@ -1781,30 +1782,49 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
 
     public byte[] convertSqlStringToByte(String value)
     {
-        if (value == null || value.isEmpty())
+        if (value == null)
+        {
+            return null;
+        }
+
+        switch (getCategory())
+        {
+            case CHAR:
+            case VARCHAR:
+            case STRING:
+            case VARBINARY:
+            case BINARY:
+                return value.getBytes(StandardCharsets.UTF_8);
+            default:
+                break;
+        }
+
+        if (value.isEmpty())
         {
             return null;
         }
 
         byte[] bytes;
         value = value.trim();
+        if (value.isEmpty())
+        {
+            throw new IllegalArgumentException("Blank value is not valid for " + getCategory());
+        }
         switch (getCategory())
         {
             case BYTE:
                 return new byte[]{Byte.parseByte(value)};
             case BOOLEAN:
             {
-                char c = value.charAt(0);
-                byte parsedByte;
-                if (c == '0' || c == '1')
+                if (value.equals("1") || value.equalsIgnoreCase("true"))
                 {
-                    parsedByte = Byte.parseByte(value);
+                    return new byte[]{1};
                 }
-                else
+                if (value.equals("0") || value.equalsIgnoreCase("false"))
                 {
-                    parsedByte = Boolean.parseBoolean(value) ? (byte) 1 : (byte) 0;
+                    return new byte[]{0};
                 }
-                return new byte[]{parsedByte};
+                throw new IllegalArgumentException("Invalid BOOLEAN value: " + value);
             }
             case SHORT:
             {
@@ -1876,15 +1896,6 @@ public final class TypeDescription implements Comparable<TypeDescription>, Seria
                     buffer.putLong(low);
                     return buffer.array();
                 }
-            }
-            case CHAR:
-            case VARCHAR:
-            case STRING:
-            case VARBINARY:
-            case BINARY:
-            {
-                bytes = value.getBytes(StandardCharsets.UTF_8);
-                break;
             }
             case DATE:
             {

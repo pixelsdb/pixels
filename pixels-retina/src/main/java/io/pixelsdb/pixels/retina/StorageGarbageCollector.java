@@ -33,6 +33,7 @@ import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
 import io.pixelsdb.pixels.common.metadata.domain.Schema;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
+import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.NetUtils;
@@ -47,12 +48,12 @@ import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
+import io.pixelsdb.pixels.core.utils.PrimaryKeyBytes;
 import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.index.IndexProto;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -664,6 +665,7 @@ public class StorageGarbageCollector
         List<PendingIndexEntry> pendingIndexEntries = new ArrayList<>();
 
         // Resolve PK columns for index key capture; null if no primary index exists.
+        // keyColumnIds are metadata column IDs — map to file-schema ordinals by name.
         int[] pkColIndices = null;
         List<TypeDescription> pkColTypes = null;
         try
@@ -674,14 +676,36 @@ public class StorageGarbageCollector
             {
                 KeyColumns keyColumns = primaryIndex.getKeyColumns();
                 List<Integer> colIds = keyColumns.getKeyColumnIds();
+                Table table = metadataService.getTableById(group.tableId);
+                Schema schemaMeta = metadataService.getSchemaById(table.getSchemaId());
+                List<Column> columns = metadataService.getColumns(
+                        schemaMeta.getName(), table.getName(), false);
+                Map<Long, String> idToName = new HashMap<>(columns.size());
+                for (Column column : columns)
+                {
+                    idToName.put(column.getId(), column.getName());
+                }
+                List<String> fieldNames = schema.getFieldNames();
+                List<TypeDescription> children = schema.getChildren();
                 pkColIndices = new int[colIds.size()];
                 pkColTypes = new ArrayList<>(colIds.size());
-                List<TypeDescription> children = schema.getChildren();
                 for (int i = 0; i < colIds.size(); i++)
                 {
-                    int colId = colIds.get(i);
-                    pkColIndices[i] = colId;
-                    pkColTypes.add(children.get(colId));
+                    long colId = colIds.get(i);
+                    String name = idToName.get(colId);
+                    if (name == null)
+                    {
+                        throw new MetadataException("Primary key column id " + colId +
+                                " not found in table " + table.getName());
+                    }
+                    int ordinal = fieldNames.indexOf(name);
+                    if (ordinal < 0)
+                    {
+                        throw new MetadataException("Primary key column '" + name +
+                                "' not found in file schema for table " + table.getName());
+                    }
+                    pkColIndices[i] = ordinal;
+                    pkColTypes.add(children.get(ordinal));
                 }
             }
         }
@@ -689,6 +713,8 @@ public class StorageGarbageCollector
         {
             logger.warn("StorageGC: failed to resolve primary index for tableId={}, index sync will be skipped",
                     group.tableId, e);
+            pkColIndices = null;
+            pkColTypes = null;
         }
 
         try (PixelsWriter writer = PixelsWriterImpl.newBuilder()
@@ -758,7 +784,9 @@ public class StorageGarbageCollector
                                         fwdMapping[oldRgRowOffset] = globalNewRowOffset;
                                         if (pkColIndices != null)
                                         {
-                                            ByteString pkBytes = extractPkBytes(batch, r, pkColIndices, pkColTypes);
+                                            ByteString pkBytes = ByteString.copyFrom(
+                                                    PrimaryKeyBytes.fromColumnVectors(
+                                                            pkColTypes, batch.cols, pkColIndices, r));
                                             long createTs = hasHiddenColumn
                                                     ? ((LongColumnVector) batch.getHiddenColumnVector()).vector[r]
                                                     : 0L;
@@ -1045,37 +1073,6 @@ public class StorageGarbageCollector
                     : Arrays.copyOf(entry.getValue(), size);
             resourceManager.importDeletionChain(result.newFileId, newRgId, interleaved);
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // PK byte extraction
-    // -------------------------------------------------------------------------
-
-    /**
-     * Extracts and concatenates the primary-key column bytes from a batch row,
-     * using the same encoding as {@link TypeDescription#convertSqlStringToByte}.
-     */
-    private static ByteString extractPkBytes(VectorizedRowBatch batch, int row,
-                                             int[] pkColIndices, List<TypeDescription> pkColTypes)
-    {
-        if (pkColIndices.length == 1)
-        {
-            byte[] bytes = pkColTypes.get(0).convertColumnVectorToByte(batch.cols[pkColIndices[0]], row);
-            return ByteString.copyFrom(bytes);
-        }
-        int totalLen = 0;
-        byte[][] parts = new byte[pkColIndices.length][];
-        for (int i = 0; i < pkColIndices.length; i++)
-        {
-            parts[i] = pkColTypes.get(i).convertColumnVectorToByte(batch.cols[pkColIndices[i]], row);
-            totalLen += parts[i].length;
-        }
-        ByteBuffer buf = ByteBuffer.allocate(totalLen);
-        for (byte[] part : parts)
-        {
-            buf.put(part);
-        }
-        return ByteString.copyFrom((ByteBuffer) buf.rewind());
     }
 
     // -------------------------------------------------------------------------

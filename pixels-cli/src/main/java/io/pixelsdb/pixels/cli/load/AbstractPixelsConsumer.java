@@ -115,7 +115,7 @@ public abstract class AbstractPixelsConsumer extends Consumer
     @Override
     public void run()
     {
-        System.out.println("Start " + this.getClass().getSimpleName() + ", " + currentThread().getName() +
+        System.out.println("Start " + this.getClass().getSimpleName() + ", " + Thread.currentThread().getName() +
                 ", time: " + DateUtil.formatTime(new Date()));
         int count = 0;
         boolean isRunning = true;
@@ -141,16 +141,19 @@ public abstract class AbstractPixelsConsumer extends Consumer
 
         } catch (InterruptedException e)
         {
-            System.out.println(this.getClass().getSimpleName() + ": " + e.getMessage());
-            currentThread().interrupt();
-        } catch (Throwable e)
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(this.getClass().getSimpleName() + " interrupted", e);
+        } catch (RuntimeException e)
         {
-            e.printStackTrace();
+            throw e;
+        } catch (Exception e)
+        {
+            throw new RuntimeException(this.getClass().getSimpleName() + " failed", e);
         } finally
         {
             cleanupTemporaryFiles();
-            System.out.println(currentThread().getName() + ":" + count);
-            System.out.println("Exit " + this.getClass().getSimpleName() + ", thread: " + currentThread().getName() +
+            System.out.println(Thread.currentThread().getName() + ":" + count);
+            System.out.println("Exit " + this.getClass().getSimpleName() + ", thread: " + Thread.currentThread().getName() +
                     ", time: " + DateUtil.formatTime(new Date()));
         }
     }
@@ -242,34 +245,57 @@ public abstract class AbstractPixelsConsumer extends Consumer
 
     protected void writeRowToBatch(VectorizedRowBatch rowBatch, String line, long timestamp)
     {
-        String[] colsInLine = line.split(Pattern.quote(regex));
+        // limit=-1 keeps trailing empty fields; String.split(regex) drops them by default.
+        String[] colsInLine = Pattern.compile(Pattern.quote(regex)).split(line, -1);
         writeRowToBatch(rowBatch, colsInLine, timestamp);
     }
 
     protected void writeRowToBatch(VectorizedRowBatch rowBatch, String[] colsInLine, long timestamp)
     {
         ColumnVector[] columnVectors = rowBatch.cols;
-        rowBatch.size++;
 
         for (int i = 0; i < columnVectors.length - 1; i++)
         {
+            int valueIdx = orderMapping[i];
+            if (valueIdx < 0 || valueIdx >= colsInLine.length)
+            {
+                throw new IllegalArgumentException("Missing value at input index " + valueIdx + " for column " + i);
+            }
+
+            String value = colsInLine[valueIdx];
             try
             {
-                int valueIdx = orderMapping[i];
-                if (valueIdx >= colsInLine.length ||
-                        colsInLine[valueIdx].isEmpty() ||
-                        colsInLine[valueIdx].equalsIgnoreCase("\\N"))
+                // LOAD dialect: \N/null -> NULL; empty text/binary -> ""; empty other -> NULL.
+                if (value == null || value.equalsIgnoreCase("\\N"))
                 {
                     columnVectors[i].addNull();
-                } else
+                }
+                else if (!value.isEmpty())
                 {
-                    columnVectors[i].add(colsInLine[valueIdx]);
+                    columnVectors[i].add(value);
+                }
+                else
+                {
+                    switch (schema.getChildren().get(i).getCategory())
+                    {
+                        case CHAR:
+                        case VARCHAR:
+                        case STRING:
+                        case BINARY:
+                        case VARBINARY:
+                            columnVectors[i].add("");
+                            break;
+                        default:
+                            columnVectors[i].addNull();
+                            break;
+                    }
                 }
             } catch (Exception e)
             {
-                e.printStackTrace();
+                throw new IllegalArgumentException("Failed to parse column " + i + " from value " + value, e);
             }
         }
         columnVectors[columnVectors.length - 1].add(timestamp);
+        rowBatch.size++;
     }
 }

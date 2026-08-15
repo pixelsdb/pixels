@@ -31,6 +31,7 @@ import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
@@ -146,9 +147,13 @@ public class TestTypeDescription
                 ByteBuffer.allocate(Long.BYTES).putLong(1234567L).array());
 
         BinaryColumnVector binaryCol = new BinaryColumnVector(1);
-        byte[] payload = "hello".getBytes();
+        byte[] payload = "hello".getBytes(StandardCharsets.UTF_8);
         binaryCol.setVal(0, payload);
         assertConvert(TypeDescription.createVarchar(255), binaryCol, 0, "hello", payload);
+
+        BinaryColumnVector emptyBinaryCol = new BinaryColumnVector(1);
+        emptyBinaryCol.add(new byte[0]);
+        assertConvert(TypeDescription.createVarchar(255), emptyBinaryCol, 0, "", new byte[0]);
     }
 
     @Test
@@ -159,9 +164,35 @@ public class TestTypeDescription
         col.isNull[0] = true;
         assertNull(TypeDescription.createByte().convertColumnVectorToByte(col, 0));
 
-        // Legacy PK text semantics retained in this PR.
         assertNull(TypeDescription.createVarchar(16).convertSqlStringToByte(null));
-        assertNull(TypeDescription.createVarchar(16).convertSqlStringToByte(""));
+        assertArrayEquals(new byte[0], TypeDescription.createVarchar(16).convertSqlStringToByte(""));
+        assertArrayEquals("  value  ".getBytes(StandardCharsets.UTF_8),
+                TypeDescription.createVarchar(16).convertSqlStringToByte("  value  "));
+
+        assertNull(TypeDescription.createInt().convertSqlStringToByte(null));
+        assertNull(TypeDescription.createInt().convertSqlStringToByte(""));
+        assertSqlConversionFails(TypeDescription.createInt(), "   ");
+    }
+
+    @Test
+    public void testConvertBooleanAndByteStrictly()
+    {
+        TypeDescription booleanType = TypeDescription.createBoolean();
+        assertArrayEquals(new byte[]{0}, booleanType.convertSqlStringToByte("0"));
+        assertArrayEquals(new byte[]{1}, booleanType.convertSqlStringToByte("1"));
+        assertArrayEquals(new byte[]{0}, booleanType.convertSqlStringToByte("FaLsE"));
+        assertArrayEquals(new byte[]{1}, booleanType.convertSqlStringToByte("TrUe"));
+        assertSqlConversionFails(booleanType, "2");
+        assertSqlConversionFails(booleanType, "yes");
+        assertSqlConversionFails(booleanType, "10");
+
+        TypeDescription byteType = TypeDescription.createByte();
+        assertArrayEquals(new byte[]{Byte.MIN_VALUE},
+                byteType.convertSqlStringToByte(Byte.toString(Byte.MIN_VALUE)));
+        assertArrayEquals(new byte[]{Byte.MAX_VALUE},
+                byteType.convertSqlStringToByte(Byte.toString(Byte.MAX_VALUE)));
+        assertSqlConversionFails(byteType, "-129");
+        assertSqlConversionFails(byteType, "128");
     }
 
     private static TypeDescription parseBoth(String typeExpression)
@@ -196,6 +227,19 @@ public class TestTypeDescription
         catch (IllegalArgumentException expected)
         {
             // expected
+        }
+    }
+
+    private static void assertSqlConversionFails(TypeDescription type, String sql)
+    {
+        try
+        {
+            type.convertSqlStringToByte(sql);
+            fail("Expected SQL conversion failure for type " + type + " value: " + sql);
+        }
+        catch (IllegalArgumentException expected)
+        {
+            // expected, NumberFormatException from numeric parsers is a subclass of it
         }
     }
 

@@ -69,14 +69,11 @@ import io.pixelsdb.pixels.core.PixelsWriter;
              System.out.println("loading data from: " + originalFilePath);
              long timestamp = parameters.getTimestamp();
              String line;
+             long lineNumber = 0;
 
              while ((line = reader.readLine()) != null)
              {
-                 if (line.isEmpty())
-                 {
-                     System.err.println("thread: " + currentThread().getName() + " got empty line.");
-                     continue;
-                 }
+                 lineNumber++;
 
                  // 1. Check if a new PixelsFile needs to be initialized
                  if (pixelsWriter == null)
@@ -85,7 +82,14 @@ import io.pixelsdb.pixels.core.PixelsWriter;
                  }
 
                  // 2. Write row to batch
-                 writeRowToBatch(rowBatch, line, timestamp);
+                 try
+                 {
+                     writeRowToBatch(rowBatch, line, timestamp);
+                 } catch (RuntimeException e)
+                 {
+                     throw new IOException("Failed to load '" + originalFilePath +
+                             "' at line " + lineNumber, e);
+                 }
                  rowCounter++;
 
                  // 3. Check and Flush Row Batch
