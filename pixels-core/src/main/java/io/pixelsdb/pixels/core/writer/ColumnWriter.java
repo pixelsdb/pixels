@@ -51,9 +51,11 @@ public interface ColumnWriter
             case BYTE:
                 return new ByteColumnWriter(type, writerOption);
             case SHORT:
+                return new ShortColumnWriter(type, writerOption);
             case INT:
+                return new IntColumnWriter(type, writerOption);
             case LONG:
-                return new IntegerColumnWriter(type, writerOption);
+                return new LongColumnWriter(type, writerOption);
             case FLOAT:
                 return new FloatColumnWriter(type, writerOption);
             case DOUBLE:

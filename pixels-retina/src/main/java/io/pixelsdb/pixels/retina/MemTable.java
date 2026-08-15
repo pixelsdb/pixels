@@ -39,12 +39,12 @@ public class MemTable implements Referenceable
     private final int startIndex;
     private final int length;
 
-    public MemTable(long id, TypeDescription schema, int size, int mode,
+    public MemTable(long id, TypeDescription schema, int size,
                     long fileId, int startIndex, int length)
     {
         this.id = id;
         this.schema = schema;
-        this.rowBatch = schema.createRowBatchWithHiddenColumn(size, mode);
+        this.rowBatch = schema.createRowBatchWithHiddenColumn(size);
         this.fileId = fileId;
         this.startIndex = startIndex;
         this.length = length;

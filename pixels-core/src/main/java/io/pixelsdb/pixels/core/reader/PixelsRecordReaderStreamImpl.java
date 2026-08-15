@@ -90,6 +90,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private ByteBuffer[] chunkBuffers;     // buffers of each chunk in current row group, arranged by chunk's column id
     private ColumnReader[] readers;        // column readers for each target columns
     private final boolean enableEncodedVector = false;
+    private final int vectorLayout;
     private long diskReadBytes = 0L;
     private long readTimeNanos = 0L;
     private long memoryUsage = 0L;
@@ -122,6 +123,8 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         this.curRGFooterBuffer = ByteBuffer.allocate(Constants.STREAM_READER_RG_FOOTER_BUFFER_SIZE);
         this.streamHeader = streamHeader;
         this.option = option;
+        this.vectorLayout = (option.isReadIntColumnAsLongVector() ? TypeDescription.VectorLayout.INT_AS_LONG : 0) |
+                (option.isReadShortColumnAsLongVector() ? TypeDescription.VectorLayout.SHORT_AS_LONG : 0);
         this.includedColumnTypes = new ArrayList<>();
         checkBeforeRead();
     }
@@ -246,7 +249,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
     private VectorizedRowBatch createEmptyEOFRowBatch(int size)
     {
         TypeDescription resultSchema = TypeDescription.createSchema(new ArrayList<>());
-        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0, TypeDescription.Mode.NONE);
+        VectorizedRowBatch resultRowBatch = resultSchema.createRowBatch(0, vectorLayout);
         resultRowBatch.projectionSize = 0;
         resultRowBatch.endOfFile = true;
         resultRowBatch.size = size;
@@ -268,8 +271,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         {
             if (this.resultRowBatch == null || this.resultRowBatch.projectionSize != includedColumnNum)
             {
-                this.resultRowBatch = resultSchema.createRowBatch(batchSize,
-                        TypeDescription.Mode.NONE, resultColumnsEncoded);
+                this.resultRowBatch = resultSchema.createRowBatch(batchSize, vectorLayout, resultColumnsEncoded);
                 this.resultRowBatch.projectionSize = includedColumnNum;
             }
             this.resultRowBatch.reset();
@@ -278,7 +280,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         }
         else
         {
-            resultRowBatch = resultSchema.createRowBatch(batchSize, TypeDescription.Mode.NONE, resultColumnsEncoded);
+            resultRowBatch = resultSchema.createRowBatch(batchSize, vectorLayout, resultColumnsEncoded);
             resultRowBatch.projectionSize = includedColumnNum;
         }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2026 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -13,7 +13,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * Affero GNU General Public License for more details.
  *
- * You should have received a copy of the Affero GNU General Public
+ * You should have received a copy of the GNU Affero General Public
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
@@ -23,9 +23,9 @@ import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.utils.Bitmap;
-import io.pixelsdb.pixels.core.vector.IntColumnVector;
-import io.pixelsdb.pixels.core.writer.IntColumnWriter;
+import io.pixelsdb.pixels.core.vector.ShortColumnVector;
 import io.pixelsdb.pixels.core.writer.PixelsWriterOption;
+import io.pixelsdb.pixels.core.writer.ShortColumnWriter;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -35,17 +35,14 @@ import java.nio.ByteOrder;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Memory round-trip tests for INT after the integer-type split.
- *
- * @author hank, gengdy
- * @create 2024-12-07
- * @update 2026-08-08
+ * @author gengdy
+ * @create 2026-08-07
  */
-public class TestIntColumnReader
+public class TestShortColumnReader
 {
-    private static IntColumnVector createSampleVector(int numRows)
+    private static ShortColumnVector createSampleVector(int numRows)
     {
-        IntColumnVector vector = new IntColumnVector(numRows);
+        ShortColumnVector vector = new ShortColumnVector(numRows);
         vector.add(100);
         vector.add(103);
         vector.add(106);
@@ -65,13 +62,13 @@ public class TestIntColumnReader
         vector.addNull();
         vector.add(6);
         vector.add(7);
-        vector.add(Integer.MAX_VALUE);
+        vector.add(Short.MAX_VALUE);
         vector.add(3434);
-        vector.add(Integer.MIN_VALUE);
+        vector.add(Short.MIN_VALUE);
         return vector;
     }
 
-    private static void assertVectorsEqual(IntColumnVector expected, IntColumnVector actual, int numRows)
+    private static void assertVectorsEqual(ShortColumnVector expected, ShortColumnVector actual, int numRows)
     {
         assertEquals(expected.noNulls, actual.noNulls);
         for (int i = 0; i < numRows; ++i)
@@ -94,9 +91,9 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(encodingLevel).nullsPadding(nullsPadding);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector originVector = createSampleVector(numRows);
+        ShortColumnWriter columnWriter = new ShortColumnWriter(
+                TypeDescription.createShort(), writerOption);
+        ShortColumnVector originVector = createSampleVector(numRows);
         columnWriter.write(originVector, numRows);
         columnWriter.flush();
         columnWriter.close();
@@ -107,6 +104,7 @@ public class TestIntColumnReader
         assertEquals(expectedEncoding, encoding.getKind());
 
         Bitmap selected = new Bitmap(numRows, true);
+        // Skip non-null and null rows so the reader must still consume encoded payload.
         selected.clear(0);
         selected.clear(2);
         selected.clear(4);
@@ -116,8 +114,8 @@ public class TestIntColumnReader
         selected.clear(16);
         selected.clear(20);
 
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(vectorIndex + numRows);
+        ShortColumnReader columnReader = new ShortColumnReader(TypeDescription.createShort());
+        ShortColumnVector targetVector = new ShortColumnVector(vectorIndex + numRows);
         columnReader.readSelected(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, vectorIndex, targetVector, chunkIndex, selected);
         columnReader.close();
@@ -147,9 +145,9 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector sourceVector = createSampleVector(numRows);
+        ShortColumnWriter columnWriter = new ShortColumnWriter(
+                TypeDescription.createShort(), writerOption);
+        ShortColumnVector sourceVector = createSampleVector(numRows);
         columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
@@ -158,8 +156,8 @@ public class TestIntColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, encoding.getKind());
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(numRows);
+        ShortColumnReader columnReader = new ShortColumnReader(TypeDescription.createShort());
+        ShortColumnVector targetVector = new ShortColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, targetVector, chunkIndex);
         columnReader.close();
@@ -175,9 +173,9 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(false);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector sourceVector = createSampleVector(numRows);
+        ShortColumnWriter columnWriter = new ShortColumnWriter(
+                TypeDescription.createShort(), writerOption);
+        ShortColumnVector sourceVector = createSampleVector(numRows);
         columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
@@ -186,8 +184,8 @@ public class TestIntColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         assertEquals(PixelsProto.ColumnEncoding.Kind.NONE, encoding.getKind());
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(numRows);
+        ShortColumnReader columnReader = new ShortColumnReader(TypeDescription.createShort());
+        ShortColumnVector targetVector = new ShortColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, targetVector, chunkIndex);
         columnReader.close();
@@ -203,9 +201,9 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL2).nullsPadding(false);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector originVector = new IntColumnVector(numRows);
+        ShortColumnWriter columnWriter = new ShortColumnWriter(
+                TypeDescription.createShort(), writerOption);
+        ShortColumnVector originVector = new ShortColumnVector(numRows);
         originVector.add(5);
         originVector.add(5);
         originVector.add(5);
@@ -225,8 +223,8 @@ public class TestIntColumnReader
         originVector.addNull();
         originVector.add(9);
         originVector.add(9);
-        originVector.add(Integer.MIN_VALUE);
-        originVector.add(Integer.MAX_VALUE);
+        originVector.add(Short.MIN_VALUE);
+        originVector.add(Short.MAX_VALUE);
         originVector.add(0);
         columnWriter.write(originVector, numRows);
         columnWriter.flush();
@@ -236,8 +234,8 @@ public class TestIntColumnReader
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         assertEquals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH, encoding.getKind());
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(numRows);
+        ShortColumnReader columnReader = new ShortColumnReader(TypeDescription.createShort());
+        ShortColumnVector targetVector = new ShortColumnVector(numRows);
         columnReader.read(ByteBuffer.wrap(content), encoding, 0, numRows,
                 pixelsStride, 0, targetVector, chunkIndex);
         columnReader.close();
@@ -253,9 +251,9 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(pixelsStride).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL0).nullsPadding(true);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
-        IntColumnVector sourceVector = createSampleVector(numRows);
+        ShortColumnWriter columnWriter = new ShortColumnWriter(
+                TypeDescription.createShort(), writerOption);
+        ShortColumnVector sourceVector = createSampleVector(numRows);
         columnWriter.write(sourceVector, numRows);
         columnWriter.flush();
         columnWriter.close();
@@ -263,8 +261,8 @@ public class TestIntColumnReader
         byte[] content = columnWriter.getColumnChunkContent();
         PixelsProto.ColumnChunkIndex chunkIndex = columnWriter.getColumnChunkIndex().build();
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(numRows);
+        ShortColumnReader columnReader = new ShortColumnReader(TypeDescription.createShort());
+        ShortColumnVector targetVector = new ShortColumnVector(numRows);
         Bitmap selected = new Bitmap(numRows, true);
         selected.clear(0);
         selected.clear(10);
@@ -307,10 +305,10 @@ public class TestIntColumnReader
         PixelsWriterOption writerOption = new PixelsWriterOption()
                 .pixelStride(10000).byteOrder(ByteOrder.LITTLE_ENDIAN)
                 .encodingLevel(EncodingLevel.EL2).nullsPadding(false);
-        IntColumnWriter columnWriter = new IntColumnWriter(
-                TypeDescription.createInt(), writerOption);
+        ShortColumnWriter columnWriter = new ShortColumnWriter(
+                TypeDescription.createShort(), writerOption);
 
-        IntColumnVector originVector = new IntColumnVector(numRows);
+        ShortColumnVector originVector = new ShortColumnVector(numRows);
         for (int j = 0; j < numRows; j++)
         {
             if (j % 100 == 0)
@@ -319,7 +317,7 @@ public class TestIntColumnReader
             }
             else
             {
-                originVector.add((j / 200) % 4);
+                originVector.add((short) ((j / 200) % 4));
             }
         }
 
@@ -335,8 +333,8 @@ public class TestIntColumnReader
         PixelsProto.ColumnEncoding encoding = columnWriter.getColumnChunkEncoding().build();
         assertEquals(PixelsProto.ColumnEncoding.Kind.RUNLENGTH, encoding.getKind());
         int totalRows = numBatches * numRows;
-        IntColumnReader columnReader = new IntColumnReader(TypeDescription.createInt());
-        IntColumnVector targetVector = new IntColumnVector(totalRows);
+        ShortColumnReader columnReader = new ShortColumnReader(TypeDescription.createShort());
+        ShortColumnVector targetVector = new ShortColumnVector(totalRows);
         ByteBuffer buffer = ByteBuffer.wrap(content);
         columnReader.read(buffer, encoding, 0, 123,
                 10000, 0, targetVector, chunkIndex);

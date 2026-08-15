@@ -20,9 +20,10 @@
 package io.pixelsdb.pixels.core;
 
 import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
-import io.pixelsdb.pixels.core.vector.ColumnVector;
 import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
+import io.pixelsdb.pixels.core.vector.IntColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
+import io.pixelsdb.pixels.core.vector.ShortColumnVector;
 import io.pixelsdb.pixels.core.vector.TimestampColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
@@ -33,6 +34,7 @@ import java.sql.Timestamp;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -49,78 +51,106 @@ public class TestColumnVector
         for (int i = 0; i < 100; i++)
         {
             a.vector[i] = i;
+            a.isNull[i] = false;
         }
-        ColumnVector b = new LongColumnVector(100);
+        a.setWriteIndex(100);
+
+        LongColumnVector b = new LongColumnVector(100);
         for (int i = 0; i < 100; i++)
         {
             b.addElement(i, a);
         }
+
+        assertEquals(100, b.getWriteIndex());
+        assertTrue(b.noNulls);
+        for (int i = 0; i < b.getWriteIndex(); i++)
+        {
+            assertFalse(b.isNull[i]);
+            assertEquals(i, b.vector[i]);
+        }
+
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < b.getLength(); i++)
+        for (int i = 0; i < b.getWriteIndex(); i++)
         {
             b.stringifyValue(sb, i);
-            sb.append("\n");
+            if (i + 1 < b.getWriteIndex())
+            {
+                sb.append('\n');
+            }
         }
-        System.out.println(sb.toString());
+        String[] lines = sb.toString().split("\n");
+        assertEquals(100, lines.length);
+        assertEquals("0", lines[0]);
+        assertEquals("99", lines[99]);
     }
 
     @Test
     public void testDateTimeTypes()
     {
         Date date = Date.valueOf("1900-12-31");
-        System.out.println(date.getTime());
+        assertEquals(Date.valueOf("1900-12-31"), date);
+        assertTrue(date.getTime() < 0);
+
         Time time = Time.valueOf("23:59:59");
-        System.out.println((int)time.getTime());
+        assertEquals(Time.valueOf("23:59:59").toString(), time.toString());
+
         Timestamp timestamp = Timestamp.valueOf("2018-05-07 20:39:20");
-        System.out.println(timestamp.getNanos());
+        assertEquals(0, timestamp.getNanos());
+        assertEquals(Timestamp.valueOf("2018-05-07 20:39:20"), timestamp);
+
         date = new Date(System.currentTimeMillis());
-        System.out.println(date.toString());
+        assertNotNull(date.toString());
         time = new Time(System.currentTimeMillis());
-        System.out.println(time.toString());
+        assertNotNull(time.toString());
     }
 
     @Test
     public void testCVCopyFrom()
     {
         int testNum = 1000_000;
-        String mockSchema = "struct<a:int,b:double,c:string,d:timestamp>";
+        String mockSchema = "struct<a:short,b:int,c:long,d:double,e:string,f:timestamp>";
 
-        VectorizedRowBatch srcRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(
-                testNum, TypeDescription.Mode.NONE);
-        LongColumnVector src0 = (LongColumnVector) srcRowBatch.cols[0];
-        DoubleColumnVector src1 = (DoubleColumnVector) srcRowBatch.cols[1];
-        BinaryColumnVector src2 = (BinaryColumnVector) srcRowBatch.cols[2];
-        TimestampColumnVector src3 = (TimestampColumnVector) srcRowBatch.cols[3];
+        VectorizedRowBatch srcRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
+        ShortColumnVector src0 = (ShortColumnVector) srcRowBatch.cols[0];
+        IntColumnVector src1 = (IntColumnVector) srcRowBatch.cols[1];
+        LongColumnVector src2 = (LongColumnVector) srcRowBatch.cols[2];
+        DoubleColumnVector src3 = (DoubleColumnVector) srcRowBatch.cols[3];
+        BinaryColumnVector src4 = (BinaryColumnVector) srcRowBatch.cols[4];
+        TimestampColumnVector src5 = (TimestampColumnVector) srcRowBatch.cols[5];
 
-        VectorizedRowBatch dstRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(
-                testNum, TypeDescription.Mode.NONE);
-        LongColumnVector dst0 = (LongColumnVector) dstRowBatch.cols[0];
-        DoubleColumnVector dst1 = (DoubleColumnVector) dstRowBatch.cols[1];
-        BinaryColumnVector dst2 = (BinaryColumnVector) dstRowBatch.cols[2];
-        TimestampColumnVector dst3 = (TimestampColumnVector) dstRowBatch.cols[3];
+        VectorizedRowBatch dstRowBatch = TypeDescription.fromString(mockSchema).createRowBatch(testNum);
+        ShortColumnVector dst0 = (ShortColumnVector) dstRowBatch.cols[0];
+        IntColumnVector dst1 = (IntColumnVector) dstRowBatch.cols[1];
+        LongColumnVector dst2 = (LongColumnVector) dstRowBatch.cols[2];
+        DoubleColumnVector dst3 = (DoubleColumnVector) dstRowBatch.cols[3];
+        BinaryColumnVector dst4 = (BinaryColumnVector) dstRowBatch.cols[4];
+        TimestampColumnVector dst5 = (TimestampColumnVector) dstRowBatch.cols[5];
 
         for (int i = 0; i < testNum; i++)
         {
-            src0.vector[i] = i;
+            src0.vector[i] = (short) i;
             src1.vector[i] = i;
-            src2.setVal(i, String.valueOf(i).getBytes());
-            src3.set(i, Timestamp.valueOf("2018-05-07 20:39:20"));
+            src2.vector[i] = i;
+            src3.vector[i] = i;
+            src4.setVal(i, String.valueOf(i).getBytes());
+            src5.set(i, Timestamp.valueOf("2018-05-07 20:39:20"));
         }
 
-        long begin = System.nanoTime();
         dst0.duplicate(src0);
         dst1.duplicate(src1);
         dst2.duplicate(src2);
         dst3.duplicate(src3);
-        long end = System.nanoTime();
-        System.out.println("Copy cost: " + (end - begin));
+        dst4.duplicate(src4);
+        dst5.duplicate(src5);
 
         for (int i = 0; i < testNum; i++)
         {
-            assert dst0.vector[i] == i;
-            assert i * 1.0d == dst1.vector[i];
-            assertEquals(String.valueOf(i), dst2.toString(i));
-            assertEquals(Timestamp.valueOf("2018-05-07 20:39:20"), dst3.asScratchTimestamp(i));
+            assertEquals((short) i, dst0.vector[i]);
+            assertEquals(i, dst1.vector[i]);
+            assertEquals(i, dst2.vector[i]);
+            assertEquals(i * 1.0d, dst3.vector[i], 0);
+            assertEquals(String.valueOf(i), dst4.toString(i));
+            assertEquals(Timestamp.valueOf("2018-05-07 20:39:20"), dst5.asScratchTimestamp(i));
         }
     }
 
@@ -131,30 +161,44 @@ public class TestColumnVector
         VectorizedRowBatch rowBatch = TypeDescription.fromString(mockSchema).createRowBatch();
 
         assertFalse(rowBatch.cols[0].duplicated);
-        assert rowBatch.cols[0].originVecId == -1;
+        assertEquals(-1, rowBatch.cols[0].originVecId);
         assertFalse(rowBatch.cols[1].duplicated);
-        assert rowBatch.cols[1].originVecId == -1;
+        assertEquals(-1, rowBatch.cols[1].originVecId);
         assertFalse(rowBatch.cols[2].duplicated);
-        assert rowBatch.cols[2].originVecId == -1;
+        assertEquals(-1, rowBatch.cols[2].originVecId);
         assertFalse(rowBatch.cols[3].duplicated);
-        assert rowBatch.cols[3].originVecId == -1;
+        assertEquals(-1, rowBatch.cols[3].originVecId);
         assertTrue(rowBatch.cols[4].duplicated);
-        assert rowBatch.cols[4].originVecId == 0;
+        assertEquals(0, rowBatch.cols[4].originVecId);
         assertTrue(rowBatch.cols[5].duplicated);
-        assert rowBatch.cols[5].originVecId == 1;
+        assertEquals(1, rowBatch.cols[5].originVecId);
         assertFalse(rowBatch.cols[6].duplicated);
-        assert rowBatch.cols[6].originVecId == -1;
+        assertEquals(-1, rowBatch.cols[6].originVecId);
     }
 
     @Test
     public void testBytesColumnVector()
     {
-        BinaryColumnVector cv = new BinaryColumnVector();
+        // Keep capacity large enough to avoid BinaryColumnVector.ensureSize growth;
+        // the lens-copy fix lives on feature/binaryColumn.
+        int capacity = 10000;
+        BinaryColumnVector cv = new BinaryColumnVector(capacity);
         cv.init();
-        cv.ensureSize(1000, false);
-        for (int i = 0; i < 10000; i++)
+        assertTrue(cv.getLength() >= capacity);
+
+        for (int i = 0; i < capacity; i++)
         {
             cv.add("13333333333333333333333333333334");   //32 bytes
         }
+        assertEquals(capacity, cv.getWriteIndex());
+        assertTrue(cv.noNulls);
+        assertEquals(32, cv.lens[0]);
+        assertEquals(32, cv.lens[capacity - 1]);
+        assertEquals("13333333333333333333333333333334", cv.toString(0));
+        assertEquals("13333333333333333333333333333334", cv.toString(capacity - 1));
+
+        cv.reset();
+        assertEquals(0, cv.getWriteIndex());
+        assertTrue(cv.noNulls);
     }
 }

@@ -45,7 +45,7 @@ public class TestRowBatchFlat
     {
         String schemaStr = "struct<a_:boolean,b_:date,c_:decimal(5,2),d_:double,e_:float,f_:int,g_:long,h_:decimal(30,20),i:string,j_:time,k_:timestamp,l_:vector>";
         TypeDescription schema = TypeDescription.fromString(schemaStr);
-        VectorizedRowBatch rowBatch = schema.createRowBatch(VectorizedRowBatch.DEFAULT_SIZE, TypeDescription.Mode.CREATE_INT_VECTOR_FOR_INT);
+        VectorizedRowBatch rowBatch = schema.createRowBatch(VectorizedRowBatch.DEFAULT_SIZE);
         ByteColumnVector a_ = (ByteColumnVector) rowBatch.cols[0];               // boolean
         DateColumnVector b_ = (DateColumnVector) rowBatch.cols[1];               // date
         DecimalColumnVector c_ = (DecimalColumnVector) rowBatch.cols[2];         // decimal

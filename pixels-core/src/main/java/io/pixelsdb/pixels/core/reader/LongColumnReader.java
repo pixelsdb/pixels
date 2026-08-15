@@ -35,6 +35,10 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 /**
+ * This column reader reads short (int16), integer (int32), and long (int64) columns
+ * into a {@link LongColumnVector}. It is used by old query engines (e.g. Trino 405,
+ * Presto 0.279) that expect short and integer columns in {@code long[]}.
+ *
  * @author guodong, hank
  * @create 2017-12-06
  * @update 2023-08-21: support nulls padding
@@ -46,13 +50,32 @@ public class LongColumnReader extends ColumnReader
     private InputStream inputStream;
 
     /**
-     * True if the data type of the values is long (int64), otherwise the data type is int32.
+     * The number of bytes per value when the encoding is NONE (not run-length encoded).
+     * For SHORT it is 2, for INT it is 4, and for LONG it is 8. When the encoding is
+     * RUNLENGTH, this field is unused because the decoder always returns a long.
      */
-    private boolean isLong = false;
+    private int readBytes = Long.BYTES;
 
     LongColumnReader(TypeDescription type)
     {
         super(type);
+    }
+
+    /**
+     * Reads the next value from the input buffer, widening it to long if the
+     * underlying column is SHORT (2 bytes) or INT (4 bytes).
+     */
+    private long readNextValue()
+    {
+        switch (readBytes)
+        {
+            case Short.BYTES:
+                return inputBuffer.getShort();
+            case Integer.BYTES:
+                return inputBuffer.getInt();
+            default:
+                return inputBuffer.getLong();
+        }
     }
 
     /**
@@ -120,7 +143,18 @@ public class LongColumnReader extends ColumnReader
             elementIndex = 0;
             if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.NONE))
             {
-                isLong = type.getCategory() == TypeDescription.Category.LONG;
+                switch (type.getCategory())
+                {
+                    case SHORT:
+                        readBytes = Short.BYTES;
+                        break;
+                    case INT:
+                        readBytes = Integer.BYTES;
+                        break;
+                    default:
+                        readBytes = Long.BYTES;
+                        break;
+                }
             }
         }
 
@@ -169,43 +203,20 @@ public class LongColumnReader extends ColumnReader
             }
             else
             {
-                if (isLong)
+                if (nullsPadding)
                 {
-                    if (nullsPadding)
+                    for (int j = i; j < i + numToRead; ++j)
                     {
-                        for (int j = i; j < i + numToRead; ++j)
-                        {
-                            columnVector.vector[j] = inputBuffer.getLong();
-                        }
-                    }
-                    else
-                    {
-                        for (int j = i; j < i + numToRead; ++j)
-                        {
-                            if (!(hasNull && columnVector.isNull[j]))
-                            {
-                                columnVector.vector[j] = inputBuffer.getLong();
-                            }
-                        }
+                        columnVector.vector[j] = readNextValue();
                     }
                 }
                 else
                 {
-                    if (nullsPadding)
+                    for (int j = i; j < i + numToRead; ++j)
                     {
-                        for (int j = i; j < i + numToRead; ++j)
+                        if (!(hasNull && columnVector.isNull[j]))
                         {
-                            columnVector.vector[j] = inputBuffer.getInt();
-                        }
-                    }
-                    else
-                    {
-                        for (int j = i; j < i + numToRead; ++j)
-                        {
-                            if (!(hasNull && columnVector.isNull[j]))
-                            {
-                                columnVector.vector[j] = inputBuffer.getInt();
-                            }
+                            columnVector.vector[j] = readNextValue();
                         }
                     }
                 }
@@ -259,7 +270,18 @@ public class LongColumnReader extends ColumnReader
             elementIndex = 0;
             if (encoding.getKind().equals(PixelsProto.ColumnEncoding.Kind.NONE))
             {
-                isLong = type.getCategory() == TypeDescription.Category.LONG;
+                switch (type.getCategory())
+                {
+                    case SHORT:
+                        readBytes = Short.BYTES;
+                        break;
+                    case INT:
+                        readBytes = Integer.BYTES;
+                        break;
+                    default:
+                        readBytes = Long.BYTES;
+                        break;
+                }
             }
         }
 
@@ -347,67 +369,32 @@ public class LongColumnReader extends ColumnReader
             }
             else
             {
-                if (isLong)
+                if (nullsPadding)
                 {
-                    if (nullsPadding)
+                    for (int j = i; j < i + numToRead; ++j)
                     {
-                        for (int j = i; j < i + numToRead; ++j)
+                        long value = readNextValue();
+                        if (selected.get(j - vectorIndex))
                         {
-                            long value = inputBuffer.getLong();
-                            if (selected.get(j - vectorIndex))
-                            {
-                                columnVector.vector[vectorWriteIndex++] = value;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        for (int j = i; j < i + numToRead; ++j)
-                        {
-                            if (!(hasNull && isNull[j - vectorIndex]))
-                            {
-                                long value = inputBuffer.getLong();
-                                if (selected.get(j - vectorIndex))
-                                {
-                                    columnVector.vector[vectorWriteIndex++] = value;
-                                }
-                            }
-                            else if (selected.get(j - vectorIndex))
-                            {
-                                vectorWriteIndex++;
-                            }
+                            columnVector.vector[vectorWriteIndex++] = value;
                         }
                     }
                 }
                 else
                 {
-                    if (nullsPadding)
+                    for (int j = i; j < i + numToRead; ++j)
                     {
-                        for (int j = i; j < i + numToRead; ++j)
+                        if (!(hasNull && isNull[j - vectorIndex]))
                         {
-                            int value = inputBuffer.getInt();
+                            long value = readNextValue();
                             if (selected.get(j - vectorIndex))
                             {
                                 columnVector.vector[vectorWriteIndex++] = value;
                             }
                         }
-                    }
-                    else
-                    {
-                        for (int j = i; j < i + numToRead; ++j)
+                        else if (selected.get(j - vectorIndex))
                         {
-                            if (!(hasNull && isNull[j]))
-                            {
-                                int value = inputBuffer.getInt();
-                                if (selected.get(j - vectorIndex))
-                                {
-                                    columnVector.vector[vectorWriteIndex++] = value;
-                                }
-                            }
-                            else if (selected.get(j - vectorIndex))
-                            {
-                                vectorWriteIndex++;
-                            }
+                            vectorWriteIndex++;
                         }
                     }
                 }

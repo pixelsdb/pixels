@@ -68,7 +68,7 @@ public class HashJoiner extends Joiner
         requireNonNull(largeBatch, "largeBatch is null");
         checkArgument(largeBatch.size > 0, "largeBatch is empty");
         List<VectorizedRowBatch> result = new LinkedList<>();
-        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize, TypeDescription.Mode.NONE);
+        VectorizedRowBatch joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize);
         Tuple.Builder builder = new Tuple.Builder(largeBatch, this.largeKeyColumnIds, this.largeProjection);
         while (builder.hasNext())
         {
@@ -87,7 +87,7 @@ public class HashJoiner extends Joiner
                         if (joinedRowBatch.isFull())
                         {
                             result.add(joinedRowBatch);
-                            joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize, TypeDescription.Mode.NONE);
+                            joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize);
                         }
                         joined.writeTo(joinedRowBatch);
                         break;
@@ -111,7 +111,7 @@ public class HashJoiner extends Joiner
                     if (joinedRowBatch.isFull())
                     {
                         result.add(joinedRowBatch);
-                        joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize, TypeDescription.Mode.NONE);
+                        joinedRowBatch = this.joinedSchema.createRowBatch(largeBatch.maxSize);
                     }
                     joined.writeTo(joinedRowBatch);
                     smallHead = smallHead.next;
@@ -141,7 +141,7 @@ public class HashJoiner extends Joiner
                 leftOuterTuples.add(small);
             }
         }
-        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
+        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize);
         for (Tuple small : leftOuterTuples)
         {
             if (leftOuterBatch.isFull())
@@ -187,7 +187,7 @@ public class HashJoiner extends Joiner
                 leftOuterTuples.add(small);
             }
         }
-        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
+        VectorizedRowBatch leftOuterBatch = this.joinedSchema.createRowBatch(batchSize);
         for (Tuple small : leftOuterTuples)
         {
             if (leftOuterBatch.isFull())

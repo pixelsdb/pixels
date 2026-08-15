@@ -20,7 +20,9 @@
 package io.pixelsdb.pixels.executor.aggregation.function;
 
 import io.pixelsdb.pixels.core.vector.ColumnVector;
+import io.pixelsdb.pixels.core.vector.IntColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
+import io.pixelsdb.pixels.core.vector.ShortColumnVector;
 
 /**
  * @author hank
@@ -37,8 +39,23 @@ public class BigintSum extends SingleColumnFunction
     {
         if (inputVector.noNulls || !inputVector.isNull[rowId])
         {
-            LongColumnVector longColumnVector = (LongColumnVector) inputVector;
-            this.value += longColumnVector.vector[rowId];
+            if (inputVector instanceof ShortColumnVector)
+            {
+                this.value += ((ShortColumnVector) inputVector).vector[rowId];
+            }
+            else if (inputVector instanceof IntColumnVector)
+            {
+                this.value += ((IntColumnVector) inputVector).vector[rowId];
+            }
+            else if (inputVector instanceof LongColumnVector)
+            {
+                this.value += ((LongColumnVector) inputVector).vector[rowId];
+            }
+            else
+            {
+                throw new IllegalStateException("Unsupported input vector: " +
+                        inputVector.getClass().getName());
+            }
         }
     }
 

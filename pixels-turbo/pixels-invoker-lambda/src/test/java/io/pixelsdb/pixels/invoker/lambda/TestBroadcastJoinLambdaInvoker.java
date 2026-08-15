@@ -120,17 +120,17 @@ public class TestBroadcastJoinLambdaInvoker
     @Test
     public void testSerFilter()
     {
-        ArrayList<Bound<Long>> discreteValues = new ArrayList<>();
-        discreteValues.add(new Bound<>(INCLUDED, 49L));
-        discreteValues.add(new Bound<>(INCLUDED, 14L));
-        discreteValues.add(new Bound<>(INCLUDED, 23L));
-        discreteValues.add(new Bound<>(INCLUDED, 45L));
-        discreteValues.add(new Bound<>(INCLUDED, 19L));
-        discreteValues.add(new Bound<>(INCLUDED, 3L));
-        discreteValues.add(new Bound<>(INCLUDED, 36L));
-        discreteValues.add(new Bound<>(INCLUDED, 9L));
-        ColumnFilter<Long> columnFilter = new ColumnFilter<Long>("p_size", TypeDescription.Category.INT,
-                new Filter<>(Long.TYPE, new ArrayList<>(), discreteValues, false, false, false, false));
+        ArrayList<Bound<Integer>> discreteValues = new ArrayList<>();
+        discreteValues.add(new Bound<>(INCLUDED, 49));
+        discreteValues.add(new Bound<>(INCLUDED, 14));
+        discreteValues.add(new Bound<>(INCLUDED, 23));
+        discreteValues.add(new Bound<>(INCLUDED, 45));
+        discreteValues.add(new Bound<>(INCLUDED, 19));
+        discreteValues.add(new Bound<>(INCLUDED, 3));
+        discreteValues.add(new Bound<>(INCLUDED, 36));
+        discreteValues.add(new Bound<>(INCLUDED, 9));
+        ColumnFilter<Integer> columnFilter = new ColumnFilter<>("p_size", TypeDescription.Category.INT,
+                new Filter<>(Integer.TYPE, new ArrayList<>(), discreteValues, false, false, false, false));
         SortedMap<Integer, ColumnFilter> columnFilters = new TreeMap<>();
         columnFilters.put(2, columnFilter);
         TableScanFilter filter = new TableScanFilter("tpch", "lineitem", columnFilters);
@@ -142,7 +142,7 @@ public class TestBroadcastJoinLambdaInvoker
     {
         String filter = "{\"schemaName\":\"tpch\",\"tableName\":\"lineitem\"," +
                 "\"columnFilters\":{2:{\"columnName\":\"p_size\",\"columnType\":\"INT\"," +
-                "\"filterJson\":\"{\\\"javaType\\\":\\\"long\\\",\\\"isAll\\\":false," +
+                "\"filterJson\":\"{\\\"javaType\\\":\\\"int\\\",\\\"isAll\\\":false," +
                 "\\\"isNone\\\":false,\\\"allowNull\\\":false,\\\"onlyNull\\\":false," +
                 "\\\"ranges\\\":[],\\\"discreteValues\\\":[{" +
                 "\\\"type\\\":\\\"INCLUDED\\\",\\\"value\\\":49}," +

@@ -219,11 +219,11 @@ public class IntegerStatsRecorder
         long upper = maximum;
         if (lowerBound != null)
         {
-            lower = (long) lowerBound;
+            lower = ((Number) lowerBound).longValue();
         }
         if (upperBound != null)
         {
-            upper = (long) upperBound;
+            upper = ((Number) upperBound).longValue();
         }
         checkArgument(lower <= upper, "lower bound must be larger than the upper bound");
         if (lower < minimum)

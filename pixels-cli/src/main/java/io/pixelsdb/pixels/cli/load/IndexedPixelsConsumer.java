@@ -308,7 +308,7 @@
              this.prevRgId = this.rgId;
              this.rgRowOffset = 0;
              this.rowCounter = 0;
-             this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride, TypeDescription.Mode.NONE);
+             this.rowBatch = schema.createRowBatchWithHiddenColumn(pixelStride);
              this.vNodeId = vNodeId;
              this.indexService = indexServices.computeIfAbsent(node.getAddress(), nodeInfo ->
                      RPCIndexService.CreateInstance(nodeInfo, indexServerPort));

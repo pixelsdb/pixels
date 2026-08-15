@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 PixelsDB.
+ * Copyright 2026 PixelsDB.
  *
  * This file is part of Pixels.
  *
@@ -21,7 +21,7 @@ package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
-import io.pixelsdb.pixels.core.flat.IntColumnVectorFlat;
+import io.pixelsdb.pixels.core.flat.ShortColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
 import java.nio.ByteBuffer;
@@ -31,40 +31,42 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 /**
- * This class represents a nullable int column vector.
- * This class uses a 32-bit integer value to hold the values.
- * In high Java versions such as Java 23, 32-bit integer has comparable operation performance as 64-bit integer.
- * Therefore, using 32-bit column vector for int32 columns saves memory without performance degradation.
- * <p>
- * The vector[] field is public by design for high-performance access in the inner
- * loop of query execution.
+ * This class represents a nullable short (int16) column vector.
+ * This class uses 16-bit integer values.
  *
- * @author hank
- * @create 2024-12-02
+ * @author gengdy
+ * @create 2026-08-07
  */
-public class IntColumnVector extends ColumnVector
+public class ShortColumnVector extends ColumnVector
 {
-    public int[] vector;
+    public short[] vector;
 
-    /**
-     * Use this constructor by default. All column vectors
-     * should normally be the default size.
-     */
-    public IntColumnVector()
+    public ShortColumnVector()
     {
         this(VectorizedRowBatch.DEFAULT_SIZE);
     }
 
-    /**
-     * Don't use this except for testing purposes.
-     *
-     * @param len the number of rows
-     */
-    public IntColumnVector(int len)
+    public ShortColumnVector(int len)
     {
         super(len);
-        vector = new int[len];
-        memoryUsage += (long) Integer.BYTES * len;
+        this.vector = new short[len];
+        this.memoryUsage += (long) Short.BYTES * len;
+    }
+
+    @Override
+    public void add(int value)
+    {
+        add((long) value);
+    }
+
+    @Override
+    public void add(long value)
+    {
+        if (value < Short.MIN_VALUE || value > Short.MAX_VALUE)
+        {
+            throw new IllegalArgumentException("SHORT value out of range: " + value);
+        }
+        add((short) value);
     }
 
     @Override
@@ -79,7 +81,7 @@ public class IntColumnVector extends ColumnVector
                 add(0);
                 break;
             default:
-                add(Integer.parseInt(value));
+                add(Short.parseShort(value));
                 break;
         }
     }
@@ -90,47 +92,45 @@ public class IntColumnVector extends ColumnVector
         add(value ? 1 : 0);
     }
 
-    @Override
-    public void add(int v)
+    public void add(short value)
     {
         if (writeIndex >= getLength())
         {
             ensureSize(writeIndex * 2, true);
         }
         int index = writeIndex++;
-        vector[index] = v;
-        isNull[index] = false;
+        this.vector[index] = value;
+        this.isNull[index] = false;
     }
-
+    
     @Override
     public void add(byte[] value)
     {
-        if(checkBytesNull(value))
+        if (checkBytesNull(value))
         {
             return;
         }
-        if (value.length != Integer.BYTES)
+        if (value.length != Short.BYTES)
         {
-            throw new IllegalArgumentException("Only byte[4] supported for serialization to int");
+            throw new IllegalArgumentException("Only byte[2] supported for serialization to short");
         }
-        int v = ByteBuffer.wrap(value).getInt();
+        short v = ByteBuffer.wrap(value).getShort();
         add(v);
     }
-
 
     @Override
     public int[] accumulateHashCode(int[] hashCode)
     {
         requireNonNull(hashCode, "hashCode is null");
-        checkArgument(hashCode.length > 0 && hashCode.length <= this.length, "",
+        checkArgument(hashCode.length > 0 && hashCode.length <= this.length,
                 "the length of hashCode is not in the range [1, length]");
         for (int i = 0; i < hashCode.length; ++i)
         {
-            if (this.isNull[i])
+            if (!this.isNull[i])
             {
-                continue;
+                int value = this.vector[i];
+                hashCode[i] = 31 * hashCode[i] + (value ^ (value >>> 16));
             }
-            hashCode[i] = 31 * hashCode[i] + (this.vector[i] ^ (this.vector[i] >>> 16));
         }
         return hashCode;
     }
@@ -138,55 +138,47 @@ public class IntColumnVector extends ColumnVector
     @Override
     public boolean elementEquals(int index, int otherIndex, ColumnVector other)
     {
-        IntColumnVector otherVector = (IntColumnVector) other;
-        if (!this.isNull[index] && !otherVector.isNull[otherIndex])
-        {
-            return this.vector[index] == otherVector.vector[otherIndex];
-        }
-        return false;
+        ShortColumnVector otherVector = (ShortColumnVector) other;
+        return !this.isNull[index] && !otherVector.isNull[otherIndex] &&
+                this.vector[index] == otherVector.vector[otherIndex];
     }
 
     @Override
     public int compareElement(int index, int otherIndex, ColumnVector other)
     {
-        IntColumnVector otherVector = (IntColumnVector) other;
+        ShortColumnVector otherVector = (ShortColumnVector) other;
         if (!this.isNull[index] && !otherVector.isNull[otherIndex])
         {
-            return this.vector[index] < otherVector.vector[otherIndex] ? -1 :
-                    (this.vector[index] == otherVector.vector[otherIndex] ? 0 : 1);
+            return Short.compare(this.vector[index], otherVector.vector[otherIndex]);
         }
         return this.isNull[index] ? -1 : 1;
     }
 
-    // Fill the column vector with the provided value
-    public void fill(int value)
+    public void fill(short value)
     {
-        noNulls = true;
-        isRepeating = true;
-        vector[0] = value;
+        this.noNulls = true;
+        this.isRepeating = true;
+        this.vector[0] = value;
     }
 
-    // Simplify vector by brute-force flattening noNulls and isRepeating
-    // This can be used to reduce combinatorial explosion of code paths in VectorExpressions
-    // with many arguments.
+    @Override
     public void flatten(boolean selectedInUse, int[] sel, int size)
     {
         flattenPush();
         if (isRepeating)
         {
             isRepeating = false;
-            int repeatVal = vector[0];
+            short repeatValue = vector[0];
             if (selectedInUse)
             {
-                for (int j = 0; j < size; j++)
+                for (int j = 0; j < size; ++j)
                 {
-                    int i = sel[j];
-                    vector[i] = repeatVal;
+                    vector[sel[j]] = repeatValue;
                 }
             }
             else
             {
-                Arrays.fill(vector, 0, size, repeatVal);
+                Arrays.fill(vector, 0, size, repeatValue);
             }
             writeIndex = size;
             flattenRepeatingNulls(selectedInUse, sel, size);
@@ -200,35 +192,33 @@ public class IntColumnVector extends ColumnVector
         int index = writeIndex++;
         if (inputVector.noNulls || !inputVector.isNull[inputIndex])
         {
-            isNull[index] = false;
-            vector[index] = ((IntColumnVector) inputVector).vector[inputIndex];
+            this.isNull[index] = false;
+            this.vector[index] = ((ShortColumnVector) inputVector).vector[inputIndex];
         }
         else
         {
-            isNull[index] = true;
-            noNulls = false;
+            this.isNull[index] = true;
+            this.noNulls = false;
         }
     }
 
     @Override
     public void addSelected(int[] selected, int offset, int length, ColumnVector src)
     {
-        // isRepeating should be false and src should be an instance of IntColumnVector.
-        // However, we do not check these for performance considerations.
-        IntColumnVector source = (IntColumnVector) src;
-
-        for (int i = offset; i < offset + length; i++)
+        ShortColumnVector source = (ShortColumnVector) src;
+        for (int i = offset; i < offset + length; ++i)
         {
-            int srcIndex = selected[i], thisIndex = writeIndex++;
-            if (source.isNull[srcIndex])
+            int sourceIndex = selected[i];
+            int targetIndex = writeIndex++;
+            if (source.isNull[sourceIndex])
             {
-                this.isNull[thisIndex] = true;
+                this.isNull[targetIndex] = true;
                 this.noNulls = false;
             }
             else
             {
-                this.vector[thisIndex] = source.vector[srcIndex];
-                this.isNull[thisIndex] = false;
+                this.vector[targetIndex] = source.vector[sourceIndex];
+                this.isNull[targetIndex] = false;
             }
         }
     }
@@ -236,14 +226,14 @@ public class IntColumnVector extends ColumnVector
     @Override
     public void duplicate(ColumnVector inputVector)
     {
-        if (inputVector instanceof IntColumnVector)
+        if (inputVector instanceof ShortColumnVector)
         {
-            IntColumnVector srcVector = (IntColumnVector) inputVector;
-            this.vector = srcVector.vector;
-            this.isNull = srcVector.isNull;
-            this.writeIndex = srcVector.writeIndex;
-            this.noNulls = srcVector.noNulls;
-            this.isRepeating = srcVector.isRepeating;
+            ShortColumnVector source = (ShortColumnVector) inputVector;
+            this.vector = source.vector;
+            this.isNull = source.isNull;
+            this.writeIndex = source.writeIndex;
+            this.noNulls = source.noNulls;
+            this.isRepeating = source.isRepeating;
         }
     }
 
@@ -254,26 +244,23 @@ public class IntColumnVector extends ColumnVector
                 "column vector is repeating, flatten before applying filter");
         checkArgument(before > 0 && before <= length,
                 "before index is not in the range [1, length]");
-        boolean noNulls = true;
-        int j = 0;
-        for (int i = filter.nextSetBit(0);
-             i >= 0 && i < before; i = filter.nextSetBit(i+1), j++)
+        boolean filteredNoNulls = true;
+        int targetIndex = 0;
+        for (int sourceIndex = filter.nextSetBit(0);
+             sourceIndex >= 0 && sourceIndex < before;
+             sourceIndex = filter.nextSetBit(sourceIndex + 1), ++targetIndex)
         {
-            if (i > j)
+            if (sourceIndex > targetIndex)
             {
-                this.vector[j] = this.vector[i];
-                this.isNull[j] = this.isNull[i];
+                this.vector[targetIndex] = this.vector[sourceIndex];
+                this.isNull[targetIndex] = this.isNull[sourceIndex];
             }
-            if (this.isNull[j])
+            if (this.isNull[targetIndex])
             {
-                noNulls = false;
+                filteredNoNulls = false;
             }
-            /*
-             * The number of rows in a row batch is impossible to reach Integer.MAX_VALUE.
-             * Therefore, we do not check overflow here.
-             */
         }
-        this.noNulls = noNulls;
+        this.noNulls = filteredNoNulls;
     }
 
     @Override
@@ -299,9 +286,9 @@ public class IntColumnVector extends ColumnVector
         super.ensureSize(size, preserveData);
         if (size > vector.length)
         {
-            int[] oldArray = vector;
-            vector = new int[size];
-            memoryUsage += Integer.BYTES * size;
+            short[] oldArray = vector;
+            vector = new short[size];
+            memoryUsage += (long) Short.BYTES * size;
             length = size;
             if (preserveData)
             {
@@ -327,28 +314,28 @@ public class IntColumnVector extends ColumnVector
     @Override
     public byte getFlatBufferType()
     {
-        return ColumnVectorFlat.IntColumnVectorFlat;
+        return ColumnVectorFlat.ShortColumnVectorFlat;
     }
 
     @Override
     public int serialize(FlatBufferBuilder builder)
     {
         int baseOffset = super.serialize(builder);
-        int vectorVectorOffset = IntColumnVectorFlat.createVectorVector(builder, vector);
-        IntColumnVectorFlat.startIntColumnVectorFlat(builder);
-        IntColumnVectorFlat.addBase(builder, baseOffset);
-        IntColumnVectorFlat.addVector(builder, vectorVectorOffset);
-        return IntColumnVectorFlat.endIntColumnVectorFlat(builder);
+        int vectorOffset = ShortColumnVectorFlat.createVectorVector(builder, vector);
+        ShortColumnVectorFlat.startShortColumnVectorFlat(builder);
+        ShortColumnVectorFlat.addBase(builder, baseOffset);
+        ShortColumnVectorFlat.addVector(builder, vectorOffset);
+        return ShortColumnVectorFlat.endShortColumnVectorFlat(builder);
     }
 
-    public static IntColumnVector deserialize(IntColumnVectorFlat flat)
+    public static ShortColumnVector deserialize(ShortColumnVectorFlat flat)
     {
-        IntColumnVector vector = new IntColumnVector(flat.base().length());
+        ShortColumnVector result = new ShortColumnVector(flat.base().length());
         for (int i = 0; i < flat.vectorLength(); ++i)
         {
-            vector.vector[i] = flat.vector(i);
+            result.vector[i] = flat.vector(i);
         }
-        vector.deserializeBase(flat.base());
-        return vector;
+        result.deserializeBase(flat.base());
+        return result;
     }
 }

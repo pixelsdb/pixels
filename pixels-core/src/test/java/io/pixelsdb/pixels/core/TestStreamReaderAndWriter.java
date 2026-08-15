@@ -39,7 +39,7 @@ public class TestStreamReaderAndWriter
     static int charMaxSize = 55;
     static boolean nullsPadding = true;
     static TypeDescription schema;
-    static LongColumnVector intColumnVector = new LongColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
+    static IntColumnVector intColumnVector = new IntColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
     static LongColumnVector longColumnVector = new LongColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
     static DecimalColumnVector decimalColumnVector = new DecimalColumnVector(VectorizedRowBatch.DEFAULT_SIZE, 15, 2);
     static BinaryColumnVector varCharColumnVector = new BinaryColumnVector(VectorizedRowBatch.DEFAULT_SIZE);
@@ -242,15 +242,14 @@ public class TestStreamReaderAndWriter
     private static void compareColumn(int colIdx, VectorizedRowBatch rowBatch)
     {
         ColumnVector column = rowBatch.cols[colIdx];
-        if (column instanceof LongColumnVector &&
-                schema.getChildren().get(colIdx).getCategory() == TypeDescription.Category.INT)
+        if (column instanceof IntColumnVector)
         {
             for (int i = 0; i < VectorizedRowBatch.DEFAULT_SIZE; i++)
             {
                 assert column.noNulls == intColumnVector.noNulls;
                 assert column.isNull[i] == intColumnVector.isNull[i];
                 assert !intColumnVector.noNulls && column.isNull[i] ||
-                        ((LongColumnVector) column).vector[i] == intColumnVector.vector[i];
+                        ((IntColumnVector) column).vector[i] == intColumnVector.vector[i];
             }
         } else if (column instanceof LongColumnVector )
         {

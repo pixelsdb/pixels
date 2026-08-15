@@ -83,7 +83,7 @@ public class Partitioner
         this.selectedArrayIndexes = new int[numPartition];
         for (int i = 0; i < numPartition; ++i)
         {
-            this.rowBatches[i] = schema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
+            this.rowBatches[i] = schema.createRowBatch(batchSize);
             this.selectedArrays[i] = new int[batchSize];
             this.selectedArrayIndexes[i] = 0;
         }
@@ -127,14 +127,14 @@ public class Partitioner
             if (freeSlots == 0)
             {
                 output.put(hash, rowBatches[hash]);
-                rowBatches[hash] = schema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
+                rowBatches[hash] = schema.createRowBatch(batchSize);
                 rowBatches[hash].addSelected(selected, 0, selectedLength, input);
             }
             else if (freeSlots <= selectedLength)
             {
                 rowBatches[hash].addSelected(selected, 0, freeSlots, input);
                 output.put(hash, rowBatches[hash]);
-                rowBatches[hash] = schema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
+                rowBatches[hash] = schema.createRowBatch(batchSize);
                 if (freeSlots < selectedLength)
                 {
                     rowBatches[hash].addSelected(selected, freeSlots, selectedLength - freeSlots, input);

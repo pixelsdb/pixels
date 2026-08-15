@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
-import com.google.flatbuffers.Table;
 import io.pixelsdb.pixels.core.flat.*;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
@@ -426,7 +425,6 @@ public class VectorizedRowBatch implements AutoCloseable
 
         for (int i = 0; i < batchFlat.numCols(); ++i)
         {
-            Table colTable;
             switch (batchFlat.colsType(i))
             {
                 case ColumnVectorFlat.BinaryColumnVectorFlat:
@@ -452,6 +450,9 @@ public class VectorizedRowBatch implements AutoCloseable
                     break;
                 case ColumnVectorFlat.IntColumnVectorFlat:
                     batch.cols[i] = IntColumnVector.deserialize((IntColumnVectorFlat) batchFlat.cols(new IntColumnVectorFlat(), i));
+                    break;
+                case ColumnVectorFlat.ShortColumnVectorFlat:
+                    batch.cols[i] = ShortColumnVector.deserialize((ShortColumnVectorFlat) batchFlat.cols(new ShortColumnVectorFlat(), i));
                     break;
                 case ColumnVectorFlat.LongColumnVectorFlat:
                     batch.cols[i] = LongColumnVector.deserialize((LongColumnVectorFlat) batchFlat.cols(new LongColumnVectorFlat(), i));
