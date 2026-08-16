@@ -941,7 +941,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     private int preRGIdx = 0;
 
     /**
-     * Prepare for the next row batch. This method is independent from {@link #readBatch(int, boolean)}.
+     * Prepare for the next row batch. This method is independent of {@link #readBatch(int, boolean)}.
      *
      * @param batchSize the willing batch size.
      * @return the real batch size.

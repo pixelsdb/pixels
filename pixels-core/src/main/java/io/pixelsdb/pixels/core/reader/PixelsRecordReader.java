@@ -31,7 +31,7 @@ import java.io.IOException;
 public interface PixelsRecordReader extends AutoCloseable
 {
     /**
-     * Prepare for the next row batch. This method is independent from readBatch().
+     * Prepare for the next row batch. This method is independent of readBatch().
      *
      * @param batchSize the willing batch size
      * @return the real batch size
@@ -39,7 +39,7 @@ public interface PixelsRecordReader extends AutoCloseable
     int prepareBatch(int batchSize) throws IOException;
 
     /**
-     * Read the next row batch. This method is thread-safe and independent from prepareBatch().
+     * Read the next row batch. This method is thread-safe and independent of prepareBatch().
      *
      * @param batchSize the row batch size
      * @return vectorized row batch
