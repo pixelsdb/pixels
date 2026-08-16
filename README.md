@@ -148,7 +148,6 @@ The key ideas and insights in Pixels are elaborated in the following publication
   Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du  
   *Proceedings of the 25th International Conference on Extending Database Technology* (**EDBT'22**)
 
-
 ### File Formats
 > [Pixels: An Efficient Column Store for Cloud Data Lakes](https://doi.org/10.1109/ICDE53745.2022.00276)  
   Haoqiong Bian, Anastasia Ailamaki  
