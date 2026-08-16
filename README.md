@@ -117,14 +117,20 @@ Pixels is an academic system aims at providing production-grade quality. It supp
 is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
+### Real-Time Analytics
 > [Transactional Data Change for Real-Time Analytics in Lakehouses]()  
-Dongyang Geng, Haoqiong Bian, Zinuo Li, Haoyue Li  
-*Proceedings of the VLDB Endowment, Volume 19* (**VLDB'26**)
+  Dongyang Geng, Haoqiong Bian, Zinuo Li, Haoyue Li  
+  *Proceedings of the VLDB Endowment, Volume 19* (**VLDB'26**)
 
 > [How Consistent and Fresh are Lake Tables Really](https://doi.org/10.1145/3802514.3812602)  
   Zinuo Li, Dongyang Geng, Haoyue Li, Hailong Yu, Qi Lei, Haoqiong Bian  
   *Proceedings of the 1st International Workshop on Data FORMATS for Modern Architectures and Workloads* (**FORMATS'26 @ SIGMOD**)
 
+> [Pixels: Multiversion Wide Table Store for Data Lakes (abstract)](https://www.cidrdb.org/cidr2020/gongshow2020/gongshow/abstracts/cidr2020_abstract74.pdf)  
+  Haoqiong Bian  
+  *10th Annual Conference on Innovative Data Systems Research* (**CIDR'20**)
+
+### Elastic Query Processing
 > [PixelsDB: Serverless and NL-Aided Data Analytics with Flexible Service Levels and Prices (demo)](https://doi.org/10.1109/ICDE65448.2025.00365)  
   Haoqiong Bian, Dongyang Geng, Haoyang Li, Yunpeng Chai, Anastasia Ailamaki  
   *Proceedings of the 41st IEEE International Conference on Data Engineering* (**ICDE'25**)
@@ -137,17 +143,19 @@ Dongyang Geng, Haoqiong Bian, Zinuo Li, Haoyue Li
   Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki  
   *Proceedings of the 2023 ACM International Conference on Management of Data* (**SIGMOD'23**)
 
+### Caching
 > [Columnar Storage Optimization and Caching for Data Lakes (short)](https://doi.org/10.48786/edbt.2022.33)  
   Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du  
   *Proceedings of the 25th International Conference on Extending Database Technology* (**EDBT'22**)
 
+### File Formats
 > [Pixels: An Efficient Column Store for Cloud Data Lakes](https://doi.org/10.1109/ICDE53745.2022.00276)  
   Haoqiong Bian, Anastasia Ailamaki  
   *Proceedings of the 38th IEEE International Conference on Data Engineering* (**ICDE'22**)
 
-> [Pixels: Multiversion Wide Table Store for Data Lakes (abstract)](https://www.cidrdb.org/cidr2020/gongshow2020/gongshow/abstracts/cidr2020_abstract74.pdf)  
-  Haoqiong Bian  
-  *10th Annual Conference on Innovative Data Systems Research* (**CIDR'20**)
+> [HDFS存储和优化技术研究综述 (Survey on Storage and Optimization Techniques of HDFS)](https://www.jos.org.cn/jos/article/abstract/5872)  
+  Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du  
+  *Journal of Software, 2020, 31(1): 137-161*
 
 > [Rainbow: Adaptive Layout Optimization for Wide Tables (demo)](https://doi.org/10.1109/ICDE.2018.00200)  
   Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du  
