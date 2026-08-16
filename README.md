@@ -117,8 +117,12 @@ Pixels is an academic system aims at providing production-grade quality. It supp
 is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
-> [How Consistent and Fresh are Lake Tables Really (short)](https://doi.org/10.1145/3802514.3812602)  
-  Zinuo Li, Dongyang Geng, Haoqyue Li, Hailong Yu, Qi Lei, Haoqiong Bian  
+> [Transactional Data Change for Real-Time Analytics in Lakehouses]()  
+Dongyang Geng, Haoqiong Bian, Zinuo Li, Haoyue Li  
+*Proceedings of the VLDB Endowment, Volume 19* (**VLDB'26**)
+
+> [How Consistent and Fresh are Lake Tables Really](https://doi.org/10.1145/3802514.3812602)  
+  Zinuo Li, Dongyang Geng, Haoyue Li, Hailong Yu, Qi Lei, Haoqiong Bian  
   *Proceedings of the 1st International Workshop on Data FORMATS for Modern Architectures and Workloads* (**FORMATS'26 @ SIGMOD**)
 
 > [PixelsDB: Serverless and NL-Aided Data Analytics with Flexible Service Levels and Prices (demo)](https://doi.org/10.1109/ICDE65448.2025.00365)  
@@ -127,7 +131,7 @@ The key ideas and insights in Pixels are elaborated in the following publication
 
 > [Serverless Query Processing with Flexible Performance SLAs and Prices](https://arxiv.org/abs/2409.01388)  
   Haoqiong Bian, Dongyang Geng, Yunpeng Chai, Anastasia Ailamaki  
-  *arXiv preprint arXiv:2409.01388* (**arXiv'24**)
+  *arXiv preprint arXiv:2409.01388*
 
 > [Using Cloud Functions as Accelerator for Elastic Data Analytics](https://doi.org/10.1145/3589306)  
   Haoqiong Bian, Tiannan Sha, Anastasia Ailamaki  
