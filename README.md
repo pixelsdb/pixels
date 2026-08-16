@@ -118,8 +118,8 @@ is compatible with the mainstream data analytic ecosystems.
 The key ideas and insights in Pixels are elaborated in the following publications.
 
 > [Transactional Data Change for Real-Time Analytics in Lakehouses]()  
-Dongyang Geng, Haoqiong Bian, Zinuo Li, Haoyue Li  
-*Proceedings of the VLDB Endowment, Volume 19* (**VLDB'26**)
+  Dongyang Geng, Haoqiong Bian, Zinuo Li, Haoyue Li  
+  *Proceedings of the VLDB Endowment, Volume 19* (**VLDB'26**)
 
 > [How Consistent and Fresh are Lake Tables Really](https://doi.org/10.1145/3802514.3812602)  
   Zinuo Li, Dongyang Geng, Haoyue Li, Hailong Yu, Qi Lei, Haoqiong Bian  
@@ -148,6 +148,10 @@ Dongyang Geng, Haoqiong Bian, Zinuo Li, Haoyue Li
 > [Pixels: Multiversion Wide Table Store for Data Lakes (abstract)](https://www.cidrdb.org/cidr2020/gongshow2020/gongshow/abstracts/cidr2020_abstract74.pdf)  
   Haoqiong Bian  
   *10th Annual Conference on Innovative Data Systems Research* (**CIDR'20**)
+
+> [HDFS存储和优化技术研究综述 (Survey on Storage and Optimization Techniques of HDFS)](https://www.jos.org.cn/jos/article/abstract/5872)  
+  Guodong Jin, Haoqiong Bian, Yueguo Chen, Xiaoyong Du  
+  *Journal of Software, 2020, 31(1): 137-161*
 
 > [Rainbow: Adaptive Layout Optimization for Wide Tables (demo)](https://doi.org/10.1109/ICDE.2018.00200)  
   Haoqiong Bian, Youxian Tao, Guodong Jin, Yueguo Chen, Xiongpai Qin, Xiaoyong Du  
