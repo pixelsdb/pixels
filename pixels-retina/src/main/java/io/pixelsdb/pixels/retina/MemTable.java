@@ -33,18 +33,20 @@ public class MemTable implements Referenceable
     private final long id;  // unique identifier
     private final TypeDescription schema;
     private final VectorizedRowBatch rowBatch;
+    private final int[] orderMapping;
 
 
     private final long fileId;
     private final int startIndex;
     private final int length;
 
-    public MemTable(long id, TypeDescription schema, int size,
-                    long fileId, int startIndex, int length)
+    public MemTable(long id, TypeDescription schema, int size, int vectorLayout,
+                    int[] orderMapping, long fileId, int startIndex, int length)
     {
         this.id = id;
         this.schema = schema;
-        this.rowBatch = schema.createRowBatchWithHiddenColumn(size);
+        this.orderMapping = orderMapping;
+        this.rowBatch = schema.createRowBatchWithHiddenColumn(size, vectorLayout);
         this.fileId = fileId;
         this.startIndex = startIndex;
         this.length = length;
@@ -68,13 +70,14 @@ public class MemTable implements Referenceable
         }
         for (int i = 0; i < values.length; ++i)
         {
-            if (values[i] == null)
+            byte[] value = values[this.orderMapping[i]];
+            if (value == null)
             {
                 this.rowBatch.cols[i].addNull();
             }
             else
             {
-                this.rowBatch.cols[i].add(values[i]);
+                this.rowBatch.cols[i].add(value);
             }
         }
         this.rowBatch.cols[schema.getChildren().size()].add(timestamp);
