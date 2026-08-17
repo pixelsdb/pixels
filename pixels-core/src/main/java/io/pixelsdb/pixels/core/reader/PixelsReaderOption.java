@@ -35,7 +35,7 @@ public class PixelsReaderOption
     private boolean enableEncodedColumnVector = false; // whether read encoded column vectors directly when possible
     private boolean readIntColumnAsLongVector = false; // whether read int32 columns as long column vectors, for backward compatibility of old query engines
     private boolean readShortColumnAsLongVector = false; // whether read int16 columns as long column vectors, for backward compatibility of old query engines
-    private boolean readTimeColumnAsLongVector = false; // whether read time columns as picoseconds in long vectors
+    private boolean readTimeColumnAsLongTimeVector = false; // whether read TIME as LongTimeColumnVector (picoseconds), for Trino-native layout
     private boolean exposeHiddenColumn = false; // whether expose the hidden commit timestamp column in the result batch
     private long transId = -1L;
     private long transTimestamp = -1L; // -1 means no need to consider the timestamp when reading data
@@ -179,15 +179,15 @@ public class PixelsReaderOption
         return readShortColumnAsLongVector;
     }
 
-    public PixelsReaderOption readTimeColumnAsLongVector(boolean readTimeColumnAsLongVector)
+    public PixelsReaderOption readTimeColumnAsLongTimeVector(boolean readTimeColumnAsLongTimeVector)
     {
-        this.readTimeColumnAsLongVector = readTimeColumnAsLongVector;
+        this.readTimeColumnAsLongTimeVector = readTimeColumnAsLongTimeVector;
         return this;
     }
 
-    public boolean isReadTimeColumnAsLongVector()
+    public boolean isReadTimeColumnAsLongTimeVector()
     {
-        return readTimeColumnAsLongVector;
+        return readTimeColumnAsLongTimeVector;
     }
 
     public PixelsReaderOption exposeHiddenColumn(boolean exposeHiddenColumn)

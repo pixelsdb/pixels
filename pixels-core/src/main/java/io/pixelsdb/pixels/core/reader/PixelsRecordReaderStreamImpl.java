@@ -125,7 +125,7 @@ public class PixelsRecordReaderStreamImpl implements PixelsRecordReader
         this.option = option;
         this.vectorLayout = (option.isReadIntColumnAsLongVector() ? TypeDescription.VectorLayout.INT_AS_LONG : 0) |
                 (option.isReadShortColumnAsLongVector() ? TypeDescription.VectorLayout.SHORT_AS_LONG : 0) |
-                (option.isReadTimeColumnAsLongVector() ? TypeDescription.VectorLayout.TIME_AS_PICO_LONG : 0);
+                (option.isReadTimeColumnAsLongTimeVector() ? TypeDescription.VectorLayout.TIME_AS_LONG_TIME : 0);
         this.includedColumnTypes = new ArrayList<>();
         checkBeforeRead();
     }

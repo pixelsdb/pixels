@@ -38,7 +38,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOSECONDS_PER_MILLISECOND;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOS_PER_MILLIS;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -379,9 +379,9 @@ public class ColumnFilter<T extends Comparable<T>>
                 doFilter(dacv.dates, dacv.noNulls ? null : dacv.isNull, start, length, result);
                 return;
             case TIME:
-                if (columnVector instanceof LongColumnVector)
+                if (columnVector instanceof LongTimeColumnVector)
                 {
-                    LongColumnVector ltcv = (LongColumnVector) columnVector;
+                    LongTimeColumnVector ltcv = (LongTimeColumnVector) columnVector;
                     doFilterTime(ltcv.vector, ltcv.noNulls ? null : ltcv.isNull, start, length, result);
                 }
                 else
@@ -686,11 +686,11 @@ public class ColumnFilter<T extends Comparable<T>>
                 long lowerBound = range.lowerBound.type != Bound.Type.UNBOUNDED ?
                         ((Integer) range.lowerBound.value +
                                 (range.lowerBound.type == Bound.Type.EXCLUDED ? 1L : 0L)) *
-                                PICOSECONDS_PER_MILLISECOND : Long.MIN_VALUE;
+                                PICOS_PER_MILLIS : Long.MIN_VALUE;
                 long upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
                         ((Integer) range.upperBound.value -
                                 (range.upperBound.type == Bound.Type.EXCLUDED ? 1L : 0L)) *
-                                PICOSECONDS_PER_MILLISECOND : Long.MAX_VALUE;
+                                PICOS_PER_MILLIS : Long.MAX_VALUE;
                 for (int i = start; i < start + length; ++i)
                 {
                     if (this.filter.allowNull && !noNulls && isNull[i] ||
@@ -706,12 +706,12 @@ public class ColumnFilter<T extends Comparable<T>>
             Set<Long> picoIncludes = new HashSet<>(includes.size());
             for (T value : includes)
             {
-                picoIncludes.add((Integer) value * PICOSECONDS_PER_MILLISECOND);
+                picoIncludes.add((Integer) value * PICOS_PER_MILLIS);
             }
             Set<Long> picoExcludes = new HashSet<>(excludes.size());
             for (T value : excludes)
             {
-                picoExcludes.add((Integer) value * PICOSECONDS_PER_MILLISECOND);
+                picoExcludes.add((Integer) value * PICOS_PER_MILLIS);
             }
             for (int i = start; i < start + length; ++i)
             {

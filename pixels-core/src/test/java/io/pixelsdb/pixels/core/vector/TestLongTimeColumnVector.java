@@ -22,19 +22,21 @@ package io.pixelsdb.pixels.core.vector;
 import io.pixelsdb.pixels.core.TypeDescription;
 import org.junit.Test;
 
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOSECONDS_PER_MILLISECOND;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOS_PER_MILLIS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * @author hank
- * @create 2026-08-09
+ * Tests for {@link LongTimeColumnVector} read layout and native TIME deserialization.
+ *
+ * @author gengdy
+ * @create 2026-08-17
  */
-public class TestLongColumnVector
+public class TestLongTimeColumnVector
 {
     @Test
-    public void testDeserializeTimeWithLongLayout()
+    public void testDeserializeTimeWithRequestedLayout()
     {
         int[] millis = {0, 1, 3_723_004, 86_399_999};
         VectorizedRowBatch source = TypeDescription.createTime(3).createRowBatch(millis.length + 1);
@@ -51,18 +53,27 @@ public class TestLongColumnVector
         assertTrue(defaultBatch.cols[0] instanceof TimeColumnVector);
         assertEquals(millis[2], ((TimeColumnVector) defaultBatch.cols[0]).times[2]);
 
-        VectorizedRowBatch longBatch = VectorizedRowBatch.deserialize(
-                serialized, TypeDescription.VectorLayout.TIME_AS_PICO_LONG);
-        assertTrue(longBatch.cols[0] instanceof LongColumnVector);
-        LongColumnVector longVector = (LongColumnVector) longBatch.cols[0];
-        assertEquals(timeVector.getLength(), longVector.getLength());
-        assertEquals(timeVector.getWriteIndex(), longVector.getWriteIndex());
-        assertFalse(longVector.noNulls);
+        VectorizedRowBatch longTimeBatch = VectorizedRowBatch.deserialize(
+                serialized, TypeDescription.VectorLayout.TIME_AS_LONG_TIME);
+        assertTrue(longTimeBatch.cols[0] instanceof LongTimeColumnVector);
+        LongTimeColumnVector longTimeVector = (LongTimeColumnVector) longTimeBatch.cols[0];
+        assertEquals(timeVector.getLength(), longTimeVector.getLength());
+        assertEquals(timeVector.getWriteIndex(), longTimeVector.getWriteIndex());
+        assertEquals(timeVector.noNulls, longTimeVector.noNulls);
+        assertEquals(timeVector.getPrecision(), longTimeVector.getPrecision());
         for (int i = 0; i < millis.length; ++i)
         {
-            assertFalse(longVector.isNull[i]);
-            assertEquals(millis[i] * PICOSECONDS_PER_MILLISECOND, longVector.vector[i]);
+            assertFalse(longTimeVector.isNull[i]);
+            assertEquals((long) millis[i] * PICOS_PER_MILLIS, longTimeVector.vector[i]);
         }
-        assertTrue(longVector.isNull[millis.length]);
+        assertTrue(longTimeVector.isNull[millis.length]);
+    }
+
+    @Test(expected = UnsupportedOperationException.class)
+    public void testLongTimeColumnVectorCannotBeSerialized()
+    {
+        TypeDescription.createTime(3)
+                .createRowBatch(1, TypeDescription.VectorLayout.TIME_AS_LONG_TIME)
+                .serialize();
     }
 }

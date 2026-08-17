@@ -28,7 +28,7 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Decimal;
-import io.pixelsdb.pixels.core.vector.LongColumnVector;
+import io.pixelsdb.pixels.core.vector.LongTimeColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
@@ -37,7 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOSECONDS_PER_MILLISECOND;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOS_PER_MILLIS;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -91,11 +91,11 @@ public class TestPredicate
                 new Bound<>(Bound.Type.INCLUDED, 200));
         ColumnFilter<Integer> columnFilter =
                 new ColumnFilter<>("time", TypeDescription.Category.TIME, timeFilter);
-        LongColumnVector vector = new LongColumnVector(5);
+        LongTimeColumnVector vector = new LongTimeColumnVector(5, 3);
         int[] millis = {99, 100, 150, 200, 201};
         for (int i = 0; i < millis.length; ++i)
         {
-            vector.vector[i] = (long) millis[i] * PICOSECONDS_PER_MILLISECOND;
+            vector.vector[i] = (long) millis[i] * PICOS_PER_MILLIS;
         }
 
         Bitmap result = new Bitmap(millis.length, false);

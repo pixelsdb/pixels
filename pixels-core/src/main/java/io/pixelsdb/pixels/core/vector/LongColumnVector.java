@@ -22,14 +22,12 @@ package io.pixelsdb.pixels.core.vector;
 import com.google.flatbuffers.FlatBufferBuilder;
 import io.pixelsdb.pixels.core.flat.ColumnVectorFlat;
 import io.pixelsdb.pixels.core.flat.LongColumnVectorFlat;
-import io.pixelsdb.pixels.core.flat.TimeColumnVectorFlat;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOSECONDS_PER_MILLISECOND;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -365,24 +363,6 @@ public class LongColumnVector extends ColumnVector
             vector.vector[i] = flat.vector(i);
         }
         vector.deserializeBase(flat.base());
-        return vector;
-    }
-
-    /**
-     * Deserialize a time vector directly into Trino's physical representation.
-     * Pixels stores TIME values as milliseconds of day, while Trino stores them as
-     * picoseconds of day.
-     */
-    public static LongColumnVector deserializeTime(TimeColumnVectorFlat flat)
-    {
-        int length = flat.base().length();
-        LongColumnVector vector = new LongColumnVector(length);
-        for (int i = 0; i < flat.timesLength(); ++i)
-        {
-            vector.vector[i] = (long) flat.times(i) * PICOSECONDS_PER_MILLISECOND;
-        }
-        vector.deserializeBase(flat.base());
-        vector.memoryUsage += (long) (Long.BYTES - Integer.BYTES) * length;
         return vector;
     }
 }

@@ -174,7 +174,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         this.enableEncodedVector = option.isEnableEncodedColumnVector();
         this.vectorLayout = (option.isReadIntColumnAsLongVector() ? TypeDescription.VectorLayout.INT_AS_LONG : 0) |
                 (option.isReadShortColumnAsLongVector() ? TypeDescription.VectorLayout.SHORT_AS_LONG : 0) |
-                (option.isReadTimeColumnAsLongVector() ? TypeDescription.VectorLayout.TIME_AS_PICO_LONG : 0);
+                (option.isReadTimeColumnAsLongTimeVector() ? TypeDescription.VectorLayout.TIME_AS_LONG_TIME : 0);
         this.enableMetrics = enableMetrics;
         this.metricsDir = metricsDir;
         this.readPerfMetrics = new ReadPerfMetrics();

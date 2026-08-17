@@ -423,10 +423,10 @@ public class VectorizedRowBatch implements AutoCloseable
     }
 
     /**
-     * Deserialize a row batch using the requested physical vector layout.
+     * Deserialize a row batch using the requested read vector layout.
      *
      * @param buffer the ByteBuffer containing serialized batch data
-     * @param vectorLayout requested physical vector layout
+     * @param vectorLayout requested read vector layout
      * @return the deserialized row batch
      */
     public static VectorizedRowBatch deserialize(ByteBuffer buffer, int vectorLayout)
@@ -478,12 +478,10 @@ public class VectorizedRowBatch implements AutoCloseable
                     batch.cols[i] = LongDecimalColumnVector.deserialize((LongDecimalColumnVectorFlat) batchFlat.cols(new LongDecimalColumnVectorFlat(), i));
                     break;
                 case ColumnVectorFlat.TimeColumnVectorFlat:
-                    TimeColumnVectorFlat timeFlat =
-                            (TimeColumnVectorFlat) batchFlat.cols(new TimeColumnVectorFlat(), i);
-                    if (TypeDescription.VectorLayout.match(
-                            vectorLayout, TypeDescription.VectorLayout.TIME_AS_PICO_LONG))
+                    TimeColumnVectorFlat timeFlat = (TimeColumnVectorFlat) batchFlat.cols(new TimeColumnVectorFlat(), i);
+                    if (TypeDescription.VectorLayout.match(vectorLayout, TypeDescription.VectorLayout.TIME_AS_LONG_TIME))
                     {
-                        batch.cols[i] = LongColumnVector.deserializeTime(timeFlat);
+                        batch.cols[i] = LongTimeColumnVector.deserialize(timeFlat);
                     }
                     else
                     {
