@@ -121,21 +121,21 @@ public class TimeColumnReader extends ColumnReader
 
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact;
-        boolean endOfPixels;
+        boolean endOfPixel;
         for (int i = vectorIndex; numLeft > 0;)
         {
             if (elementIndex / pixelStride < (elementIndex + numLeft) / pixelStride)
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-                endOfPixels = true;
+                endOfPixel = true;
             }
             else
             {
                 numToRead = numLeft;
-                endOfPixels = false;
+                endOfPixel = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixels ? 7 : 0)) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
             // read isNull
             int pixelId = elementIndex / pixelStride;
             hasNull = chunkIndex.getPixelStatistics(pixelId).getStatistic().getHasNull();
@@ -144,7 +144,7 @@ public class TimeColumnReader extends ColumnReader
                 BitUtils.bitWiseDeCompact(vector.isNull, i, numToRead,
                         inputBuffer, isNullOffset, isNullSkipBits, littleEndian);
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = endOfPixels ? 0 : (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 vector.noNulls = false;
             }
             else
@@ -270,7 +270,7 @@ public class TimeColumnReader extends ColumnReader
         // read without copying the de-compacted content and isNull
         int numLeft = size, numToRead, bytesToDeCompact, vectorWriteIndex = vectorIndex;
         boolean[] isNull = null;
-        boolean endOfPixels;
+        boolean endOfPixel;
         if (decoding || !nullsPadding)
         {
             isNull = new boolean[size];
@@ -281,14 +281,14 @@ public class TimeColumnReader extends ColumnReader
             {
                 // read to the end of the current pixel
                 numToRead = pixelStride - elementIndex % pixelStride;
-                endOfPixels = true;
+                endOfPixel = true;
             }
             else
             {
                 numToRead = numLeft;
-                endOfPixels = false;
+                endOfPixel = false;
             }
-            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixels ? 7 : 0)) / 8;
+            bytesToDeCompact = (numToRead + isNullSkipBits + (endOfPixel ? 7 : 0)) / 8;
 
             // read isNull
             int pixelId = elementIndex / pixelStride;
@@ -317,7 +317,7 @@ public class TimeColumnReader extends ColumnReader
                     }
                 }
                 isNullOffset += bytesToDeCompact;
-                isNullSkipBits = endOfPixels ? 0 : (numToRead + isNullSkipBits) % 8;
+                isNullSkipBits = endOfPixel ? 0 : (numToRead + isNullSkipBits) % 8;
                 vector.noNulls = false;
             }
             else
