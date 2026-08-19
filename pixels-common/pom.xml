@@ -202,33 +202,6 @@
             <!-- generate flatBuffers -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>${maven.plugin.dependency.version}</version>
-                <executions>
-                    <execution>
-                        <id>unpack</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>unpack</goal>
-                        </goals>
-                        <configuration>
-                            <artifactItems>
-                                <artifactItem>
-                                    <groupId>com.github.davidmoten</groupId>
-                                    <artifactId>flatbuffers-compiler</artifactId>
-                                    <version>${dep.flatbuffers.version}</version>
-                                    <type>tar.gz</type>
-                                    <classifier>distribution-${os.detected.name}</classifier>
-                                    <overWrite>true</overWrite>
-                                    <outputDirectory>${project.build.directory}</outputDirectory>
-                                </artifactItem>
-                            </artifactItems>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>${maven.plugin.antrun.version}</version>
                 <executions>
@@ -240,6 +213,12 @@
                         </goals>
                         <configuration>
                             <target>
+                                <!-- copy flatc for the target os and platform -->
+                                <mkdir dir="${project.build.directory}/bin"/>
+                                <copy file="${basedir}/src/main/resources/flatc/${os.detected.classifier}/flatc-${dep.flatbuffers.version}"
+                                      tofile="${project.build.directory}/bin/flatc"/>
+                                <chmod file="${project.build.directory}/bin/flatc" perm="+x"/>
+                                <!-- generate java sources -->
                                 <mkdir dir="${project.build.directory}/generated-sources/flatbuffers/java"/>
                                 <apply executable="${project.build.directory}/bin/flatc" parallel="false"  failonerror="true">
                                     <arg value="--java"/>
