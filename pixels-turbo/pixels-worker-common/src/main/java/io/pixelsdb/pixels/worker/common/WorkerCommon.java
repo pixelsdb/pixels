@@ -22,6 +22,7 @@ package io.pixelsdb.pixels.worker.common;
 import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.*;
@@ -29,7 +30,10 @@ import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleQueueInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
+import io.pixelsdb.pixels.storage.s3qs.S3QS;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -64,6 +68,7 @@ public class WorkerCommon
     protected static Storage minio;
     private static Storage redis;
     private static Storage stream;
+    private static Storage s3qs;
     public static final int rowBatchSize;
     protected static final int pixelStride;
     protected static final int rowGroupSize;
@@ -106,6 +111,10 @@ public class WorkerCommon
             {
                 WorkerCommon.stream = StorageFactory.Instance().getStorage(Storage.Scheme.httpstream);
             }
+            else if (WorkerCommon.s3qs == null && storageInfo.getScheme() == Storage.Scheme.s3qs)
+            {
+                WorkerCommon.s3qs = StorageFactory.Instance().getStorage(Storage.Scheme.s3qs);
+            }
         } catch (Throwable e)
         {
             throw new WorkerException("failed to initialize the storage of scheme " + storageInfo.getScheme(), e);
@@ -124,8 +133,57 @@ public class WorkerCommon
                 return redis;
             case httpstream:
                 return stream;
+            case s3qs:
+                return s3qs;
         }
         throw new UnsupportedOperationException("scheme " + scheme + " is not supported");
+    }
+
+    public static void initOptionalShuffleStorage(ShuffleInfo shuffleInfo)
+    {
+        if (shuffleInfo == null)
+        {
+            return;
+        }
+        StorageInfo storageInfo = requireNonNull(shuffleInfo.getStorageInfo(), "shuffle storageInfo is null");
+        initStorage(storageInfo);
+        if (storageInfo.getScheme() == Storage.Scheme.s3qs)
+        {
+            registerS3QSShuffleQueues(shuffleInfo);
+        }
+    }
+
+    private static void registerS3QSShuffleQueues(ShuffleInfo shuffleInfo)
+    {
+        List<ShuffleQueueInfo> queues = requireNonNull(shuffleInfo.getQueues(), "shuffle queues is null");
+        checkArgument(shuffleInfo.getNumPartitions() > 0, "shuffle numPartitions must be positive");
+        checkArgument(queues.size() == shuffleInfo.getNumPartitions(),
+                "shuffle queues size does not match numPartitions");
+
+        Storage storage = getStorage(Storage.Scheme.s3qs);
+        if (!(storage instanceof S3QS))
+        {
+            throw new WorkerException("storage of scheme s3qs is not S3QS");
+        }
+
+        S3QS s3qsStorage = (S3QS) storage;
+        try
+        {
+            for (ShuffleQueueInfo queue : queues)
+            {
+                requireNonNull(queue, "shuffle queue is null");
+                checkArgument(queue.getPartitionId() >= 0 && queue.getPartitionId() < shuffleInfo.getNumPartitions(),
+                        "shuffle queue partitionId is out of range");
+                String queueUrl = s3qsStorage.registerQueue(shuffleInfo.getShuffleId(), queue.getPartitionId(),
+                        queue.getQueueName(), queue.getQueueUrl());
+                queue.setQueueUrl(queueUrl);
+            }
+        }
+        catch (IOException e)
+        {
+            throw new WorkerException("failed to register s3qs shuffle queues for " +
+                    shuffleInfo.getShuffleId(), e);
+        }
     }
 
     /**
@@ -530,6 +588,40 @@ public class WorkerCommon
             writer = builder.build();
         }
         return writer;
+    }
+
+    /**
+     * Build a Pixels writer on top of an already-created physical writer.
+     *
+     * This is used by S3QS shuffle producers because the S3 object writer is
+     * created by S3QS.offer() together with the queue message that will be sent
+     * when the physical writer is closed.
+     */
+    public static PixelsWriter getWriter(TypeDescription schema, Storage storage, String filePath,
+                                         PhysicalWriter physicalWriter, boolean isPartitioned,
+                                         List<Integer> keyColumnIds)
+    {
+        requireNonNull(schema, "schema is null");
+        requireNonNull(filePath, "fileName is null");
+        requireNonNull(storage, "storage is null");
+        requireNonNull(physicalWriter, "physicalWriter is null");
+        checkArgument(!isPartitioned || keyColumnIds != null,
+                "keyColumnIds is null whereas isPartitioned is true");
+        PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder()
+                .setSchema(schema)
+                .setPixelStride(pixelStride)
+                .setRowGroupSize(rowGroupSize)
+                .setStorage(storage)
+                .setPath(filePath)
+                .setPhysicalWriter(physicalWriter)
+                .setOverwrite(true)
+                .setEncodingLevel(EncodingLevel.EL2)
+                .setPartitioned(isPartitioned);
+        if (isPartitioned)
+        {
+            builder.setPartKeyColumnIds(keyColumnIds);
+        }
+        return builder.build();
     }
 
     /**

@@ -51,6 +51,10 @@ public class PartitionInput extends Input
      * The information about the hash partitioning.
      */
     private PartitionInfo partitionInfo;
+    /**
+     * The stable logical producer task id for shuffle protocols.
+     */
+    private int producerTaskId = -1;
 
     /**
      * Default constructor for Jackson.
@@ -68,6 +72,7 @@ public class PartitionInput extends Input
         this.projection = projection;
         this.output = output;
         this.partitionInfo = partitionInfo;
+        this.producerTaskId = -1;
     }
 
     public ScanTableInfo getTableInfo()
@@ -108,5 +113,15 @@ public class PartitionInput extends Input
     public void setPartitionInfo(PartitionInfo partitionInfo)
     {
         this.partitionInfo = partitionInfo;
+    }
+
+    public int getProducerTaskId()
+    {
+        return producerTaskId;
+    }
+
+    public void setProducerTaskId(int producerTaskId)
+    {
+        this.producerTaskId = producerTaskId;
     }
 }

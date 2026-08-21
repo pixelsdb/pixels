@@ -30,9 +30,15 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.executor.join.*;
 import io.pixelsdb.pixels.planner.plan.physical.domain.MultiOutputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionedTableInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionedJoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput;
+import io.pixelsdb.pixels.storage.s3qs.S3QS;
+import io.pixelsdb.pixels.storage.s3qs.S3QueueMessage;
+import io.pixelsdb.pixels.storage.s3qs.S3QueuePollResult;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
@@ -83,20 +89,28 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             long transId = event.getTransId();
             long timestamp = event.getTimestamp();
             requireNonNull(event.getSmallTable(), "event.smallTable is null");
+            boolean leftS3QS = isS3QSShuffle(event.getSmallTable());
             StorageInfo leftInputStorageInfo = event.getSmallTable().getStorageInfo();
             List<String> leftPartitioned = event.getSmallTable().getInputFiles();
-            requireNonNull(leftPartitioned, "leftPartitioned is null");
-            checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
+            if (!leftS3QS)
+            {
+                requireNonNull(leftPartitioned, "leftPartitioned is null");
+                checkArgument(leftPartitioned.size() > 0, "leftPartitioned is empty");
+            }
             int leftParallelism = event.getSmallTable().getParallelism();
             checkArgument(leftParallelism > 0, "leftParallelism is not positive");
             String[] leftColumnsToRead = event.getSmallTable().getColumnsToRead();
             int[] leftKeyColumnIds = event.getSmallTable().getKeyColumnIds();
 
             requireNonNull(event.getLargeTable(), "event.largeTable is null");
+            boolean rightS3QS = isS3QSShuffle(event.getLargeTable());
             StorageInfo rightInputStorageInfo = event.getLargeTable().getStorageInfo();
             List<String> rightPartitioned = event.getLargeTable().getInputFiles();
-            requireNonNull(rightPartitioned, "rightPartitioned is null");
-            checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
+            if (!rightS3QS)
+            {
+                requireNonNull(rightPartitioned, "rightPartitioned is null");
+                checkArgument(rightPartitioned.size() > 0, "rightPartitioned is empty");
+            }
             int rightParallelism = event.getLargeTable().getParallelism();
             checkArgument(rightParallelism > 0, "rightParallelism is not positive");
             String[] rightColumnsToRead = event.getLargeTable().getColumnsToRead();
@@ -141,15 +155,45 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
 
             WorkerCommon.initStorage(leftInputStorageInfo);
             WorkerCommon.initStorage(rightInputStorageInfo);
+            WorkerCommon.initOptionalShuffleStorage(event.getSmallTable().getShuffleInfo());
+            WorkerCommon.initOptionalShuffleStorage(event.getLargeTable().getShuffleInfo());
             WorkerCommon.initStorage(outputStorageInfo);
 
             // build the joiner.
             AtomicReference<TypeDescription> leftSchema = new AtomicReference<>();
             AtomicReference<TypeDescription> rightSchema = new AtomicReference<>();
-            WorkerCommon.getFileSchemaFromPaths(threadPool,
-                    WorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
-                    WorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
-                    leftSchema, rightSchema, leftPartitioned, rightPartitioned);
+            Map<Integer, Queue<S3QueuePollResult>> leftPendingMessages = new HashMap<>();
+            Map<Integer, Queue<S3QueuePollResult>> rightPendingMessages = new HashMap<>();
+            if (!leftS3QS && !rightS3QS)
+            {
+                WorkerCommon.getFileSchemaFromPaths(threadPool,
+                        WorkerCommon.getStorage(leftInputStorageInfo.getScheme()),
+                        WorkerCommon.getStorage(rightInputStorageInfo.getScheme()),
+                        leftSchema, rightSchema, leftPartitioned, rightPartitioned);
+            }
+            else
+            {
+                if (leftS3QS)
+                {
+                    leftSchema.set(getS3QSFileSchema(
+                            event.getSmallTable().getShuffleInfo(), hashValues, leftPendingMessages));
+                }
+                else
+                {
+                    leftSchema.set(WorkerCommon.getFileSchemaFromPaths(
+                            WorkerCommon.getStorage(leftInputStorageInfo.getScheme()), leftPartitioned));
+                }
+                if (rightS3QS)
+                {
+                    rightSchema.set(getS3QSFileSchema(
+                            event.getLargeTable().getShuffleInfo(), hashValues, rightPendingMessages));
+                }
+                else
+                {
+                    rightSchema.set(WorkerCommon.getFileSchemaFromPaths(
+                            WorkerCommon.getStorage(rightInputStorageInfo.getScheme()), rightPartitioned));
+                }
+            }
             /*
              * Issue #450:
              * For the left and the right partial partitioned files, the file schema is equal to the columns to read in normal cases.
@@ -161,34 +205,42 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     WorkerCommon.getResultSchema(rightSchema.get(), rightColumnsToRead),
                     rightColAlias, rightProjection, rightKeyColumnIds);
             // build the hash table for the left table.
-            List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
-            int leftSplitSize = leftPartitioned.size() / leftParallelism;
-            if (leftPartitioned.size() % leftParallelism > 0)
+            if (leftS3QS)
             {
-                leftSplitSize++;
+                buildHashTableS3QS(transId, timestamp, (HashJoiner) joiner, event.getSmallTable().getShuffleInfo(),
+                        leftPendingMessages, leftColumnsToRead, hashValues, workerMetrics);
             }
-            for (int i = 0; i < leftPartitioned.size(); i += leftSplitSize)
+            else
             {
-                List<String> parts = new LinkedList<>();
-                for (int j = i; j < i + leftSplitSize && j < leftPartitioned.size(); ++j)
+                List<Future> leftFutures = new ArrayList<>(leftPartitioned.size());
+                int leftSplitSize = leftPartitioned.size() / leftParallelism;
+                if (leftPartitioned.size() % leftParallelism > 0)
                 {
-                    parts.add(leftPartitioned.get(j));
+                    leftSplitSize++;
                 }
-                leftFutures.add(threadPool.submit(() -> {
-                    try
+                for (int i = 0; i < leftPartitioned.size(); i += leftSplitSize)
+                {
+                    List<String> parts = new LinkedList<>();
+                    for (int j = i; j < i + leftSplitSize && j < leftPartitioned.size(); ++j)
                     {
-                        buildHashTable(transId, timestamp, (HashJoiner) joiner, parts, leftColumnsToRead, leftInputStorageInfo.getScheme(),
-                                hashValues, numPartition, workerMetrics);
+                        parts.add(leftPartitioned.get(j));
                     }
-                    catch (Throwable e)
-                    {
-                        throw new WorkerException("error during hash table construction", e);
-                    }
-                }));
-            }
-            for (Future future : leftFutures)
-            {
-                future.get();
+                    leftFutures.add(threadPool.submit(() -> {
+                        try
+                        {
+                            buildHashTable(transId, timestamp, (HashJoiner) joiner, parts, leftColumnsToRead, leftInputStorageInfo.getScheme(),
+                                    hashValues, numPartition, workerMetrics);
+                        }
+                        catch (Throwable e)
+                        {
+                            throw new WorkerException("error during hash table construction", e);
+                        }
+                    }));
+                }
+                for (Future future : leftFutures)
+                {
+                    future.get();
+                }
             }
             logger.info("hash table size: " + joiner.getSmallTableSize() + ", duration (ns): " +
                     (workerMetrics.getInputCostNs() + workerMetrics.getComputeCostNs()));
@@ -209,49 +261,78 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             // scan the right table and do the join.
             if (joiner.getSmallTableSize() > 0)
             {
-                int rightSplitSize = rightPartitioned.size() / rightParallelism;
-                if (rightPartitioned.size() % rightParallelism > 0)
+                if (rightS3QS)
                 {
-                    rightSplitSize++;
-                }
-
-                for (int i = 0; i < rightPartitioned.size(); i += rightSplitSize)
-                {
-                    List<String> parts = new LinkedList<>();
-                    for (int j = i; j < i + rightSplitSize && j < rightPartitioned.size(); ++j)
+                    if (partitionOutput)
                     {
-                        parts.add(rightPartitioned.get(j));
+                        joinWithRightTableAndPartitionS3QS(transId, timestamp, joiner,
+                                event.getLargeTable().getShuffleInfo(), rightPendingMessages, rightColumnsToRead,
+                                hashValues, outputPartitionInfo, result, workerMetrics);
                     }
-                    threadPool.execute(() -> {
-                        try
-                        {
-                            int numJoinedRows = partitionOutput ?
-                                    joinWithRightTableAndPartition(
-                                            transId, timestamp, joiner, parts, rightColumnsToRead,
-                                            rightInputStorageInfo.getScheme(), hashValues,
-                                            numPartition, outputPartitionInfo, result, workerMetrics) :
-                                    joinWithRightTable(transId, timestamp, joiner, parts, rightColumnsToRead,
-                                            rightInputStorageInfo.getScheme(), hashValues, numPartition,
-                                            result.get(0), workerMetrics);
-                        } catch (Throwable e)
-                        {
-                            throw new WorkerException("error during hash join", e);
-                        }
-                    });
+                    else
+                    {
+                        joinWithRightTableS3QS(transId, timestamp, joiner, event.getLargeTable().getShuffleInfo(),
+                                rightPendingMessages, rightColumnsToRead, hashValues, result.get(0), workerMetrics);
+                    }
                 }
-                threadPool.shutdown();
-                try
+                else
                 {
-                    while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
-                } catch (InterruptedException e)
-                {
-                    throw new WorkerException("interrupted while waiting for the termination of join", e);
-                }
+                    int rightSplitSize = rightPartitioned.size() / rightParallelism;
+                    if (rightPartitioned.size() % rightParallelism > 0)
+                    {
+                        rightSplitSize++;
+                    }
 
-                if (exceptionHandler.hasException())
-                {
-                    throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+                    for (int i = 0; i < rightPartitioned.size(); i += rightSplitSize)
+                    {
+                        List<String> parts = new LinkedList<>();
+                        for (int j = i; j < i + rightSplitSize && j < rightPartitioned.size(); ++j)
+                        {
+                            parts.add(rightPartitioned.get(j));
+                        }
+                        threadPool.execute(() -> {
+                            try
+                            {
+                                int numJoinedRows = partitionOutput ?
+                                        joinWithRightTableAndPartition(
+                                                transId, timestamp, joiner, parts, rightColumnsToRead,
+                                                rightInputStorageInfo.getScheme(), hashValues,
+                                                numPartition, outputPartitionInfo, result, workerMetrics) :
+                                        joinWithRightTable(transId, timestamp, joiner, parts, rightColumnsToRead,
+                                                rightInputStorageInfo.getScheme(), hashValues, numPartition,
+                                                result.get(0), workerMetrics);
+                            } catch (Throwable e)
+                            {
+                                throw new WorkerException("error during hash join", e);
+                            }
+                        });
+                    }
+                    threadPool.shutdown();
+                    try
+                    {
+                        while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                    } catch (InterruptedException e)
+                    {
+                        throw new WorkerException("interrupted while waiting for the termination of join", e);
+                    }
+
+                    if (exceptionHandler.hasException())
+                    {
+                        throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+                    }
                 }
+            }
+            else if (rightS3QS)
+            {
+                for (int hashValue : hashValues)
+                {
+                    drainS3QSPartition(event.getLargeTable().getShuffleInfo(), hashValue, rightPendingMessages,
+                            message -> { });
+                }
+            }
+            if (!threadPool.isShutdown())
+            {
+                threadPool.shutdown();
             }
 
             String outputPath = outputFolder + outputInfo.getFileNames().get(0);
@@ -355,6 +436,275 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return joinOutput;
         }
+    }
+
+    protected interface S3QSDataHandler
+    {
+        void handle(S3QueueMessage message) throws Exception;
+    }
+
+    protected interface RowBatchHandler
+    {
+        void handle(VectorizedRowBatch rowBatch) throws Exception;
+    }
+
+    protected static boolean isS3QSShuffle(PartitionedTableInfo tableInfo)
+    {
+        ShuffleInfo shuffleInfo = tableInfo.getShuffleInfo();
+        return shuffleInfo != null &&
+                shuffleInfo.getStorageInfo() != null &&
+                shuffleInfo.getStorageInfo().getScheme() == Storage.Scheme.s3qs;
+    }
+
+    private static S3QS getS3QSStorage()
+    {
+        Storage storage = WorkerCommon.getStorage(Storage.Scheme.s3qs);
+        if (!(storage instanceof S3QS))
+        {
+            throw new WorkerException("storage of scheme s3qs is not S3QS");
+        }
+        return (S3QS) storage;
+    }
+
+    protected static TypeDescription getS3QSFileSchema(ShuffleInfo shuffleInfo, List<Integer> hashValues,
+                                                       Map<Integer, Queue<S3QueuePollResult>> pendingMessages)
+            throws IOException
+    {
+        checkArgument(!hashValues.isEmpty(), "hashValues is empty");
+        S3QS s3qs = getS3QSStorage();
+        int partitionId = hashValues.get(0);
+        while (true)
+        {
+            S3QueuePollResult result = pollS3QSMessage(s3qs, shuffleInfo, partitionId, pendingMessages);
+            if (result == null)
+            {
+                continue;
+            }
+            addPendingMessage(pendingMessages, partitionId, result);
+            S3QueueMessage message = result.getMessage();
+            if (message.getMetadata() != null && !message.getMetadata().isEmpty())
+            {
+                return TypeDescription.fromString(message.getMetadata());
+            }
+            if (message.isData())
+            {
+                try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                        message.getObjectPath(), WorkerCommon.getStorage(Storage.Scheme.s3qs)))
+                {
+                    return pixelsReader.getFileSchema();
+                }
+            }
+        }
+    }
+
+    private static S3QueuePollResult pollS3QSMessage(S3QS s3qs, ShuffleInfo shuffleInfo, int partitionId,
+                                                     Map<Integer, Queue<S3QueuePollResult>> pendingMessages)
+            throws IOException
+    {
+        Queue<S3QueuePollResult> pending = pendingMessages.get(partitionId);
+        if (pending != null)
+        {
+            S3QueuePollResult result = pending.poll();
+            if (result != null)
+            {
+                return result;
+            }
+        }
+        S3QueuePollResult result = s3qs.pollMessage(
+                shuffleInfo.getShuffleId(), partitionId, shuffleInfo.getPollTimeoutSeconds());
+        if (result != null)
+        {
+            validateS3QSMessage(shuffleInfo, partitionId, result.getMessage());
+        }
+        return result;
+    }
+
+    private static void addPendingMessage(Map<Integer, Queue<S3QueuePollResult>> pendingMessages, int partitionId,
+                                          S3QueuePollResult result)
+    {
+        Queue<S3QueuePollResult> pending = pendingMessages.get(partitionId);
+        if (pending == null)
+        {
+            pending = new LinkedList<>();
+            pendingMessages.put(partitionId, pending);
+        }
+        pending.add(result);
+    }
+
+    private static void validateS3QSMessage(ShuffleInfo shuffleInfo, int partitionId, S3QueueMessage message)
+    {
+        if (!shuffleInfo.getShuffleId().equals(message.getShuffleId()))
+        {
+            throw new WorkerException("unexpected s3qs shuffle id: " + message.getShuffleId());
+        }
+        if (message.getPartitionId() != partitionId)
+        {
+            throw new WorkerException("unexpected s3qs partition id: " + message.getPartitionId() +
+                    ", expected " + partitionId);
+        }
+    }
+
+    /**
+     * Drain one S3QS partition queue until all producer end markers are seen and
+     * one final long poll returns empty. DATA messages are acknowledged only
+     * after the handler has processed the referenced S3 object.
+     */
+    protected static void drainS3QSPartition(ShuffleInfo shuffleInfo, int partitionId,
+                                             Map<Integer, Queue<S3QueuePollResult>> pendingMessages,
+                                             S3QSDataHandler dataHandler) throws Exception
+    {
+        S3QS s3qs = getS3QSStorage();
+        Set<Integer> endedProducers = new HashSet<>(shuffleInfo.getProducerCount());
+        while (true)
+        {
+            S3QueuePollResult result = pollS3QSMessage(s3qs, shuffleInfo, partitionId, pendingMessages);
+            if (result == null)
+            {
+                if (endedProducers.size() >= shuffleInfo.getProducerCount())
+                {
+                    return;
+                }
+                continue;
+            }
+
+            S3QueueMessage message = result.getMessage();
+            message.setReceiptHandle(result.getReceiptHandle());
+            if (message.isProducerEnd())
+            {
+                endedProducers.add(message.getProducerId());
+                s3qs.finishWork(message);
+            }
+            else if (message.isData())
+            {
+                dataHandler.handle(message);
+                s3qs.finishWork(message);
+            }
+            else
+            {
+                throw new WorkerException("unsupported s3qs message type: " + message.getMessageType());
+            }
+        }
+    }
+
+    protected static void readS3QSDataObject(long transId, long timestamp, S3QueueMessage message,
+                                             String[] columnsToRead, WorkerMetrics workerMetrics,
+                                             RowBatchHandler rowBatchHandler)
+            throws Exception
+    {
+        WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
+        WorkerMetrics.Timer computeCostTimer = new WorkerMetrics.Timer();
+        long readBytes = 0L;
+        int numReadRequests = 0;
+        readCostTimer.start();
+        try (PixelsReader pixelsReader = WorkerCommon.getReader(
+                message.getObjectPath(), WorkerCommon.getStorage(Storage.Scheme.s3qs)))
+        {
+            readCostTimer.stop();
+            PixelsReaderOption option = WorkerCommon.getReaderOption(
+                    transId, timestamp, columnsToRead, new InputInfo(message.getObjectPath(), 0, -1));
+            PixelsRecordReader recordReader = pixelsReader.read(option);
+            checkArgument(recordReader.isValid(), "failed to get record reader");
+
+            VectorizedRowBatch rowBatch;
+            computeCostTimer.start();
+            do
+            {
+                rowBatch = recordReader.readBatch(WorkerCommon.rowBatchSize);
+                if (rowBatch.size > 0)
+                {
+                    rowBatchHandler.handle(rowBatch);
+                }
+            } while (!rowBatch.endOfFile);
+            computeCostTimer.stop();
+            computeCostTimer.minus(recordReader.getReadTimeNanos());
+            readCostTimer.add(recordReader.getReadTimeNanos());
+            readBytes += recordReader.getCompletedBytes();
+            numReadRequests += recordReader.getNumReadRequests();
+        }
+        workerMetrics.addReadBytes(readBytes);
+        workerMetrics.addNumReadRequests(numReadRequests);
+        workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
+        workerMetrics.addComputeCostNs(computeCostTimer.getElapsedNs());
+    }
+
+    protected static void buildHashTableS3QS(long transId, long timestamp, HashJoiner joiner, ShuffleInfo shuffleInfo,
+                                             Map<Integer, Queue<S3QueuePollResult>> pendingMessages,
+                                             String[] leftCols, List<Integer> hashValues,
+                                             WorkerMetrics workerMetrics) throws Exception
+    {
+        for (int partitionId : hashValues)
+        {
+            drainS3QSPartition(shuffleInfo, partitionId, pendingMessages, message ->
+                    readS3QSDataObject(transId, timestamp, message, leftCols, workerMetrics,
+                            joiner::populateLeftTable));
+        }
+    }
+
+    protected static int joinWithRightTableS3QS(
+            long transId, long timestamp, Joiner joiner, ShuffleInfo shuffleInfo,
+            Map<Integer, Queue<S3QueuePollResult>> pendingMessages, String[] rightCols,
+            List<Integer> hashValues, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult,
+            WorkerMetrics workerMetrics) throws Exception
+    {
+        final int[] joinedRows = {0};
+        for (int partitionId : hashValues)
+        {
+            drainS3QSPartition(shuffleInfo, partitionId, pendingMessages, message ->
+                    readS3QSDataObject(transId, timestamp, message, rightCols, workerMetrics, rowBatch -> {
+                        List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
+                        for (VectorizedRowBatch joined : joinedBatches)
+                        {
+                            if (!joined.isEmpty())
+                            {
+                                joinResult.add(joined);
+                                joinedRows[0] += joined.size;
+                            }
+                        }
+                    }));
+        }
+        return joinedRows[0];
+    }
+
+    protected static int joinWithRightTableAndPartitionS3QS(
+            long transId, long timestamp, Joiner joiner, ShuffleInfo shuffleInfo,
+            Map<Integer, Queue<S3QueuePollResult>> pendingMessages, String[] rightCols,
+            List<Integer> hashValues, PartitionInfo postPartitionInfo,
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics)
+            throws Exception
+    {
+        requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
+        Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
+                WorkerCommon.rowBatchSize, joiner.getJoinedSchema(), postPartitionInfo.getKeyColumnIds());
+        final int[] joinedRows = {0};
+        for (int partitionId : hashValues)
+        {
+            drainS3QSPartition(shuffleInfo, partitionId, pendingMessages, message ->
+                    readS3QSDataObject(transId, timestamp, message, rightCols, workerMetrics, rowBatch -> {
+                        List<VectorizedRowBatch> joinedBatches = joiner.join(rowBatch);
+                        for (VectorizedRowBatch joined : joinedBatches)
+                        {
+                            if (!joined.isEmpty())
+                            {
+                                Map<Integer, VectorizedRowBatch> parts = partitioner.partition(joined);
+                                for (Map.Entry<Integer, VectorizedRowBatch> entry : parts.entrySet())
+                                {
+                                    partitionResult.get(entry.getKey()).add(entry.getValue());
+                                }
+                                joinedRows[0] += joined.size;
+                            }
+                        }
+                    }));
+        }
+
+        VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();
+        for (int hash = 0; hash < tailBatches.length; ++hash)
+        {
+            if (!tailBatches[hash].isEmpty())
+            {
+                partitionResult.get(hash).add(tailBatches[hash]);
+            }
+        }
+        return joinedRows[0];
     }
 
     /**
