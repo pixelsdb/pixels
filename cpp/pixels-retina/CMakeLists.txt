@@ -161,16 +161,24 @@ gtest_discover_tests(visibility_perf_tests)
 # endif ()
 
 if (RETINA_SIMD)
-    include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag("-mavx2" COMPILER_SUPPORTS_AVX2)
-    if(COMPILER_SUPPORTS_AVX2)
-        message(STATUS "AVX2 supported: enabling AVX2 code path")
-        target_compile_options(pixels-retina PRIVATE
-                -mavx2
-        )
+    string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" RETINA_ARCH)
+    if(RETINA_ARCH MATCHES "^(x86_64|amd64|i[3-6]86)$")
+        include(CheckCXXCompilerFlag)
+        check_cxx_compiler_flag("-mavx2" COMPILER_SUPPORTS_AVX2)
+        if(COMPILER_SUPPORTS_AVX2)
+            message(STATUS "AVX2 supported: enabling x86 SIMD code path")
+            target_compile_options(pixels-retina PRIVATE
+                    -mavx2
+            )
+            target_compile_definitions(pixels-retina PRIVATE RETINA_SIMD)
+        else()
+            message(STATUS "AVX2 not supported: falling back to scalar code path")
+        endif ()
+    elseif(RETINA_ARCH MATCHES "^(aarch64|arm64)$")
+        message(STATUS "AArch64 detected: enabling ARM NEON SIMD code path")
         target_compile_definitions(pixels-retina PRIVATE RETINA_SIMD)
     else()
-        message(STATUS "AVX2 not supported: falling back to scalar code path")
+        message(STATUS "Unsupported SIMD architecture (${CMAKE_SYSTEM_PROCESSOR}): falling back to scalar code path")
     endif ()
 endif()
 

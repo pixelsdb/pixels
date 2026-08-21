@@ -27,7 +27,14 @@
 #include <cstring>
 #include <stdexcept>
 
+#if defined(RETINA_SIMD) && (defined(__x86_64__) || defined(__i386__))
 #include <immintrin.h>
+#define RETINA_X86_AVX2 1
+#endif
+#if defined(RETINA_SIMD) && (defined(__aarch64__) || defined(_M_ARM64))
+#include <arm_neon.h>
+#define RETINA_ARM_NEON 1
+#endif
 
 template<size_t CAPACITY>
 TileVisibility<CAPACITY>::TileVisibility(uint64_t timestamp, const uint64_t* bitmap)
@@ -203,6 +210,7 @@ void TileVisibility<CAPACITY>::appendDeleteChain(uint16_t rowId, uint64_t ts) {
     }
 }
 
+#if defined(RETINA_X86_AVX2)
 inline void process_bitmap_block_256(const DeleteIndexBlock *blk,
                                      uint32_t offset,
                                      uint64_t* outBitmap,
@@ -230,6 +238,29 @@ inline void process_bitmap_block_256(const DeleteIndexBlock *blk,
         }
     }
 }
+#endif
+
+#if defined(RETINA_ARM_NEON)
+inline void process_bitmap_block_128(const DeleteIndexBlock *blk,
+                                     uint32_t offset,
+                                     uint64_t* outBitmap,
+                                     const uint64x2_t &vThr,
+                                     const uint64x2_t &tsMask) {
+    uint64x2_t vItems = vld1q_u64(&blk->items[offset]);
+    uint64x2_t vTs = vandq_u64(vItems, tsMask);
+    uint64x2_t cmp = vcgeq_u64(vThr, vTs);
+
+    uint64x2_t vRow = vshrq_n_u64(vItems, 48);
+    uint64_t row0 = vgetq_lane_u64(vRow, 0);
+    uint64_t row1 = vgetq_lane_u64(vRow, 1);
+    if (vgetq_lane_u64(cmp, 0)) {
+        SET_BITMAP_BIT(outBitmap, static_cast<uint16_t>(row0));
+    }
+    if (vgetq_lane_u64(cmp, 1)) {
+        SET_BITMAP_BIT(outBitmap, static_cast<uint16_t>(row1));
+    }
+}
+#endif
 
 template<size_t CAPACITY>
 void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* outBitmap) const {
@@ -245,10 +276,13 @@ void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* ou
     if (ts == ver->baseTimestamp) return;
 
     DeleteIndexBlock *blk = ver->head;
-#ifdef RETINA_SIMD
+#if defined(RETINA_X86_AVX2)
     const __m256i signBit = _mm256_set1_epi64x(0x8000000000000000ULL);
     const __m256i vThrFlip = _mm256_xor_si256(_mm256_set1_epi64x(ts), signBit);
     const __m256i tsMask = _mm256_set1_epi64x(0x0000FFFFFFFFFFFFULL);
+#elif defined(RETINA_ARM_NEON)
+    const uint64x2_t vThr = vdupq_n_u64(ts);
+    const uint64x2_t tsMask = vdupq_n_u64(0x0000FFFFFFFFFFFFULL);
 #endif
 
     while (blk) {
@@ -267,7 +301,7 @@ void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* ou
         }
 
         uint64_t i = 0;
-#ifdef RETINA_SIMD
+#if defined(RETINA_X86_AVX2)
         // NOTE: the SIMD path does not check for zero-initialised (item == 0)
         // sentinel values.  In the extremely rare stale-tailUsed race window,
         // up to BLOCK_CAPACITY-1 zero items may cause row 0 to be transiently
@@ -276,6 +310,10 @@ void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* ou
         // self-correcting on the next query once tailUsed is fully updated.
         for (; i + 4 <= count; i += 4) {
             process_bitmap_block_256(blk, i, outBitmap, vThrFlip, tsMask, signBit);
+        }
+#elif defined(RETINA_ARM_NEON)
+        for (; i + 2 <= count; i += 2) {
+            process_bitmap_block_128(blk, i, outBitmap, vThr, tsMask);
         }
 #endif
         for (; i < count; i++) {
