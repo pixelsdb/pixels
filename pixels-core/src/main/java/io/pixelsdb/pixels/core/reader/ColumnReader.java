@@ -101,7 +101,14 @@ public abstract class ColumnReader implements Closeable
             case DATE:
                 return new DateColumnReader(type);
             case TIME:
-                return new TimeColumnReader(type);
+                if (option.isReadTimeColumnAsLongTimeVector())
+                {
+                    return new LongTimeColumnReader(type);
+                }
+                else
+                {
+                    return new TimeColumnReader(type);
+                }
             case TIMESTAMP:
                 return new TimestampColumnReader(type);
             case BINARY:

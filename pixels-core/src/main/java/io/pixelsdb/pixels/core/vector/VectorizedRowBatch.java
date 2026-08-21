@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.core.vector;
 
 import com.google.flatbuffers.FlatBufferBuilder;
+import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.flat.*;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 
@@ -400,8 +401,12 @@ public class VectorizedRowBatch implements AutoCloseable
 
     public static VectorizedRowBatch deserialize(byte[] data)
     {
-        ByteBuffer buffer = ByteBuffer.wrap(data);
-        return deserialize(buffer);
+        return deserialize(ByteBuffer.wrap(data));
+    }
+
+    public static VectorizedRowBatch deserialize(byte[] data, int vectorLayout)
+    {
+        return deserialize(ByteBuffer.wrap(data), vectorLayout);
     }
 
     /** Issue-1078:
@@ -413,6 +418,18 @@ public class VectorizedRowBatch implements AutoCloseable
      * @return the deserialized VectorizedRowBatch
      */
     public static VectorizedRowBatch deserialize(ByteBuffer buffer)
+    {
+        return deserialize(buffer, TypeDescription.VectorLayout.NONE);
+    }
+
+    /**
+     * Deserialize a row batch using the requested read vector layout.
+     *
+     * @param buffer the ByteBuffer containing serialized batch data
+     * @param vectorLayout requested read vector layout
+     * @return the deserialized row batch
+     */
+    public static VectorizedRowBatch deserialize(ByteBuffer buffer, int vectorLayout)
     {
         VectorizedRowBatchFlat batchFlat = VectorizedRowBatchFlat.getRootAsVectorizedRowBatchFlat(buffer);
 
@@ -461,7 +478,15 @@ public class VectorizedRowBatch implements AutoCloseable
                     batch.cols[i] = LongDecimalColumnVector.deserialize((LongDecimalColumnVectorFlat) batchFlat.cols(new LongDecimalColumnVectorFlat(), i));
                     break;
                 case ColumnVectorFlat.TimeColumnVectorFlat:
-                    batch.cols[i] = TimeColumnVector.deserialize((TimeColumnVectorFlat) batchFlat.cols(new TimeColumnVectorFlat(), i));
+                    TimeColumnVectorFlat timeFlat = (TimeColumnVectorFlat) batchFlat.cols(new TimeColumnVectorFlat(), i);
+                    if (TypeDescription.VectorLayout.match(vectorLayout, TypeDescription.VectorLayout.TIME_AS_LONG_TIME))
+                    {
+                        batch.cols[i] = LongTimeColumnVector.deserialize(timeFlat);
+                    }
+                    else
+                    {
+                        batch.cols[i] = TimeColumnVector.deserialize(timeFlat);
+                    }
                     break;
                 case ColumnVectorFlat.TimestampColumnVectorFlat:
                     batch.cols[i] = TimestampColumnVector.deserialize((TimestampColumnVectorFlat) batchFlat.cols(new TimestampColumnVectorFlat(), i));

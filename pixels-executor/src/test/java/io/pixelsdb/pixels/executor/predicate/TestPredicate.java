@@ -28,6 +28,7 @@ import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
 import io.pixelsdb.pixels.core.utils.Bitmap;
 import io.pixelsdb.pixels.core.utils.Decimal;
+import io.pixelsdb.pixels.core.vector.LongTimeColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import org.junit.Test;
 
@@ -35,6 +36,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.SortedMap;
 import java.util.TreeMap;
+
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOS_PER_MILLIS;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Created at: 07/04/2022
@@ -76,6 +80,32 @@ public class TestPredicate
         System.out.println(columnFilter1.getFilter().getJavaType());
         System.out.println(columnFilter1.getFilter().getRangeCount());
         System.out.println(columnFilter1.getFilter().getDiscreteValueCount());
+    }
+
+    @Test
+    public void testLongTimeVectorFilterUsesMillisBounds()
+    {
+        Filter<Integer> timeFilter = new Filter<>(Integer.TYPE, false, false, false, false);
+        timeFilter.addRange(
+                new Bound<>(Bound.Type.INCLUDED, 100),
+                new Bound<>(Bound.Type.INCLUDED, 200));
+        ColumnFilter<Integer> columnFilter =
+                new ColumnFilter<>("time", TypeDescription.Category.TIME, timeFilter);
+        LongTimeColumnVector vector = new LongTimeColumnVector(5, 3);
+        int[] millis = {99, 100, 150, 200, 201};
+        for (int i = 0; i < millis.length; ++i)
+        {
+            vector.vector[i] = (long) millis[i] * PICOS_PER_MILLIS;
+        }
+
+        Bitmap result = new Bitmap(millis.length, false);
+        columnFilter.doFilter(vector, 0, millis.length, result);
+
+        assertEquals(false, result.get(0));
+        assertEquals(true, result.get(1));
+        assertEquals(true, result.get(2));
+        assertEquals(true, result.get(3));
+        assertEquals(false, result.get(4));
     }
 
     @Test

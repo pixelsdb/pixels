@@ -33,6 +33,10 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
+ * Tests for {@link TimeColumnReader} reading into {@link TimeColumnVector}
+ * (millis of day). For picoseconds / {@code LongTimeColumnVector} output layout,
+ * see {@link TestLongTimeColumnReader}.
+ *
  * @author hank
  * @create 2023-08-20 Zermatt
  */

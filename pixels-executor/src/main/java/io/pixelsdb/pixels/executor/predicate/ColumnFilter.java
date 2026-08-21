@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.pixelsdb.pixels.core.utils.DatetimeUtils.PICOS_PER_MILLIS;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -378,8 +379,16 @@ public class ColumnFilter<T extends Comparable<T>>
                 doFilter(dacv.dates, dacv.noNulls ? null : dacv.isNull, start, length, result);
                 return;
             case TIME:
-                TimeColumnVector tcv = (TimeColumnVector) columnVector;
-                doFilter(tcv.times, tcv.noNulls ? null : tcv.isNull, start, length, result);
+                if (columnVector instanceof LongTimeColumnVector)
+                {
+                    LongTimeColumnVector ltcv = (LongTimeColumnVector) columnVector;
+                    doFilterTime(ltcv.vector, ltcv.noNulls ? null : ltcv.isNull, start, length, result);
+                }
+                else
+                {
+                    TimeColumnVector tcv = (TimeColumnVector) columnVector;
+                    doFilter(tcv.times, tcv.noNulls ? null : tcv.isNull, start, length, result);
+                }
                 return;
             case TIMESTAMP:
                 TimestampColumnVector tscv = (TimestampColumnVector) columnVector;
@@ -662,6 +671,56 @@ public class ColumnFilter<T extends Comparable<T>>
                             result.set(i);
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private void doFilterTime(long[] vector, boolean[] isNull, int start, int length, Bitmap result)
+    {
+        boolean noNulls = isNull == null;
+        if (!this.filter.ranges.isEmpty())
+        {
+            for (Range<T> range : this.filter.ranges)
+            {
+                long lowerBound = range.lowerBound.type != Bound.Type.UNBOUNDED ?
+                        ((Integer) range.lowerBound.value +
+                                (range.lowerBound.type == Bound.Type.EXCLUDED ? 1L : 0L)) *
+                                PICOS_PER_MILLIS : Long.MIN_VALUE;
+                long upperBound = range.upperBound.type != Bound.Type.UNBOUNDED ?
+                        ((Integer) range.upperBound.value -
+                                (range.upperBound.type == Bound.Type.EXCLUDED ? 1L : 0L)) *
+                                PICOS_PER_MILLIS : Long.MAX_VALUE;
+                for (int i = start; i < start + length; ++i)
+                {
+                    if (this.filter.allowNull && !noNulls && isNull[i] ||
+                            (noNulls || !isNull[i]) && vector[i] >= lowerBound && vector[i] <= upperBound)
+                    {
+                        result.set(i);
+                    }
+                }
+            }
+        }
+        else
+        {
+            Set<Long> picoIncludes = new HashSet<>(includes.size());
+            for (T value : includes)
+            {
+                picoIncludes.add((Integer) value * PICOS_PER_MILLIS);
+            }
+            Set<Long> picoExcludes = new HashSet<>(excludes.size());
+            for (T value : excludes)
+            {
+                picoExcludes.add((Integer) value * PICOS_PER_MILLIS);
+            }
+            for (int i = start; i < start + length; ++i)
+            {
+                if (this.filter.allowNull && !noNulls && isNull[i] ||
+                        (noNulls || !isNull[i]) &&
+                                ((!picoIncludes.isEmpty() && picoIncludes.contains(vector[i])) ||
+                                        (!picoExcludes.isEmpty() && !picoExcludes.contains(vector[i]))))
+                {
+                    result.set(i);
                 }
             }
         }
