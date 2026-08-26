@@ -40,7 +40,6 @@ LongColumnWriter::LongColumnWriter(
 
 int LongColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
 {
-  std::cout << "In LongColumnWriter" << std::endl;
   auto columnVector = std::static_pointer_cast<LongColumnVector>(vector);
   if (!columnVector)
   {
@@ -124,8 +123,9 @@ void LongColumnWriter::newPixel()
   // write out current pixel vector
   if (runlengthEncoding)
   {
-    std::vector<byte> buffer(curPixelVectorIndex *
-    sizeof(int));
+    // RLE output may be larger than the unencoded values because it also
+    // contains encoding headers and variable-length integer metadata.
+    std::vector<byte> buffer(curPixelVectorIndex * sizeof(long) + 32);
     int resLen;
     encoder->encode(curPixelVector.data(), buffer.data(), curPixelVectorIndex,
                     resLen);
@@ -136,20 +136,20 @@ void LongColumnWriter::newPixel()
     EncodingUtils encodingUtils;
 
     curVecPartitionBuffer =
-        std::make_shared<ByteBuffer>(curPixelVectorIndex * sizeof(int));
+        std::make_shared<ByteBuffer>(curPixelVectorIndex * sizeof(long));
     if (byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN)
     {
       for (int i = 0; i < curPixelVectorIndex; i++)
       {
         encodingUtils.writeLongLE(curVecPartitionBuffer,
-                                  (int) curPixelVector[i]);
+                                  (int64_t) curPixelVector[i]);
       }
     } else
     {
       for (int i = 0; i < curPixelVectorIndex; i++)
       {
         encodingUtils.writeLongBE(curVecPartitionBuffer,
-                                  (int) curPixelVector[i]);
+                                  (int64_t) curPixelVector[i]);
       }
     }
 
@@ -160,17 +160,14 @@ void LongColumnWriter::newPixel()
   ColumnWriter::newPixel();
 }
 
-pixels::proto::ColumnEncoding LongColumnWriter::getColumnChunkEncoding() const
+const flatbuffers::Offset<pixels::fb::ColumnEncoding> LongColumnWriter::getColumnChunkEncoding(flatbuffers::FlatBufferBuilder& fbb) const
 {
-  pixels::proto::ColumnEncoding columnEncoding;
+
   if (runlengthEncoding)
   {
-    columnEncoding.set_kind(
-        pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_RUNLENGTH);
+    return pixels::fb::CreateColumnEncoding(fbb,pixels::fb::EncodingKind_RUNLENGTH);
   } else
   {
-    columnEncoding.set_kind(
-        pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_NONE);
+    return pixels::fb::CreateColumnEncoding(fbb,pixels::fb::EncodingKind_NONE);
   }
-  return columnEncoding;
 }

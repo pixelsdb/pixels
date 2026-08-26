@@ -23,6 +23,7 @@
  * @create 2023-04-06
  */
 #include "reader/DateColumnReader.h"
+#include "vector/DateColumnVector.h"
 
 
 DateColumnReader::DateColumnReader(std::shared_ptr <TypeDescription> type) : ColumnReader(type)
@@ -35,9 +36,10 @@ void DateColumnReader::close()
 
 }
 
-void DateColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset,
+void DateColumnReader::read(std::shared_ptr <ByteBuffer> input,
+                            const pixels::fb::ColumnEncoding* encoding, int offset,
                             int size, int pixelStride, int vectorIndex, std::shared_ptr <ColumnVector> vector,
-                            pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
+                            const pixels::fb::ColumnChunkIndex* chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
 {
     std::shared_ptr <DateColumnVector> columnVector =
             std::static_pointer_cast<DateColumnVector>(vector);
@@ -45,14 +47,14 @@ void DateColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto::C
     {
         decoder = std::make_shared<RunLenIntDecoder>(input, true);
         elementIndex = 0;
-        isNullOffset = chunkIndex.isnulloffset();
+        isNullOffset = chunkIndex->isNullOffset();
     }
 
     int pixelId = elementIndex / pixelStride;
-    bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+    bool hasNull = chunkIndex->pixelStatistics()->Get(pixelId)->statistic()->hasNull();
     setValid(input, pixelStride, vector, pixelId, hasNull);
 
-    if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_RUNLENGTH)
+    if (encoding->kind() == pixels::fb::EncodingKind_RUNLENGTH)
     {
         for (int i = 0; i < size; i++)
         {

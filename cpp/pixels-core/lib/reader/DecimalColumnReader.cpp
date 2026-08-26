@@ -23,6 +23,7 @@
  * @create 2023-04-05
  */
 #include "reader/DecimalColumnReader.h"
+#include "vector/DecimalColumnVector.h"
 
 /**
  * The column reader of decimals.
@@ -39,9 +40,10 @@ void DecimalColumnReader::close()
 
 }
 
-void DecimalColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset,
+void DecimalColumnReader::read(std::shared_ptr <ByteBuffer> input,
+                               const pixels::fb::ColumnEncoding* encoding, int offset,
                                int size, int pixelStride, int vectorIndex, std::shared_ptr <ColumnVector> vector,
-                               pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
+                               const pixels::fb::ColumnChunkIndex* chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
 {
     std::shared_ptr <DecimalColumnVector> columnVector =
             std::static_pointer_cast<DecimalColumnVector>(vector);
@@ -57,12 +59,12 @@ void DecimalColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto
     {
         // TODO: here we check null
         ColumnReader::elementIndex = 0;
-        isNullOffset = chunkIndex.isnulloffset();
+        isNullOffset = chunkIndex->isNullOffset();
     }
     // TODO: we didn't implement the run length encoded method
 
     int pixelId = elementIndex / pixelStride;
-    bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+    bool hasNull = chunkIndex->pixelStatistics()->Get(pixelId)->statistic()->hasNull();
     setValid(input, pixelStride, vector, pixelId, hasNull);
 
     columnVector->vector = (long *) (input->getPointer() + input->getReadPos());

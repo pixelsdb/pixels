@@ -40,7 +40,7 @@ public:
 
   bool decideNullsPadding(std::shared_ptr <PixelsWriterOption> writerOption) override;
 
-  pixels::proto::ColumnEncoding getColumnChunkEncoding() const override;
+  const flatbuffers::Offset<pixels::fb::ColumnEncoding> getColumnChunkEncoding(flatbuffers::FlatBufferBuilder& fbb) const override;
 
 private:
   bool runlengthEncoding;

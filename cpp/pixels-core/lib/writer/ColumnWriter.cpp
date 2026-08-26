@@ -41,20 +41,49 @@ int ColumnWriter::getColumnChunkSize() const
     return static_cast<int>(outputStream->getWritePos() - outputStream->getReadPos());
 }
 
-pixels::proto::ColumnChunkIndex ColumnWriter::getColumnChunkIndex()
-{
-    return *columnChunkIndex;
-}
-
-std::shared_ptr <pixels::proto::ColumnChunkIndex> ColumnWriter::getColumnChunkIndexPtr()
+const flatbuffers::Offset<pixels::fb::ColumnChunkIndex> ColumnWriter::getColumnChunkIndex()
 {
     return columnChunkIndex;
 }
 
-pixels::proto::ColumnEncoding ColumnWriter::getColumnChunkEncoding() const
+flatbuffers::Offset<pixels::fb::ColumnChunkIndex> ColumnWriter::buildColumnChunkIndex(flatbuffers::FlatBufferBuilder& fbb, uint64_t chunkOffset, uint32_t chunkLength, bool littleEndian)
 {
-    pixels::proto::ColumnEncoding encoding;
-    encoding.set_kind(pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_NONE);
+    auto positions = fbb.CreateVector(pixelPositions);
+
+    std::vector<flatbuffers::Offset<pixels::fb::PixelStatistic>> pixelStats;
+    pixelStats.reserve(pixelStatSnapshots.size());
+
+    for (auto& snapshot : pixelStatSnapshots) {
+        auto colStatOffset = pixels::fb::ColumnStatistic::Pack(fbb, snapshot.colStatObj.get());
+
+        auto pixelStatOffset = pixels::fb::CreatePixelStatistic(fbb, colStatOffset);
+        pixelStats.push_back(pixelStatOffset);
+    }
+
+    auto statistics = fbb.CreateVector(pixelStats);
+
+    auto index = pixels::fb::CreateColumnChunkIndex(
+        fbb,
+        chunkOffset,
+        chunkLength,
+        isNullOffset,
+        positions,
+        statistics,
+        littleEndian,
+        nullsPadding,
+        ISNULL_ALIGNMENT
+    );
+    return index;
+}
+
+const flatbuffers::Offset<pixels::fb::ColumnEncoding> ColumnWriter::getColumnChunkEncoding(flatbuffers::FlatBufferBuilder &fbb) const
+{
+    auto encoding = pixels::fb::CreateColumnEncoding(
+        fbb,
+        pixels::fb::EncodingKind_NONE,
+        0,
+        0
+    );
     return encoding;
 }
 
@@ -64,16 +93,29 @@ void ColumnWriter::flush()
     {
         newPixel();
     }
-    int isNullOffset = static_cast<int>(outputStream->getWritePos());
+
+    isNullOffset = static_cast<int>(outputStream->getWritePos());
     if (ISNULL_ALIGNMENT != 0 && isNullOffset % ISNULL_ALIGNMENT != 0)
     {
         int alignBytes = ISNULL_ALIGNMENT - (isNullOffset % ISNULL_ALIGNMENT);
         outputStream->putBytes(const_cast<uint8_t *>(ISNULL_PADDING_BUFFER.data()), alignBytes);
         isNullOffset += alignBytes;
     }
-    columnChunkIndex->set_isnulloffset(isNullOffset);
+
     outputStream->putBytes(isNullStream->getPointer() + isNullStream->getReadPos(),
                            isNullStream->getWritePos() - isNullStream->getReadPos());
+
+    // Align the complete column chunk so its reported size matches the bytes
+    // written to storage.
+    static const int CHUNK_ALIGNMENT = std::stoi(ConfigFactory::Instance().getProperty("column.chunk.alignment"));
+    static const std::vector<uint8_t> CHUNK_PADDING_BUFFER(CHUNK_ALIGNMENT, 0);
+
+    int chunkSize = static_cast<int>(outputStream->getWritePos());
+    if (CHUNK_ALIGNMENT != 0 && chunkSize % CHUNK_ALIGNMENT != 0)
+    {
+        int alignBytes = CHUNK_ALIGNMENT - (chunkSize % CHUNK_ALIGNMENT);
+        outputStream->putBytes(const_cast<uint8_t *>(CHUNK_PADDING_BUFFER.data()), alignBytes);
+    }
 }
 
 void ColumnWriter::newPixel()
@@ -84,6 +126,7 @@ void ColumnWriter::newPixel()
         isNullStream->putBytes(const_cast<uint8_t *>(compacted.data()), compacted.size());
         pixelStatRecorder.setHasNull();
     }
+
     curPixelPosition = static_cast<int>(outputStream->getWritePos());
     curPixelEleIndex = 0;
     curPixelVectorIndex = 0;
@@ -91,11 +134,16 @@ void ColumnWriter::newPixel()
 
     columnChunkStatRecorder.merge(pixelStatRecorder);
 
-    pixels::proto::PixelStatistic pixelStat;
-    *pixelStat.mutable_statistic() = pixelStatRecorder.serialize();
-    columnChunkIndex->add_pixelpositions(lastPixelPosition);
-    auto new_pixelstatistic = columnChunkIndex->add_pixelstatistics();
-    *new_pixelstatistic = pixelStat;
+    // Add pixel position
+    pixelPositions.push_back(lastPixelPosition);
+
+    auto colStatT = std::make_unique<pixels::fb::ColumnStatisticT>();
+    colStatT->numberOfValues = pixelStatRecorder.getNumberOfValues();
+    colStatT->hasNull = pixelStatRecorder.hasNullValue();
+
+    PixelStatSnapshot snapshot;
+    snapshot.colStatObj = std::move(colStatT);
+    pixelStatSnapshots.push_back(std::move(snapshot));
 
     lastPixelPosition = curPixelPosition;
     pixelStatRecorder.reset();
@@ -106,8 +154,13 @@ void ColumnWriter::reset()
 {
     lastPixelPosition = 0;
     curPixelPosition = 0;
-    columnChunkIndex->Clear();
-    columnChunkStat->Clear();
+
+    // Clear flatbuffers data
+    pixelPositions.clear();
+    pixelStatSnapshots.clear();  // Clear snapshots instead of pixelStatistics
+    columnChunkIndex = 0;
+    columnChunkStat = nullptr;
+
     pixelStatRecorder.reset();
     columnChunkStatRecorder.reset();
     outputStream->resetPosition();
@@ -125,13 +178,15 @@ ColumnWriter::ColumnWriter(std::shared_ptr <TypeDescription> type,
         : pixelStride(writerOption->getPixelsStride()),
           encodingLevel(writerOption->getEncodingLevel()),
           byteOrder(writerOption->getByteOrder()),
-          nullsPadding(false),// default is false
-          isNull(pixelStride, false)
+          nullsPadding(writerOption->isNullsPadding()),// default is false
+          isNull(pixelStride, false),
+          columnChunkIndex(0),
+          columnChunkStat(nullptr)
 {
-    outputStream = std::make_shared<ByteBuffer>();
-    isNullStream = std::make_shared<ByteBuffer>();
-    columnChunkIndex = std::make_shared<pixels::proto::ColumnChunkIndex>();
-    columnChunkIndex->set_littleendian(byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN);
-    columnChunkIndex->set_nullspadding(nullsPadding);
-    columnChunkIndex->set_isnullalignment(ISNULL_ALIGNMENT);
+    outputStream = std::make_shared<ByteBuffer>(pixelStride);
+    isNullStream = std::make_shared<ByteBuffer>(pixelStride);
+
+    // Reserve space for pixel positions and statistics snapshots
+    pixelPositions.reserve(100);  // reasonable initial capacity
+    pixelStatSnapshots.reserve(100);
 }

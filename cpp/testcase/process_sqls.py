@@ -135,7 +135,7 @@ def load_benchmark_create_view(benchmark_json_path: str, benchmark_name: str) ->
 
 
 def run_single_sql(duckdb_bin: str, create_view_sql: str, sql_content: str, wait_after_run: float, threads: int) -> float:
-    duckdb_commands = f"{create_view_sql}\nset threads={threads};\n\n.timer on\n{sql_content.strip()}\n.exit"
+    duckdb_commands = f"{create_view_sql}\nset threads={threads};\n\n.timer on\nexplain analyze {sql_content.strip()}\n.exit"
     process = None
 
     try:
@@ -153,7 +153,7 @@ def run_single_sql(duckdb_bin: str, create_view_sql: str, sql_content: str, wait
 
         if process.returncode != 0:
             raise RuntimeError(f"duckdb execution failed (code {process.returncode}):\n{output[:1000]}...")
-
+        print(output)
         real_time = extract_real_time(output)
         time.sleep(wait_after_run)
         kill_remaining_duckdb(duckdb_bin)

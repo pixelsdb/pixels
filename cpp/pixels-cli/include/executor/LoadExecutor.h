@@ -36,6 +36,6 @@ public:
 
 private:
     bool startConsumers(const std::vector <std::string> &inputFiles, Parameters parameters,
-                        const std::vector <std::string> &loadedFiles);
+                        const std::vector <std::string> &loadedFiles, int concurrency);
 };
 #endif //PIXELS_LOADEXECUTOR_H

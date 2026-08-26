@@ -1,0 +1,207 @@
+// File format definition of Pixels (FlatBuffers version)
+
+namespace pixels.fb;
+
+enum CompressionKind : byte {
+    NONE = 0,
+    ZLIB = 1,
+    SNAPPY = 2,
+    LZO = 3,
+    LZ4 = 4,
+    ZSTD = 5
+}
+
+enum TypeKind : byte {
+    BOOLEAN = 0,
+    BYTE = 1,
+    SHORT = 2,
+    INT = 3,
+    LONG = 4,
+    FLOAT = 5,
+    DOUBLE = 6,
+    STRING = 7,
+    BINARY = 8,
+    TIMESTAMP = 9,
+    ARRAY = 10,
+    MAP = 11,
+    STRUCT = 12,
+    VARBINARY = 13,
+    DECIMAL = 14,
+    DATE = 15,
+    VARCHAR = 16,
+    CHAR = 17,
+    TIME = 18,
+    VECTOR = 19
+}
+
+enum EncodingKind : byte {
+    NONE = 0,
+    RUNLENGTH = 1,
+    DICTIONARY = 2
+}
+
+// --- Statistics Tables ---
+
+table IntegerStatistic {
+    minimum: long;
+    maximum: long;
+    sum: long;
+}
+
+table Integer128Statistic {
+    minimum_high: uint64;
+    minimum_low: uint64;
+    maximum_high: long;
+    maximum_low: long;
+}
+
+table DoubleStatistic {
+    minimum: double;
+    maximum: double;
+    sum: double;
+}
+
+table StringStatistic {
+    minimum: string;
+    maximum: string;
+    sum: long;
+}
+
+table BucketStatistic {
+    count: [uint64];
+}
+
+table TimestampStatistic {
+    minimum: long;
+    maximum: long;
+}
+
+table DateStatistic {
+    minimum: int;
+    maximum: int;
+}
+
+table TimeStatistic {
+    minimum: int;
+    maximum: int;
+}
+
+table BinaryStatistic {
+    sum: long;
+}
+
+table ColumnStatistic {
+    numberOfValues: uint64;
+    intStatistics: IntegerStatistic;
+    doubleStatistics: DoubleStatistic;
+    stringStatistics: StringStatistic;
+    bucketStatistics: BucketStatistic;
+    binaryStatistics: BinaryStatistic;
+    timestampStatistics: TimestampStatistic;
+    dateStatistics: DateStatistic;
+    timeStatistics: TimeStatistic;
+    int128Statistics: Integer128Statistic;
+    hasNull: bool = false;
+}
+
+table PixelStatistic {
+    statistic: ColumnStatistic;
+}
+
+// --- Schema and Metadata ---
+
+table Type {
+    kind: TypeKind = BOOLEAN;
+    name: string;
+    subtypes: [uint];
+    maximumLength: uint;
+    precision: uint;
+    scale: uint;
+    dimension: uint;
+}
+
+table PartitionInformation {
+    columnIds: [uint];
+    hashValue: int;
+}
+
+table RowGroupInformation {
+    footerOffset: uint64;
+    dataLength: uint;
+    footerLength: uint;
+    numberOfRows: uint;
+    partitionInfo: PartitionInformation;
+}
+
+table RowGroupStatistic {
+    columnChunkStats: [ColumnStatistic];
+    hiddenColumnChunkStats: ColumnStatistic;
+}
+
+// --- Index and Encoding ---
+
+table ColumnChunkIndex {
+    chunkOffset: uint64;
+    chunkLength: uint;
+    isNullOffset: uint;
+    pixelPositions: [uint];
+    pixelStatistics: [PixelStatistic];
+    littleEndian: bool = true;
+    nullsPadding: bool = false;
+    isNullAlignment: uint;
+}
+
+table ColumnEncoding {
+    kind: EncodingKind = NONE;
+    dictionarySize: uint;
+    cascadeEncoding: ColumnEncoding;
+}
+
+table RowGroupIndex {
+    columnChunkIndexEntries: [ColumnChunkIndex];
+    hiddenColumnChunkIndexEntry: ColumnChunkIndex;
+}
+
+table RowGroupEncoding {
+    columnChunkEncodings: [ColumnEncoding];
+    hiddenColumnChunkEncoding: ColumnEncoding;
+}
+
+table RowGroupFooter {
+    rowGroupIndexEntry: RowGroupIndex;
+    rowGroupEncoding: RowGroupEncoding;
+}
+
+// --- File Tail Components ---
+
+table PostScript {
+    version: uint;
+    contentLength: uint64;
+    numberOfRows: uint;
+    compression: CompressionKind = NONE;
+    compressionBlockSize: uint;
+    pixelStride: uint;
+    writerTimezone: string;
+    partitioned: bool = false;
+    columnChunkAlignment: uint;
+    hasHiddenColumn: bool = false;
+    magic: string; // "PIXELS"
+}
+
+table Footer {
+    types: [Type];
+    columnStats: [ColumnStatistic];
+    rowGroupInfos: [RowGroupInformation];
+    rowGroupStats: [RowGroupStatistic];
+    hiddenType: Type;
+    hiddenColumnStats: ColumnStatistic;
+}
+
+table FileTail {
+    footer: Footer;
+    postscript: PostScript;
+    footerLength: uint;
+    postscriptLength: uint;
+}
+
+root_type FileTail;

@@ -41,7 +41,6 @@ IntColumnWriter::IntColumnWriter(
 int
 IntColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
 {
-    std::cout << "In IntColumnWriter" << std::endl;
     auto columnVector = std::static_pointer_cast<IntColumnVector> (vector);
     if (!columnVector)
     {
@@ -125,8 +124,9 @@ void IntColumnWriter::newPixel()
     // write out current pixel vector
     if (runlengthEncoding)
     {
-        std::vector<byte> buffer(curPixelVectorIndex *
-        sizeof (int));
+        // RLE output may be larger than the unencoded values because it also
+        // contains encoding headers and variable-length integer metadata.
+        std::vector<byte> buffer(curPixelVectorIndex * sizeof(long) + 32);
         int resLen;
         encoder->encode (curPixelVector.data (), buffer.data (), curPixelVectorIndex,
                          resLen);
@@ -159,17 +159,14 @@ void IntColumnWriter::newPixel()
     ColumnWriter::newPixel ();
 }
 
-pixels::proto::ColumnEncoding IntColumnWriter::getColumnChunkEncoding() const
+const flatbuffers::Offset<pixels::fb::ColumnEncoding> IntColumnWriter::getColumnChunkEncoding(flatbuffers::FlatBufferBuilder& fbb) const
 {
-    pixels::proto::ColumnEncoding columnEncoding;
+
     if (runlengthEncoding)
     {
-        columnEncoding.set_kind (
-                pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_RUNLENGTH);
+        return pixels::fb::CreateColumnEncoding(fbb,pixels::fb::EncodingKind_RUNLENGTH);
     } else
     {
-        columnEncoding.set_kind (
-                pixels::proto::ColumnEncoding::Kind::ColumnEncoding_Kind_NONE);
+        return pixels::fb::CreateColumnEncoding(fbb,pixels::fb::EncodingKind_NONE);
     }
-    return columnEncoding;
 }

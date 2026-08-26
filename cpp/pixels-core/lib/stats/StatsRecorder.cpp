@@ -30,9 +30,9 @@ StatsRecorder::StatsRecorder() : numberOfValues(0), hasNull(false)
 {}
 
 
-StatsRecorder::StatsRecorder(const pixels::proto::ColumnStatistic &statistic)
-        : numberOfValues(statistic.has_numberofvalues() ? statistic.numberofvalues() : 0),
-          hasNull(statistic.has_hasnull() ? statistic.hasnull() : true)
+StatsRecorder::StatsRecorder(const pixels::fb::ColumnStatistic* statistic)
+        : numberOfValues(statistic != nullptr ? statistic->numberOfValues() : 0),
+          hasNull(statistic != nullptr ? statistic->hasNull() : true)
 {}
 
 
@@ -132,12 +132,22 @@ bool StatsRecorder::hasNullValue() const
 { return hasNull; }
 
 
-pixels::proto::ColumnStatistic StatsRecorder::serialize() const
+flatbuffers::Offset<pixels::fb::ColumnStatistic> StatsRecorder::serialize(flatbuffers::FlatBufferBuilder& builder) const
 {
-    pixels::proto::ColumnStatistic statistic;
-    statistic.set_numberofvalues(numberOfValues);
-    statistic.set_hasnull(hasNull);
-    return statistic;
+    return pixels::fb::CreateColumnStatistic(
+        builder,
+        numberOfValues,  // numberOfValues
+        0,  // intStatistics
+        0,  // doubleStatistics
+        0,  // stringStatistics
+        0,  // bucketStatistics
+        0,  // binaryStatistics
+        0,  // timestampStatistics
+        0,  // dateStatistics
+        0,  // timeStatistics
+        0,  // int128Statistics
+        hasNull  // hasNull
+    );
 }
 
 
@@ -157,7 +167,7 @@ std::unique_ptr <StatsRecorder> StatsRecorder::create(TypeDescription type)
 
 
 std::unique_ptr <StatsRecorder>
-StatsRecorder::create(TypeDescription type, const pixels::proto::ColumnStatistic &statistic)
+StatsRecorder::create(TypeDescription type, const pixels::fb::ColumnStatistic* statistic)
 {
     switch (type.getCategory())
     {
@@ -169,7 +179,7 @@ StatsRecorder::create(TypeDescription type, const pixels::proto::ColumnStatistic
 
 
 std::unique_ptr <StatsRecorder>
-StatsRecorder::create(TypeDescription::Category category, const pixels::proto::ColumnStatistic &statistic)
+StatsRecorder::create(TypeDescription::Category category, const pixels::fb::ColumnStatistic* statistic)
 {
     switch (category)
     {

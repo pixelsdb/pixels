@@ -16,18 +16,18 @@ endif ()
 
 target_link_libraries(
         IntegerWriterTest
+        PRIVATE
         gtest_main
-        pixels-common
-        pixels-core
         duckdb
+        pixels-core
 )
 
 target_link_libraries(
         PixelsWriterTest
+        PRIVATE
         gtest_main
-        pixels-common
-        pixels-core
         duckdb
+        pixels-core
 )
 
 set(GTEST_DIR "${PROJECT_SOURCE_DIR}/third-party/googletest")

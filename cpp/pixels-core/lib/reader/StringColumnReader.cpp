@@ -24,6 +24,7 @@
  */
 #include "reader/StringColumnReader.h"
 #include "profiler/CountProfiler.h"
+#include "vector/BinaryColumnVector.h"
 
 StringColumnReader::StringColumnReader(std::shared_ptr <TypeDescription> type) : ColumnReader(type)
 {
@@ -46,9 +47,9 @@ void StringColumnReader::close()
 
 }
 
-void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset,
+void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, const pixels::fb::ColumnEncoding* encoding, int offset,
                               int size, int pixelStride, int vectorIndex, std::shared_ptr <ColumnVector> vector,
-                              pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
+                              const pixels::fb::ColumnChunkIndex* chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
 {
     // TODO: support dictionary
     std::shared_ptr <BinaryColumnVector> columnVector =
@@ -58,20 +59,20 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
     {
         elementIndex = 0;
         bufferOffset = 0;
-        isNullOffset = chunkIndex.isnulloffset();
+        isNullOffset = chunkIndex->isNullOffset();
         readContent(input, input->bytesRemaining(), encoding);
     }
 
     int pixelId = elementIndex / pixelStride;
-    bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
+    bool hasNull = chunkIndex->pixelStatistics()->Get(pixelId)->statistic()->hasNull();
     setValid(input, pixelStride, vector, pixelId, hasNull);
 
     // TODO: if dictionary encoded
-    if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY)
+    if (encoding->kind() == pixels::fb::EncodingKind_DICTIONARY)
     {
         bool cascadeRLE = false;
-        if (encoding.has_cascadeencoding() &&
-            encoding.cascadeencoding().kind() == pixels::proto::ColumnEncoding_Kind_RUNLENGTH)
+        if (encoding->cascadeEncoding() != nullptr &&
+            encoding->cascadeEncoding()->kind() == pixels::fb::EncodingKind_RUNLENGTH)
         {
             cascadeRLE = true;
         }
@@ -91,7 +92,7 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
                 // use setRef instead of setVal to reduce memory copy.
                 columnVector->setRef(i + vectorIndex, dictContentBuf->getPointer(), dictStarts[originId], tmpLen);
             }
-            else if (!valid && (!cascadeRLE) && chunkIndex.nullspadding())
+            else if (!valid && (!cascadeRLE) && chunkIndex->nullsPadding())
             {
                 // is null: skip this number
                 contentBuf->getInt();
@@ -152,9 +153,9 @@ void StringColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto:
 
 void StringColumnReader::readContent(std::shared_ptr <ByteBuffer> input,
                                      uint32_t inputLength,
-                                     pixels::proto::ColumnEncoding &encoding)
+                                     const pixels::fb::ColumnEncoding* encoding)
 {
-    if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_DICTIONARY)
+    if (encoding->kind() == pixels::fb::EncodingKind_DICTIONARY)
     {
         input->markReaderIndex();
         input->skipBytes(inputLength - 2 * sizeof(int));
@@ -170,14 +171,14 @@ void StringColumnReader::readContent(std::shared_ptr <ByteBuffer> input,
                 *input, dictStartsOffset, startsBufLength);
         int bufferStart = 0;
 
-        if (encoding.has_cascadeencoding() &&
-            encoding.cascadeencoding().kind() == pixels::proto::ColumnEncoding_Kind::ColumnEncoding_Kind_RUNLENGTH)
+        if (encoding->cascadeEncoding() != nullptr &&
+            encoding->cascadeEncoding()->kind() == pixels::fb::EncodingKind_RUNLENGTH)
         {
             std::shared_ptr <RunLenIntDecoder> startsDecoder =
                     std::make_shared<RunLenIntDecoder>(startsBuf, false);
-            if (encoding.has_dictionarysize())
+            if (encoding->dictionarySize() != 0)
             {
-                startsLength = (int) encoding.dictionarysize() + 1;
+                startsLength = (int) encoding->dictionarySize() + 1;
                 dictStarts = new int[startsLength];
                 int i = 0;
                 while (startsDecoder->hasNext())
@@ -199,7 +200,7 @@ void StringColumnReader::readContent(std::shared_ptr <ByteBuffer> input,
                         "StringColumnReader::readContent: the length of the starts array buffer is invalid. ");
             }
             int startsSize = startsBufLength / sizeof(int);
-            if (encoding.has_dictionarysize() && encoding.dictionarysize() + 1 != startsSize)
+            if (encoding->dictionarySize() != 0 && encoding->dictionarySize() + 1 != startsSize)
             {
                 throw new InvalidArgumentException(
                         "the dictionary size is inconsistent with the size of the starts array");

@@ -90,7 +90,7 @@ void* DecimalColumnVector::current()
            readIndex * ElementSize();
 }
 
-void DecimalColumnVector::add(const std::string& input)
+void DecimalColumnVector::add(std::string& input)
 {
     std::string value = input;
 

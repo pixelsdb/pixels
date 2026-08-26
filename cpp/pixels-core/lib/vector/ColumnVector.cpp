@@ -145,23 +145,22 @@ void ColumnVector::ensureSize(uint64_t size, bool preserveData)
 
 void ColumnVector::add(std::string &value)
 {
-    throw new std::runtime_error("Adding string is not supported");
+    throw std::runtime_error("Adding string is not supported");
 }
 
 void ColumnVector::add(bool value)
 {
-    throw new std::runtime_error("Adding boolean is not supported");
+    throw std::runtime_error("Adding boolean is not supported");
 }
 
 void ColumnVector::add(int64_t value)
 {
-    throw new std::runtime_error("Adding long is not supported");
+    throw std::runtime_error("Adding long is not supported");
 }
 
 void ColumnVector::add(int value)
 {
-    throw new std::runtime_error("Adding int is not supported");
+    throw std::runtime_error("Adding int is not supported");
 }
-
 
 

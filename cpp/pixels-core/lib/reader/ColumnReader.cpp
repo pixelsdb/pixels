@@ -73,9 +73,9 @@ std::shared_ptr <ColumnReader> ColumnReader::newColumnReader(std::shared_ptr <Ty
 }
 
 void
-ColumnReader::read(std::shared_ptr <ByteBuffer> input, pixels::proto::ColumnEncoding &encoding, int offset, int size,
+ColumnReader::read(std::shared_ptr <ByteBuffer> input,const pixels::fb::ColumnEncoding* encoding, int offset, int size,
                    int pixelStride, int vectorIndex, std::shared_ptr <ColumnVector> vector,
-                   pixels::proto::ColumnChunkIndex &chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
+                   const pixels::fb::ColumnChunkIndex* chunkIndex, std::shared_ptr <PixelsBitMask> filterMask)
 {
 }
 
@@ -118,4 +118,42 @@ void ColumnReader::setValid(const std::shared_ptr <ByteBuffer> &input, int pixel
 //    }
 //
 //    columnVector->isNull = (uint8_t *)(input->getPointer() + isNullOffset + pixelId * pixelStride / 8);
+}
+
+void ColumnReader::setValid(const std::shared_ptr<ByteBuffer> &input,
+                            const std::shared_ptr<ColumnVector> &columnVector,
+                            bool hasNull, int vectorIndex, int size,
+                            bool littleEndian)
+{
+    auto *validity = reinterpret_cast<uint8_t *>(columnVector->isValid);
+    const uint8_t *nulls = input->getPointer() + isNullOffset;
+
+    for (int i = 0; i < size; ++i)
+    {
+        bool isNull = false;
+        if (hasNull)
+        {
+            int bitIndex = i % 8;
+            int shift = littleEndian ? bitIndex : 7 - bitIndex;
+            isNull = (nulls[i / 8] & (1U << shift)) != 0;
+        }
+
+        int outputIndex = vectorIndex + i;
+        columnVector->isNull[outputIndex] = isNull;
+        uint8_t mask = static_cast<uint8_t>(1U << (outputIndex % 8));
+        if (isNull)
+        {
+            validity[outputIndex / 8] &= static_cast<uint8_t>(~mask);
+            columnVector->noNulls = false;
+        }
+        else
+        {
+            validity[outputIndex / 8] |= mask;
+        }
+    }
+
+    if (hasNull)
+    {
+        isNullOffset += (size + 7) / 8;
+    }
 }

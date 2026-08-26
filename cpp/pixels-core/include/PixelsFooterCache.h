@@ -27,29 +27,28 @@
 
 #include <iostream>
 #include <string>
-#include "pixels-common/pixels.pb.h"
+#include "pixels_generated.h"
 #include <unordered_map>
 
-using namespace pixels::proto;
-typedef std::unordered_map <std::string, std::shared_ptr<FileTail>> FileTailTable;
-typedef std::unordered_map <std::string, std::shared_ptr<RowGroupFooter>> RGFooterTable;
+typedef std::unordered_map<std::string, const pixels::fb::FileTail*> FileTailTable;
+typedef std::unordered_map<std::string, const pixels::fb::RowGroupFooter*> RGFooterTable;
 
 class PixelsFooterCache
 {
 public:
     PixelsFooterCache();
 
-    void putFileTail(const std::string &id, std::shared_ptr <FileTail> fileTail);
+    void putFileTail(const std::string &id, const pixels::fb::FileTail* fileTail);
 
     bool containsFileTail(const std::string &id);
 
-    std::shared_ptr <FileTail> getFileTail(const std::string &id);
+    const pixels::fb::FileTail* getFileTail(const std::string &id);
 
-    void putRGFooter(const std::string &id, std::shared_ptr <RowGroupFooter> footer);
+    void putRGFooter(const std::string &id, const pixels::fb::RowGroupFooter* footer);
 
     bool containsRGFooter(const std::string &id);
 
-    std::shared_ptr <RowGroupFooter> getRGFooter(const std::string &id);
+    const pixels::fb::RowGroupFooter* getRGFooter(const std::string &id);
 
 private:
     FileTailTable fileTailCacheMap;

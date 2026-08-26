@@ -31,7 +31,6 @@
 #include "PixelsVersion.h"
 #include "utils/Endianness.h"
 #include "physical/PhysicalWriterUtil.h"
-#include "pixels-common/pixels.pb.h"
 #include "reader/PixelsRecordReader.h"
 #include "reader/PixelsRecordReaderImpl.h"
 #include "utils/Endianness.h"
@@ -53,7 +52,7 @@ PixelsWriterImpl::PixelsWriterImpl(std::shared_ptr<TypeDescription> schema,
                                    bool nullsPadding, bool partitioned,
                                    int compressionBlockSize)
     : schema(schema), rowGroupSize(rowGroupSize),
-      compressionBlockSize(compressionBlockSize)
+      compressionBlockSize(compressionBlockSize),fbb(1024)
 {
   this->columnWriterOption = std::make_shared<PixelsWriterOption>()
       ->setPixelsStride(pixelsStride)
@@ -61,7 +60,7 @@ PixelsWriterImpl::PixelsWriterImpl(std::shared_ptr<TypeDescription> schema,
       ->setNullsPadding(nullsPadding);
   this->physicalWriter = PhysicalWriterUtil::newPhysicalWriter(
       targetFilePath, blockSize, blockPadding, false);
-  this->compressionKind = pixels::proto::CompressionKind::NONE;
+  this->compressionKind = pixels::fb::CompressionKind::CompressionKind_NONE;
   // this->timeZone =
   // std::unique_ptr<icu::TimeZone>(icu::TimeZone::createDefault());
   this->children = schema->getChildren();
@@ -77,7 +76,6 @@ PixelsWriterImpl::PixelsWriterImpl(std::shared_ptr<TypeDescription> schema,
 bool PixelsWriterImpl::addRowBatch(
     std::shared_ptr<VectorizedRowBatch> rowBatch)
 {
-  std::cout << "PixelsWriterImpl::addRowBatch" << std::endl;
   curRowGroupDataLength = 0;
   curRowGroupNumOfRows += rowBatch->count();
   writeColumnVectors(rowBatch->cols, rowBatch->count());
@@ -90,43 +88,39 @@ bool PixelsWriterImpl::addRowBatch(
   }
   return true;
 }
-
 void PixelsWriterImpl::writeColumnVectors(
     std::vector<std::shared_ptr<ColumnVector>> &columnVectors,
     int rowBatchSize)
 {
-  std::vector<std::future<void>> futures;
-  std::atomic<int> dataLength(0);
+  std::vector<std::future<int>> futures;
   int commonColumnLength = columnVectors.size();
 
-  // Writing regular columns
+  // Column writers maintain independent state, so columns can be written in
+  // parallel without sharing the FlatBufferBuilder.
   for (int i = 0; i < commonColumnLength; ++i)
   {
-    // dataLength += columnWriters[i]->write(columnVectors[i], rowBatchSize);
-    futures.emplace_back(std::async(std::launch::async, [this, columnVectors,
-        rowBatchSize, i,
-        &dataLength]()
+    futures.emplace_back(std::async(std::launch::async, [this, &columnVectors,
+        rowBatchSize, i]()
     {
       try
       {
-        dataLength += columnWriters[i]->write(columnVectors[i], rowBatchSize);
-      } catch (const std::exception &e)
+        return columnWriters[i]->write(columnVectors[i], rowBatchSize);
+      }
+      catch (const std::exception &e)
       {
-        throw std::runtime_error("failed to write column vector: " +
+        throw std::runtime_error("failed to write column vector [" + std::to_string(i) + "]: " +
             std::string(e.what()));
       }
     }));
   }
 
-  // Wait for all futures to complete
+  int dataLength = 0;
   for (auto &future : futures)
   {
-    future.get(); // Blocking until all tasks are completed
+    dataLength += future.get();
   }
 
-  // Simulate curRowGroupDataLength accumulation
-  curRowGroupDataLength += dataLength.load();
-  std::cout << "Data length written: " << curRowGroupDataLength << std::endl;
+  curRowGroupDataLength += dataLength;
 }
 
 void PixelsWriterImpl::close()
@@ -150,21 +144,24 @@ void PixelsWriterImpl::close()
   }
 }
 
+// Persist the current row group in four stages: prepare aligned column chunks,
+// write their data, build the FlatBuffers footer, and record file metadata.
 void PixelsWriterImpl::writeRowGroup()
 {
-  // TODO
-  std::cout << "Try to write rowGroup" << std::endl;
-  int rowGroupDataLength = 0;
-  //    pixels::proto::RowGroupStatistic curRowGroupStatistic;
-  pixels::proto::RowGroupInformation curRowGroupInfo;
-  pixels::proto::RowGroupIndex curRowGroupIndex;
-  pixels::proto::RowGroupEncoding curRowGroupEncoding;
-  // reset each column writer and get current row group content size in bytes
-  for (auto writer : columnWriters)
+  int rowGroupDataLength=prepareRowGroup();
+  writeRowGroupData(rowGroupDataLength);
+  rowGroupDataLength=writeRowGroupFooter();
+  recordRowGroupMetadata(rowGroupDataLength);
+}
+
+int PixelsWriterImpl::prepareRowGroup()
+{
+  int rowGroupDataLength =0;
+  for (auto writer: columnWriters)
   {
-    // flush writes the isNull bit map into the internal output stream.
+    // flush residual rows to storage, a new pixels is created
     writer->flush();
-    rowGroupDataLength += writer->getColumnChunkSize();
+    rowGroupDataLength+=writer->getColumnChunkSize();
     if (CHUNK_ALIGNMENT != 0 && rowGroupDataLength % CHUNK_ALIGNMENT != 0)
     {
       /*
@@ -177,168 +174,218 @@ void PixelsWriterImpl::writeRowGroup()
           CHUNK_ALIGNMENT - rowGroupDataLength % CHUNK_ALIGNMENT;
     }
   }
-  // write and flush row group content
+  return rowGroupDataLength;
+}
+
+void PixelsWriterImpl::writeRowGroupData(uint32_t rowGroupDataLength)
+{
   try
   {
-    curRowGroupOffset = physicalWriter->prepare(rowGroupDataLength);
-    if (curRowGroupOffset != -1)
+  curRowGroupOffset= physicalWriter->prepare(rowGroupDataLength);
+    if (curRowGroupOffset!=-1){
+    // No need for double alignment
+    if (CHUNK_ALIGNMENT !=0 && curRowGroupOffset % CHUNK_ALIGNMENT)
     {
-      int tryAlign = 0;
-      while (CHUNK_ALIGNMENT != 0 && curRowGroupOffset % CHUNK_ALIGNMENT != 0 &&
-          tryAlign++ < 2)
+      int paddingNeeded = CHUNK_ALIGNMENT -(curRowGroupOffset% CHUNK_ALIGNMENT);
+      physicalWriter->append(CHUNK_PADDING_BUFFER.data(),0,paddingNeeded);
+      writtenBytes += paddingNeeded;
+      curRowGroupOffset = physicalWriter->prepare(rowGroupDataLength);
+    }
+
+    for (auto & writer: columnWriters)
+    {
+      auto rowGroupBuffer=writer->getColumnChunkContent();
+      physicalWriter->append(rowGroupBuffer.data(),0,rowGroupBuffer.size());
+      writtenBytes += rowGroupBuffer.size();
+      if (CHUNK_ALIGNMENT != 0 &&
+          rowGroupBuffer.size() % CHUNK_ALIGNMENT != 0)
       {
-        int alignBytes = CHUNK_ALIGNMENT - curRowGroupOffset % CHUNK_ALIGNMENT;
+        int alignBytes =
+            CHUNK_ALIGNMENT - rowGroupBuffer.size() % CHUNK_ALIGNMENT;
         physicalWriter->append(CHUNK_PADDING_BUFFER.data(), 0, alignBytes);
         writtenBytes += alignBytes;
-        curRowGroupOffset = physicalWriter->prepare(rowGroupDataLength);
       }
-      if (tryAlign > 2)
-      {
-        std::cerr << "Failed to align the start offset of the column chunks in "
-                     "the row group"
-                  << std::endl;
-        throw std::runtime_error("Failed to align the start offset of the "
-                                 "column chunks in the row group");
-      }
-
-      for (auto &writer : columnWriters)
-      {
-        auto rowGroupBuffer = writer->getColumnChunkContent();
-        physicalWriter->append(rowGroupBuffer.data(), 0, rowGroupBuffer.size());
-        writtenBytes += rowGroupBuffer.size();
-        if (CHUNK_ALIGNMENT != 0 &&
-            rowGroupBuffer.size() % CHUNK_ALIGNMENT != 0)
-        {
-          int alignBytes =
-              CHUNK_ALIGNMENT - rowGroupBuffer.size() % CHUNK_ALIGNMENT;
-          physicalWriter->append(CHUNK_PADDING_BUFFER.data(), 0, alignBytes);
-          writtenBytes += alignBytes;
-        }
-      }
-      physicalWriter->flush();
-    } else
-    {
-      std::cerr << "Write row group prepare failed" << std::endl;
-      throw std::runtime_error("Write row group prepare failed");
     }
-  } catch (const std::exception &e)
+    physicalWriter->flush();
+  } else
+  {
+    std::cerr << "Write row group prepare failed" << std::endl;
+    throw std::runtime_error("Write row group prepare failed");
+  }
+  }catch (const std::exception &e)
   {
     std::cerr << e.what() << std::endl;
     throw;
   }
+}
+
+int PixelsWriterImpl::writeRowGroupFooter()
+{
+  std::vector<
+    flatbuffers::Offset<pixels::fb::ColumnChunkIndex>>
+    columnChunkIndexVector;
+
+  std::vector<
+      flatbuffers::Offset<pixels::fb::ColumnEncoding>>
+      columnChunkEncodingVector;
 
   // update index and stats(necessary?)
-  rowGroupDataLength = 0;
+  int rowGroupDataLength = 0;
   for (int i = 0; i < columnWriters.size(); i++)
   {
     std::shared_ptr<ColumnWriter> writer = columnWriters[i];
-    auto chunkIndex = writer->getColumnChunkIndex();
-    chunkIndex.set_chunkoffset(curRowGroupOffset + rowGroupDataLength);
-    chunkIndex.set_chunklength(writer->getColumnChunkSize());
-    chunkIndex.set_littleendian(true);
+    auto chunkIndex = writer->buildColumnChunkIndex(fbb,
+      curRowGroupOffset + rowGroupDataLength,writer->getColumnChunkSize(),true);
+
     rowGroupDataLength += writer->getColumnChunkSize();
     if (CHUNK_ALIGNMENT != 0 && rowGroupDataLength % CHUNK_ALIGNMENT != 0)
     {
       rowGroupDataLength +=
           CHUNK_ALIGNMENT - rowGroupDataLength % CHUNK_ALIGNMENT;
     }
-    *(curRowGroupIndex.add_columnchunkindexentries()) = chunkIndex;
-    *(curRowGroupEncoding.add_columnchunkencodings()) =
-        writer->getColumnChunkEncoding();
+    columnChunkIndexVector.push_back(chunkIndex);
+    columnChunkEncodingVector.push_back(writer->getColumnChunkEncoding(fbb));
 
     columnWriters[i] = ColumnWriterBuilder::newColumnWriter(children.at(i),
                                                             columnWriterOption);
   }
-
   // put curRowGroupIndex into rowGroupFooter
-  std::shared_ptr<pixels::proto::RowGroupFooter> rowGroupFooter =
-      std::make_shared<pixels::proto::RowGroupFooter>();
+  auto entriesOffset = fbb.CreateVector(columnChunkIndexVector);
+  auto curRowGroupIndex = pixels::fb::CreateRowGroupIndex(fbb, entriesOffset);
+  auto curRowGroupEncodingOffset = fbb.CreateVector(columnChunkEncodingVector);
+  auto curRowGroupEncoding=pixels::fb::CreateRowGroupEncoding(fbb,curRowGroupEncodingOffset,0);
+  flatbuffers::Offset<pixels::fb::RowGroupFooter> rowGroupFooterOffset =
+    pixels::fb::CreateRowGroupFooter(fbb, curRowGroupIndex, curRowGroupEncoding);
 
-  rowGroupFooter->mutable_rowgroupindexentry()->CopyFrom(curRowGroupIndex);
-  rowGroupFooter->mutable_rowgroupencoding()->CopyFrom(curRowGroupEncoding);
-  std::cout << "curRowGroupEncoding: " << curRowGroupEncoding.ByteSizeLong()
-            << std::endl;
-  std::cout << "curRowGroupEncoding: " << curRowGroupEncoding.ByteSizeLong()
-            << std::endl;
+  auto curRowGroupFooterOffset = rowGroupFooterOffset;
+
+  fbb.Finish(curRowGroupFooterOffset);
+
+  return rowGroupDataLength;
+
+}
+
+void PixelsWriterImpl::recordRowGroupMetadata(int rowGroupDataLength )
+{
+    uint8_t *footerBufPtr = fbb.GetBufferPointer();
+  size_t footerBufSize = fbb.GetSize();
+  long uploadedFooterOffset = 0;
+
   try
   {
-    ByteBuffer footerBuffer(rowGroupFooter->ByteSizeLong());
-    rowGroupFooter->SerializeToArray(footerBuffer.getPointer(),
-                                     rowGroupFooter->ByteSizeLong());
-    physicalWriter->prepare(footerBuffer.size());
-    curRowGroupFooterOffset = physicalWriter->append(footerBuffer.getPointer(),
-                                                     0, footerBuffer.size());
-    writtenBytes += footerBuffer.size();
+    physicalWriter->prepare(footerBufSize);
+    uploadedFooterOffset = physicalWriter->append(footerBufPtr, 0, footerBufSize);
+    writtenBytes += footerBufSize;
     physicalWriter->flush();
   } catch (const std::exception &e)
   {
-    std::cerr << e.what() << std::endl;
+    std::cerr << "Failed to write RowGroupFooter: " << e.what() << std::endl;
     throw;
   }
+
   // Update RowGroupInformation and add it to the list
-  curRowGroupInfo.set_footeroffset(curRowGroupFooterOffset);
-  curRowGroupInfo.set_datalength(rowGroupDataLength);
-  curRowGroupInfo.set_footerlength(rowGroupFooter->ByteSizeLong());
-  curRowGroupInfo.set_numberofrows(curRowGroupNumOfRows);
+  auto curRowGroupInfo = pixels::fb::CreateRowGroupInformation(
+        fbb,
+        uploadedFooterOffset,
+        rowGroupDataLength,
+        static_cast<uint32_t>(footerBufSize),
+        curRowGroupNumOfRows,
+        0                     );
   rowGroupInfoList.push_back(curRowGroupInfo);
+
+  // store rowgroupInfo
+  RowGroupNative nativeInfo;
+  nativeInfo.footerOffset = (uint64_t)uploadedFooterOffset;
+  nativeInfo.footerLength = (uint32_t)footerBufSize;
+  nativeInfo.dataLength = this->curRowGroupDataLength;
+  nativeInfo.numberOfRows = this->curRowGroupNumOfRows;
+  rowGroupMetadataList.push_back(nativeInfo);
 
   this->fileRowNum += curRowGroupNumOfRows;
   this->fileContentLength += rowGroupDataLength;
-  std::cout << "PixelsWriterImpl::writeRowGroup" << std::endl;
+
+  // release fbb
+  fbb.Clear();
 }
 
 void PixelsWriterImpl::writeFileTail()
 {
-  std::shared_ptr<pixels::proto::Footer> footer =
-      std::make_shared<pixels::proto::Footer>();
-  std::shared_ptr<pixels::proto::PostScript> postScript =
-      std::make_shared<pixels::proto::PostScript>();
-  schema->writeTypes(footer);
-  for (auto rowGroupInformation : rowGroupInfoList)
-  {
-    *(footer->add_rowgroupinfos()) = rowGroupInformation;
+  fbb.Clear();
+
+  std::vector<flatbuffers::Offset<pixels::fb::RowGroupInformation>> infoOffsets;
+  for (size_t i = 0; i < rowGroupMetadataList.size(); i++) {
+    const auto& info = rowGroupMetadataList[i];
+
+    auto fbInfo = pixels::fb::CreateRowGroupInformation(
+        fbb,
+        info.footerOffset,
+        info.dataLength,
+        info.footerLength,
+        info.numberOfRows
+    );
+    infoOffsets.push_back(fbInfo);
   }
-  postScript->set_version(PixelsVersion::V1);
-  std::string FILE_MAGIC = "PIXELS";
-  postScript->set_contentlength(fileContentLength);
-  postScript->set_numberofrows(fileRowNum);
-  postScript->set_compression(compressionKind);
-  postScript->set_compressionblocksize(compressionBlockSize);
-  postScript->set_pixelstride(columnWriterOption->getPixelsStride());
-  postScript->set_partitioned(partitioned);
-  postScript->set_columnchunkalignment(CHUNK_ALIGNMENT);
-  postScript->set_magic(FILE_MAGIC);
+  auto rowGroupInfoVector = fbb.CreateVector(infoOffsets);
 
-    // build fileTail
-    pixels::proto::FileTail fileTail;
-    *fileTail.mutable_footer() = *footer;
-    *fileTail.mutable_postscript() = *postScript;
-    fileTail.set_footerlength(footer->ByteSizeLong());
-    fileTail.set_postscriptlength(postScript->ByteSizeLong());
+  // === 1. build Footer ===
+  size_t footerStart = fbb.GetSize();
 
-    // flush filetail
-    int fileTailLen = fileTail.ByteSizeLong() + 8;
-    physicalWriter->prepare(fileTailLen);
+  auto typeOffsets = schema->writeTypes(fbb);
+  auto typeVector = fbb.CreateVector(typeOffsets);
+  auto footerOffset = pixels::fb::CreateFooter(fbb, typeVector, 0, rowGroupInfoVector);
 
-    std::shared_ptr<ByteBuffer> fileTailBuffer =
-            std::make_shared<ByteBuffer>(fileTail.ByteSizeLong());
-    fileTail.SerializeToArray(fileTailBuffer->getPointer(),
-                              fileTail.ByteSizeLong());
-    long tailOffset = physicalWriter->append(fileTailBuffer->getPointer(), 0,
-            fileTail.ByteSizeLong());
+  uint32_t footerLength = static_cast<uint32_t>(fbb.GetSize() - footerStart);
 
-    if (Endianness::isLittleEndian())
-    {
-        tailOffset = (long) __builtin_bswap64(tailOffset);
-    }
+  // === 2. build PostScript ===
+  size_t psStart = fbb.GetSize();
 
-  std::shared_ptr<ByteBuffer> tailOffsetBuffer =
-      std::make_shared<ByteBuffer>(8);
+  auto magicOffset = fbb.CreateString("PIXELS");
+  auto postScriptOffset = pixels::fb::CreatePostScript(
+      fbb,
+      PixelsVersion::V1,
+      fileContentLength,
+      fileRowNum,
+      compressionKind,
+      compressionBlockSize,
+      columnWriterOption->getPixelsStride(),
+      0,  // writerTimeZone
+      partitioned,
+      CHUNK_ALIGNMENT,
+      false,
+      magicOffset
+  );
 
+  uint32_t postScriptLength = static_cast<uint32_t>(fbb.GetSize() - psStart);
+
+  // === 3. build root object FileTail ===
+  auto fileTailOffset = pixels::fb::CreateFileTail(
+      fbb,
+      footerOffset,
+      postScriptOffset,
+      footerLength,
+      postScriptLength
+  );
+
+  fbb.Finish(fileTailOffset);
+
+  // === 4. physical write ===
+  uint8_t *bufferPtr = fbb.GetBufferPointer();
+  size_t bufferSize = fbb.GetSize();
+
+  int totalFileTailLen = static_cast<int>(bufferSize + 8);
+  physicalWriter->prepare(totalFileTailLen);
+
+  long tailOffset = physicalWriter->append(bufferPtr, 0, bufferSize);
+
+  if (Endianness::isLittleEndian())
+  {
+      tailOffset = (long) __builtin_bswap64(tailOffset);
+  }
+
+  std::shared_ptr<ByteBuffer> tailOffsetBuffer = std::make_shared<ByteBuffer>(8);
   tailOffsetBuffer->putLong(tailOffset);
   physicalWriter->append(tailOffsetBuffer);
-  writtenBytes += fileTailLen;
-  physicalWriter->flush();
 
-  std::cout << "PixelsWriterImpl::writeFileTail" << std::endl;
+  writtenBytes += totalFileTailLen;
+  physicalWriter->flush();
 }

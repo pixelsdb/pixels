@@ -92,12 +92,9 @@ void RunLenIntEncoder::encode(long *values, int offset, int length, byte *result
 {
     for (int i = 0; i < length; ++i)
     {
-        // std::cout << encodingType << " value : " << values[i + offset] << std::endl;
         this->write(values[i + offset]);
     }
     flush();
-    // std::cout << "length: " << length << std::endl;
-    // std::cout << "buffer end: " << outputStream->getWritePos() << std::endl;
     resLen = outputStream->getWritePos();
     outputStream->getBytes(results, resLen);
     outputStream->resetPosition();
@@ -971,7 +968,7 @@ int RunLenIntEncoder::percentileBits(long *data, int offset, int length, double 
         return -1;
     }
 
-    int hist[32];
+    int hist[32] = {};
     for (int i = offset; i < (offset + length); ++i)
     {
         // QUESTION: there is calling of getClosestFixedBits in encodeBitWidth function, 
@@ -1087,7 +1084,8 @@ void RunLenIntEncoder::computeZigZagLiterals()
 
 long RunLenIntEncoder::zigzagEncode(long val)
 {
-    return (val << 1) ^ (val >> 63);
+    return static_cast<long>((static_cast<unsigned long>(val) << 1) ^
+                             static_cast<unsigned long>(val >> 63));
 }
 
 void RunLenIntEncoder::writeVulong(std::shared_ptr <ByteBuffer> output, long value)
@@ -1102,7 +1100,7 @@ void RunLenIntEncoder::writeVulong(std::shared_ptr <ByteBuffer> output, long val
         else
         {
             output->put((byte)(0x80 | (value & 0x7f)));
-            value = ((unsigned) value) >> 7;
+            value = static_cast<long>(static_cast<unsigned long>(value) >> 7);
         }
     }
 }

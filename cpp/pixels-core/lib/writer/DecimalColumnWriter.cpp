@@ -49,7 +49,10 @@ int DecimalColumnWriter::write(std::shared_ptr<ColumnVector> vector, int size)
         if (columnVector->isNull[i])
         {
             hasNull = true;
-            encodingUtils.writeLongLE(outputStream, 0L);
+            if (nullsPadding)
+            {
+                encodingUtils.writeLongLE(outputStream, 0L);
+            }
         } else
         {
             if (byteOrder == ByteOrder::PIXELS_LITTLE_ENDIAN)

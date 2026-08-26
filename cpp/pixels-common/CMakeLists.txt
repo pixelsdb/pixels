@@ -4,7 +4,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 include(ExternalProject)
 
-
 file(GLOB_RECURSE pixels_common_cxx
 		"lib/physical/*.cpp"
 		"lib/physical/*.h"
@@ -21,18 +20,36 @@ file(GLOB_RECURSE pixels_common_cxx
 		"lib/MergedRequest.cpp"
 )
 
-include_directories(include)
+set(FBS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../flatbuffers/pixels.fbs")
+set(GEN_HEADER_DIR "${CMAKE_CURRENT_BINARY_DIR}/flatbuffers_out")
+set(FBS_HEADER "${GEN_HEADER_DIR}/pixels_generated.h")
 
-if(NOT DEFINED ENV{PIXELS_SRC})
-	message(FATAL_ERROR "You must set PIXELS_SRC environment variable. The value should be set to the Pixels base directory.")
-endif()
+file(MAKE_DIRECTORY "${GEN_HEADER_DIR}")
 
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS $ENV{PIXELS_SRC}/proto/pixels.proto)
+add_custom_command(
+		OUTPUT "${FBS_HEADER}"
+		COMMAND $<TARGET_FILE:flatc>
+				--cpp
+				--gen-object-api
+				-o "${GEN_HEADER_DIR}"
+				"${FBS_SRC}"
+		DEPENDS flatc "${FBS_SRC}"
+		COMMENT "Running FlatBuffers compiler (flatc) with --gen-object-api on ${FBS_SRC}"
+		VERBATIM
+)
 
-add_library(pixels-common ${pixels_common_cxx} ${PROTO_SRCS} ${PROTO_HDRS})
+add_custom_target(pixels_fb_gen DEPENDS "${FBS_HEADER}")
 
-# liburing
-set(LIBURING_GIT_REPOSITORY git@github.com:axboe/liburing.git)
+add_library(pixels-common ${pixels_common_cxx} "${FBS_HEADER}")
+add_dependencies(pixels-common pixels_fb_gen)
+
+target_include_directories(pixels-common PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+		$<BUILD_INTERFACE:${GEN_HEADER_DIR}>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../third-party/flatbuffers/include>
+)
+
+set(LIBURING_GIT_REPOSITORY https://github.com/axboe/liburing.git)
 set(LIBURING_GIT_TAG liburing-2.2)
 set(LIBURING_BUILD_COMMAND make -j)
 
@@ -45,12 +62,17 @@ ExternalProject_Add(liburing
 		INSTALL_COMMAND ""
 		BUILD_COMMAND ${LIBURING_BUILD_COMMAND}
 		BUILD_IN_SOURCE true
-		)
+)
 
 add_dependencies(pixels-common liburing)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/liburing/src/include)
-link_directories(${CMAKE_CURRENT_BINARY_DIR}/liburing/src)
-message(${CMAKE_CURRENT_BINARY_DIR}/liburing/src)
+
+set(LIBURING_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/liburing/src/include)
+set(LIBURING_LIB ${CMAKE_CURRENT_BINARY_DIR}/liburing/src/liburing.a)
+
+target_include_directories(pixels-common PRIVATE ${LIBURING_INCLUDE_DIR})
+
 target_link_libraries(pixels-common
-        ${Protobuf_LIBRARIES}
-		${CMAKE_CURRENT_BINARY_DIR}/liburing/src/liburing.a)
+		PRIVATE
+		${LIBURING_LIB}
+		pthread
+)

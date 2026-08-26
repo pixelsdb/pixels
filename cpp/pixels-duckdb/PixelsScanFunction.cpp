@@ -489,7 +489,7 @@ bool PixelsScanFunction::PixelsParallelStateNext(ClientContext &context, PixelsR
     parallel_lock.unlock();
     return false;
     }
-
+  bind_data.curFileId++;
   scan_data.curr_file_index = scan_data.next_file_index;
   scan_data.curr_batch_index = scan_data.next_batch_index;
   scan_data.next_file_index = parallel_state.file_index.at(scan_data.deviceID);
