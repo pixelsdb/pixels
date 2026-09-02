@@ -118,7 +118,8 @@
         <!-- jetcd-core-0.7.7 uses grpc-1.60.0 and netty-4.1.100-Final,
         however it is tested to be compatible with grpc-1.74.0 and netty-4.1.118-Final -->
         <dep.jetcd.version>0.7.7</dep.jetcd.version>
-        <dep.derby.version>10.17.1.0</dep.derby.version>
+        <!-- 10.14.2.0 is the latest version derby compatible with JDK 8 -->
+        <dep.derby.version>10.14.2.0</dep.derby.version>
         <dep.jna.version>5.13.0</dep.jna.version>
         <dep.javax.annotation.version>1.3.2</dep.javax.annotation.version>
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
