@@ -143,7 +143,7 @@ Leave the other config parameters as default.
 Set `cache.enabled` to `false` in `PIXELS_HOME/etc/pixels.properties` if you don't use pixels-cache.
 
 ## Install MySQL*
-Mysql is optional. Pixels uses Derby to store the metadata by default. 
+Mysql is optional. Pixels uses the embedded database Derby to store the metadata by default. 
 However, we also support MySQL as the metadata database.
 MySQL/MariaDB 5.5 or later has been tested. Other forks or variants may also work.
 
