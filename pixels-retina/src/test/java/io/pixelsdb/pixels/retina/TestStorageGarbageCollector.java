@@ -19,24 +19,18 @@
  */
 package io.pixelsdb.pixels.retina;
 
+import com.google.common.collect.ImmutableList;
 import io.pixelsdb.pixels.common.index.service.LocalIndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
-import io.pixelsdb.pixels.common.utils.CheckpointFileIO;
-import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.common.utils.MetaDBUtil;
-import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
-import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
-import io.pixelsdb.pixels.core.PixelsFooterCache;
-import io.pixelsdb.pixels.core.PixelsReader;
-import io.pixelsdb.pixels.core.PixelsReaderImpl;
-import io.pixelsdb.pixels.core.PixelsWriter;
-import io.pixelsdb.pixels.core.PixelsWriterImpl;
-import io.pixelsdb.pixels.core.TypeDescription;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
+import io.pixelsdb.pixels.common.utils.RetinaUtils;
+import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
 import io.pixelsdb.pixels.core.reader.PixelsRecordReader;
@@ -44,37 +38,20 @@ import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 import io.pixelsdb.pixels.core.vector.DoubleColumnVector;
 import io.pixelsdb.pixels.core.vector.LongColumnVector;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.*;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.PreparedStatement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * Tests for {@link StorageGarbageCollector}, covering scan/grouping, data rewrite,
@@ -3313,8 +3290,7 @@ public class TestStorageGarbageCollector
     // Helpers: catalog registration
     // =======================================================================
 
-    private long registerTestFile(String name, File.Type type,
-                                  int numRg, long minRow, long maxRow)
+    private long registerTestFile(String name, File.Type type, int numRg, long minRow, long maxRow)
             throws Exception
     {
         File f = new File();
@@ -3330,29 +3306,22 @@ public class TestStorageGarbageCollector
         return id;
     }
 
-    private long insertRawFileWithType(String name, int fileType,
-                                       int numRg, long minRow, long maxRow)
-            throws Exception
+    private long insertRawFileWithType(String name, int fileType, int numRg, long minRow, long maxRow) throws Exception
     {
-        String sql = "INSERT INTO FILES(FILE_NAME, FILE_TYPE, FILE_NUM_RG, FILE_MIN_ROW_ID, FILE_MAX_ROW_ID, PATHS_PATH_ID) " +
-                "VALUES (?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement pst = MetaDBUtil.Instance().getConnection().prepareStatement(sql))
-        {
-            pst.setString(1, name);
-            pst.setInt(2, fileType);
-            pst.setInt(3, numRg);
-            pst.setLong(4, minRow);
-            pst.setLong(5, maxRow);
-            pst.setLong(6, testPathId);
-            assertEquals("raw test file insert should affect one row", 1, pst.executeUpdate());
-        }
+        File file = new File();
+        file.setName(name);
+        file.setType(File.Type.valueOf(fileType));
+        file.setNumRowGroup(numRg);
+        file.setMinRowId(minRow);
+        file.setMaxRowId(maxRow);
+        file.setPathId(testPathId);
+        metadataService.addFiles(ImmutableList.of(file));
         long id = metadataService.getFileId(testOrderedPathUri + "/" + name);
         assertTrue(name + " must have valid id", id > 0);
         return id;
     }
 
-    private long[] registerTestFiles(String[] names, File.Type[] types,
-                                     int[] numRgs, long[] minRows, long[] maxRows)
+    private long[] registerTestFiles(String[] names, File.Type[] types, int[] numRgs, long[] minRows, long[] maxRows)
             throws Exception
     {
         List<File> files = new ArrayList<>();
@@ -3428,8 +3397,7 @@ public class TestStorageGarbageCollector
     // Helpers: GC factory for grouping tests
     // =======================================================================
 
-    private static StorageGarbageCollector newGcForGrouping(
-            long targetFileSize, int maxFilesPerGroup, int maxGroups)
+    private static StorageGarbageCollector newGcForGrouping(long targetFileSize, int maxFilesPerGroup, int maxGroups)
     {
         return new StorageGarbageCollector(
                 null, null, null, 0.5, targetFileSize, maxFilesPerGroup, maxGroups,
@@ -3448,8 +3416,7 @@ public class TestStorageGarbageCollector
      *   <li>The sentinel entry equals the expected total surviving rows</li>
      * </ul>
      */
-    private static void assertRewriteResultConsistency(
-            StorageGarbageCollector.RewriteResult result, int expectedTotalRows)
+    private static void assertRewriteResultConsistency(StorageGarbageCollector.RewriteResult result, int expectedTotalRows)
     {
         assertTrue("newFileRgCount must be at least 1", result.newFileRgCount >= 1);
         assertEquals(result.newFileRgCount, result.newFileRgActualRecordNums.length);
@@ -3579,8 +3546,7 @@ public class TestStorageGarbageCollector
      * the Pixels writer flushes one RG per call.  Row values are sequential integers
      * starting from 0.
      */
-    private static String writeTestFileMultiRg(String fileName, TypeDescription schema,
-                                               int numRgs, int rowsPerRg) throws Exception
+    private static String writeTestFileMultiRg(String fileName, TypeDescription schema, int numRgs, int rowsPerRg) throws Exception
     {
         return writeTestFileMultiRg(fileName, schema, numRgs, rowsPerRg, 10_000);
     }
@@ -3671,8 +3637,7 @@ public class TestStorageGarbageCollector
      * {@code pathId} is set to {@link #testPathId} so that {@code addFiles} satisfies
      * the foreign key constraint against the PATHS table.
      */
-    private static StorageGarbageCollector.FileGroup makeGroup(
-            long fileId, String filePath, TypeDescription schema) throws Exception
+    private static StorageGarbageCollector.FileGroup makeGroup(long fileId, String filePath, TypeDescription schema) throws Exception
     {
         int rgCount;
         try (PixelsReader r = PixelsReaderImpl.newBuilder()
@@ -3701,10 +3666,8 @@ public class TestStorageGarbageCollector
      * {@link StorageGarbageCollector.FileCandidate} objects backed by distinct files.
      * Both files share the same {@code (tableId=1, virtualNodeId=0)}.
      */
-    private static StorageGarbageCollector.FileGroup makeMultiFileGroup(
-            TypeDescription schema,
-            long fileIdA, String pathA,
-            long fileIdB, String pathB) throws Exception
+    private static StorageGarbageCollector.FileGroup makeMultiFileGroup(TypeDescription schema,
+            long fileIdA, String pathA, long fileIdB, String pathB) throws Exception
     {
         List<StorageGarbageCollector.FileCandidate> candidates = new ArrayList<>();
         for (long[] pair : new long[][]{{fileIdA, 0}, {fileIdB, 0}})

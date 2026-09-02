@@ -17,11 +17,10 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.common;
+package io.pixelsdb.pixels.common.metadata;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.exception.MetadataException;
-import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.*;
 import org.junit.Before;
 import org.junit.Test;
