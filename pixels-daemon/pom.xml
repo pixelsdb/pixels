@@ -87,6 +87,11 @@
             <artifactId>jetcd-core</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.derby</groupId>
+            <artifactId>derby</artifactId>
+        </dependency>
+
         <!-- trino-jdbc -->
         <dependency>
             <groupId>io.trino</groupId>

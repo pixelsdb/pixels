@@ -21,16 +21,34 @@ package io.pixelsdb.pixels.daemon.metadata.dao;
 
 import io.pixelsdb.pixels.common.metadata.domain.Layout;
 import io.pixelsdb.pixels.common.metadata.domain.Ordered;
+import io.pixelsdb.pixels.common.utils.MetaDBUtil;
 import io.pixelsdb.pixels.daemon.MetadataProto;
 import org.junit.Test;
 
 import java.io.*;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 public class TestRdbDaos
 {
+    @Test
+    public void testRdbConnection() throws SQLException
+    {
+        MetaDBUtil db = MetaDBUtil.Instance();
+        Connection conn = db.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery("VALUES 1"); // VALUES 1 for derby, SELCT 1 for MySQL
+        assert rs != null && rs.next();
+        assert rs.getInt(1) == 1;
+        assert !rs.next();
+        conn.close();
+    }
+
     @Test
     public void testSchema ()
     {

@@ -55,12 +55,10 @@ public class MetaDBUtil
         try
         {
             ConfigFactory config = ConfigFactory.Instance();
-            String driver = config.getProperty("metadata.db.driver");
             url = config.getProperty("metadata.db.url");
             user = config.getProperty("metadata.db.user");
             pass = config.getProperty("metadata.db.password");
 
-            Class.forName(driver);
             this.connection = DriverManager.getConnection(url, user, pass);
         }
         catch (Exception e)

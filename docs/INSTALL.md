@@ -78,15 +78,12 @@ source ~/.bashrc
 ./install.sh
 ```
 
-But you still need to:
-- Put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib`.
-- Modify `PIXELS_HOME/etc/pixels.properties` to ensure the following properties are valid:
+But you still need to modify `PIXELS_HOME/etc/pixels.properties` to ensure the following properties are valid:
 ```properties
 pixels.var.dir=/home/pixels/opt/pixels/var/
-metadata.db.driver=com.mysql.jdbc.Driver
 metadata.db.user=pixels
 metadata.db.password=password
-metadata.db.url=jdbc:mysql://localhost:3306/pixels_metadata?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull
+metadata.db.url=jdbc:derby:/home/pixels/opt/pixels/var/pixels_metadata;create=true
 metadata.server.port=18888
 metadata.server.host=localhost
 trans.server.port=18889
@@ -145,9 +142,10 @@ Leave the other config parameters as default.
 
 Set `cache.enabled` to `false` in `PIXELS_HOME/etc/pixels.properties` if you don't use pixels-cache.
 
-## Install MySQL
-MySQL and etcd are used to store the metadata and states of Pixels. MySQL/MariaDB 5.5 or later has been tested. Other forks or variants may also work.
-You only need to install one etcd and one MySQL instance, even in a cluster.
+## Install MySQL*
+Mysql is optional. Pixels uses the embedded database Derby to store the metadata by default. 
+However, we also support MySQL as the metadata database.
+MySQL/MariaDB 5.5 or later has been tested. Other forks or variants may also work.
 
 To install MySQL:
 ```bash
@@ -177,7 +175,13 @@ binds the server to localhost thus declines remote connections.
 
 Use `scripts/sql/metadata_schema.sql` to create tables in `pixels_metadata`.
 
+Then, put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib` and set `metadata.db.url=jdbc:mysql://localhost:3306/pixels_metadata?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull`
+in `PIXELS_HOME/etc/pixels.properties` to enable MySQL as the metadata storage in Pixels.
+Change `localhost` in the URL to the hostname of the MySQL server if it is not running on the same node as Pixels coordinator.
+
 ## Install etcd
+
+Etcd is used to store the states of Pixels.
 
 First install go-lang:
 ```bash
