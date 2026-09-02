@@ -175,7 +175,14 @@ FLUSH PRIVILEGES;
 Ensure that MySQL server can be accessed remotely. Sometimes the default MySQL configuration
 binds the server to localhost thus declines remote connections.
 
-Use `scripts/sql/metadata_schema.sql` to create tables in `pixels_metadata`.
+Use the `INIT-META` command in pixels-cli to create tables in the configured metadata database
+(`pixels-daemon/src/main/resources/pixels_metadata_mysql.sql` for MySQL, or
+`pixels-daemon/src/main/resources/pixels_metadata_derby.sql` for Derby):
+```bash
+java -jar $PIXELS_HOME/sbin/pixels-cli-*-full.jar
+# then in the pixels-cli prompt:
+INIT-META
+```
 
 ## Install etcd
 

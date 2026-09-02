@@ -1,6 +1,9 @@
 package io.pixelsdb.pixels.daemon.metadata.dao;
 
+import io.pixelsdb.pixels.daemon.metadata.MetadataDbType;
 import io.pixelsdb.pixels.daemon.metadata.dao.impl.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * @author hank
@@ -8,6 +11,8 @@ import io.pixelsdb.pixels.daemon.metadata.dao.impl.*;
  */
 public class DaoFactory
 {
+    private static final Logger log = LogManager.getLogger(DaoFactory.class);
+
     private static final class InstanceHolder
     {
         private static final DaoFactory instance = new DaoFactory();
@@ -17,6 +22,8 @@ public class DaoFactory
     {
         return InstanceHolder.instance;
     }
+
+    private final MetadataDbType metadataDbType;
 
     private final ColumnDao columnDao;
     private final LayoutDao layoutDao;
@@ -34,6 +41,8 @@ public class DaoFactory
 
     private DaoFactory ()
     {
+        this.metadataDbType = MetadataDbType.fromConfig();
+        log.info("detected metadata database type: {}", this.metadataDbType);
         this.columnDao = new RdbColumnDao();
         this.layoutDao = new RdbLayoutDao();
         this.schemaDao = new RdbSchemaDao();
@@ -47,6 +56,11 @@ public class DaoFactory
         this.rangeDao = new RdbRangeDao();
         this.rangeIndexDao = new RdbRangeIndexDao();
         this.singlePointIndexDao = new RdbSinglePointIndexDao();
+    }
+
+    public MetadataDbType getMetadataDbType()
+    {
+        return this.metadataDbType;
     }
 
     public ColumnDao getColumnDao ()

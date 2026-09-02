@@ -153,7 +153,7 @@ RUN sed -i 's|http://mirrors.cloud.aliyuncs.com|http://mirrors.aliyun.com|g' /et
 && echo "password=password" >> $HOME/pixels.cnf \
 # Initialize metadata schema
 && mysql --defaults-file=root.cnf < $HOME/user.sql \
-&& mysql --defaults-file=pixels.cnf < $HOME/opt/pixels/scripts/sql/metadata_schema.sql \
+&& mysql --defaults-file=pixels.cnf < $HOME/opt/pixels/pixels-daemon/src/main/resources/pixels_metadata_mysql.sql \
 && service mysql stop \
 
 # Install ETCD
