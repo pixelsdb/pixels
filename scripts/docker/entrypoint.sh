@@ -35,10 +35,7 @@ run_service() {
 # [1] SSH
 service ssh start
 
-# [2] MySQL
-service mysql start
-
-# [3] Etcd 
+# [2] Etcd 
 echo -n "${SUFFIX}Start Etcd ... "
 sh $HOME/opt/etcd/start-etcd.sh >/tmp/etcd.log 2>&1 &
 ETCD_PID=$!
@@ -47,10 +44,10 @@ ETCD_PID=$!
 until nc -z 127.0.0.1 2379; do sleep 1; done
 print_result 0
 
-# [4] Pixels
+# [3] Pixels
 run_service "Pixels" "\$PIXELS_HOME/sbin/start-pixels.sh" "/tmp/pixels.log"
 
-# [5] Trino
+# [4] Trino
 run_service "Trino" "\$HOME/opt/trino-server/bin/launcher start" "/tmp/trino.log"
 
 

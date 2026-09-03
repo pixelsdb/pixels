@@ -10,6 +10,7 @@ scripts:
   check: scripts/check_prerequisites.sh
   jdk: scripts/install_jdk.sh
   maven: scripts/install_maven.sh
+  init_metadata: scripts/init_metadata.sh
   mysql: scripts/install_mysql.sh
   etcd: scripts/install_etcd.sh
   pixels: scripts/build_install_pixels.sh
@@ -29,10 +30,10 @@ phases:
   - prepare_deployment_config
   - install_or_verify_jdk
   - install_or_verify_maven
-  - install_or_verify_mysql
   - install_or_verify_etcd
   - build_install_pixels
   - configure_pixels
+  - init_metadata
   - start_pixels_optional
   - install_shell_helpers_optional
   - smoke_test

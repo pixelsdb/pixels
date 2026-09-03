@@ -19,9 +19,9 @@
  */
 package io.pixelsdb.pixels.cli.executor;
 
+import io.pixelsdb.pixels.cli.load.MetadataSchemaInitializer;
+import io.pixelsdb.pixels.common.metadata.MetadataDbType;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
-import io.pixelsdb.pixels.daemon.metadata.MetadataDbType;
-import io.pixelsdb.pixels.daemon.metadata.MetadataSchemaInitializer;
 import net.sourceforge.argparse4j.inf.Namespace;
 
 /**

@@ -158,13 +158,6 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>ec2</artifactId>
         </dependency>
-
-        <dependency>
-            <groupId>org.apache.derby</groupId>
-            <artifactId>derby</artifactId>
-            <version>10.14.2.0</version>
-        </dependency>
-
         <dependency>
             <!-- this is only for third-party libs that use slf4j -->
             <groupId>org.apache.logging.log4j</groupId>

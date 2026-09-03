@@ -72,7 +72,8 @@ CHECK_TRANS_SERVER="${CHECK_TRANS_SERVER:-false}"
 CHECK_CORE_SERVICES="${CHECK_CORE_SERVICES:-true}"
 CHECK_JAVA="${CHECK_JAVA:-true}"
 CHECK_ETCD="${CHECK_ETCD:-true}"
-CHECK_MYSQL="${CHECK_MYSQL:-true}"
+CHECK_MYSQL="${CHECK_MYSQL:-false}"
+CHECK_DERBY="${CHECK_DERBY:-true}"
 CHECK_PIXELS_CLI="${CHECK_PIXELS_CLI:-true}"
 CHECK_TRINO="${CHECK_TRINO:-false}"
 CHECK_PIXELS_LAYOUT="${CHECK_PIXELS_LAYOUT:-true}"
@@ -350,20 +351,45 @@ verify_etcd() {
   check_port_reachable etcd "etcd" "$etcd_host" "$etcd_port"
 }
 
-verify_mysql() {
-  if [[ "$CHECK_MYSQL" != "true" ]]; then
-    result_record mysql skip "set CHECK_MYSQL=true to enable"
+verify_metadata_db() {
+  local metadata_db_url derby_dir
+
+  metadata_db_url="$(property_value metadata.db.url)"
+  if [[ -z "$metadata_db_url" ]]; then
+    result_record metadata_db fail "metadata.db.url is missing"
     return
   fi
 
-  local metadata_db_url mysql_host mysql_port
-  metadata_db_url="$(property_value metadata.db.url)"
-  mysql_host="$(printf '%s\n' "$metadata_db_url" | sed -nE 's#^jdbc:mysql://([^:/?]+).*#\1#p')"
-  mysql_port="$(printf '%s\n' "$metadata_db_url" | sed -nE 's#^jdbc:mysql://[^:/?]+:([0-9]+).*#\1#p')"
-  mysql_host="${mysql_host:-localhost}"
-  mysql_port="${mysql_port:-$MYSQL_PORT}"
+  if [[ "$metadata_db_url" == jdbc:derby:* ]]; then
+    if [[ "$CHECK_DERBY" != "true" ]]; then
+      result_record derby skip "set CHECK_DERBY=true to enable"
+      return
+    fi
+    derby_dir="${metadata_db_url#jdbc:derby:}"
+    derby_dir="${derby_dir%%;*}"
+    if [[ -d "$derby_dir" ]]; then
+      result_record derby ok "Derby metadata directory exists: $derby_dir"
+    else
+      result_record derby fail "Derby metadata directory not found: $derby_dir (run init_metadata.sh / INIT-META)"
+    fi
+    return
+  fi
 
-  check_port_reachable mysql "MySQL" "$mysql_host" "$mysql_port"
+  if [[ "$metadata_db_url" == jdbc:mysql:* ]]; then
+    if [[ "$CHECK_MYSQL" != "true" ]]; then
+      result_record mysql skip "MySQL URL detected; set CHECK_MYSQL=true to probe the server"
+      return
+    fi
+    local mysql_host mysql_port
+    mysql_host="$(printf '%s\n' "$metadata_db_url" | sed -nE 's#^jdbc:mysql://([^:/?]+).*#\1#p')"
+    mysql_port="$(printf '%s\n' "$metadata_db_url" | sed -nE 's#^jdbc:mysql://[^:/?]+:([0-9]+).*#\1#p')"
+    mysql_host="${mysql_host:-localhost}"
+    mysql_port="${mysql_port:-$MYSQL_PORT}"
+    check_port_reachable mysql "MySQL" "$mysql_host" "$mysql_port"
+    return
+  fi
+
+  result_record metadata_db warn "unrecognized metadata.db.url: $metadata_db_url"
 }
 
 verify_pixels_cli() {
@@ -698,7 +724,7 @@ main() {
   verify_java
   verify_core_services
   verify_etcd
-  verify_mysql
+  verify_metadata_db
   verify_pixels_cli
   verify_pixels_logs
   verify_trino_pixels_client

@@ -1,6 +1,6 @@
 package io.pixelsdb.pixels.daemon.metadata.dao;
 
-import io.pixelsdb.pixels.daemon.metadata.MetadataDbType;
+import io.pixelsdb.pixels.common.metadata.MetadataDbType;
 import io.pixelsdb.pixels.daemon.metadata.dao.impl.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

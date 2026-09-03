@@ -51,27 +51,6 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-s3</artifactId>
         </dependency>
-        <dependency>
-            <groupId>io.pixelsdb</groupId>
-            <artifactId>pixels-daemon</artifactId>
-            <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <version>8.0.33</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.derby</groupId>
-            <artifactId>derby</artifactId>
-            <version>10.14.2.0</version>
-        </dependency>
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
@@ -119,6 +98,16 @@
         </dependency>
 
         <dependency>
+            <groupId>org.apache.derby</groupId>
+            <artifactId>derby</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.0.33</version>
+        </dependency>
+
+        <dependency>
             <!-- this is only for third-party libs that use slf4j -->
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j-impl</artifactId>
@@ -130,6 +119,13 @@
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/../pixels-daemon/src/main/resources</directory>
+                <includes>
+                    <include>pixels_metadata_mysql.sql</include>
+                    <include>pixels_metadata_derby.sql</include>
+                </includes>
             </resource>
         </resources>
 

@@ -17,8 +17,9 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.daemon.metadata;
+package io.pixelsdb.pixels.cli.load;
 
+import io.pixelsdb.pixels.common.metadata.MetadataDbType;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

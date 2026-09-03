@@ -20,8 +20,8 @@ RUN sed -i 's|http://mirrors.cloud.aliyuncs.com|http://mirrors.aliyun.com|g' /et
     git maven less g++ cmake make netcat-openbsd\
     python-is-python3 \
     wget tar unzip openssh-server vim \
-    mysql-server golang \
-    ca-certificates libmysqlclient-dev \
+    golang \
+    ca-certificates \
     # Additional dependency packages
     xz-utils \
     libx11-6 libxau6 libxcb1 libxdmcp6 \
@@ -49,10 +49,6 @@ RUN sed -i 's|http://mirrors.cloud.aliyuncs.com|http://mirrors.aliyun.com|g' /et
 # Execute Pixels installation script
 && cd $PIXELS_HOME && mvn install \
 && bash $PIXELS_HOME/install.sh \
-
-# Prepare MySQL Connector/J
-&& cd $PIXELS_HOME/lib/ \
-&& wget https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar \
 
 # Clone and compile pixels-trino
 && cd $HOME/opt/ \
@@ -127,34 +123,11 @@ RUN sed -i 's|http://mirrors.cloud.aliyuncs.com|http://mirrors.aliyun.com|g' /et
 && echo "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED" >> $HOME/opt/trino-server/etc/jvm.config \
 && echo "--add-opens=java.base/java.nio=ALL-UNNAMED" >> $HOME/opt/trino-server/etc/jvm.config \
 
-# Configure MySQL
-&& cd $HOME \
-# Initialize root user credentials (username: root, password: password)
-&& echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';" >> $HOME/root.sql \
-# Create pixels user and database
-&& echo "CREATE USER 'pixels'@'%' IDENTIFIED BY 'password';" >> $HOME/user.sql \
-&& echo "CREATE DATABASE pixels_metadata;" >> $HOME/user.sql \
-&& echo "GRANT ALL PRIVILEGES ON pixels_metadata.* to 'pixels'@'%';" >> $HOME/user.sql \
-&& echo "FLUSH PRIVILEGES;" >> $HOME/user.sql \
-
-# Initialize MySQL service
-&& usermod -d /var/lib/mysql/ mysql \
-&& service mysql start \
-&& while ! mysqladmin ping -hlocalhost --silent; do sleep 1; done  \
-# Initialize root user
-&& mysql < $HOME/root.sql \
-# Create root credential file
-&& echo "[client]" >> $HOME/root.cnf \
-&& echo "user=root" >> $HOME/root.cnf \
-&& echo "password=password" >> $HOME/root.cnf \
-# Create pixels user credential file
-&& echo "[client]" >> $HOME/pixels.cnf \
-&& echo "user=pixels" >> $HOME/pixels.cnf \
-&& echo "password=password" >> $HOME/pixels.cnf \
-# Initialize metadata schema
-&& mysql --defaults-file=root.cnf < $HOME/user.sql \
-&& mysql --defaults-file=pixels.cnf < $HOME/opt/pixels/pixels-daemon/src/main/resources/pixels_metadata_mysql.sql \
-&& service mysql stop \
+# Configure Derby as the metadata database and create tables with INIT-META
+&& sed -i 's|^metadata.db.driver=.*|metadata.db.driver=org.apache.derby.jdbc.EmbeddedDriver|' $PIXELS_HOME/etc/pixels.properties \
+&& sed -i "s|^metadata.db.url=.*|metadata.db.url=jdbc:derby:${PIXELS_HOME}/var/pixels_metadata;create=true|" $PIXELS_HOME/etc/pixels.properties \
+&& mkdir -p $PIXELS_HOME/var \
+&& printf 'INIT-META\nexit\n' | java -jar $PIXELS_HOME/sbin/pixels-cli-*-full.jar \
 
 # Install ETCD
 && cp -v $HOME/opt/pixels/scripts/tars/etcd-v3.3.4-linux-amd64.tar.xz $HOME/opt/ \

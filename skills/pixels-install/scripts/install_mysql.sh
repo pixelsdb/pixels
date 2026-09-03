@@ -9,6 +9,7 @@ if [ "${BASH_SOURCE[0]}" != "$0" ]; then
 fi
 set -euo pipefail
 
+# Optional alternative to the default Derby + INIT-META metadata path.
 # Installs MySQL, sets the root password, and creates the Pixels metadata
 # database/user described in docs/INSTALL.md ("Install MySQL"). Both the
 # MySQL root password and the pixels DB user password default to
