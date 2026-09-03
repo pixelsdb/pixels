@@ -47,8 +47,20 @@
         </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-s3qs</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-redis</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- testing -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-api</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
