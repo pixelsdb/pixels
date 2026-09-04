@@ -15,8 +15,8 @@ To use the following optional components, follow the instructions in the corresp
 * [Pixels Retina](../pixels-retina/README.md): The transactional data synchronization framework that replays the data changes from the CDC (Change-Data-Capture) stream.
 * [Pixels Amphi](../pixels-amphi/README.md): The adaptive query scheduler that enables cost-efficient query processing in both on-perm and in-cloud environments.
 
-In AWS EC2, create an Ubuntu 22.04 instance with x86 arch and at least 4GB memory and 20GB root volume. 
-8GB or larger memory is recommended for performance evaluations on datasets larger than 10GB. 
+In AWS EC2, create an Ubuntu 22.04 instance with x86 or aarch64 architecture and at least 4GB memory and 20GB root volume. 
+8GB or larger memory is recommended for performance evaluations on datasets larger than 10GB.
 Login the instance as `ubuntu` user, and install the following components.
 
 > Installation steps marked with `*` are optional.
@@ -32,7 +32,7 @@ Replace `21` with other valid JDK version if needed.
 A higher version JDK can be installed using a downloaded `deb` package 
 ([Zulu JDK](https://www.azul.com/downloads/?package=jdk#zulu) is recommended):
 ```bash
-sudo dpkg -i zulu23.30.13-ca-jdk23.0.1-linux_amd64.deb
+sudo dpkg -i zulu25.36.205-ca-jdk25.0.4.1-linux_amd64/arm64.deb
 ```
 
 Check the java version:
@@ -78,7 +78,7 @@ source ~/.bashrc
 ./install.sh
 ```
 
-But you still need to modify `PIXELS_HOME/etc/pixels.properties` to ensure the following properties are valid:
+After that, you need to modify `PIXELS_HOME/etc/pixels.properties` to ensure the following properties are valid:
 ```properties
 pixels.var.dir=/home/pixels/opt/pixels/var/
 metadata.db.user=pixels
@@ -97,10 +97,6 @@ metrics.node.text.dir=/home/pixels/opt/node_exporter/text/
 presto.pixels.jdbc.url=jdbc:trino://localhost:8080/pixels/tpch
 ```
 The hostnames, ports, paths, usernames, and passwords in these properties are to be configured in the following steps of installation.
-
-The default metadata store is the embedded Derby database under `PIXELS_HOME/var`.
-No extra database server or JDBC connector is required. After the properties are valid,
-create the metadata tables with pixels-cli `INIT-META` (see [Initialize Metadata](#initialize-metadata)).
 
 > **Note:** optionally, you can also set the `PIXEL_CONFIG` system environment variable
 > to specify a different location of `pixels.properties`. This can be a http or https URL
@@ -148,26 +144,6 @@ Set `cache.enabled` to `false` in `PIXELS_HOME/etc/pixels.properties` if you don
 
 Then run `INIT-META` as described in [Initialize Metadata](#initialize-metadata).
 
-## Initialize Metadata
-
-Pixels stores table/layout metadata in the database configured by `metadata.db.driver`
-and `metadata.db.url`. Create those tables with the `INIT-META` command in pixels-cli.
-No need to source the SQL scripts by hand; `INIT-META` selects the matching schema
-(`pixels_metadata_derby.sql` or `pixels_metadata_mysql.sql`) from the configured JDBC URL.
-
-```bash
-mkdir -p $PIXELS_HOME/var
-java -jar $PIXELS_HOME/sbin/pixels-cli-*-full.jar
-# then in the pixels-cli prompt:
-INIT-META
-```
-
-It should print `Initializing metadata tables in DERBY database...` (or `MYSQL` if configured) and
-`INIT-META finished`.
-
-Run `INIT-META` once on the node that hosts the metadata database (the coordinator when
-using the default Derby URL). Workers do not need their own metadata schema.
-
 ## Install MySQL*
 MySQL is optional. Pixels uses the embedded database Derby to store the metadata by default.
 However, we also support MySQL as the metadata database.
@@ -200,7 +176,7 @@ Ensure that MySQL server can be accessed remotely. Sometimes the default MySQL c
 binds the server to localhost thus declines remote connections.
 
 Then put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar)
-into `PIXELS_HOME/lib` and switch the metadata properties in `PIXELS_HOME/etc/pixels.properties`:
+into `PIXELS_HOME/lib` and set the metadata properties in `PIXELS_HOME/etc/pixels.properties` as:
 ```properties
 metadata.db.user=pixels
 metadata.db.password=password
@@ -208,9 +184,22 @@ metadata.db.url=jdbc:mysql://localhost:3306/pixels_metadata?useUnicode=true&char
 ```
 Change `localhost` in the URL to the hostname of the MySQL server if it is not running on the same node as the Pixels coordinator.
 
-After the properties point at MySQL, create the tables with the same `INIT-META` command
-described in [Initialize Metadata](#initialize-metadata). It should report
-`Initializing metadata tables in MYSQL database...`.
+## Initialize Metadata
+
+Pixels stores metadata (table schema and catalogs) in the database configured by `metadata.db.url`.
+We can create the metadata database using the `INIT-META` command in pixels-cli:
+
+```bash
+java -jar $PIXELS_HOME/sbin/pixels-cli-*-full.jar
+# then in the pixels-cli prompt:
+INIT-META
+```
+
+It should print `Initializing metadata tables in DERBY database...` 
+(or `Initializing metadata tables in MYSQL database...` if MySQL is configured for metadata storage)
+and `INIT-META finished`.
+
+Run `INIT-META` once and only once on the Pixels coordinator node that provides the metadata service.
 
 ## Install etcd
 
@@ -262,7 +251,8 @@ Pixels will read the Hadoop configuration files `core-site.xml` and `hdfs-site.x
 ## Install Trino
 Trino is the recommended query engine that works with Pixels.
 Follow the instructions in [pixels-trino document](https://github.com/pixelsdb/pixels-trino?tab=readme-ov-file#pixels-trino) to install Trino with the Pixels plugins.
-If you want to use an early Pixels-compatible Trino version (e.g., 405), see the installation instructions in the corresponding branch of [pixels-trino](https://github.com/pixelsdb/pixels-trino). 
+If you want to use an earlier Pixels-compatible Trino version (e.g., 405), 
+see the installation instructions in the corresponding branch of [pixels-trino](https://github.com/pixelsdb/pixels-trino/tree/Trino-405). 
 
 ## Install Prometheus and Grafana*
 Prometheus and Grafana are optional. We can install them to monitor the
