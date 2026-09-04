@@ -17,7 +17,7 @@
  * License along with Pixels.  If not, see
  * <https://www.gnu.org/licenses/>.
  */
-package io.pixelsdb.pixels.cli.load;
+package io.pixelsdb.pixels.cli.initmeta;
 
 import io.pixelsdb.pixels.common.metadata.MetadataDbType;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;

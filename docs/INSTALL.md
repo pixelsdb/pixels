@@ -81,7 +81,6 @@ source ~/.bashrc
 But you still need to modify `PIXELS_HOME/etc/pixels.properties` to ensure the following properties are valid:
 ```properties
 pixels.var.dir=/home/pixels/opt/pixels/var/
-metadata.db.driver=org.apache.derby.jdbc.EmbeddedDriver
 metadata.db.user=pixels
 metadata.db.password=password
 metadata.db.url=jdbc:derby:/home/pixels/opt/pixels/var/pixels_metadata;create=true
@@ -203,7 +202,6 @@ binds the server to localhost thus declines remote connections.
 Then put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar)
 into `PIXELS_HOME/lib` and switch the metadata properties in `PIXELS_HOME/etc/pixels.properties`:
 ```properties
-metadata.db.driver=com.mysql.cj.jdbc.Driver
 metadata.db.user=pixels
 metadata.db.password=password
 metadata.db.url=jdbc:mysql://localhost:3306/pixels_metadata?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull
