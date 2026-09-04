@@ -98,6 +98,10 @@ presto.pixels.jdbc.url=jdbc:trino://localhost:8080/pixels/tpch
 ```
 The hostnames, ports, paths, usernames, and passwords in these properties are to be configured in the following steps of installation.
 
+The default metadata store is the embedded Derby database under `PIXELS_HOME/var`.
+No extra database server or JDBC connector is required. After the properties are valid,
+create the metadata tables with pixels-cli `INIT-META` (see [Initialize Metadata](#initialize-metadata)).
+
 > **Note:** optionally, you can also set the `PIXEL_CONFIG` system environment variable
 > to specify a different location of `pixels.properties`. This can be a http or https URL
 > to a remote location.
@@ -134,16 +138,38 @@ mkdir var
 ```
 Put the sh scripts in `scripts/bin` and `scripts/sbin` into `PIXELS_HOME/bin` and `PIXELS_HOME/sbin`, respectively.
 Put `pixels-daemon-*-full.jar` into `PIXELS_HOME/bin`.
-Put `pixels-cli-*-full.jar` into `PIXELS_HOME/sbin`
-Put the jdbc connector of MySQL into `PIXELS_HOME/lib`.
+Put `pixels-cli-*-full.jar` into `PIXELS_HOME/sbin`.
 Put `pixels-common/src/main/resources/pixels.properties` into `PIXELS_HOME/etc`.
 Modify `pixels.properties` to ensure that the URLs, ports, paths, usernames, and passwords are valid.
-Leave the other config parameters as default.
+Leave the other config parameters as default. Derby is bundled in pixels-cli and pixels-daemon,
+so you do not need a MySQL JDBC connector unless you switch the metadata database to MySQL.
 
 Set `cache.enabled` to `false` in `PIXELS_HOME/etc/pixels.properties` if you don't use pixels-cache.
 
+Then run `INIT-META` as described in [Initialize Metadata](#initialize-metadata).
+
+## Initialize Metadata
+
+Pixels stores table/layout metadata in the database configured by `metadata.db.driver`
+and `metadata.db.url`. Create those tables with the `INIT-META` command in pixels-cli.
+No need to source the SQL scripts by hand; `INIT-META` selects the matching schema
+(`pixels_metadata_derby.sql` or `pixels_metadata_mysql.sql`) from the configured JDBC URL.
+
+```bash
+mkdir -p $PIXELS_HOME/var
+java -jar $PIXELS_HOME/sbin/pixels-cli-*-full.jar
+# then in the pixels-cli prompt:
+INIT-META
+```
+
+It should print `Initializing metadata tables in DERBY database...` (or `MYSQL` if configured) and
+`INIT-META finished`.
+
+Run `INIT-META` once on the node that hosts the metadata database (the coordinator when
+using the default Derby URL). Workers do not need their own metadata schema.
+
 ## Install MySQL*
-Mysql is optional. Pixels uses the embedded database Derby to store the metadata by default. 
+MySQL is optional. Pixels uses the embedded database Derby to store the metadata by default.
 However, we also support MySQL as the metadata database.
 MySQL/MariaDB 5.5 or later has been tested. Other forks or variants may also work.
 
@@ -173,11 +199,18 @@ FLUSH PRIVILEGES;
 Ensure that MySQL server can be accessed remotely. Sometimes the default MySQL configuration
 binds the server to localhost thus declines remote connections.
 
-Use `scripts/sql/metadata_schema.sql` to create tables in `pixels_metadata`.
+Then put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar)
+into `PIXELS_HOME/lib` and switch the metadata properties in `PIXELS_HOME/etc/pixels.properties`:
+```properties
+metadata.db.user=pixels
+metadata.db.password=password
+metadata.db.url=jdbc:mysql://localhost:3306/pixels_metadata?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull
+```
+Change `localhost` in the URL to the hostname of the MySQL server if it is not running on the same node as the Pixels coordinator.
 
-Then, put the [MySQL JDBC connector](https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar) into `PIXELS_HOME/lib` and set `metadata.db.url=jdbc:mysql://localhost:3306/pixels_metadata?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull`
-in `PIXELS_HOME/etc/pixels.properties` to enable MySQL as the metadata storage in Pixels.
-Change `localhost` in the URL to the hostname of the MySQL server if it is not running on the same node as Pixels coordinator.
+After the properties point at MySQL, create the tables with the same `INIT-META` command
+described in [Initialize Metadata](#initialize-metadata). It should report
+`Initializing metadata tables in MYSQL database...`.
 
 ## Install etcd
 

@@ -17,10 +17,9 @@ source "$SCRIPT_DIR/lib/shell_env.sh"
 # default.
 load_toolchain_env
 
-# Picks up METADATA_DB_USER/METADATA_DB_PASSWORD/METADATA_DB_NAME written by
-# install_mysql.sh, so the MySQL credentials confirmed interactively there
-# are the same ones written into pixels.properties below. Explicit env vars
-# passed to this script still take precedence over the secrets file.
+# Default metadata backend is Derby. When METADATA_DB_TYPE=mysql, this
+# script also picks up METADATA_DB_USER/METADATA_DB_PASSWORD/METADATA_DB_NAME
+# written by install_mysql.sh. Explicit env vars still take precedence.
 SKILL_DIR="${SKILL_DIR:-$(skill_dir)}"
 STATE_DIR="${STATE_DIR:-$(state_dir)}"
 DEPLOYMENT_FILE="${DEPLOYMENT_FILE:-$STATE_DIR/deployment.env}"
@@ -32,6 +31,7 @@ if [[ "$USE_DEPLOYMENT_FILE" == "true" && -f "$DEPLOYMENT_FILE" ]]; then
   set +a
 fi
 PIXELS_HOME="${PIXELS_HOME:-$HOME/opt/pixels}"
+PIXELS_HOME="${PIXELS_HOME%/}"
 CONFIG_FILE="${PIXELS_CONFIG_FILE:-$PIXELS_HOME/etc/pixels.properties}"
 BACKUP_FILE="${BACKUP_FILE:-$CONFIG_FILE.bak.$(date '+%Y%m%d%H%M%S')}"
 SECRETS_FILE="${SECRETS_FILE:-$STATE_DIR/deployment.secrets.env}"
@@ -44,8 +44,17 @@ if [[ -f "$SECRETS_FILE" ]]; then
   set +a
 fi
 
+log() {
+  printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*"
+}
+
+fail() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
 PIXELS_VAR_DIR="${PIXELS_VAR_DIR:-$PIXELS_HOME/var/}"
-METADATA_DB_DRIVER="${METADATA_DB_DRIVER:-com.mysql.cj.jdbc.Driver}"
+METADATA_DB_TYPE="${METADATA_DB_TYPE:-derby}"
 METADATA_DB_USER="${METADATA_DB_USER:-pixels}"
 ALLOW_DEFAULT_METADATA_PASSWORD="${ALLOW_DEFAULT_METADATA_PASSWORD:-false}"
 if [[ -z "${METADATA_DB_PASSWORD:-}" && "$ALLOW_DEFAULT_METADATA_PASSWORD" == "true" ]]; then
@@ -55,7 +64,20 @@ METADATA_DB_PASSWORD="${METADATA_DB_PASSWORD:-}"
 METADATA_DB_HOST="${METADATA_DB_HOST:-localhost}"
 METADATA_DB_PORT="${METADATA_DB_PORT:-3306}"
 METADATA_DB_NAME="${METADATA_DB_NAME:-pixels_metadata}"
-METADATA_DB_URL="${METADATA_DB_URL:-jdbc:mysql://$METADATA_DB_HOST:$METADATA_DB_PORT/$METADATA_DB_NAME?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull}"
+case "$METADATA_DB_TYPE" in
+  derby)
+    METADATA_DB_DRIVER="${METADATA_DB_DRIVER:-org.apache.derby.jdbc.EmbeddedDriver}"
+    METADATA_DB_PASSWORD="${METADATA_DB_PASSWORD:-pixels}"
+    METADATA_DB_URL="${METADATA_DB_URL:-jdbc:derby:${PIXELS_HOME}/var/pixels_metadata;create=true}"
+    ;;
+  mysql)
+    METADATA_DB_DRIVER="${METADATA_DB_DRIVER:-com.mysql.cj.jdbc.Driver}"
+    METADATA_DB_URL="${METADATA_DB_URL:-jdbc:mysql://$METADATA_DB_HOST:$METADATA_DB_PORT/$METADATA_DB_NAME?useUnicode=true&characterEncoding=UTF-8&zeroDateTimeBehavior=convertToNull}"
+    ;;
+  *)
+    fail "METADATA_DB_TYPE must be derby or mysql, got: $METADATA_DB_TYPE"
+    ;;
+esac
 METADATA_SERVER_HOST="${METADATA_SERVER_HOST:-localhost}"
 METADATA_SERVER_PORT="${METADATA_SERVER_PORT:-18888}"
 TRANS_SERVER_HOST="${TRANS_SERVER_HOST:-localhost}"
@@ -68,15 +90,6 @@ METRICS_NODE_TEXT_DIR="${METRICS_NODE_TEXT_DIR:-$HOME/opt/node_exporter/text/}"
 PRESTO_PIXELS_JDBC_URL="${PRESTO_PIXELS_JDBC_URL:-jdbc:trino://localhost:8080/pixels/tpch}"
 CACHE_ENABLED="${CACHE_ENABLED:-false}"
 CONFIGURE_PIXELS_WORKERS_FILE="${CONFIGURE_PIXELS_WORKERS_FILE:-true}"
-
-log() {
-  printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*"
-}
-
-fail() {
-  printf 'ERROR: %s\n' "$*" >&2
-  exit 1
-}
 
 escape_ere() {
   printf '%s' "$1" | sed 's/[][\\.^$*+?{}()|]/\\&/g'
@@ -109,7 +122,17 @@ validate_boolean() {
   esac
 }
 
+validate_metadata_type() {
+  case "$METADATA_DB_TYPE" in
+    derby|mysql) ;;
+    *) fail "METADATA_DB_TYPE must be derby or mysql, got: $METADATA_DB_TYPE" ;;
+  esac
+}
+
 validate_metadata_password() {
+  if [[ "$METADATA_DB_TYPE" == "derby" ]]; then
+    return
+  fi
   if [[ -n "$METADATA_DB_PASSWORD" ]]; then
     return
   fi
@@ -201,8 +224,10 @@ verify_config() {
 
 main() {
   validate_boolean
+  validate_metadata_type
   validate_metadata_password
   validate_config_file
+  mkdir -p "$PIXELS_HOME/var"
   configure_pixels
   configure_workers_file
   verify_config

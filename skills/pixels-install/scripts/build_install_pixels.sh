@@ -29,6 +29,8 @@ fi
 # load_toolchain_env preserves the confirmed PIXELS_HOME above.
 load_toolchain_env
 PIXELS_HOME="${PIXELS_HOME:-$HOME/opt/pixels}"
+METADATA_DB_TYPE="${METADATA_DB_TYPE:-derby}"
+INSTALL_MYSQL_CONNECTOR="${INSTALL_MYSQL_CONNECTOR:-false}"
 MYSQL_CONNECTOR_VERSION="${MYSQL_CONNECTOR_VERSION:-8.0.33}"
 MYSQL_CONNECTOR_JAR="${MYSQL_CONNECTOR_JAR:-$PIXELS_HOME/lib/mysql-connector-j-$MYSQL_CONNECTOR_VERSION.jar}"
 MYSQL_CONNECTOR_URL="${MYSQL_CONNECTOR_URL:-https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/$MYSQL_CONNECTOR_VERSION/mysql-connector-j-$MYSQL_CONNECTOR_VERSION.jar}"
@@ -140,7 +142,9 @@ verify_install() {
   compgen -G "$PIXELS_HOME/bin/pixels-daemon-*-full.jar" >/dev/null || fail "pixels daemon jar not found in $PIXELS_HOME/bin"
   compgen -G "$PIXELS_HOME/sbin/pixels-cli-*-full.jar" >/dev/null || fail "pixels cli jar not found in $PIXELS_HOME/sbin"
   [[ -f "$PIXELS_HOME/etc/pixels.properties" ]] || fail "missing config: $PIXELS_HOME/etc/pixels.properties"
-  find "$PIXELS_HOME/lib" -maxdepth 1 -name 'mysql-connector-j-*.jar' -print -quit | grep -q . || fail "MySQL JDBC connector not found in $PIXELS_HOME/lib"
+  if [[ "$METADATA_DB_TYPE" == "mysql" || "$INSTALL_MYSQL_CONNECTOR" == "true" ]]; then
+    find "$PIXELS_HOME/lib" -maxdepth 1 -name 'mysql-connector-j-*.jar' -print -quit | grep -q . || fail "MySQL JDBC connector not found in $PIXELS_HOME/lib"
+  fi
 
   log "Pixels installation verified at $PIXELS_HOME"
 }
@@ -149,7 +153,11 @@ main() {
   confirm_pixels_install
   persist_pixels_home
   run_pixels_install
-  install_mysql_connector
+  if [[ "$METADATA_DB_TYPE" == "mysql" || "$INSTALL_MYSQL_CONNECTOR" == "true" ]]; then
+    install_mysql_connector
+  else
+    log "skipping MySQL JDBC connector (default metadata backend is Derby; set METADATA_DB_TYPE=mysql or INSTALL_MYSQL_CONNECTOR=true to install it)"
+  fi
   verify_install
 }
 

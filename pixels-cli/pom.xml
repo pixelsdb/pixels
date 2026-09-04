@@ -98,6 +98,15 @@
         </dependency>
 
         <dependency>
+            <groupId>org.apache.derby</groupId>
+            <artifactId>derby</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+        </dependency>
+
+        <dependency>
             <!-- this is only for third-party libs that use slf4j -->
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j-impl</artifactId>
@@ -109,6 +118,13 @@
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/../pixels-daemon/src/main/resources</directory>
+                <includes>
+                    <include>pixels_metadata_mysql.sql</include>
+                    <include>pixels_metadata_derby.sql</include>
+                </includes>
             </resource>
         </resources>
 

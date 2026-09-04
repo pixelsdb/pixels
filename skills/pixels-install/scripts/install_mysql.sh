@@ -9,6 +9,7 @@ if [ "${BASH_SOURCE[0]}" != "$0" ]; then
 fi
 set -euo pipefail
 
+# Optional alternative to the default Derby + INIT-META metadata path.
 # Installs MySQL, sets the root password, and creates the Pixels metadata
 # database/user described in docs/INSTALL.md ("Install MySQL"). Both the
 # MySQL root password and the pixels DB user password default to
@@ -39,7 +40,7 @@ METADATA_DB_NAME="${METADATA_DB_NAME:-pixels_metadata}"
 # '%' allows the pixels DB user to connect from any host; set to 'localhost'
 # for a single-node deployment with no remote metadata access.
 METADATA_DB_USER_HOST="${METADATA_DB_USER_HOST:-%}"
-SCHEMA_FILE="${SCHEMA_FILE:-$REPO_ROOT/scripts/sql/metadata_schema.sql}"
+SCHEMA_FILE="${SCHEMA_FILE:-$REPO_ROOT/pixels-daemon/src/main/resources/pixels_metadata_mysql.sql}"
 SECRETS_FILE="${SECRETS_FILE:-$STATE_DIR/deployment.secrets.env}"
 ASSUME_YES="${ASSUME_YES:-false}"
 DEFAULT_PASSWORD="password"

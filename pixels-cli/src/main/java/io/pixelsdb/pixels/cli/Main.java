@@ -72,6 +72,9 @@ import static java.util.Objects.requireNonNull;
  * <p>
  * STAT -s tpch -t region
  * </p>
+ * <p>
+ * INIT-META
+ * </p>
  */
 public class Main
 {
@@ -140,7 +143,8 @@ public class Main
                             "STAT\n" +
                             "QUERY\n" +
                             "COPY\n" +
-                            "FILE_META");
+                            "FILE_META\n" +
+                            "INIT-META");
                     System.out.println("{command} -h to show the usage of a command.\nexit / quit / -q to exit.\n");
                     continue;
                 }
@@ -366,6 +370,33 @@ public class Main
                     }
                 }
 
+                if (command.equals("INIT-META"))
+                {
+                    ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels INIT-META")
+                            .defaultHelp(true);
+
+                    Namespace ns;
+                    try
+                    {
+                        String argsLine = inputStr.substring(command.length()).trim();
+                        ns = argumentParser.parseArgs(argsLine.isEmpty() ? new String[0] : argsLine.split("\\s+"));
+                    } catch (ArgumentParserException e)
+                    {
+                        argumentParser.handleError(e);
+                        continue;
+                    }
+
+                    try
+                    {
+                        InitMetaExecutor initMetaExecutor = new InitMetaExecutor();
+                        initMetaExecutor.execute(ns, command);
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+
                 if (command.equals("FILE_META"))
                 {
                     ArgumentParser argumentParser = ArgumentParsers.newArgumentParser("Pixels File Metadata Explorer")
@@ -401,7 +432,8 @@ public class Main
                         !command.equals("COMPACT") &&
                         !command.equals("STAT") &&
                         !command.equals("IMPORT") &&
-                        !command.equals("FILE_META"))
+                        !command.equals("FILE_META") &&
+                        !command.equals("INIT-META"))
                 {
                     System.out.println("Command '" + command + "' not found");
                 }
