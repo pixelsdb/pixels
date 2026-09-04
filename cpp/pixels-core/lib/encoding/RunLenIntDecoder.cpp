@@ -280,7 +280,8 @@ long RunLenIntDecoder::readVulong(const std::shared_ptr <ByteBuffer> &input)
         {
             throw InvalidArgumentException("Reading Vulong past EOF");
         }
-        result |= (0x7f & b) << offset;
+        result |= static_cast<long>(static_cast<unsigned long>(0x7f & b)
+                                    << offset);
         offset += 7;
     }
     while (b >= 0x80);

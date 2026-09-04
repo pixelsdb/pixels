@@ -38,10 +38,10 @@ void IntColumnReader::close()
 }
 
 void IntColumnReader::read(std::shared_ptr<ByteBuffer> input,
-                           pixels::proto::ColumnEncoding &encoding, int offset,
+                           const pixels::fb::ColumnEncoding* encoding, int offset,
                            int size, int pixelStride, int vectorIndex,
                            std::shared_ptr<ColumnVector> vector,
-                           pixels::proto::ColumnChunkIndex &chunkIndex,
+                           const pixels::fb::ColumnChunkIndex* chunkIndex,
                            std::shared_ptr<PixelsBitMask> filterMask)
 {
   std::shared_ptr<IntColumnVector> columnVector =
@@ -55,27 +55,45 @@ void IntColumnReader::read(std::shared_ptr<ByteBuffer> input,
   {
     decoder = std::make_shared<RunLenIntDecoder>(input, true);
     ColumnReader::elementIndex = 0;
-    isNullOffset = chunkIndex.isnulloffset();
+    isNullOffset = chunkIndex->isNullOffset();
   }
 
   int pixelId = elementIndex / pixelStride;
-  bool hasNull = chunkIndex.pixelstatistics(pixelId).statistic().hasnull();
-  setValid(input, pixelStride, vector, pixelId, hasNull);
+  bool hasNull = chunkIndex->pixelStatistics()->Get(pixelId)->statistic()->hasNull();
+  setValid(input, vector, hasNull, vectorIndex, size,
+           chunkIndex->littleEndian());
 
-  if (encoding.kind() == pixels::proto::ColumnEncoding_Kind_RUNLENGTH)
+  if (encoding->kind() == pixels::fb::EncodingKind_RUNLENGTH)
   {
     for (int i = 0; i < size; i++)
     {
-
-      *(reinterpret_cast<int *>(columnVector->intVector) + i + vectorIndex) =
-          decoder->next();
+      int outputIndex = i + vectorIndex;
+      if (!columnVector->isNull[outputIndex] || chunkIndex->nullsPadding())
+      {
+        columnVector->intVector[outputIndex] = decoder->next();
+      }
       elementIndex++;
     }
   } else
   {
-    // if int
-    columnVector->intVector =
-        (int *) (input->getPointer() + input->getReadPos());
-    input->setReadPos(input->getReadPos() + size * sizeof(int32_t));
+    const bool littleEndian = chunkIndex->littleEndian();
+    for (int i = 0; i < size; ++i)
+    {
+      int outputIndex = vectorIndex + i;
+      if (columnVector->isNull[outputIndex] && !chunkIndex->nullsPadding())
+      {
+        ++elementIndex;
+        continue;
+      }
+
+      uint32_t value = 0;
+      for (int byteIndex = 0; byteIndex < sizeof(int32_t); ++byteIndex)
+      {
+        const int shift = littleEndian ? byteIndex * 8 : (3 - byteIndex) * 8;
+        value |= static_cast<uint32_t>(input->get()) << shift;
+      }
+      columnVector->intVector[outputIndex] = static_cast<int32_t>(value);
+      ++elementIndex;
+    }
   }
 }

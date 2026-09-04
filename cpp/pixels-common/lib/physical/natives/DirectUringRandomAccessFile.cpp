@@ -207,8 +207,8 @@ std::shared_ptr<ByteBuffer> DirectUringRandomAccessFile::readAsync(
             throw InvalidArgumentException(ss.str());
         }
 
-        io_uring_prep_read_fixed(sqe, fd, buffer->getPointer(), toRead,
-                                 fileOffsetAligned, index);
+        io_uring_prep_read(sqe, fd, buffer->getPointer(), toRead,
+                           fileOffsetAligned);
         if (fd < 0)
         {
             throw std::runtime_error(
@@ -223,8 +223,7 @@ std::shared_ptr<ByteBuffer> DirectUringRandomAccessFile::readAsync(
     else
     {
         struct io_uring_sqe* sqe = io_uring_get_sqe(ring);
-        io_uring_prep_read_fixed(sqe, fd, buffer->getPointer(), length, offset,
-                                 index);
+        io_uring_prep_read(sqe, fd, buffer->getPointer(), length, offset);
         seek(offset + length);
         auto result = std::make_shared<ByteBuffer>(*buffer, 0, length);
         return result;
@@ -292,6 +291,14 @@ void DirectUringRandomAccessFile::readAsyncComplete(
             {
                 throw InvalidArgumentException(
                     "DirectUringRandomAccessFile::readAsyncComplete: wait cqe fails");
+            }
+            if (cqe->res < 0)
+            {
+                int errorNumber = -cqe->res;
+                io_uring_cqe_seen(ring, cqe);
+                throw std::runtime_error(
+                    "DirectUringRandomAccessFile::readAsyncComplete: read fails: " +
+                    std::string(std::strerror(errorNumber)));
             }
             io_uring_cqe_seen(ring, cqe);
         }

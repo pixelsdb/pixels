@@ -7,7 +7,9 @@
 [submodule "cpp/third-party/googletest"]
 	path = cpp/third-party/googletest
 	url = git@github.com:google/googletest.git
-[submodule "cpp/FlameGraph"]
-    path = cpp/third-party/FlameGraph
-    url = git@github.com:brendangregg/FlameGraph.git
-
+[submodule "cpp/third-party/FlameGraph"]
+	path = cpp/third-party/FlameGraph
+	url = git@github.com:brendangregg/FlameGraph.git
+[submodule "cpp/third-party/flatbuffers"]
+	path = cpp/third-party/flatbuffers
+	url = https://github.com/google/flatbuffers.git

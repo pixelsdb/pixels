@@ -1,4 +1,4 @@
-.PHONY: all clean debug release pull update deps
+.PHONY: all clean debug release relWithDebInfo pull update
 
 all: release
 
@@ -18,8 +18,7 @@ ifeq ($(GEN),ninja)
 	FORCE_COLOR=-DFORCE_COLORED_OUTPUT=1
 endif
 
-PROTOBUF_DIR=third-party/protobuf
-BUILD_FLAGS=-DEXTENSION_STATIC_BUILD=1 -DBUILD_TPCH_EXTENSION=1 -DBUILD_BENCHMARKS=1 -DBUILD_PARQUET_EXTENSION=1 \
+BUILD_FLAGS=-DCMAKE_CXX_STANDARD=20 -DEXTENSION_STATIC_BUILD=1 -DBUILD_TPCH_EXTENSION=1 -DBUILD_BENCHMARKS=1 -DBUILD_PARQUET_EXTENSION=1 \
 ${OSX_BUILD_UNIVERSAL_FLAG} ${STATIC_LIBCPP}
 
 CLIENT_FLAGS :=
@@ -28,7 +27,7 @@ CLIENT_FLAGS :=
 
 EXTENSION_FLAGS=-DDUCKDB_EXTENSION_NAMES="pixels" -DDUCKDB_EXTENSION_PIXELS_PATH="$(PROJ_DIR)" \
 -DDUCKDB_EXTENSION_PIXELS_SHOULD_LINK="TRUE" -DDUCKDB_EXTENSION_PIXELS_INCLUDE_PATH="$(PROJ_DIR)include" \
--DCMAKE_PREFIX_PATH=$(PROJ_DIR)third-party/protobuf/cmake/build -DPIXELS_SRC="$(dirname $(pwd))"
+-DUSE_FLATBUFFERS=ON -DPIXELS_SRC="$(shell dirname $(CURDIR))"
 
 pull:
 	git submodule init
@@ -37,13 +36,6 @@ pull:
 update:
 	git submodule update --remote --merge pixels-duckdb/duckdb
 	git -C third-party/googletest checkout v1.15.2
-	git -C third-party/protobuf checkout v3.21.6
-
-deps:
-	mkdir -p "${PROTOBUF_DIR}/cmake/build" && cd "third-party/protobuf/cmake/build" && \
-	cmake -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release ../.. -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-		-Dprotobuf_BUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=./ && \
-	make -j install
 
 clean:
 	rm -rf build/release
@@ -51,14 +43,14 @@ clean:
 	cd pixels-duckdb/duckdb && make clean
 
 # Main build
-debug: deps
+debug:
 	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Debug ${BUILD_FLAGS} -S pixels-duckdb/duckdb -B build/debug && \
 	cmake --build build/debug --config Debug
 
-release: deps
+release:
 	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S pixels-duckdb/duckdb -B build/release && \
 	cmake --build build/release --config Release
 
-relWithDebInfo: deps
+relWithDebInfo:
 	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo ${BUILD_FLAGS} -S pixels-duckdb/duckdb -B build/relWithDebInfo && \
 	cmake --build build/relWithDebInfo --config RelWithDebInfo

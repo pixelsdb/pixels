@@ -28,9 +28,10 @@ options:
                         Path to benchmark configuration JSON file (default: ./benchmark.json)
 
 ```
+##
 
 ## I/O粒度测试
-`blk_stat.py`在执行`process_sqls.py`的同时,调用blktrace和blkprase读取底层块设备的I/O粒度，同时也需要注意运行的查询由`process_sql.py`内置 
+`blk_stat.py`在执行`process_sqls.py`的同时,调用blktrace和blkprase读取底层块设备的I/O粒度，同时也需要注意运行的查询由`process_sql.py`内置
 
 ## 单/双buffer性能测试
 `single_doublebuffer_async_sync_test.py` 设置运行参数，执行单双buffer测试

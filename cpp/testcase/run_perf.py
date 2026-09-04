@@ -21,7 +21,7 @@ import argparse # Import argparse for command-line arguments
 # SSD_MODES = ["24ssd"]
 THREADS = [24]
 QUERIES = ["q01", "q24", "q33"]
-SSD_MODES = ["1ssd"]
+SSD_MODES = ["24ssd"]
 
 # Base 'perf stat' command: focusing on CPU and scheduling metrics
 PERF_CMD_BASE = [
@@ -129,15 +129,12 @@ def run_sched_flamegraph(tmp_sql_path, query_name, ssd_mode, thread_value, resul
         print(f"[ERROR] FlameGraph script file not found at {FLAMEGRAPH_SCRIPT}")
 
 
-def main():
+def main(THREADS=THREADS, QUERIES=QUERIES, SSD_MODES=SSD_MODES):
     parser = argparse.ArgumentParser(description="Run DuckDB benchmarks with perf stat and FlameGraph analysis.")
 
     # --- New required arguments for directories ---
     parser.add_argument("--sql-dir", required=False, default="perf-pixels" ,help="Directory containing the base SQL query files (e.g., test-q01-1ssd.sql).")
     parser.add_argument("--result-dir", required=False,default="perf-pixels", help="Directory where temporary files and final results (perf stats, SVG) will be saved.")
-    THREADS = [24]
-    QUERIES = ["q01", "q24", "q33"]
-    SSD_MODES = ["1ssd"]
     # --- Optional arguments with defaults ---
     parser.add_argument("--threads", type=int, nargs='+', default=THREADS, help=f"List of thread counts to test (default: {THREADS}).")
     parser.add_argument("--queries", nargs='+', default=QUERIES, help=f"List of query IDs to test (default: {QUERIES}).")

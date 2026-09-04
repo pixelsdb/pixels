@@ -44,17 +44,17 @@ public:
     ~DecimalColumnVector();
 
     void add(long value);
-    void add(const std::string& value);
+    void add(std::string& value) override;
 
-    void* current();
-    void close();
+    void* current() override;
+    void close() override;
 
     int getPrecision() const { return precision_; }
     int getScale() const { return scale_; }
     void* getData() const { return vector; }
     pixels::PhysicalType getPhysicalType() const { return physical_type_; }
     size_t ElementSize() const;
-    void ensureSize(uint64_t size, bool preserveData);
+    void ensureSize(uint64_t size, bool preserveData) override;
     void* vector;
     int precision_;
     int scale_;

@@ -28,7 +28,7 @@
 #include "reader/LongColumnReader.h"
 #include "writer/IntColumnWriter.h"
 #include "writer/LongColumnWriter.h"
-
+#include "pixels_generated.h"
 
 #include "gtest/gtest.h"
 #include <array>
@@ -36,7 +36,6 @@
 TEST(IntWriterTest, WriteRunLengthEncodeIntWithoutNull) {
   int len = 10;
   int pixel_stride = 5;
-//  bool is_long = false;
   bool encoding = true;
   auto integer_column_vector =
       std::make_shared<IntColumnVector>(len, encoding);
@@ -54,16 +53,15 @@ TEST(IntWriterTest, WriteRunLengthEncodeIntWithoutNull) {
   option->setNullsPadding(false);
   option->setEncodingLevel(EncodingLevel(EncodingLevel::EL2));
 
+  flatbuffers::FlatBufferBuilder fbb(1024);
+
   auto integer_column_writer = std::make_unique<IntColumnWriter>(
       TypeDescription::createInt(), option);
-  auto write_size = integer_column_writer->write(integer_column_vector, len);
+  auto write_size = integer_column_writer->write( integer_column_vector, len);
   EXPECT_NE(write_size, 0);
   integer_column_writer->flush();
   auto content = integer_column_writer->getColumnChunkContent();
   EXPECT_GT(content.size(), 0);
-
-  std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
-  integer_column_writer->close();
 
   /**----------------------
    **      Write End. Use Reader to check
@@ -72,7 +70,27 @@ TEST(IntWriterTest, WriteRunLengthEncodeIntWithoutNull) {
       std::make_unique<IntColumnReader>(TypeDescription::createInt());
   auto buffer = std::make_shared<ByteBuffer>(content.size());
   buffer->putBytes(content.data(), content.size());
-  auto column_chunk_encoding = integer_column_writer->getColumnChunkEncoding();
+
+  auto column_chunk_encoding_offset = integer_column_writer->getColumnChunkEncoding(fbb);
+  auto column_chunk_index_offset = integer_column_writer->buildColumnChunkIndex(fbb, 0, content.size(), true);
+
+  std::vector<flatbuffers::Offset<pixels::fb::ColumnChunkIndex>> indexVec;
+  indexVec.push_back(column_chunk_index_offset);
+  auto indicesOffset = fbb.CreateVector(indexVec);
+  auto rowGroupIndexOffset = pixels::fb::CreateRowGroupIndex(fbb, indicesOffset);
+
+  std::vector<flatbuffers::Offset<pixels::fb::ColumnEncoding>> encodingVec;
+  encodingVec.push_back(column_chunk_encoding_offset);
+  auto encodingsOffset = fbb.CreateVector(encodingVec);
+  auto rowGroupEncodingOffset = pixels::fb::CreateRowGroupEncoding(fbb, encodingsOffset);
+
+  auto footerOffset = pixels::fb::CreateRowGroupFooter(fbb, rowGroupIndexOffset, rowGroupEncodingOffset);
+  fbb.Finish(footerOffset);
+
+  auto footer = flatbuffers::GetRoot<pixels::fb::RowGroupFooter>((fbb.GetBufferPointer()));
+  auto column_chunk_encoding = footer->rowGroupEncoding()->columnChunkEncodings()->Get(0);
+  auto column_chunk_index = footer->rowGroupIndexEntry()->columnChunkIndexEntries()->Get(0);
+
   auto int_result_vector =
       std::make_shared<IntColumnVector>(len, encoding);
   auto bit_mask = std::make_shared<PixelsBitMask>(len);
@@ -85,10 +103,8 @@ TEST(IntWriterTest, WriteRunLengthEncodeIntWithoutNull) {
     integer_column_reader->read(
         buffer, column_chunk_encoding, pixel_offset, size, pixel_stride,
         vector_index, int_result_vector,
-        *integer_column_writer->getColumnChunkIndexPtr(), bit_mask);
+        column_chunk_index, bit_mask);
     for (int i = vector_index; i < vector_index + size; i++) {
-      std::cerr << "[DEBUG READ CASE1] " << int_result_vector->intVector[i]
-                << std::endl;
       EXPECT_EQ(int_result_vector->intVector[i],
                 integer_column_vector->intVector[i]);
     }
@@ -96,12 +112,12 @@ TEST(IntWriterTest, WriteRunLengthEncodeIntWithoutNull) {
     vector_index += size;
     num_to_read -= size;
   }
+  integer_column_writer->close();
 }
 
-TEST(IntWriterTest, DISABLED_WriteIntWithoutNull) {
+TEST(IntWriterTest, WriteIntWithoutNull) {
   int len = 10;
   int pixel_stride = 5;
-  bool is_long = false;
   bool encoding = false;
   auto integer_column_vector =
       std::make_shared<IntColumnVector>(len, encoding);
@@ -120,6 +136,8 @@ TEST(IntWriterTest, DISABLED_WriteIntWithoutNull) {
   option->setByteOrder(ByteOrder::PIXELS_LITTLE_ENDIAN);
   option->setEncodingLevel(EncodingLevel(EncodingLevel::EL0));
 
+  flatbuffers::FlatBufferBuilder fbb(1024);
+
   auto integer_column_writer = std::make_unique<IntColumnWriter>(
       TypeDescription::createInt(), option);
   auto write_size = integer_column_writer->write(integer_column_vector, len);
@@ -128,9 +146,6 @@ TEST(IntWriterTest, DISABLED_WriteIntWithoutNull) {
   auto content = integer_column_writer->getColumnChunkContent();
   EXPECT_GT(content.size(), 0);
 
-  std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
-  integer_column_writer->close();
-
   /**----------------------
    **      Write End. Use Reader to check
    *------------------------**/
@@ -138,7 +153,27 @@ TEST(IntWriterTest, DISABLED_WriteIntWithoutNull) {
       std::make_unique<IntColumnReader>(TypeDescription::createInt());
   auto buffer = std::make_shared<ByteBuffer>(content.size());
   buffer->putBytes(content.data(), content.size());
-  auto column_chunk_encoding = integer_column_writer->getColumnChunkEncoding();
+
+  auto column_chunk_encoding_offset = integer_column_writer->getColumnChunkEncoding(fbb);
+  auto column_chunk_index_offset = integer_column_writer->buildColumnChunkIndex(fbb, 0, content.size(), true);
+
+  std::vector<flatbuffers::Offset<pixels::fb::ColumnChunkIndex>> indexVec;
+  indexVec.push_back(column_chunk_index_offset);
+  auto indicesOffset = fbb.CreateVector(indexVec);
+  auto rowGroupIndexOffset = pixels::fb::CreateRowGroupIndex(fbb, indicesOffset);
+
+  std::vector<flatbuffers::Offset<pixels::fb::ColumnEncoding>> encodingVec;
+  encodingVec.push_back(column_chunk_encoding_offset);
+  auto encodingsOffset = fbb.CreateVector(encodingVec);
+  auto rowGroupEncodingOffset = pixels::fb::CreateRowGroupEncoding(fbb, encodingsOffset);
+
+  auto footerOffset = pixels::fb::CreateRowGroupFooter(fbb, rowGroupIndexOffset, rowGroupEncodingOffset);
+  fbb.Finish(footerOffset);
+
+  auto footer = flatbuffers::GetRoot<pixels::fb::RowGroupFooter>((fbb.GetBufferPointer()));
+  auto column_chunk_encoding = footer->rowGroupEncoding()->columnChunkEncodings()->Get(0);
+  auto column_chunk_index = footer->rowGroupIndexEntry()->columnChunkIndexEntries()->Get(0);
+
   auto int_result_vector =
       std::make_shared<IntColumnVector>(len, encoding);
   auto bit_mask = std::make_shared<PixelsBitMask>(len);
@@ -151,46 +186,23 @@ TEST(IntWriterTest, DISABLED_WriteIntWithoutNull) {
     integer_column_reader->read(
         buffer, column_chunk_encoding, pixel_offset, size, pixel_stride,
         vector_index, int_result_vector,
-        *integer_column_writer->getColumnChunkIndexPtr(), bit_mask);
+        column_chunk_index, bit_mask);
     for (int i = vector_index; i < vector_index + size; i++) {
-      std::cerr << "[DEBUG READ CASE1] "
-                << reinterpret_cast<int *>(int_result_vector->intVector)[i]
-                << std::endl;
-      EXPECT_EQ(reinterpret_cast<int *>(int_result_vector->intVector)[i],
+      EXPECT_EQ(int_result_vector->intVector[i],
                 integer_column_vector->intVector[i]);
     }
     pixel_offset += size;
     vector_index += size;
     num_to_read -= size;
   }
+  integer_column_writer->close();
 }
 
-TEST(EncodeTest, DISABLED_EncodeLong) {
-  constexpr size_t len = 10;
-  std::array<long, len> data;
-  for (size_t i = 0; i < len; i++) {
-    data[i] = INT64_MAX - i;
-  }
-  auto encode_buffer = std::make_shared<ByteBuffer>();
-  auto encoder = std::make_unique<RunLenIntEncoder>();
-
-  int res_len{0};
-  encoder->encode(data.data(), encode_buffer->getPointer(), len, res_len);
-
-  EXPECT_GT(res_len, 0);
-
-  bool is_signed = true;
-  auto decoder = std::make_unique<RunLenIntDecoder>(encode_buffer, is_signed);
-  for (size_t i = 0; i < len; i++) {
-    EXPECT_EQ(decoder->next(), data[i]);
-  }
-}
-
-TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
+TEST(IntWriterTest, WriteRunLengthEncodeLongWithoutNull) {
   int len = 23;
   int pixel_stride = 5;
-  bool is_long = true;
   bool encoding = true;
+  bool is_long = true;
   auto long_column_vector =
       std::make_shared<LongColumnVector>(len, encoding, is_long);
   ASSERT_TRUE(long_column_vector);
@@ -203,23 +215,44 @@ TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
   option->setNullsPadding(false);
   option->setEncodingLevel(EncodingLevel(EncodingLevel::EL2));
 
-  auto long_column_writer = std::make_unique<IntColumnWriter>(
+  flatbuffers::FlatBufferBuilder fbb(1024);
+
+  auto long_column_writer = std::make_unique<LongColumnWriter>(
       TypeDescription::createLong(), option);
   auto write_size = long_column_writer->write(long_column_vector, len);
   EXPECT_NE(write_size, 0);
   long_column_writer->flush();
   auto content = long_column_writer->getColumnChunkContent();
   EXPECT_GT(content.size(), 0);
-  std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
 
   /**----------------------
    **      Write End. Use Reader to check
    *------------------------**/
   auto long_column_reader =
-      std::make_unique<IntColumnReader>(TypeDescription::createLong());
+      std::make_unique<LongColumnReader>(TypeDescription::createLong());
   auto buffer = std::make_shared<ByteBuffer>(content.size());
   buffer->putBytes(content.data(), content.size());
-  auto column_chunk_encoding = long_column_writer->getColumnChunkEncoding();
+
+  auto column_chunk_encoding_offset = long_column_writer->getColumnChunkEncoding(fbb);
+  auto column_chunk_index_offset = long_column_writer->buildColumnChunkIndex(fbb, 0, content.size(), true);
+
+  std::vector<flatbuffers::Offset<pixels::fb::ColumnChunkIndex>> indexVec;
+  indexVec.push_back(column_chunk_index_offset);
+  auto indicesOffset = fbb.CreateVector(indexVec);
+  auto rowGroupIndexOffset = pixels::fb::CreateRowGroupIndex(fbb, indicesOffset);
+
+  std::vector<flatbuffers::Offset<pixels::fb::ColumnEncoding>> encodingVec;
+  encodingVec.push_back(column_chunk_encoding_offset);
+  auto encodingsOffset = fbb.CreateVector(encodingVec);
+  auto rowGroupEncodingOffset = pixels::fb::CreateRowGroupEncoding(fbb, encodingsOffset);
+
+  auto footerOffset = pixels::fb::CreateRowGroupFooter(fbb, rowGroupIndexOffset, rowGroupEncodingOffset);
+  fbb.Finish(footerOffset);
+
+  auto footer = flatbuffers::GetRoot<pixels::fb::RowGroupFooter>((fbb.GetBufferPointer()));
+  auto column_chunk_encoding = footer->rowGroupEncoding()->columnChunkEncodings()->Get(0);
+  auto column_chunk_index = footer->rowGroupIndexEntry()->columnChunkIndexEntries()->Get(0);
+
   auto long_result_vector =
       std::make_shared<LongColumnVector>(len, encoding, is_long);
   auto bit_mask = std::make_shared<PixelsBitMask>(len);
@@ -230,11 +263,9 @@ TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
     auto size = std::min(pixel_stride, num_to_read);
     long_column_reader->read(buffer, column_chunk_encoding, pixel_offset, size,
                              pixel_stride, vector_index, long_result_vector,
-                             *(long_column_writer->getColumnChunkIndexPtr()),
+                             column_chunk_index,
                              bit_mask);
     for (int i = vector_index; i < vector_index + size; i++) {
-      std::cerr << "[DEBUG READ CASE1] " << long_result_vector->longVector[i]
-                << std::endl;
       EXPECT_EQ(long_result_vector->longVector[i],
                 long_column_vector->longVector[i]);
     }
@@ -246,13 +277,12 @@ TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeLongWithoutNull) {
   long_column_writer->close();
 }
 
-TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
+TEST(IntWriterTest, WriteRunLengthEncodeIntWithNull) {
   int len = 23;
   int pixel_stride = 5;
-  bool is_long = false;
   bool encoding = true;
   auto integer_column_vector =
-      std::make_shared<LongColumnVector>(len, encoding, is_long);
+      std::make_shared<IntColumnVector>(len, encoding);
   ASSERT_TRUE(integer_column_vector);
   for (int i = 0; i < len; ++i) {
     if (i % 2) {
@@ -271,16 +301,15 @@ TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
   option->setNullsPadding(false);
   option->setEncodingLevel(EncodingLevel(EncodingLevel::EL2));
 
+  flatbuffers::FlatBufferBuilder fbb(1024);
+
   auto integer_column_writer = std::make_unique<IntColumnWriter>(
       TypeDescription::createInt(), option);
-  auto write_size = integer_column_writer->write(integer_column_vector, len);
+  auto write_size = integer_column_writer->write( integer_column_vector, len);
   EXPECT_NE(write_size, 0);
   integer_column_writer->flush();
   auto content = integer_column_writer->getColumnChunkContent();
   EXPECT_GT(content.size(), 0);
-
-  std::cerr << "[DEBUG] content size: " << content.size() << std::endl;
-  integer_column_writer->close();
 
   /**----------------------
    **      Write End. Use Reader to check
@@ -289,7 +318,27 @@ TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
       std::make_unique<IntColumnReader>(TypeDescription::createInt());
   auto buffer = std::make_shared<ByteBuffer>(content.size());
   buffer->putBytes(content.data(), content.size());
-  auto column_chunk_encoding = integer_column_writer->getColumnChunkEncoding();
+
+  auto column_chunk_encoding_offset = integer_column_writer->getColumnChunkEncoding(fbb);
+  auto column_chunk_index_offset = integer_column_writer->buildColumnChunkIndex(fbb, 0, content.size(), true);
+
+  std::vector<flatbuffers::Offset<pixels::fb::ColumnChunkIndex>> indexVec;
+  indexVec.push_back(column_chunk_index_offset);
+  auto indicesOffset = fbb.CreateVector(indexVec);
+  auto rowGroupIndexOffset = pixels::fb::CreateRowGroupIndex(fbb, indicesOffset);
+
+  std::vector<flatbuffers::Offset<pixels::fb::ColumnEncoding>> encodingVec;
+  encodingVec.push_back(column_chunk_encoding_offset);
+  auto encodingsOffset = fbb.CreateVector(encodingVec);
+  auto rowGroupEncodingOffset = pixels::fb::CreateRowGroupEncoding(fbb, encodingsOffset);
+
+  auto footerOffset = pixels::fb::CreateRowGroupFooter(fbb, rowGroupIndexOffset, rowGroupEncodingOffset);
+  fbb.Finish(footerOffset);
+
+  auto footer = flatbuffers::GetRoot<pixels::fb::RowGroupFooter>((fbb.GetBufferPointer()));
+  auto column_chunk_encoding = footer->rowGroupEncoding()->columnChunkEncodings()->Get(0);
+  auto column_chunk_index = footer->rowGroupIndexEntry()->columnChunkIndexEntries()->Get(0);
+
   auto int_result_vector =
       std::make_shared<IntColumnVector>(len, encoding);
   auto bit_mask = std::make_shared<PixelsBitMask>(len);
@@ -302,15 +351,17 @@ TEST(IntWriterTest, DISABLED_WriteRunLengthEncodeIntWithNull) {
     integer_column_reader->read(
         buffer, column_chunk_encoding, pixel_offset, size, pixel_stride,
         vector_index, int_result_vector,
-        *integer_column_writer->getColumnChunkIndexPtr(), bit_mask);
+        column_chunk_index, bit_mask);
     for (int i = vector_index; i < vector_index + size; i++) {
-      std::cerr << "[DEBUG READ CASE1] " << int_result_vector->intVector[i]
-                << std::endl;
-      // EXPECT_EQ(int_result_vector->intVector[i],
-      // integer_column_vector->intVector[i]);
+      EXPECT_EQ(int_result_vector->isNull[i], integer_column_vector->isNull[i]);
+      if (!integer_column_vector->isNull[i]) {
+        EXPECT_EQ(int_result_vector->intVector[i],
+                  integer_column_vector->intVector[i]);
+      }
     }
     pixel_offset += size;
     vector_index += size;
     num_to_read -= size;
   }
+  integer_column_writer->close();
 }

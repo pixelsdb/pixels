@@ -27,7 +27,7 @@
 
 #include "TypeDescription.h"
 #include "physical/natives/ByteBuffer.h"
-#include "pixels-common/pixels.pb.h"
+#include "pixels_generated.h"
 #include <cmath>
 #include <memory>
 #include "PixelsFilter.h"
@@ -63,14 +63,18 @@ public:
      * @param filterMask the bitmask to store filter results
      */
     virtual void read(std::shared_ptr <ByteBuffer> input,
-                      pixels::proto::ColumnEncoding &encoding,
+                      const pixels::fb::ColumnEncoding* encoding,
                       int offset, int size, int pixelStride,
                       int vectorIndex, std::shared_ptr <ColumnVector> vector,
-                      pixels::proto::ColumnChunkIndex &chunkIndex,
+                      const pixels::fb::ColumnChunkIndex* chunkIndex,
                       std::shared_ptr <PixelsBitMask> filterMask);
 
     void setValid(const std::shared_ptr <ByteBuffer> &input, int pixelStride,
                   const std::shared_ptr <ColumnVector> &columnVector, int pixelId, bool hasNull);
+
+    void setValid(const std::shared_ptr<ByteBuffer> &input,
+                  const std::shared_ptr<ColumnVector> &columnVector,
+                  bool hasNull, int vectorIndex, int size, bool littleEndian);
 
 protected:
     int elementIndex;

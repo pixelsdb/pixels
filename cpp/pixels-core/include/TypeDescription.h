@@ -36,7 +36,9 @@
 #include <string>
 #include <memory>
 #include <map>
-#include <pixels-common/pixels.pb.h>
+#include <span>
+
+#include "pixels_generated.h"
 #include <vector/VectorizedRowBatch.h>
 #include "vector/LongColumnVector.h"
 #include "vector/ByteColumnVector.h"
@@ -129,7 +131,7 @@ public:
     static std::shared_ptr <TypeDescription> createStruct();
 
     static std::shared_ptr <TypeDescription>
-    createSchema(const std::vector <std::shared_ptr<pixels::proto::Type>> &types);
+    createSchema(std::span<const pixels::fb::Type*> types);
 
     std::shared_ptr <TypeDescription>
     addField(const std::string &field, const std::shared_ptr <TypeDescription> &fieldType);
@@ -200,8 +202,7 @@ public:
     static int MAX_TIMESTAMP_PRECISION;
 
     static int MAX_TIME_PRECISION;
-
-    void writeTypes(std::shared_ptr <pixels::proto::Footer> footer);
+    std::vector<flatbuffers::Offset<pixels::fb::Type>> writeTypes(flatbuffers::FlatBufferBuilder& fbb);
 
 
 private:
