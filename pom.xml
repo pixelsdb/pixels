@@ -120,7 +120,7 @@
         <dep.jetcd.version>0.7.7</dep.jetcd.version>
         <!-- 10.14.2.0 is the latest version derby compatible with JDK 8 -->
         <dep.derby.version>10.14.2.0</dep.derby.version>
-        <dep.mysql-connector.version>8.0.33</dep.mysql-connector.version>
+        <dep.mysql-connector.version>8.2.0</dep.mysql-connector.version>
         <dep.jna.version>5.13.0</dep.jna.version>
         <dep.javax.annotation.version>1.3.2</dep.javax.annotation.version>
         <dep.prometheus.client.version>0.16.0</dep.prometheus.client.version>
