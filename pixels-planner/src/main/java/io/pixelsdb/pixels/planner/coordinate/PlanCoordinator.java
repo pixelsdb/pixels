@@ -19,8 +19,18 @@
  */
 package io.pixelsdb.pixels.planner.coordinate;
 
+import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleQueueInfo;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -48,13 +58,42 @@ public class PlanCoordinator
      */
     private final Map<Integer, StageDependency> stageDependencies = new HashMap<>();
     /**
+     * Runtime worker control is registered only for stages whose physical
+     * workers pull coordinator tasks, currently the S3QS shuffle stages.
+     */
+    private final Map<Integer, StageRuntimeController> stageRuntimeControllers = new HashMap<>();
+    /**
+     * Query-owned shuffle edges keyed by their query-unique shuffle id.
+     */
+    private final Map<String, ShuffleInfo> shuffleInfos = new HashMap<>();
+    private final CoordinatorEndpoint coordinatorEndpoint;
+    private final StageWorkerLauncher stageWorkerLauncher;
+    /**
      * The assigner of stage id.
      */
     private final AtomicInteger stageIdAssigner = new AtomicInteger(0);
 
     public PlanCoordinator(long transId)
     {
+        this(transId, CoordinatorEndpoint.fromConfig(), new InvokerStageWorkerLauncher());
+    }
+
+    public PlanCoordinator(long transId, StageWorkerLauncher stageWorkerLauncher)
+    {
+        this(transId, CoordinatorEndpoint.fromConfig(), stageWorkerLauncher);
+    }
+
+    public PlanCoordinator(long transId, CoordinatorEndpoint coordinatorEndpoint)
+    {
+        this(transId, coordinatorEndpoint, new InvokerStageWorkerLauncher());
+    }
+
+    public PlanCoordinator(long transId, CoordinatorEndpoint coordinatorEndpoint,
+                           StageWorkerLauncher stageWorkerLauncher)
+    {
         this.transId = transId;
+        this.coordinatorEndpoint = requireNonNull(coordinatorEndpoint, "coordinatorEndpoint is null");
+        this.stageWorkerLauncher = requireNonNull(stageWorkerLauncher, "stageWorkerLauncher is null");
     }
 
     /**
@@ -86,6 +125,48 @@ public class PlanCoordinator
     }
 
     /**
+     * Register the physical execution description for a queued stage. Logical
+     * tasks must already exist in the corresponding StageCoordinator.
+     */
+    public void addStageRuntimeController(StageExecutionDescriptor descriptor)
+    {
+        requireNonNull(descriptor, "descriptor is null");
+        int stageId = descriptor.getStageId();
+        StageCoordinator stageCoordinator = requireNonNull(this.stageCoordinators.get(stageId),
+                "stage coordinator is not found");
+        checkArgument(!this.stageRuntimeControllers.containsKey(stageId),
+                "stage runtime controller already exists");
+        this.stageRuntimeControllers.put(stageId,
+                new StageRuntimeController(stageCoordinator, descriptor, this.stageWorkerLauncher));
+    }
+
+    public StageRuntimeController getStageRuntimeController(int stageId)
+    {
+        return this.stageRuntimeControllers.get(stageId);
+    }
+
+    /**
+     * Start the first worker set for a queued stage. The initial target is
+     * bounded by its current pending logical task count.
+     */
+    public List<CompletableFuture<? extends Output>> activateStage(int stageId)
+    {
+        StageCoordinator stageCoordinator = requireNonNull(this.stageCoordinators.get(stageId),
+                "stage coordinator is not found");
+        return scaleStage(stageId, stageCoordinator.getPendingTaskCount());
+    }
+
+    /**
+     * Manually change the desired runtime worker count for a stage.
+     */
+    public List<CompletableFuture<? extends Output>> scaleStage(int stageId, int targetWorkerCount)
+    {
+        StageRuntimeController runtimeController = requireNonNull(this.stageRuntimeControllers.get(stageId),
+                "stage runtime controller is not found");
+        return runtimeController.scaleTo(targetWorkerCount);
+    }
+
+    /**
      * Get this stage's dependency on the parent (downstream) stage.
      * @param stageId the id of this stage
      * @return the dependency
@@ -103,6 +184,36 @@ public class PlanCoordinator
         return transId;
     }
 
+    public CoordinatorEndpoint getCoordinatorEndpoint()
+    {
+        return coordinatorEndpoint;
+    }
+
+    /**
+     * Register one shuffle edge with this query. Producer and consumer inputs
+     * may reference separate but equivalent metadata objects, so duplicates
+     * are accepted only when all resource-defining fields agree.
+     */
+    public void addShuffleInfo(ShuffleInfo shuffleInfo)
+    {
+        requireNonNull(shuffleInfo, "shuffleInfo is null");
+        String shuffleId = requireNonNull(shuffleInfo.getShuffleId(), "shuffleId is null");
+        checkArgument(!shuffleId.trim().isEmpty(), "shuffleId is empty");
+        ShuffleInfo previous = this.shuffleInfos.get(shuffleId);
+        if (previous == null)
+        {
+            this.shuffleInfos.put(shuffleId, shuffleInfo);
+            return;
+        }
+        checkArgument(sameShuffleResource(previous, shuffleInfo),
+                "conflicting shuffle metadata for shuffleId " + shuffleId);
+    }
+
+    public Collection<ShuffleInfo> getShuffleInfos()
+    {
+        return Collections.unmodifiableCollection(new ArrayList<>(this.shuffleInfos.values()));
+    }
+
     /**
      * Assign an id for a stage. This should only be called in
      * {@link io.pixelsdb.pixels.planner.plan.physical.Operator#initPlanCoordinator(PlanCoordinator, int, boolean)}
@@ -112,5 +223,38 @@ public class PlanCoordinator
     public int assignStageId()
     {
         return this.stageIdAssigner.getAndIncrement();
+    }
+
+    private static boolean sameShuffleResource(ShuffleInfo left, ShuffleInfo right)
+    {
+        if (!Objects.equals(left.getObjectPathPrefix(), right.getObjectPathPrefix()) ||
+                left.getNumPartitions() != right.getNumPartitions() ||
+                left.getStorageInfo() == null || right.getStorageInfo() == null ||
+                left.getStorageInfo().getScheme() != right.getStorageInfo().getScheme())
+        {
+            return false;
+        }
+        List<ShuffleQueueInfo> leftQueues = left.getQueues();
+        List<ShuffleQueueInfo> rightQueues = right.getQueues();
+        if (leftQueues == null || rightQueues == null || leftQueues.size() != rightQueues.size())
+        {
+            return false;
+        }
+        Map<Integer, ShuffleQueueInfo> rightByPartition = new HashMap<>();
+        for (ShuffleQueueInfo queue : rightQueues)
+        {
+            rightByPartition.put(queue.getPartitionId(), queue);
+        }
+        for (ShuffleQueueInfo leftQueue : leftQueues)
+        {
+            ShuffleQueueInfo rightQueue = rightByPartition.get(leftQueue.getPartitionId());
+            if (rightQueue == null ||
+                    !Objects.equals(leftQueue.getQueueName(), rightQueue.getQueueName()) ||
+                    !Objects.equals(leftQueue.getQueueUrl(), rightQueue.getQueueUrl()))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 }

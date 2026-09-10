@@ -38,6 +38,7 @@ public class PhysicalS3QSWriter implements PhysicalWriter
     private long position;
     private final DataOutputStream out;
     private S3Queue queue = null;
+    private S3QueueMessage message = null;
 
     public PhysicalS3QSWriter(Storage storage, String path) throws IOException
     {
@@ -61,6 +62,12 @@ public class PhysicalS3QSWriter implements PhysicalWriter
     protected void setQueue(S3Queue queue)
     {
         this.queue = queue;
+    }
+
+    protected void setQueue(S3Queue queue, S3QueueMessage message)
+    {
+        this.queue = queue;
+        this.message = message;
     }
 
     /**
@@ -121,7 +128,14 @@ public class PhysicalS3QSWriter implements PhysicalWriter
             this.out.close();
             if (this.queue != null && !this.queue.isClosed())
             {
-                this.queue.push(this.pathStr);
+                if (this.message == null)
+                {
+                    this.queue.push(this.pathStr);
+                }
+                else
+                {
+                    this.queue.push(this.message.setObjectPath(this.pathStr));
+                }
             }
         }
         catch (IOException e)

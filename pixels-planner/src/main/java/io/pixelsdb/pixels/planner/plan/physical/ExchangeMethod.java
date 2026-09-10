@@ -25,7 +25,7 @@ package io.pixelsdb.pixels.planner.plan.physical;
  */
 public enum ExchangeMethod
 {
-    batch, stream;
+    batch, stream, s3qs;
 
     /**
      * Case-insensitive parsing from String name to enum value.

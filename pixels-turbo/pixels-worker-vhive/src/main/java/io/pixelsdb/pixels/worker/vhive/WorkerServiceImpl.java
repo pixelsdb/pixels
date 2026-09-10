@@ -76,6 +76,12 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
                 service.execute(request, responseObserver);
                 break;
             }
+            case PARTITIONED_CHAIN_JOIN_S3QS:
+            {
+                ServiceImpl<S3QSPartitionedChainJoinWorker, StageWorkerInput, JoinOutput> service = new ServiceImpl<>(S3QSPartitionedChainJoinWorker.class, StageWorkerInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
             case PARTITIONED_CHAIN_JOIN_STREAMING:
             {
                 ServiceImpl<PartitionedChainJoinStreamWorker, PartitionedChainJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedChainJoinStreamWorker.class, PartitionedChainJoinInput.class);
@@ -88,6 +94,12 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
                 service.execute(request, responseObserver);
                 break;
             }
+            case PARTITIONED_JOIN_S3QS:
+            {
+                ServiceImpl<S3QSPartitionedJoinWorker, StageWorkerInput, JoinOutput> service = new ServiceImpl<>(S3QSPartitionedJoinWorker.class, StageWorkerInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
             case PARTITIONED_JOIN_STREAMING:
             {
                 ServiceImpl<PartitionedJoinStreamWorker, PartitionedJoinInput, JoinOutput> service = new ServiceImpl<>(PartitionedJoinStreamWorker.class, PartitionedJoinInput.class);
@@ -97,6 +109,12 @@ public class WorkerServiceImpl extends vHiveWorkerServiceGrpc.vHiveWorkerService
             case PARTITION:
             {
                 ServiceImpl<PartitionWorker, PartitionInput, PartitionOutput> service = new ServiceImpl<>(PartitionWorker.class, PartitionInput.class);
+                service.execute(request, responseObserver);
+                break;
+            }
+            case PARTITION_S3QS:
+            {
+                ServiceImpl<S3QSPartitionWorker, StageWorkerInput, PartitionOutput> service = new ServiceImpl<>(S3QSPartitionWorker.class, StageWorkerInput.class);
                 service.execute(request, responseObserver);
                 break;
             }

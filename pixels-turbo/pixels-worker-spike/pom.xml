@@ -31,6 +31,15 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-localfs</artifactId>
         </dependency>
+        <!--
+            spike-java-handler is distributed as a fat jar containing an old
+            protobuf runtime. Keep the repository-wide protobuf version ahead
+            of it on the runtime and shaded classpaths.
+        -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>spike-java-handler</artifactId>

@@ -24,6 +24,9 @@ import io.pixelsdb.pixels.planner.plan.physical.Operator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static com.google.common.base.Preconditions.checkState;
+import static java.util.Objects.requireNonNull;
+
 /**
  * The factory to create and manage the plan coordinators of queries.
  * @author hank
@@ -56,10 +59,60 @@ public class PlanCoordinatorFactory
      */
     public PlanCoordinator createPlanCoordinator(long transId, Operator planRootOperator)
     {
-        PlanCoordinator planCoordinator = new PlanCoordinator(transId);
+        return createPlanCoordinator(transId, planRootOperator, CoordinatorEndpoint.fromConfig());
+    }
+
+    public PlanCoordinator createPlanCoordinator(long transId, Operator planRootOperator,
+                                                 CoordinatorEndpoint coordinatorEndpoint)
+    {
+        return createPlanCoordinator(transId, planRootOperator, coordinatorEndpoint,
+                new InvokerStageWorkerLauncher());
+    }
+
+    public PlanCoordinator createPlanCoordinator(long transId, Operator planRootOperator,
+                                                 CoordinatorEndpoint coordinatorEndpoint,
+                                                 StageWorkerLauncher stageWorkerLauncher)
+    {
+        requireNonNull(planRootOperator, "planRootOperator is null");
+        checkState(!this.transIdToPlanCoordinator.containsKey(transId),
+                "plan coordinator already exists for transaction %s", transId);
+        PlanCoordinator planCoordinator = new PlanCoordinator(transId, coordinatorEndpoint,
+                requireNonNull(stageWorkerLauncher, "stageWorkerLauncher is null"));
         planRootOperator.initPlanCoordinator(planCoordinator, -1, false);
-        this.transIdToPlanCoordinator.put(transId, planCoordinator);
+        PlanCoordinator previous = this.transIdToPlanCoordinator.putIfAbsent(transId, planCoordinator);
+        checkState(previous == null, "plan coordinator already exists for transaction %s", transId);
         return planCoordinator;
+    }
+
+    public CoordinatedPlanExecution createPlanExecution(long transId, Operator planRootOperator)
+    {
+        return createPlanExecution(transId, planRootOperator, CoordinatorEndpoint.fromConfig());
+    }
+
+    public CoordinatedPlanExecution createPlanExecution(long transId, Operator planRootOperator,
+                                                        CoordinatorEndpoint coordinatorEndpoint)
+    {
+        return createPlanExecution(transId, planRootOperator, coordinatorEndpoint,
+                new S3QSShuffleResourceLifecycle());
+    }
+
+    public CoordinatedPlanExecution createPlanExecution(long transId, Operator planRootOperator,
+                                                        CoordinatorEndpoint coordinatorEndpoint,
+                                                        ShuffleResourceLifecycle shuffleResourceLifecycle)
+    {
+        return createPlanExecution(transId, planRootOperator, coordinatorEndpoint,
+                shuffleResourceLifecycle, new InvokerStageWorkerLauncher());
+    }
+
+    public CoordinatedPlanExecution createPlanExecution(long transId, Operator planRootOperator,
+                                                        CoordinatorEndpoint coordinatorEndpoint,
+                                                        ShuffleResourceLifecycle shuffleResourceLifecycle,
+                                                        StageWorkerLauncher stageWorkerLauncher)
+    {
+        PlanCoordinator planCoordinator =
+                createPlanCoordinator(transId, planRootOperator, coordinatorEndpoint, stageWorkerLauncher);
+        return new CoordinatedPlanExecution(transId, planRootOperator, planCoordinator, this,
+                requireNonNull(shuffleResourceLifecycle, "shuffleResourceLifecycle is null"));
     }
 
     /**
@@ -70,5 +123,15 @@ public class PlanCoordinatorFactory
     public PlanCoordinator getPlanCoordinator(long transId)
     {
         return this.transIdToPlanCoordinator.get(transId);
+    }
+
+    /**
+     * Remove only the coordinator owned by the given execution. This prevents
+     * a stale execution from deleting a newer coordinator with the same id.
+     */
+    public boolean removePlanCoordinator(long transId, PlanCoordinator planCoordinator)
+    {
+        return this.transIdToPlanCoordinator.remove(transId,
+                requireNonNull(planCoordinator, "planCoordinator is null"));
     }
 }
