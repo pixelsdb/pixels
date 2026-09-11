@@ -211,8 +211,9 @@ message GetWriteBufferRequest {
 message GetWriteBufferResponse {
     ResponseHeader header = 1;
     bytes data = 2;
-    repeated int64 ids = 3;
+    repeated int64 blockIds = 3;
     repeated VisibilityBitmap bitmaps = 4;
+    repeated uint64 fileIds = 5;
 }
 
 // register offload

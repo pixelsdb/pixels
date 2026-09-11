@@ -760,84 +760,78 @@ public class RetinaResourceManager
     {
         RetinaProto.GetWriteBufferResponse.Builder responseBuilder = RetinaProto.GetWriteBufferResponse.newBuilder();
 
-        // get super version
         PixelsWriteBuffer writeBuffer = checkPixelsWriteBuffer(schemaName, tableName, vNodeId);
         SuperVersion superVersion = writeBuffer.getCurrentVersion();
-        MemTable activeMemtable = superVersion.getActiveMemTable();
-        List<MemTable> immutableMemTables = superVersion.getImmutableMemTables();
-        List<ObjectEntry> objectEntries = superVersion.getObjectEntries();
-
-        Set<Long> fileIds = new HashSet<>();
-
-        // Active memTable returns its full appended rows; visibility is masked
-        // downstream by the RGVisibility bitmap slice below.
-        int activeSize = activeMemtable.getSize();
-        if (activeSize > 0)
+        try
         {
-            ByteString data = ByteString.copyFrom(activeMemtable.serialize());
-            responseBuilder.setData(data);
-        } else
-        {
-            responseBuilder.setData(ByteString.EMPTY);
-        }
+            MemTable activeMemtable = superVersion.getActiveMemTable();
+            List<MemTable> immutableMemTables = superVersion.getImmutableMemTables();
+            List<ObjectEntry> objectEntries = superVersion.getObjectEntries();
 
-        // statistics on id and fileId
-        List<Long> ids = new ArrayList<>();
-        fileIds.add(activeMemtable.getFileId());
-        for (MemTable immutableMemtable : immutableMemTables)
-        {
-            if (!immutableMemtable.isEmpty())
+            Set<Long> fileIds = new HashSet<>();
+            if (!activeMemtable.isEmpty())
             {
-                fileIds.add(immutableMemtable.getFileId());
-                ids.add(immutableMemtable.getId());
+                fileIds.add(activeMemtable.getFileId());
             }
-        }
-        for (ObjectEntry objectEntry : objectEntries)
-        {
-            fileIds.add(objectEntry.getFileId());
-            ids.add(objectEntry.getId());
-        }
-        responseBuilder.addAllIds(ids);
+            for (MemTable immutableMemtable : immutableMemTables)
+            {
+                if (!immutableMemtable.isEmpty())
+                {
+                    fileIds.add(immutableMemtable.getFileId());
+                }
+            }
+            for (ObjectEntry objectEntry : objectEntries)
+            {
+                fileIds.add(objectEntry.getFileId());
+            }
 
-        // get the visibility bitmap of fileIds
-        Map<Long, long[]> fileIdToVisibility = new HashMap<>();
-        for (Long fileId : fileIds)
-        {
-            long[] visibility = queryVisibility(fileId, 0, timestamp);
-            fileIdToVisibility.put(fileId, visibility);
-        }
+            Map<Long, long[]> fileIdToVisibility = new HashMap<>();
+            for (Long fileId : fileIds)
+            {
+                fileIdToVisibility.put(fileId, queryVisibility(fileId, 0, timestamp));
+            }
 
-        // only return the corresponding visible part of bitmap
-        if (activeSize > 0)
-        {
-            responseBuilder.addBitmaps(getVisibilityBitmapSlice(
-                    fileIdToVisibility.get(activeMemtable.getFileId()),
-                    activeMemtable.getStartIndex(), activeSize));
-        } else
-        {
-            responseBuilder.addBitmaps(RetinaProto.VisibilityBitmap.newBuilder());
-        }
-        for (MemTable immutableMemtable : immutableMemTables)
-        {
-            int immutableSize = immutableMemtable.getSize();
-            if (immutableSize > 0)
+            // Keep data, blockIds, bitmaps, and fileIds index-aligned. The active
+            // memtable occupies index 0; blockIds[i] occupies index i + 1.
+            int activeSize = activeMemtable.getSize();
+            responseBuilder.setData(activeSize == 0
+                    ? ByteString.EMPTY : ByteString.copyFrom(activeMemtable.serialize()));
+            responseBuilder.addFileIds(activeMemtable.getFileId());
+            if (activeSize == 0)
+            {
+                responseBuilder.addBitmaps(RetinaProto.VisibilityBitmap.newBuilder());
+            }
+            else
             {
                 responseBuilder.addBitmaps(getVisibilityBitmapSlice(
-                        fileIdToVisibility.get(immutableMemtable.getFileId()),
-                        immutableMemtable.getStartIndex(), immutableSize));
+                        fileIdToVisibility.get(activeMemtable.getFileId()),
+                        activeMemtable.getStartIndex(), activeSize));
             }
+            for (MemTable immutableMemtable : immutableMemTables)
+            {
+                if (!immutableMemtable.isEmpty())
+                {
+                    responseBuilder.addBlockIds(immutableMemtable.getId());
+                    responseBuilder.addFileIds(immutableMemtable.getFileId());
+                    responseBuilder.addBitmaps(getVisibilityBitmapSlice(
+                            fileIdToVisibility.get(immutableMemtable.getFileId()),
+                            immutableMemtable.getStartIndex(), immutableMemtable.getSize()));
+                }
+            }
+            for (ObjectEntry objectEntry : objectEntries)
+            {
+                responseBuilder.addBlockIds(objectEntry.getId());
+                responseBuilder.addFileIds(objectEntry.getFileId());
+                responseBuilder.addBitmaps(getVisibilityBitmapSlice(
+                        fileIdToVisibility.get(objectEntry.getFileId()),
+                        objectEntry.getStartIndex(), objectEntry.getLength()));
+            }
+            return responseBuilder;
         }
-        for (ObjectEntry objectEntry : objectEntries)
+        finally
         {
-            responseBuilder.addBitmaps(getVisibilityBitmapSlice(
-                    fileIdToVisibility.get(objectEntry.getFileId()),
-                    objectEntry.getStartIndex(), objectEntry.getLength()));
+            superVersion.unref();
         }
-
-        // unref super version
-        superVersion.unref();
-
-        return responseBuilder;
     }
 
     /**

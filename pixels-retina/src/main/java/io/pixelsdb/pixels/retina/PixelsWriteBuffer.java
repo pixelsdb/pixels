@@ -333,7 +333,25 @@ public class PixelsWriteBuffer
                         flushMemTable.getStartIndex(), flushMemTable.getSize(), capturedMinCommitTs);
                 objectEntry.ref();
 
-                // update watermark
+                // Install the ObjectEntry before publishing the flush watermark.
+                // The file publisher uses that watermark as permission to clean
+                // entries, so advancing it first can miss a late installation.
+                versionLock.writeLock().lock();
+                try
+                {
+                    this.immutableMemTables.remove(flushMemTable);
+                    this.objectEntries.add(objectEntry);
+
+                    SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
+
+                    SuperVersion oldVersion = this.currentVersion;
+                    this.currentVersion = newVersion;
+                    oldVersion.unref();
+                } finally
+                {
+                    versionLock.writeLock().unlock();
+                }
+
                 synchronized (flushLock)
                 {
                     long nextId = continuousFlushedId.get() + 1;
@@ -349,23 +367,6 @@ public class PixelsWriteBuffer
                     {
                         outOfOrderFlushedIds.add(id);
                     }
-                }
-
-                // update SuperVersion
-                versionLock.writeLock().lock();
-                try
-                {
-                    this.immutableMemTables.remove(flushMemTable);
-                    this.objectEntries.add(objectEntry);
-
-                    SuperVersion newVersion = new SuperVersion(this.activeMemTable, this.immutableMemTables, this.objectEntries);
-
-                    SuperVersion oldVersion = this.currentVersion;
-                    this.currentVersion = newVersion;
-                    oldVersion.unref();
-                } finally
-                {
-                    versionLock.writeLock().unlock();
                 }
 
                 // unref in the end
