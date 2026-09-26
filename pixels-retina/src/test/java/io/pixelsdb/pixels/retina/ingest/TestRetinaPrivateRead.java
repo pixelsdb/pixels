@@ -21,7 +21,13 @@ import io.pixelsdb.pixels.common.ingest.wire.IngestWire;
 import io.pixelsdb.pixels.ingest.IngestProto.*;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -52,6 +58,9 @@ public class TestRetinaPrivateRead
     private static final int JOURNAL_PAYLOAD_LIMIT = 1024;
     private static final long JOURNAL_BYTE_LIMIT = 1024L * 1024L;
     private static final int JOURNAL_RECORD_LIMIT = 100;
+    private static final int GROUP_COMMIT_STREAMS = 8;
+    private static final long GROUP_COMMIT_DELAY_MICROS = 50_000L;
+    private static final long GROUP_COMMIT_TIMEOUT_SECONDS = 10L;
     private static final long READ_LEASE_MILLIS = 60_000L;
     private static final String OWNER = "127.0.0.1:" + PARTICIPANT_PORT;
     private static final byte[] FIRST_PAYLOAD = new byte[] {1};
@@ -70,6 +79,66 @@ public class TestRetinaPrivateRead
             .build();
 
     @TempDir Path directory;
+
+    @Test
+    public void concurrentParticipantSealsShareWalSync() throws Exception
+    {
+        MutableDecisions decisions = new MutableDecisions();
+        Transaction.Builder transaction = Transaction.newBuilder()
+                .setTransactionId(TRANSACTION_ID)
+                .setState(TransactionState.OPEN)
+                .setTable(TABLE)
+                .addEnlistedTables(TABLE);
+        List<MutationBatch> batches = new ArrayList<>();
+        for (int writer = 0; writer < GROUP_COMMIT_STREAMS; writer++) {
+            MutationStreamId stream = stream(FIRST_STATEMENT_ID, FIRST_WRITER_ID + writer);
+            transaction.addStreams(IngestWire.encode(stream));
+            batches.add(batch(stream, FIRST_SEQUENCE, new byte[] {(byte) writer}));
+        }
+        try (LocalMutationJournal journal = new LocalMutationJournal(
+                directory, JOURNAL_PAYLOAD_LIMIT, JOURNAL_BYTE_LIMIT,
+                JOURNAL_RECORD_LIMIT, GROUP_COMMIT_DELAY_MICROS);
+                RetinaIngestParticipant participant = new RetinaIngestParticipant(
+                        OWNER, journal, decisions, new NoOpInstaller(),
+                        new IngestReadPins(READ_LEASE_MILLIS)))
+        {
+            participant.recover();
+            decisions.transaction = transaction.build();
+            for (MutationBatch entry : batches) {
+                participant.append(entry);
+            }
+            long syncsBefore = journal.getSyncCount();
+            CountDownLatch ready = new CountDownLatch(GROUP_COMMIT_STREAMS);
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService executor = Executors.newFixedThreadPool(GROUP_COMMIT_STREAMS);
+            try {
+                List<Future<?>> seals = new ArrayList<>();
+                for (MutationBatch entry : batches) {
+                    seals.add(executor.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        participant.seal(seal(entry.getStreamId(), entry));
+                        return null;
+                    }));
+                }
+                assertTrue(ready.await(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                start.countDown();
+                for (Future<?> result : seals) {
+                    result.get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                }
+                assertTrue(journal.getSyncCount() - syncsBefore < GROUP_COMMIT_STREAMS);
+                for (MutationBatch entry : batches) {
+                    assertEquals(seal(entry.getStreamId(), entry),
+                            journal.getSeal(entry.getStreamId()).orElseThrow(
+                                    () -> new AssertionError("Missing durable stream seal")));
+                }
+            }
+            finally {
+                start.countDown();
+                executor.shutdownNow();
+            }
+        }
+    }
 
     @Test
     public void readsOnlyCompletedStatementsThroughImmutableFrontier() throws Exception

@@ -6,6 +6,8 @@ import java.nio.file.*;
 
 /** Separate backend process: connector dependencies must not contaminate Trino's HTTP runtime. */
 public final class SqlIngestFixtureMain {
+    private static final long STATUS_EXPORT_INTERVAL_MILLIS = 50L;
+
     public static void main(String[] args) {
         int exitCode = 0;
         try {
@@ -27,13 +29,9 @@ public final class SqlIngestFixtureMain {
             fixture.exportStatus(control.resolve("status.properties"));
             Files.write(control.resolve("ready"), new byte[0]);
             System.out.println("PIXELS_SQL_FIXTURE_READY " + fixture.root);
-            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MINUTES.toNanos(10);
-            while (!Files.exists(control.resolve("stop")) && System.nanoTime() < deadline) {
+            while (!Files.exists(control.resolve("stop"))) {
                 fixture.exportStatus(control.resolve("status.properties"));
-                Thread.sleep(50);
-            }
-            if (!Files.exists(control.resolve("stop"))) {
-                throw new IllegalStateException("SQL fixture lifetime exceeded without shutdown request");
+                Thread.sleep(STATUS_EXPORT_INTERVAL_MILLIS);
             }
             fixture.exportStatus(control.resolve("status.properties"));
         }

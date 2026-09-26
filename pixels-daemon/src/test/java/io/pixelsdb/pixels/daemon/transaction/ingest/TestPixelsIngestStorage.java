@@ -400,6 +400,7 @@ public class TestPixelsIngestStorage {
                     putCalls = new AtomicLong();
             AtomicBoolean failOnce = new AtomicBoolean(true);
             AtomicBoolean rejectCheckpointFlush = new AtomicBoolean();
+            AtomicInteger locationLookupCalls = new AtomicInteger();
             IndexService delegate = LocalIndexService.Instance();
             IndexService index =
                     (IndexService)
@@ -407,6 +408,9 @@ public class TestPixelsIngestStorage {
                                     getClass().getClassLoader(),
                                     new Class<?>[] {IndexService.class},
                                     (proxy, method, args) -> {
+                                        if (method.getName().equals("lookupRowLocations")) {
+                                            locationLookupCalls.incrementAndGet();
+                                        }
                                         if (method.getName().equals("allocateRowIdBatch")) {
                                             int count = (Integer) args[1];
                                             allocationCalls.incrementAndGet();
@@ -714,6 +718,7 @@ public class TestPixelsIngestStorage {
                     "Coordinator absence is the durable acknowledgement that prunes this checkpoint");
 
             long bufferedBeforeFile = bufferedRows(buffer);
+            int lookupsBeforeFile = locationLookupCalls.get();
             long objectFilesBefore = countFiles(root.resolve("objects"));
             Set<Long> regularBeforeFile = catalog.files.values().stream()
                     .filter(f -> f.getType() == MetadataProto.File.Type.REGULAR)
@@ -757,6 +762,8 @@ public class TestPixelsIngestStorage {
                     "Polling an earlier contribution must accept a later written file prefix");
             assertTrue(installer.install(
                     nextFileTransaction, Collections.singletonList(nextFileBatch), false, true));
+            assertEquals(lookupsBeforeFile, locationLookupCalls.get(),
+                    "Fresh FILE spans and completion polls must not look up individual rowIds");
             assertEquals(bufferedBeforeFile, bufferedRows(buffer),
                     "FILE must not install rows into the shared MemTable");
             assertEquals(objectFilesBefore, countFiles(root.resolve("objects")),

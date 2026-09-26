@@ -26,13 +26,22 @@ import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 /** The same contract cases run under JUnit or directly with a JDK. */
 public final class LocalMutationJournalContract
 {
     private static final long STATEMENT_ID = 1L;
+    private static final int GROUP_COMMIT_STREAMS = 8;
+    private static final long GROUP_COMMIT_DELAY_MICROS = 50_000L;
+    private static final long CACHED_BATCH_OVERHEAD_BYTES = 128L;
 
     private LocalMutationJournalContract() {}
 
@@ -57,6 +66,39 @@ public final class LocalMutationJournalContract
                 check(journal.getSeal(a.getStreamId()).get().equals(seal(a)), "Lost seal");
                 check(Arrays.equals(journal.readSealedBatch(a.getStreamId(), 0).getPayload(), a.getPayload()), "Payload mismatch");
                 check(journal.readSealedBatch(b.getStreamId(), 1).getPayload()[0] == 3, "Interleaved replay mismatch");
+            }
+        });
+    }
+
+    public static void boundedPrivateCacheFallsBackToWal() throws Exception
+    {
+        withDirectory(dir -> {
+            MutationBatch first = batch(id(101, 1), 0, 1, new byte[]{1});
+            MutationBatch second = batch(id(102, 1), 0, 1, new byte[]{2});
+            long oneBatchBudget = first.getPayloadBytes() + CACHED_BATCH_OVERHEAD_BYTES;
+            try (LocalMutationJournal journal = new LocalMutationJournal(
+                    dir, 1024, 1_000_000, 1000, 0L, oneBatchBudget))
+            {
+                journal.append(first);
+                expect(IOException.class, () -> journal.readSealedBatch(first.getStreamId(), 0));
+                journal.seal(seal(first));
+                check(journal.readSealedBatch(first.getStreamId(), 0) == first,
+                        "Durable batch was needlessly reread from WAL");
+                journal.append(second);
+                journal.seal(seal(second));
+                check(journal.getCachedBatchCount() == 1, "Cache exceeded batch budget");
+                check(journal.getCachedPayloadBytes() <= oneBatchBudget, "Cache exceeded byte budget");
+                check(journal.readSealedBatch(first.getStreamId(), 0) != first,
+                        "Evicted batch did not fall back to WAL");
+                journal.discardAbortedTransaction(101);
+                expect(IOException.class, () -> journal.readSealedBatch(first.getStreamId(), 0));
+            }
+            try (LocalMutationJournal recovered = new LocalMutationJournal(
+                    dir, 1024, 1_000_000, 1000, 0L, oneBatchBudget))
+            {
+                check(recovered.getCachedBatchCount() == 0, "Recovered cache was not empty");
+                check(Arrays.equals(recovered.readSealedBatch(second.getStreamId(), 0).getPayload(),
+                        second.getPayload()), "Recovery lost uncached WAL payload");
             }
         });
     }
@@ -281,6 +323,61 @@ public final class LocalMutationJournalContract
         });
     }
 
+    public static void concurrentSealsShareOneDurabilityBarrier() throws Exception
+    {
+        withDirectory(dir -> {
+            List<MutationBatch> batches = new ArrayList<>();
+            try (LocalMutationJournal journal = new LocalMutationJournal(
+                    dir, 1024, 1_000_000, 1000, GROUP_COMMIT_DELAY_MICROS))
+            {
+                for (int stream = 0; stream < GROUP_COMMIT_STREAMS; stream++)
+                {
+                    MutationBatch batch = batch(id(100 + stream, 1), 0, 1,
+                            new byte[] {(byte) stream});
+                    journal.append(batch);
+                    batches.add(batch);
+                }
+                long before = journal.getSyncCount();
+                CountDownLatch ready = new CountDownLatch(GROUP_COMMIT_STREAMS);
+                CountDownLatch start = new CountDownLatch(1);
+                ExecutorService executor = Executors.newFixedThreadPool(GROUP_COMMIT_STREAMS);
+                List<Future<?>> seals = new ArrayList<>();
+                try
+                {
+                    for (MutationBatch batch : batches)
+                    {
+                        seals.add(executor.submit(() -> {
+                            ready.countDown();
+                            start.await();
+                            journal.seal(seal(batch));
+                            return null;
+                        }));
+                    }
+                    ready.await();
+                    start.countDown();
+                    for (Future<?> seal : seals)
+                    {
+                        seal.get();
+                    }
+                }
+                finally
+                {
+                    executor.shutdownNow();
+                }
+                check(journal.getSyncCount() == before + 1L,
+                        "Concurrent seals did not share one durability barrier");
+            }
+            try (LocalMutationJournal recovered = open(dir))
+            {
+                for (MutationBatch batch : batches)
+                {
+                    check(recovered.getSeal(batch.getStreamId()).isPresent(),
+                            "Group-committed seal was not recovered");
+                }
+            }
+        });
+    }
+
     public static void syncDoesNotSeal() throws Exception
     {
         withDirectory(dir -> {
@@ -328,13 +425,15 @@ public final class LocalMutationJournalContract
 
     public static void main(String[] args) throws Exception
     {
-        roundTripAndStreamIsolation(); duplicatesAndDefensiveCopies(); gapsSchemaAndSealValidation();
+        roundTripAndStreamIsolation(); boundedPrivateCacheFallsBackToWal();
+        duplicatesAndDefensiveCopies(); gapsSchemaAndSealValidation();
         abortFencesOldAndNewStreams(); unacknowledgedSuffixIsDiscarded(); acknowledgedTruncationFailsClosed();
         acknowledgedCorruptionFailsClosed(); corruptMarkerFailsClosed(); missingWalFailsClosed();
         missingMarkerFailsClosed(); exclusiveOwner(); admissionLimits(); postOpenCorruptionPoisonsJournal();
-        manyTransactionsShareOneWal(); syncDoesNotSeal(); mutationKindsAreIndependent();
+        manyTransactionsShareOneWal(); concurrentSealsShareOneDurabilityBarrier();
+        syncDoesNotSeal(); mutationKindsAreIndependent();
         incompleteFrameInDurablePrefixFailsClosed();
-        System.out.println("LocalMutationJournalContract: 17 cases passed");
+        System.out.println("LocalMutationJournalContract: 19 cases passed");
     }
 
     private static LocalMutationJournal open(Path dir) throws IOException

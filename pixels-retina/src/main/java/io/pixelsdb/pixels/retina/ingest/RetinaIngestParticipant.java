@@ -160,13 +160,17 @@ public final class RetinaIngestParticipant implements Closeable {
         journal.append(batch);
     }
 
-    public synchronized MutationStreamSeal seal(MutationStreamSeal seal) throws Exception {
-        serving();
-        Transaction tx = decisions.get(seal.getStreamId().getTransactionId());
-        owns(tx, seal.getStreamId());
-        if (tx.getState() == TransactionState.ABORTED) {
-            throw new IOException("Transaction aborted");
+    public MutationStreamSeal seal(MutationStreamSeal seal) throws Exception {
+        synchronized (this) {
+            serving();
+            Transaction tx = decisions.get(seal.getStreamId().getTransactionId());
+            owns(tx, seal.getStreamId());
+            if (tx.getState() == TransactionState.ABORTED) {
+                throw new IOException("Transaction aborted");
+            }
         }
+        // The journal serializes stream state and syncs a durable prefix. Do not hold the
+        // participant lock through that sync: independent streams can share one WAL fsync.
         journal.seal(seal);
         return seal;
     }
@@ -390,15 +394,14 @@ public final class RetinaIngestParticipant implements Closeable {
         }
         for (Transaction tx : transactions) {
             if (installer.recoveredByCheckpoint(tx)) {
-                journal.compactCheckpointedTransactions(
-                        Collections.singleton(tx.getTransactionId()));
+                journal.checkpointTransaction(tx.getTransactionId());
                 continue;
             }
             if (installer.checkpoint(tx, batches(tx))) {
-                journal.compactCheckpointedTransactions(
-                        Collections.singleton(tx.getTransactionId()));
+                journal.checkpointTransaction(tx.getTransactionId());
             }
         }
+        journal.compactRetiredTransactions();
     }
 
     public void checkpoint(long transactionId) throws Exception {
@@ -416,7 +419,7 @@ public final class RetinaIngestParticipant implements Closeable {
                 && !installer.checkpoint(tx, batches(tx))) {
             throw new IOException("Transaction recovery checkpoint is not durable yet");
         }
-        journal.compactCheckpointedTransactions(Collections.singleton(transactionId));
+        journal.checkpointTransaction(transactionId);
     }
 
     public synchronized ReadPin pinRead(ReadPin request) throws Exception {

@@ -8,6 +8,8 @@ package io.pixelsdb.pixels.common.ingest.rpc;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.TimeUnit;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -22,6 +24,10 @@ public class TestIngestClient
             assertTrue(client.participant("127.0.0.1:2")
                     .getCallOptions().isWaitForReady());
             assertFalse(client.coordinator().getCallOptions().isWaitForReady());
+            assertTrue(client.coordinator(2, TimeUnit.SECONDS)
+                    .getCallOptions().getDeadline().timeRemaining(TimeUnit.MILLISECONDS) > 1_000);
+            assertTrue(client.participant("127.0.0.1:2", 2, TimeUnit.SECONDS)
+                    .getCallOptions().getDeadline().timeRemaining(TimeUnit.MILLISECONDS) > 1_000);
         }
     }
 }

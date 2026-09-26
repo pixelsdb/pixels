@@ -36,7 +36,8 @@ import java.util.function.LongSupplier;
 
 /**
  * Single-owner LOCAL-durability transaction coordinator. The locked state volume is
- * authoritative. No memory update or remote installation precedes a durable decision.
+ * authoritative. A COMMIT is neither reported nor remotely installed before its decision
+ * reaches the synchronized state-log prefix.
  * Endpoint topology is frozen in the first publication snapshot and cannot migrate silently.
  */
 public final class DurableIngestCoordinator implements Closeable {
@@ -54,6 +55,8 @@ public final class DurableIngestCoordinator implements Closeable {
     private static final int DEFAULT_INSTALLATION_THREADS = 16;
     private static final long MINIMUM_RETIREMENT_TIMESTAMP_MILLIS = 1L;
     private static final long RECONCILIATION_INTERVAL_MILLIS = TimeUnit.SECONDS.toMillis(1L);
+    private static final long DEFAULT_GROUP_COMMIT_DELAY_MICROS = 0L;
+    private static final long MAX_GROUP_COMMIT_DELAY_MICROS = TimeUnit.SECONDS.toMicros(1L);
 
     public interface Tables {
         TableSpec load(String schema, String table) throws Exception;
@@ -75,9 +78,20 @@ public final class DurableIngestCoordinator implements Closeable {
     }
 
     public interface StateStore extends Closeable {
+        enum Durability {
+            DEFERRED,
+            SYNCHRONIZED
+        }
+
         CoordinatorSnapshot read() throws IOException;
 
-        void store(CoordinatorSnapshot snapshot) throws IOException;
+        void store(CoordinatorSnapshot snapshot, Durability durability) throws IOException;
+
+        void synchronize() throws IOException;
+
+        default void store(CoordinatorSnapshot snapshot) throws IOException {
+            store(snapshot, Durability.SYNCHRONIZED);
+        }
     }
 
     private static final class AtomicSnapshotStore implements StateStore {
@@ -94,9 +108,12 @@ public final class DurableIngestCoordinator implements Closeable {
         }
 
         @Override
-        public void store(CoordinatorSnapshot value) throws IOException {
+        public void store(CoordinatorSnapshot value, Durability durability) throws IOException {
             delegate.store(value.toByteArray());
         }
+
+        @Override
+        public void synchronize() {}
 
         @Override
         public void close() throws IOException {
@@ -115,6 +132,7 @@ public final class DurableIngestCoordinator implements Closeable {
     private final int maxStreams;
     private final long terminalRetentionMillis;
     private final int maxTerminalTransactions;
+    private final long groupCommitDelayNanos;
     private final Object publisher = new Object();
     private final ScheduledExecutorService recovery;
     private final ExecutorService installationExecutor;
@@ -122,6 +140,10 @@ public final class DurableIngestCoordinator implements Closeable {
     private final Set<Long> installationContributed = new HashSet<>();
     private final Set<Long> installationReady = new HashSet<>();
     private CoordinatorSnapshot snapshot;
+    private long stateSequence;
+    private long synchronizedSequence;
+    private boolean stateSyncInProgress;
+    private IOException persistenceFailure;
     private long forceFileThroughTimestamp;
     private volatile boolean closed;
 
@@ -192,6 +214,27 @@ public final class DurableIngestCoordinator implements Closeable {
             int maxTerminalTransactions,
             int installationThreads)
             throws IOException {
+        this(store, tables, participants, ids, clock, baselineTimestamp, leaseMillis,
+                maxTransactions, maxStreams, terminalRetentionMillis,
+                maxTerminalTransactions, installationThreads,
+                DEFAULT_GROUP_COMMIT_DELAY_MICROS);
+    }
+
+    public DurableIngestCoordinator(
+            StateStore store,
+            Tables tables,
+            Participants participants,
+            LongSupplier ids,
+            Clock clock,
+            long baselineTimestamp,
+            long leaseMillis,
+            int maxTransactions,
+            int maxStreams,
+            long terminalRetentionMillis,
+            int maxTerminalTransactions,
+            int installationThreads,
+            long groupCommitDelayMicros)
+            throws IOException {
         this.store = store;
         this.tables = tables;
         this.participants = participants;
@@ -202,11 +245,14 @@ public final class DurableIngestCoordinator implements Closeable {
         this.maxStreams = maxStreams;
         if (terminalRetentionMillis < leaseMillis
                 || maxTerminalTransactions <= 0
-                || installationThreads <= 0) {
-            throw new IllegalArgumentException("Invalid terminal transaction retention");
+                || installationThreads <= 0
+                || groupCommitDelayMicros < 0L
+                || groupCommitDelayMicros > MAX_GROUP_COMMIT_DELAY_MICROS) {
+            throw new IllegalArgumentException("Invalid coordinator limits");
         }
         this.terminalRetentionMillis = terminalRetentionMillis;
         this.maxTerminalTransactions = maxTerminalTransactions;
+        this.groupCommitDelayNanos = TimeUnit.MICROSECONDS.toNanos(groupCommitDelayMicros);
         CoordinatorSnapshot recovered = store.read();
         if (recovered == null) {
             snapshot =
@@ -215,7 +261,9 @@ public final class DurableIngestCoordinator implements Closeable {
                             .setPublishedTimestamp(baselineTimestamp)
                             .setLastCommitTimestamp(baselineTimestamp)
                             .build();
-            save(snapshot);
+            store.store(snapshot);
+            stateSequence = 1L;
+            synchronizedSequence = stateSequence;
         } else {
             snapshot = recovered;
             validateRecoveredSnapshot(snapshot);
@@ -261,14 +309,86 @@ public final class DurableIngestCoordinator implements Closeable {
     }
 
     private void checkOpen() throws IOException {
+        if (persistenceFailure != null) {
+            throw new IOException("Coordinator state unavailable; recovery required",
+                    persistenceFailure);
+        }
         if (closed) {
             throw new IOException("Coordinator closed");
         }
     }
 
     private void save(CoordinatorSnapshot value) throws IOException {
-        store.store(value);
+        appendState(value);
+        synchronizeState(stateSequence);
+    }
+
+    private void appendState(CoordinatorSnapshot value) throws IOException {
+        if (!Thread.holdsLock(this)) {
+            throw new IllegalStateException("Coordinator state lock is not held");
+        }
+        store.store(value, StateStore.Durability.DEFERRED);
         snapshot = value;
+        stateSequence = Math.addExact(stateSequence, 1L);
+    }
+
+    private void saveDeferred(CoordinatorSnapshot value) throws IOException {
+        appendState(value);
+    }
+
+    private void synchronizeState(long requiredSequence) throws IOException {
+        if (!Thread.holdsLock(this)) {
+            throw new IllegalStateException("Coordinator state lock is not held");
+        }
+        boolean interrupted = false;
+        try {
+            while (synchronizedSequence < requiredSequence) {
+                if (persistenceFailure != null) {
+                    throw new IOException("Coordinator state synchronization failed",
+                            persistenceFailure);
+                }
+                if (!stateSyncInProgress) {
+                    stateSyncInProgress = true;
+                    try {
+                        if (groupCommitDelayNanos > 0L) {
+                            long millis = TimeUnit.NANOSECONDS.toMillis(groupCommitDelayNanos);
+                            int nanos = (int) (groupCommitDelayNanos
+                                    - TimeUnit.MILLISECONDS.toNanos(millis));
+                            try {
+                                wait(millis, nanos);
+                            }
+                            catch (InterruptedException ignored) {
+                                interrupted = true;
+                            }
+                        }
+                        long synchronizedThrough = stateSequence;
+                        store.synchronize();
+                        synchronizedSequence = synchronizedThrough;
+                    }
+                    catch (IOException e) {
+                        persistenceFailure = e;
+                        throw e;
+                    }
+                    finally {
+                        stateSyncInProgress = false;
+                        notifyAll();
+                    }
+                }
+                else {
+                    try {
+                        wait();
+                    }
+                    catch (InterruptedException ignored) {
+                        interrupted = true;
+                    }
+                }
+            }
+        }
+        finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     private static void validateRecoveredSnapshot(CoordinatorSnapshot recovered)
@@ -637,6 +757,13 @@ public final class DurableIngestCoordinator implements Closeable {
                         .build());
     }
 
+    private void replaceDeferred(Transaction value) throws IOException {
+        saveDeferred(
+                snapshot.toBuilder()
+                        .setTransactions(position(value.getTransactionId()), value)
+                        .build());
+    }
+
     private long expiry() {
         return Math.addExact(clock.millis(), leaseMillis);
     }
@@ -647,7 +774,7 @@ public final class DurableIngestCoordinator implements Closeable {
         }
     }
 
-    public synchronized Transaction get(long id) throws IOException {
+    private Transaction transaction(long id) throws IOException {
         checkOpen();
         for (Transaction transaction : snapshot.getTransactionsList()) {
             if (transaction.getTransactionId() == id) {
@@ -666,11 +793,28 @@ public final class DurableIngestCoordinator implements Closeable {
         throw new IOException("Unknown ingest transaction " + id + "; absence is not ABORT");
     }
 
+    public synchronized Transaction get(long id) throws IOException {
+        synchronizeState(stateSequence);
+        return transaction(id);
+    }
+
     public synchronized long publishedTimestamp() {
+        try {
+            synchronizeState(stateSequence);
+        }
+        catch (IOException e) {
+            throw new IllegalStateException("Cannot read durable published timestamp", e);
+        }
         return snapshot.getPublishedTimestamp();
     }
 
     public synchronized long lastCommitTimestamp() {
+        try {
+            synchronizeState(stateSequence);
+        }
+        catch (IOException e) {
+            throw new IllegalStateException("Cannot read durable commit timestamp", e);
+        }
         return snapshot.getLastCommitTimestamp();
     }
 
@@ -710,6 +854,7 @@ public final class DurableIngestCoordinator implements Closeable {
             for (Transaction existing : snapshot.getTransactionsList()) {
                 if (existing.getRequestId().equals(request.getRequestId())) {
                     validateBeginRetry(existing, request);
+                    synchronizeState(stateSequence);
                     return existing;
                 }
             }
@@ -717,6 +862,7 @@ public final class DurableIngestCoordinator implements Closeable {
                 if (terminal.getTransaction().getRequestId().equals(request.getRequestId())) {
                     Transaction existing = terminalTransaction(terminal);
                     validateBeginRetry(existing, request);
+                    synchronizeState(stateSequence);
                     return existing;
                 }
             }
@@ -730,6 +876,7 @@ public final class DurableIngestCoordinator implements Closeable {
             for (Transaction existing : snapshot.getTransactionsList()) {
                 if (existing.getRequestId().equals(request.getRequestId())) {
                     validateBeginRetry(existing, request);
+                    synchronizeState(stateSequence);
                     return existing;
                 }
             }
@@ -737,6 +884,7 @@ public final class DurableIngestCoordinator implements Closeable {
                 if (terminal.getTransaction().getRequestId().equals(request.getRequestId())) {
                     Transaction existing = terminalTransaction(terminal);
                     validateBeginRetry(existing, request);
+                    synchronizeState(stateSequence);
                     return existing;
                 }
             }
@@ -805,7 +953,7 @@ public final class DurableIngestCoordinator implements Closeable {
         validateStatementIdentity(request.getStatementId(), request.getQueryId(),
                 request.getOrdinal(), request.getReadOwnThroughOrdinal());
         synchronized (this) {
-            Transaction tx = get(request.getTransactionId());
+            Transaction tx = transaction(request.getTransactionId());
             boolean existingStatement = false;
             for (StatementManifest statement : tx.getStatementsList()) {
                 if (statement.getStatementId() == request.getStatementId()) {
@@ -842,7 +990,7 @@ public final class DurableIngestCoordinator implements Closeable {
         }
         TableSpec descriptor = tables.load(request.getSchemaName(), request.getTableName());
         synchronized (this) {
-            Transaction tx = get(request.getTransactionId());
+            Transaction tx = transaction(request.getTransactionId());
             int existingPosition = -1;
             StatementManifest existingStatement = null;
             for (int index = 0; index < tx.getStatementsCount(); index++) {
@@ -942,6 +1090,7 @@ public final class DurableIngestCoordinator implements Closeable {
         synchronized (this) {
             checkOpen();
             pinRoutes(current);
+            synchronizeState(stateSequence);
             return Publication.newBuilder()
                     .setPublishedTimestamp(snapshot.getPublishedTimestamp())
                     .addAllRoutes(snapshot.getRoutesList())
@@ -956,7 +1105,7 @@ public final class DurableIngestCoordinator implements Closeable {
                 || request.getRequestId().length() > MAX_IDENTITY_CHARACTERS) {
             throw new IllegalArgumentException("A bounded writer request id is required");
         }
-        Transaction tx = get(request.getTransactionId());
+        Transaction tx = transaction(request.getTransactionId());
         if (tx.getState() == TransactionState.ABORTED) {
             throw new IOException("Transaction aborted");
         }
@@ -967,6 +1116,7 @@ public final class DurableIngestCoordinator implements Closeable {
                         || writer.getStatementId() != request.getStatementId()) {
                     throw new IOException("Writer request reused with a different task identity");
                 }
+                synchronizeState(stateSequence);
                 return writer;
             }
             maximum = Math.max(maximum, writer.getWriterId());
@@ -1007,7 +1157,7 @@ public final class DurableIngestCoordinator implements Closeable {
     }
 
     public synchronized Transaction register(StreamId stream) throws IOException {
-        Transaction tx = get(stream.getTransactionId());
+        Transaction tx = transaction(stream.getTransactionId());
         IngestWire.decode(stream);
         if (stream.getKind() != MutationKind.APPEND_ROWS) {
             throw new IOException("Stream does not match the INSERT transaction");
@@ -1029,6 +1179,7 @@ public final class DurableIngestCoordinator implements Closeable {
             if (tx.getState() == TransactionState.ABORTED) {
                 throw new IOException("Transaction aborted");
             }
+            synchronizeState(stateSequence);
             return tx;
         }
         if (tx.getState() != TransactionState.OPEN) {
@@ -1039,13 +1190,16 @@ public final class DurableIngestCoordinator implements Closeable {
             throw new IOException("Transaction stream limit exceeded");
         }
         tx = tx.toBuilder().addStreams(stream).setExpiresAtMillis(expiry()).build();
-        replace(tx);
+        // Registration is replayable admission state. Statement completion supplies the
+        // durability barrier for its exact stream manifest.
+        replaceDeferred(tx);
         return tx;
     }
 
     public synchronized Transaction touch(long id) throws IOException {
-        Transaction tx = get(id);
+        Transaction tx = transaction(id);
         if (tx.getState() == TransactionState.ABORTED || IngestWire.committed(tx)) {
+            synchronizeState(stateSequence);
             return tx;
         }
         live(tx);
@@ -1067,7 +1221,7 @@ public final class DurableIngestCoordinator implements Closeable {
 
     public synchronized Transaction completeStatement(CompleteStatementRequest request)
             throws IOException {
-        Transaction tx = get(request.getTransactionId());
+        Transaction tx = transaction(request.getTransactionId());
         if (tx.getState() != TransactionState.OPEN || tx.getRollbackOnly()) {
             throw new IOException("Transaction no longer accepts statement completion");
         }
@@ -1089,6 +1243,7 @@ public final class DurableIngestCoordinator implements Closeable {
             if (!statement.getSealsList().equals(seals)) {
                 throw new IOException("Completed statement manifest mismatch");
             }
+            synchronizeState(stateSequence);
             return tx;
         }
         Set<StreamId> expected = new HashSet<>();
@@ -1130,7 +1285,7 @@ public final class DurableIngestCoordinator implements Closeable {
         Transaction tx;
         List<StreamSeal> seals = canonical(request.getSealsList());
         synchronized (this) {
-            tx = get(request.getTransactionId());
+            tx = transaction(request.getTransactionId());
             List<StreamSeal> completed = canonical(tx.getSealsList());
             if (!seals.isEmpty() && !seals.equals(completed)) {
                 throw new IOException("Transaction manifest differs from completed statements");
@@ -1147,6 +1302,7 @@ public final class DurableIngestCoordinator implements Closeable {
                 throw new IOException("Transaction aborted");
             }
             if (IngestWire.committed(tx)) {
+                synchronizeState(stateSequence);
                 return tx;
             }
             if (tx.getState() != TransactionState.OPEN) {
@@ -1154,6 +1310,9 @@ public final class DurableIngestCoordinator implements Closeable {
                     throw new IOException("Sealed manifest mismatch");
                 }
                 if (tx.getState() == TransactionState.PREPARED || IngestWire.committed(tx)) {
+                    if (IngestWire.committed(tx)) {
+                        synchronizeState(stateSequence);
+                    }
                     return tx;
                 }
             } else {
@@ -1176,7 +1335,8 @@ public final class DurableIngestCoordinator implements Closeable {
                                 .setState(TransactionState.SEALED)
                                 .setExpiresAtMillis(expiry())
                                 .build();
-                replace(tx);
+                // The participant Prepare and the later decision are the durable boundaries.
+                replaceDeferred(tx);
             }
         }
         List<PrepareToken> tokens = new ArrayList<>();
@@ -1190,11 +1350,14 @@ public final class DurableIngestCoordinator implements Closeable {
             tokens.add(token);
         }
         synchronized (this) {
-            Transaction current = get(tx.getTransactionId());
+            Transaction current = transaction(tx.getTransactionId());
             if (current.getState() == TransactionState.ABORTED) {
                 throw new IOException("Transaction aborted during Prepare");
             }
             if (current.getState() == TransactionState.PREPARED || IngestWire.committed(current)) {
+                if (IngestWire.committed(current)) {
+                    synchronizeState(stateSequence);
+                }
                 return current;
             }
             live(current);
@@ -1205,15 +1368,17 @@ public final class DurableIngestCoordinator implements Closeable {
                             .setState(TransactionState.PREPARED)
                             .setExpiresAtMillis(expiry())
                             .build();
-            replace(tx);
+            // COMMIT synchronizes this token record and its decision in one WAL prefix.
+            replaceDeferred(tx);
             return tx;
         }
     }
 
     public Transaction commit(long id) throws Exception {
         synchronized (this) {
-            Transaction tx = get(id);
+            Transaction tx = transaction(id);
             if (tx.getState() == TransactionState.PUBLISHED) {
+                synchronizeState(stateSequence);
                 return tx;
             }
             if (tx.getState() == TransactionState.ABORTED) {
@@ -1347,7 +1512,7 @@ public final class DurableIngestCoordinator implements Closeable {
                     continue;
                 }
                 synchronized (this) {
-                    Transaction current = get(next.getTransactionId());
+                    Transaction current = transaction(next.getTransactionId());
                     if (current.getState() != TransactionState.COMMIT_DECIDED) {
                         throw new IOException("Invalid installation transition");
                     }
@@ -1452,6 +1617,7 @@ public final class DurableIngestCoordinator implements Closeable {
         long boundary;
         synchronized (this) {
             checkOpen();
+            synchronizeState(stateSequence);
             boundary = snapshot.getLastCommitTimestamp();
         }
         if (request.getDeadlineMillis() <= clock.millis()) {
@@ -1475,8 +1641,9 @@ public final class DurableIngestCoordinator implements Closeable {
     public Transaction abort(long id) throws Exception {
         Transaction tx;
         synchronized (this) {
-            tx = get(id);
+            tx = transaction(id);
             if (IngestWire.committed(tx)) {
+                synchronizeState(stateSequence);
                 return tx;
             }
             if (tx.getState() != TransactionState.ABORTED) {
@@ -1493,6 +1660,7 @@ public final class DurableIngestCoordinator implements Closeable {
     }
 
     public synchronized TransactionList list(String owner) throws IOException {
+        synchronizeState(stateSequence);
         TransactionList.Builder result =
                 TransactionList.newBuilder()
                         .setPublishedTimestamp(snapshot.getPublishedTimestamp());
@@ -1612,7 +1780,27 @@ public final class DurableIngestCoordinator implements Closeable {
         installationExecutor.shutdownNow();
         synchronized (publisher) {
             synchronized (this) {
-                store.close();
+                IOException failure = null;
+                try {
+                    synchronizeState(stateSequence);
+                }
+                catch (IOException e) {
+                    failure = e;
+                }
+                try {
+                    store.close();
+                }
+                catch (IOException e) {
+                    if (failure == null) {
+                        failure = e;
+                    }
+                    else {
+                        failure.addSuppressed(e);
+                    }
+                }
+                if (failure != null) {
+                    throw failure;
+                }
             }
         }
     }

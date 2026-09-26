@@ -29,6 +29,12 @@ public class TestLocalMutationJournal
     }
 
     @Test
+    public void boundedPrivateCacheFallsBackToWal() throws Exception
+    {
+        LocalMutationJournalContract.boundedPrivateCacheFallsBackToWal();
+    }
+
+    @Test
     public void duplicatesAndDefensiveCopies() throws Exception
     {
         LocalMutationJournalContract.duplicatesAndDefensiveCopies();
@@ -104,6 +110,12 @@ public class TestLocalMutationJournal
     public void manyTransactionsShareOneWal() throws Exception
     {
         LocalMutationJournalContract.manyTransactionsShareOneWal();
+    }
+
+    @Test
+    public void concurrentSealsShareOneDurabilityBarrier() throws Exception
+    {
+        LocalMutationJournalContract.concurrentSealsShareOneDurabilityBarrier();
     }
 
     @Test

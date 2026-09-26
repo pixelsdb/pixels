@@ -224,12 +224,51 @@ public final class LocalMutationJournalGcContract
             { check(journal.readSealedBatch(deletion.getStreamId(), 0).getStreamId().equals(deletion.getStreamId()), "Lost delete identity"); }
         });
     }
+    public static void checkpointFenceSurvivesDeferredCompaction() throws Exception
+    {
+        directory(dir -> {
+            MutationBatch first = batch(301, 0), second = batch(302, 0), third = batch(303, 0);
+            try (LocalMutationJournal journal = open(dir))
+            {
+                appendSealed(journal, first);
+                appendSealed(journal, second);
+                appendSealed(journal, third);
+                long before = journal.getJournalBytes();
+                journal.checkpointTransaction(301);
+                journal.checkpointTransaction(301);
+                fails(() -> journal.append(first));
+                check(journal.getJournalBytes() > before, "Checkpoint should append a fence before reclamation");
+                check(journal.compactRetiredTransactions() == 0, "Rewrote more live payload than reclaimed");
+                check(journal.getGeneration() == 0, "Premature WAL generation rewrite");
+            }
+            try (LocalMutationJournal journal = open(dir))
+            {
+                fails(() -> journal.readSealedBatch(first.getStreamId(), 0));
+                fails(() -> journal.append(first));
+                check(Arrays.equals(journal.readSealedBatch(third.getStreamId(), 0).getDigest(),
+                        third.getDigest()), "Deferred GC lost a live batch");
+                journal.checkpointTransaction(302);
+                check(journal.compactRetiredTransactions() > first.getPayloadBytes(),
+                        "Grouped checkpoint did not reclaim retired payloads");
+                check(journal.getGeneration() == 1, "Checkpoint group requires one rewrite");
+                journal.checkpointTransaction(303);
+            }
+            try (LocalMutationJournal journal = open(dir))
+            {
+                fails(() -> journal.append(third));
+                check(journal.compactRetiredTransactions() > 0, "Recovery did not reclaim the fenced tail");
+                check(journal.getCheckpointedTransactions().size() == 3, "Reclamation lost terminal fences");
+            }
+        });
+    }
+
     public static void main(String[] args) throws Exception
     {
         collectsPayloadButKeepsIdentityFence(); abortOnlyReclamation(); openStreamIsPreserved();
         crashAtEveryPublicationBoundary(); lockSurvivesGenerationSwitch();
         corruptSelectedGenerationNeverFallsBack(); multipleCyclesAndAdmissionRecovery();
         differentTablesAndKindsArePreserved();
-        System.out.println("Journal GC contract: 12 cases passed (including 5 crash boundaries)");
+        checkpointFenceSurvivesDeferredCompaction();
+        System.out.println("Journal GC contract: 13 cases passed (including 5 crash boundaries)");
     }
 }

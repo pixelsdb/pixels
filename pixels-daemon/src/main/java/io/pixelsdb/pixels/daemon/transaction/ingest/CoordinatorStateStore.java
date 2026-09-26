@@ -97,9 +97,11 @@ public final class CoordinatorStateStore implements DurableIngestCoordinator.Sta
     }
 
     @Override
-    public synchronized void store(CoordinatorSnapshot value) throws IOException
+    public synchronized void store(CoordinatorSnapshot value, Durability durability)
+            throws IOException
     {
         ensureOpen();
+        java.util.Objects.requireNonNull(durability, "durability");
         CoordinatorMutation mutation = mutation(current, value);
         byte[] body = mutation.toByteArray();
         int frameBytes = Math.addExact(FRAME_HEADER_BYTES, body.length);
@@ -119,12 +121,30 @@ public final class CoordinatorStateStore implements DurableIngestCoordinator.Sta
         try
         {
             writeFully(journal, frame);
-            journal.force(true);
+            if (durability == Durability.SYNCHRONIZED)
+            {
+                journal.force(true);
+            }
             current = value;
             if (journal.size() >= compactionBytes)
             {
                 compact();
             }
+        }
+        catch (IOException e)
+        {
+            failed = true;
+            throw e;
+        }
+    }
+
+    @Override
+    public synchronized void synchronize() throws IOException
+    {
+        ensureOpen();
+        try
+        {
+            journal.force(true);
         }
         catch (IOException e)
         {
@@ -391,6 +411,10 @@ public final class CoordinatorStateStore implements DurableIngestCoordinator.Sta
         IOException failure = null;
         try
         {
+            if (!failed)
+            {
+                journal.force(true);
+            }
             journal.close();
         }
         catch (IOException e)

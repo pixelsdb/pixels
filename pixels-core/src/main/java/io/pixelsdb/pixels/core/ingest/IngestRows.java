@@ -84,10 +84,33 @@ public final class IngestRows {
     }
 
     public static void validate(TableSpec table, byte[][] row) throws IOException {
+        new Validator(table).validate(row);
+    }
+
+    /** Resolves the pinned column types once for a batch of native encoded rows. */
+    public static final class Validator {
+        private final TableSpec table;
+        private final TypeDescription[] types;
+
+        public Validator(TableSpec table) throws IOException {
+            this.table = table;
+            this.types = new TypeDescription[table.getColumnsCount()];
+            for (int i = 0; i < types.length; i++) {
+                types[i] = supported(table.getColumns(i).getType());
+            }
+        }
+
+        public void validate(byte[][] row) throws IOException {
+            validateRow(table, types, row);
+        }
+    }
+
+    private static void validateRow(TableSpec table, TypeDescription[] types, byte[][] row)
+            throws IOException {
         if (row.length != table.getColumnsCount())
             throw new IOException("Column count differs from pinned schema");
         for (int i = 0; i < row.length; i++) {
-            TypeDescription t = supported(table.getColumns(i).getType());
+            TypeDescription t = types[i];
             byte[] b = row[i];
             if (b == null) continue;
             int width = -1;

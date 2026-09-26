@@ -48,11 +48,15 @@ public final class IngestOptions {
     private static final int DEFAULT_MAX_PREPARED_ROWS = 1_000_000;
     private static final long DEFAULT_READ_LEASE_MILLIS = 120_000L;
     private static final long DEFAULT_TRANSACTION_LEASE_MILLIS = 300_000L;
+    private static final long DEFAULT_INSTALL_RPC_TIMEOUT_MILLIS = 3_600_000L;
     private static final long DEFAULT_TERMINAL_RETENTION_MILLIS = 86_400_000L;
     private static final int DEFAULT_MAX_TERMINAL_TRANSACTIONS = 100_000;
     private static final int DEFAULT_WAL_SEGMENT_BYTES = 64 * MEBIBYTE;
     private static final long DEFAULT_WAL_MAX_BYTES = 4L * GIBIBYTE;
     private static final int DEFAULT_WAL_MAX_RECORDS = 10_000_000;
+    private static final long DEFAULT_WAL_GROUP_COMMIT_DELAY_MICROS = 200L;
+    private static final long DEFAULT_WAL_READ_CACHE_MAX_BYTES = 64L * MEBIBYTE;
+    private static final long DEFAULT_COORDINATOR_GROUP_COMMIT_DELAY_MICROS = 200L;
     private static final int DEFAULT_PRIVATE_READ_MAX_BATCHES = 128;
     private static final int DEFAULT_PRIVATE_READ_MAX_BYTES = 4 * MEBIBYTE;
 
@@ -95,6 +99,8 @@ public final class IngestOptions {
             property("retina.ingest.commit.ack", CommitAckMode.VISIBLE.name()));
     public final long transactionLeaseMillis = longNumber(
             "retina.ingest.transaction.lease.ms", DEFAULT_TRANSACTION_LEASE_MILLIS);
+    public final long installRpcTimeoutMillis = longNumber(
+            "retina.ingest.install.rpc.timeout.ms", DEFAULT_INSTALL_RPC_TIMEOUT_MILLIS);
     public final long terminalRetentionMillis =
             longNumber("retina.ingest.terminal.retention.ms",
                     DEFAULT_TERMINAL_RETENTION_MILLIS);
@@ -113,6 +119,15 @@ public final class IngestOptions {
             longNumber("retina.ingest.wal.max.bytes", DEFAULT_WAL_MAX_BYTES);
     public final int walMaxRecords =
             number("retina.ingest.wal.max.records", DEFAULT_WAL_MAX_RECORDS);
+    public final long walGroupCommitDelayMicros = nonNegativeLong(
+            "retina.ingest.wal.group.commit.delay.micros",
+            DEFAULT_WAL_GROUP_COMMIT_DELAY_MICROS);
+    public final long walReadCacheMaxBytes = nonNegativeLong(
+            "retina.ingest.wal.read.cache.max.bytes",
+            DEFAULT_WAL_READ_CACHE_MAX_BYTES);
+    public final long coordinatorGroupCommitDelayMicros = nonNegativeLong(
+            "retina.ingest.coordinator.group.commit.delay.micros",
+            DEFAULT_COORDINATOR_GROUP_COMMIT_DELAY_MICROS);
     public final long cutoverBaselineTimestamp =
             nonNegative("retina.ingest.cutover.baseline.timestamp", 0L);
 
@@ -150,6 +165,14 @@ public final class IngestOptions {
                     key + " must fit Retina's non-negative 48-bit timestamp domain");
         }
         return n;
+    }
+
+    private static long nonNegativeLong(String key, long fallback) {
+        long value = Long.parseLong(property(key, Long.toString(fallback)));
+        if (value < 0) {
+            throw new IllegalArgumentException(key + " must be non-negative");
+        }
+        return value;
     }
 
     private static WriteRepresentation representation(String value) {

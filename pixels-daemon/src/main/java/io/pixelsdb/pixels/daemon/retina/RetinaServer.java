@@ -179,7 +179,9 @@ public class RetinaServer implements Server
                     journal = new LocalMutationJournal(
                             Files.createDirectories(Paths.get(options.participantWalDirectory)),
                             options.walSegmentBytes,
-                            options.walMaxBytes, options.walMaxRecords);
+                            options.walMaxBytes, options.walMaxRecords,
+                            options.walGroupCommitDelayMicros,
+                            options.walReadCacheMaxBytes);
                     RetinaIngestParticipant participant = new RetinaIngestParticipant(
                             owner, journal,
                             new RetinaIngestParticipant.Decisions()

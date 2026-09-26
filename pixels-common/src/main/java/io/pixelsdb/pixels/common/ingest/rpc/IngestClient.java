@@ -70,14 +70,24 @@ public final class IngestClient implements Closeable {
     }
 
     public IngestCoordinatorServiceGrpc.IngestCoordinatorServiceBlockingStub coordinator() {
-        return coordinator.withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+        return coordinator(timeout, TimeUnit.MILLISECONDS);
+    }
+
+    public IngestCoordinatorServiceGrpc.IngestCoordinatorServiceBlockingStub coordinator(
+            long callTimeout, TimeUnit unit) {
+        return coordinator.withDeadlineAfter(callTimeout, unit);
     }
 
     public IngestParticipantServiceGrpc.IngestParticipantServiceBlockingStub participant(
             String target) {
+        return participant(target, timeout, TimeUnit.MILLISECONDS);
+    }
+
+    public IngestParticipantServiceGrpc.IngestParticipantServiceBlockingStub participant(
+            String target, long callTimeout, TimeUnit unit) {
         return IngestParticipantServiceGrpc.newBlockingStub(channel(target))
                 .withWaitForReady()
-                .withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
+                .withDeadlineAfter(callTimeout, unit);
     }
 
     public MutationTransport transport(TableSpec table) {

@@ -90,22 +90,25 @@ grep -q '^PIXELS_NORMAL_INGEST_DAEMON_PASS rows=73 pixelsFiles=3 services=TransS
 # A committed decision is recovery authority. A checksum failure must stop the transaction
 # server; it must never be treated as an empty coordinator on a fresh deployment.
 cp -a "$WORK/state" "$WORK/corrupt-decision-state"
-python3 - "$WORK/corrupt-decision-state/decisions/state" <<'PY'
+python3 - "$WORK/corrupt-decision-state/decisions/decisions.log" <<'PY'
 import pathlib
+import struct
 import sys
 
 path = pathlib.Path(sys.argv[1])
 payload = bytearray(path.read_bytes())
-if len(payload) < 41:
-    raise SystemExit("decision state is unexpectedly short")
-payload[8] ^= 0x01
+journal_header_bytes = struct.calcsize('>II')
+frame_header_bytes = struct.calcsize('>II')
+if len(payload) <= journal_header_bytes + frame_header_bytes:
+    raise SystemExit("decision journal is unexpectedly short")
+payload[-1] ^= 0x01
 path.write_bytes(payload)
 PY
 if run_phase fail-closed "$WORK/corrupt-decision-state" > "$WORK/corrupt-decision.log" 2>&1; then
     echo "daemon accepted corrupt committed decision state" >&2
     exit 1
 fi
-grep -q 'State checksum mismatch' "$WORK/corrupt-decision.log"
+grep -q 'Coordinator journal checksum mismatch' "$WORK/corrupt-decision.log"
 
 # Reusing a legacy timestamp domain without advancing the allocator must be rejected before
 # new writes are admitted.

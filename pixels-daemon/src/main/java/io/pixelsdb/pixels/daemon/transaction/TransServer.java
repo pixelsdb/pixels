@@ -122,7 +122,11 @@ public class TransServer implements Server
                         public boolean install(
                                 String owner, Transaction transaction, boolean forceFileTail)
                         {
-                            return client.participant(owner).install(
+                            return client.participant(
+                                            owner,
+                                            options.installRpcTimeoutMillis,
+                                            TimeUnit.MILLISECONDS)
+                                    .install(
                                     ParticipantRequest.newBuilder()
                                             .setOwner(owner)
                                             .setTransaction(transaction)
@@ -161,7 +165,7 @@ public class TransServer implements Server
                     Clock.systemUTC(), options.cutoverBaselineTimestamp,
                     options.transactionLeaseMillis, options.maxTransactions, options.maxStreams,
                     options.terminalRetentionMillis, options.maxTerminalTransactions,
-                    options.installationThreads);
+                    options.installationThreads, options.coordinatorGroupCommitDelayMicros);
             long first = firstId.get();
             long floor = Math.max(options.cutoverBaselineTimestamp, coordinator.lastCommitTimestamp());
             if (first <= floor)

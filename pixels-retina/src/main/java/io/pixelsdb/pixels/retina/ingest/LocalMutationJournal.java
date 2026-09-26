@@ -44,9 +44,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 
 /**
@@ -69,8 +72,8 @@ import java.util.zip.CRC32;
  *
  * <p>This class never updates a MemTable, index, row allocator, or transaction
  * outcome. discardAbortedTransaction must only be invoked after the caller has
- * verified an authoritative ABORT decision. Payloads remain on disk; only batch
- * descriptors and stream state are retained in memory. Checkpoint-backed compaction
+ * verified an authoritative ABORT decision. An optional bounded private cache can
+ * serve durable sealed batches without rereading their WAL payloads. Checkpoint-backed compaction
  * replaces the WAL using a checksummed generation pointer. Terminal transaction
  * fences survive payload reclamation; the transaction coordinator remains the
  * authority for outcomes and for when data/index/visibility checkpoints are safe.
@@ -83,12 +86,16 @@ public final class LocalMutationJournal implements Closeable
     static final int MAGIC = 0x50494D4A;
     static final int MARKER_MAGIC = 0x50494D44;
     static final int VERSION = 2;
-    static final int HEADER_BYTES = 8;
+    static final int HEADER_BYTES = Integer.BYTES * 2;
+    private static final int FRAME_HEADER_BYTES = Integer.BYTES * 2;
     static final String WAL_NAME = "mutations.wal";
     static final String MARKER_NAME = "durable.offset";
     private static final int GENERATION_MARKER_BYTES = 28;
     private static final String LOCK_NAME = "journal.lock";
     private static final int MAX_FIXED_BODY_BYTES = 96;
+    private static final long MAX_GROUP_COMMIT_DELAY_MICROS =
+            TimeUnit.SECONDS.toMicros(1L);
+    private static final long CACHED_BATCH_OVERHEAD_BYTES = 128L;
     private static final int APPEND = 1;
     private static final int SEAL = 2;
     private static final int ABORT = 3;
@@ -99,6 +106,11 @@ public final class LocalMutationJournal implements Closeable
     private final int maxPayloadBytes;
     private final long maxJournalBytes;
     private final int maxRecords;
+    private final long groupCommitDelayNanos;
+    private final long maxCachedPayloadBytes;
+    private final LinkedHashMap<Entry, MutationBatch> cachedBatches =
+            new LinkedHashMap<>(16, 0.75f, true);
+    private long cachedPayloadBytes;
     private FileChannel channel;
     private final FileChannel lockChannel;
     private final FileLock lock;
@@ -118,18 +130,54 @@ public final class LocalMutationJournal implements Closeable
     private int recordCount;
     private boolean failed;
     private boolean closed;
+    private boolean syncInProgress;
+    private long syncCount;
 
     public LocalMutationJournal(Path directory, int maxPayloadBytes,
                                 long maxJournalBytes, int maxRecords) throws IOException
     {
-        this(directory, maxPayloadBytes, maxJournalBytes, maxRecords, phase -> {});
+        this(directory, maxPayloadBytes, maxJournalBytes, maxRecords, 0L);
+    }
+
+    public LocalMutationJournal(Path directory, int maxPayloadBytes,
+                                long maxJournalBytes, int maxRecords,
+                                long groupCommitDelayMicros) throws IOException
+    {
+        this(directory, maxPayloadBytes, maxJournalBytes, maxRecords,
+                groupCommitDelayMicros, 0L);
+    }
+
+    public LocalMutationJournal(Path directory, int maxPayloadBytes,
+                                long maxJournalBytes, int maxRecords,
+                                long groupCommitDelayMicros, long maxCachedPayloadBytes) throws IOException
+    {
+        this(directory, maxPayloadBytes, maxJournalBytes, maxRecords,
+                groupCommitDelayMicros, maxCachedPayloadBytes, phase -> {});
     }
 
     LocalMutationJournal(Path directory, int maxPayloadBytes,
                          long maxJournalBytes, int maxRecords, FaultInjector faults) throws IOException
     {
+        this(directory, maxPayloadBytes, maxJournalBytes, maxRecords, 0L, faults);
+    }
+
+    LocalMutationJournal(Path directory, int maxPayloadBytes,
+                         long maxJournalBytes, int maxRecords, long groupCommitDelayMicros,
+                         FaultInjector faults) throws IOException
+    {
+        this(directory, maxPayloadBytes, maxJournalBytes, maxRecords,
+                groupCommitDelayMicros, 0L, faults);
+    }
+
+    LocalMutationJournal(Path directory, int maxPayloadBytes,
+                         long maxJournalBytes, int maxRecords, long groupCommitDelayMicros,
+                         long maxCachedPayloadBytes, FaultInjector faults) throws IOException
+    {
         if (maxPayloadBytes <= 0 || maxPayloadBytes > Integer.MAX_VALUE - MAX_FIXED_BODY_BYTES - 8
-                || maxJournalBytes < HEADER_BYTES || maxRecords <= 0)
+                || maxJournalBytes < HEADER_BYTES || maxRecords <= 0
+                || groupCommitDelayMicros < 0L
+                || groupCommitDelayMicros > MAX_GROUP_COMMIT_DELAY_MICROS
+                || maxCachedPayloadBytes < 0L)
         {
             throw new IllegalArgumentException("Invalid journal limits");
         }
@@ -139,6 +187,8 @@ public final class LocalMutationJournal implements Closeable
         this.maxPayloadBytes = maxPayloadBytes;
         this.maxJournalBytes = maxJournalBytes;
         this.maxRecords = maxRecords;
+        this.groupCommitDelayNanos = TimeUnit.MICROSECONDS.toNanos(groupCommitDelayMicros);
+        this.maxCachedPayloadBytes = maxCachedPayloadBytes;
         this.faults = java.util.Objects.requireNonNull(faults, "faults");
         this.lockChannel = FileChannel.open(this.directory.resolve(LOCK_NAME),
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE);
@@ -215,34 +265,49 @@ public final class LocalMutationJournal implements Closeable
         validateNextBatch(state, batch);
         long offset = appendRecord(encodeBatch(batch));
         rememberBatch(batch, offset);
+        cacheBatch(streams.get(batch.getStreamId()).entries.get((int) batch.getSequence()), batch);
         return offset;
     }
 
     /** Seal only this stream; other writers in the transaction remain open. */
-    public synchronized MutationStreamSeal seal(MutationStreamSeal expected) throws IOException
+    public MutationStreamSeal seal(MutationStreamSeal expected) throws IOException
     {
-        ensureOpen();
-        requireNotAborted(expected.getStreamId().getTransactionId());
-        StreamState state = requireStream(expected.getStreamId());
-        if (!state.boundary(expected.getStreamId()).equals(expected))
+        long requiredOffset;
+        MutationStreamSeal result;
+        synchronized (this)
         {
-            throw new IOException("Stream seal does not match received batch sequence, totals, or digest");
-        }
-        if (state.seal == null)
-        {
-            appendRecord(encodeSeal(expected));
-            state.seal = expected;
+            ensureOpen();
+            requireNotAborted(expected.getStreamId().getTransactionId());
+            StreamState state = requireStream(expected.getStreamId());
+            if (!state.boundary(expected.getStreamId()).equals(expected))
+            {
+                throw new IOException(
+                        "Stream seal does not match received batch sequence, totals, or digest");
+            }
+            if (state.seal == null)
+            {
+                appendRecord(encodeSeal(expected));
+                state.seal = expected;
+                state.sealEndOffset = channel.position();
+            }
+            requiredOffset = channel.position();
+            result = state.seal;
         }
         // Repeated seal also supplies a durability barrier after a retry.
-        persistDurablePrefix();
-        return state.seal;
+        awaitDurable(requiredOffset);
+        return result;
     }
 
     /** Explicit local group-sync barrier; does not seal or commit any stream. */
-    public synchronized void sync() throws IOException
+    public void sync() throws IOException
     {
-        ensureOpen();
-        persistDurablePrefix();
+        long requiredOffset;
+        synchronized (this)
+        {
+            ensureOpen();
+            requiredOffset = channel.position();
+        }
+        awaitDurable(requiredOffset);
     }
 
     public synchronized Optional<MutationStreamSeal> getSeal(MutationStreamId id) throws IOException
@@ -250,7 +315,8 @@ public final class LocalMutationJournal implements Closeable
         ensureOpen();
         requireNotAborted(id.getTransactionId());
         StreamState state = streams.get(id);
-        return state == null ? Optional.empty() : Optional.ofNullable(state.seal);
+        return state == null || state.sealEndOffset > durableOffset
+                ? Optional.empty() : Optional.ofNullable(state.seal);
     }
 
     /** Preparation-only read. Returned bytes are not public query state. */
@@ -259,13 +325,16 @@ public final class LocalMutationJournal implements Closeable
         ensureOpen();
         requireNotAborted(id.getTransactionId());
         StreamState state = requireStream(id);
-        if (state.seal == null || sequence < 0 || sequence >= state.entries.size())
+        if (state.seal == null || state.sealEndOffset > durableOffset
+                || sequence < 0 || sequence >= state.entries.size())
         {
             throw new IOException("Batch is not inside a sealed stream");
         }
         try
         {
             Entry entry = state.entries.get((int) sequence);
+            MutationBatch cached = cachedBatches.get(entry);
+            if (cached != null) { return cached; }
             DataInputStream input = new DataInputStream(new ByteArrayInputStream(readBody(entry.offset, durableOffset)));
             if (input.readUnsignedByte() != APPEND)
             {
@@ -278,6 +347,7 @@ public final class LocalMutationJournal implements Closeable
             {
                 throw new IOException("Batch descriptor does not match durable bytes");
             }
+            cacheBatch(entry, batch);
             return batch;
         }
         catch (IOException | RuntimeException e)
@@ -309,6 +379,7 @@ public final class LocalMutationJournal implements Closeable
             appendRecord(bytes.toByteArray());
             abortedTransactions.add(transactionId);
         }
+        evictTransaction(transactionId);
         persistDurablePrefix();
     }
 
@@ -376,6 +447,7 @@ public final class LocalMutationJournal implements Closeable
                         throw new IOException("Invalid durable stream seal");
                     }
                     state.seal = seal;
+                    state.sealEndOffset = offset + FRAME_HEADER_BYTES + body.length;
                 }
                 else if (type == CHECKPOINTED)
                 {
@@ -396,7 +468,7 @@ public final class LocalMutationJournal implements Closeable
                     throw new IOException("Unknown WAL record type: " + type);
                 }
                 requireEnd(in);
-                offset += 8L + body.length;
+                offset += FRAME_HEADER_BYTES + body.length;
             }
         }
         catch (IllegalArgumentException | ArithmeticException e)
@@ -420,8 +492,74 @@ public final class LocalMutationJournal implements Closeable
             channel.force(true);
             storeMarker(generation, end);
             durableOffset = end;
+            syncCount++;
         }
         catch (IOException e) { failed = true; throw e; }
+    }
+
+    private void awaitDurable(long requiredOffset) throws IOException
+    {
+        boolean interrupted = false;
+        try
+        {
+            synchronized (this)
+            {
+                while (durableOffset < requiredOffset)
+                {
+                    ensureOpen();
+                    if (!syncInProgress)
+                    {
+                        syncInProgress = true;
+                        try
+                        {
+                            if (groupCommitDelayNanos > 0L)
+                            {
+                                long millis = TimeUnit.NANOSECONDS.toMillis(groupCommitDelayNanos);
+                                int nanos = (int) (groupCommitDelayNanos
+                                        - TimeUnit.MILLISECONDS.toNanos(millis));
+                                try
+                                {
+                                    wait(millis, nanos);
+                                }
+                                catch (InterruptedException ignored)
+                                {
+                                    interrupted = true;
+                                }
+                            }
+                            persistDurablePrefix();
+                        }
+                        finally
+                        {
+                            syncInProgress = false;
+                            notifyAll();
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            wait();
+                        }
+                        catch (InterruptedException ignored)
+                        {
+                            interrupted = true;
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (interrupted)
+            {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    synchronized long getSyncCount()
+    {
+        return syncCount;
     }
 
     private void storeMarker(long targetGeneration, long end) throws IOException
@@ -482,7 +620,8 @@ public final class LocalMutationJournal implements Closeable
         // Duplicate invocations are permitted, but do not roll a file per invocation.
         boolean hasGarbage = false;
         for (MutationStreamId id : streams.keySet())
-        { if (covered.contains(id.getTransactionId()) || abortedTransactions.contains(id.getTransactionId())) { hasGarbage = true; } }
+        { if (covered.contains(id.getTransactionId()) || checkpointedTransactions.contains(id.getTransactionId())
+                || abortedTransactions.contains(id.getTransactionId())) { hasGarbage = true; } }
         if (!hasGarbage) { return 0; }
         FileChannel replacement = null;
         try
@@ -514,7 +653,7 @@ public final class LocalMutationJournal implements Closeable
                     { writeFrame(replacement, body); keptRecords++; }
                 }
                 else if (type != ABORT && type != CHECKPOINTED) { throw new IOException("Unknown WAL record during GC"); }
-                offset += 8L + body.length;
+                offset += FRAME_HEADER_BYTES + body.length;
             }
             if (keptRecords > maxRecords || replacement.position() > maxJournalBytes)
             { throw new IOException("Compacted journal exceeds configured limits"); }
@@ -530,6 +669,7 @@ public final class LocalMutationJournal implements Closeable
             replacement = null;
             generation = nextGeneration;
             old.close();
+            clearCachedBatches();
             streams.clear(); abortedTransactions.clear(); checkpointedTransactions.clear(); recordCount = 0;
             recover(); // Rebuild generation-local offsets from the selected durable bytes.
             faults.at(GcPhase.BEFORE_OLD_DELETE);
@@ -582,17 +722,64 @@ public final class LocalMutationJournal implements Closeable
     public synchronized Set<Long> getCheckpointedTransactions() throws IOException
     { ensureOpen(); return Collections.unmodifiableSet(new HashSet<>(checkpointedTransactions)); }
 
+    /**
+     * Persist recovery ownership transfer without rewriting unrelated live payloads.
+     * The caller must first durably checkpoint data, indexes, visibility and installation
+     * identities, under the same coverage contract as compactCheckpointedTransactions.
+     */
+    public synchronized void checkpointTransaction(long transactionId) throws IOException
+    {
+        ensureOpen();
+        if (checkpointedTransactions.contains(transactionId)) { return; }
+        requireNotAborted(transactionId);
+        boolean found = false;
+        for (Map.Entry<MutationStreamId, StreamState> stream : streams.entrySet())
+        {
+            if (stream.getKey().getTransactionId() != transactionId) { continue; }
+            found = true;
+            if (stream.getValue().seal == null || stream.getValue().sealEndOffset > durableOffset)
+            { throw new IOException("Cannot checkpoint an unsealed or non-durable stream"); }
+        }
+        if (!found) { throw new IOException("Checkpoint references an unknown transaction"); }
+        appendRecord(encodeTerminal(CHECKPOINTED, transactionId));
+        persistDurablePrefix();
+        checkpointedTransactions.add(transactionId);
+        evictTransaction(transactionId);
+    }
+
+    /** Amortize generation rewriting: copy at most as much payload as is reclaimed. */
+    public synchronized long compactRetiredTransactions() throws IOException
+    {
+        ensureOpen();
+        long retiredBytes = 0L;
+        long liveBytes = 0L;
+        for (Map.Entry<MutationStreamId, StreamState> stream : streams.entrySet())
+        {
+            long tx = stream.getKey().getTransactionId();
+            if (checkpointedTransactions.contains(tx) || abortedTransactions.contains(tx))
+            { retiredBytes = Math.addExact(retiredBytes, stream.getValue().bytes); }
+            else
+            { liveBytes = Math.addExact(liveBytes, stream.getValue().bytes); }
+        }
+        if (retiredBytes == 0L || retiredBytes < liveBytes) { return 0L; }
+        return compactCheckpointedTransactions(Collections.emptySet());
+    }
+
     public synchronized long getGeneration() throws IOException { ensureOpen(); return generation; }
     public synchronized long getJournalBytes() throws IOException { ensureOpen(); return channel.size(); }
 
+    synchronized long getCachedPayloadBytes() { return cachedPayloadBytes; }
+    synchronized int getCachedBatchCount() { return cachedBatches.size(); }
+
     private long appendRecord(byte[] body) throws IOException
     {
-        if (recordCount >= maxRecords || channel.position() > maxJournalBytes - 8L - body.length)
+        if (recordCount >= maxRecords
+                || channel.position() > maxJournalBytes - FRAME_HEADER_BYTES - body.length)
         {
             throw new IOException("Journal capacity exceeded; checkpoint/reclamation is required");
         }
         long offset = channel.position();
-        ByteBuffer frame = ByteBuffer.allocate(body.length + 8);
+        ByteBuffer frame = ByteBuffer.allocate(body.length + FRAME_HEADER_BYTES);
         frame.putInt(body.length).putInt(checksum(body, 0, body.length)).put(body).flip();
         try
         {
@@ -613,7 +800,7 @@ public final class LocalMutationJournal implements Closeable
         {
             throw new IOException("Truncated acknowledged frame header");
         }
-        ByteBuffer header = ByteBuffer.allocate(8);
+        ByteBuffer header = ByteBuffer.allocate(FRAME_HEADER_BYTES);
         readFully(channel, header, offset);
         header.flip();
         int length = header.getInt();
@@ -624,7 +811,7 @@ public final class LocalMutationJournal implements Closeable
             throw new IOException("Invalid or truncated acknowledged frame length");
         }
         byte[] body = new byte[length];
-        readFully(channel, ByteBuffer.wrap(body), offset + 8);
+        readFully(channel, ByteBuffer.wrap(body), offset + FRAME_HEADER_BYTES);
         if (checksum(body, 0, body.length) != expectedChecksum)
         {
             throw new IOException("Checksum mismatch in acknowledged WAL frame");
@@ -732,6 +919,41 @@ public final class LocalMutationJournal implements Closeable
         state.digest = MutationStreamSeal.extendDigest(state.digest, batch.getDigest());
     }
 
+    private void cacheBatch(Entry entry, MutationBatch batch)
+    {
+        long weight = (long) batch.getPayloadBytes() + CACHED_BATCH_OVERHEAD_BYTES;
+        if (weight > maxCachedPayloadBytes) { return; }
+        MutationBatch previous = cachedBatches.put(entry, batch);
+        if (previous != null)
+        { cachedPayloadBytes -= (long) previous.getPayloadBytes() + CACHED_BATCH_OVERHEAD_BYTES; }
+        cachedPayloadBytes += weight;
+        Iterator<Map.Entry<Entry, MutationBatch>> iterator = cachedBatches.entrySet().iterator();
+        while (cachedPayloadBytes > maxCachedPayloadBytes && iterator.hasNext())
+        {
+            MutationBatch eldest = iterator.next().getValue();
+            cachedPayloadBytes -= (long) eldest.getPayloadBytes() + CACHED_BATCH_OVERHEAD_BYTES;
+            iterator.remove();
+        }
+    }
+
+    private void evictTransaction(long transactionId)
+    {
+        Iterator<Map.Entry<Entry, MutationBatch>> iterator = cachedBatches.entrySet().iterator();
+        while (iterator.hasNext())
+        {
+            MutationBatch batch = iterator.next().getValue();
+            if (batch.getStreamId().getTransactionId() != transactionId) { continue; }
+            cachedPayloadBytes -= (long) batch.getPayloadBytes() + CACHED_BATCH_OVERHEAD_BYTES;
+            iterator.remove();
+        }
+    }
+
+    private void clearCachedBatches()
+    {
+        cachedBatches.clear();
+        cachedPayloadBytes = 0L;
+    }
+
     private StreamState requireStream(MutationStreamId id) throws IOException
     {
         StreamState state = streams.get(id);
@@ -777,12 +999,32 @@ public final class LocalMutationJournal implements Closeable
     public synchronized void close() throws IOException
     {
         if (closed) { return; }
+        boolean interrupted = false;
+        while (syncInProgress)
+        {
+            try
+            {
+                wait();
+            }
+            catch (InterruptedException ignored)
+            {
+                interrupted = true;
+            }
+        }
         closed = true;
-        try { channel.close(); }
+        clearCachedBatches();
+        try
+        {
+            try { channel.close(); }
+            finally
+            {
+                try { lock.release(); }
+                finally { lockChannel.close(); }
+            }
+        }
         finally
         {
-            try { lock.release(); }
-            finally { lockChannel.close(); }
+            if (interrupted) { Thread.currentThread().interrupt(); }
         }
     }
 
@@ -802,6 +1044,7 @@ public final class LocalMutationJournal implements Closeable
         long bytes;
         byte[] digest = MutationStreamSeal.emptyDigest();
         MutationStreamSeal seal;
+        long sealEndOffset;
 
         StreamState(long schema, int format) { this.schema = schema; this.format = format; }
 

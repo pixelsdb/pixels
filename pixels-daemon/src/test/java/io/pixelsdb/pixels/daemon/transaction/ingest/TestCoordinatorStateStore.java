@@ -58,8 +58,8 @@ public class TestCoordinatorStateStore
 
         try (CoordinatorStateStore store = store(directory))
         {
-            store.store(initial);
-            store.store(decided);
+            store.store(initial, DurableIngestCoordinator.StateStore.Durability.DEFERRED);
+            store.store(decided, DurableIngestCoordinator.StateStore.Durability.SYNCHRONIZED);
             store.store(retired);
         }
         try (CoordinatorStateStore recovered = store(directory))
@@ -79,6 +79,16 @@ public class TestCoordinatorStateStore
                 new CoordinatorStateStore(compacted, MAXIMUM_BYTES, 64))
         {
             assertEquals(decided, recovered.read());
+        }
+
+        Path graceful = directory.resolve("graceful");
+        try (CoordinatorStateStore store = store(graceful))
+        {
+            store.store(initial, DurableIngestCoordinator.StateStore.Durability.DEFERRED);
+        }
+        try (CoordinatorStateStore recovered = store(graceful))
+        {
+            assertEquals(initial, recovered.read());
         }
     }
 

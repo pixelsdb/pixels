@@ -66,7 +66,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -96,8 +95,6 @@ public final class NormalIngestDaemonMain
     private static final int CHECKPOINTED_BUFFERED_ROWS = 64;
     private static final int REPLAY_BUFFERED_ROWS = 1;
     private static final int CUTOVER_ADDED_ROWS = 1;
-    private static final int CHECKPOINTED_TRANSACTION_COUNT =
-            SHARED_FILE_TRANSACTION_COUNT + 1;
     private static final int PHASE_ONE_ROWS = FILE_TARGET_ROWS
             + CHECKPOINTED_BUFFERED_ROWS + REPLAY_BUFFERED_ROWS;
     private static final int FILE_MAX_BYTES = 1024 * 1024;
@@ -285,7 +282,7 @@ public final class NormalIngestDaemonMain
                 verifyBufferedRows(retinaPort, replay.transaction.getCommitTimestamp(),
                         REPLAY_BUFFERED_ROWS);
                 awaitPublishedFiles(catalog, 2);
-                awaitJournalGeneration(root.resolve("wal"), CHECKPOINTED_TRANSACTION_COUNT);
+                awaitJournalReclamation(root.resolve("wal"), checkpointed.payloadBytes);
                 System.out.println("PIXELS_NORMAL_INGEST_DAEMON_PHASE1_PASS rows="
                         + PHASE_ONE_ROWS + " sharedFileTransactions="
                         + SHARED_FILE_TRANSACTION_COUNT + " checkpointedTransaction="
@@ -682,28 +679,26 @@ public final class NormalIngestDaemonMain
         throw new AssertionError("Retina did not publish the expected Pixels file");
     }
 
-    private static void awaitJournalGeneration(Path wal, long expected) throws Exception
+    private static void awaitJournalReclamation(Path wal, long checkpointPayloadBytes) throws Exception
     {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
         while (System.nanoTime() < deadline)
         {
             try (java.util.stream.Stream<Path> paths = Files.list(wal))
             {
-                long latestGeneration = paths.map(Path::getFileName)
-                        .map(Path::toString)
-                        .map(JOURNAL_SEGMENT_PATTERN::matcher)
-                        .filter(Matcher::matches)
-                        .mapToLong(matcher -> Long.parseLong(matcher.group(1)))
-                        .max()
-                        .orElse(0L);
-                if (latestGeneration >= expected)
+                List<Path> generations = paths.filter(path -> JOURNAL_SEGMENT_PATTERN
+                                .matcher(path.getFileName().toString()).matches())
+                        .collect(java.util.stream.Collectors.toList());
+                if (generations.size() == 1
+                        && !Files.exists(wal.resolve("mutations.wal"))
+                        && Files.size(generations.get(0)) < checkpointPayloadBytes)
                 {
                     return;
                 }
             }
             Thread.sleep(100);
         }
-        throw new AssertionError("journal did not advance to generation " + expected);
+        throw new AssertionError("Checkpointed WAL payload was not physically reclaimed");
     }
 
     private static long countPublishedRows(SqlIngestFixture.Catalog catalog, Path root)

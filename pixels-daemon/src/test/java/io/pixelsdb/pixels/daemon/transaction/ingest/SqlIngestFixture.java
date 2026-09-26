@@ -35,15 +35,38 @@ import java.util.concurrent.atomic.*;
  */
 public final class SqlIngestFixture implements AutoCloseable {
     private static final long SERVER_SHUTDOWN_TIMEOUT_SECONDS = 5L;
+    private static final int DEFAULT_FIXTURE_ROUTE_COUNT = 1;
 
     private static String benchmarkSetting(String name, String fallback) {
         String value = System.getenv(name);
         return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
+    private static int positiveBenchmarkInteger(String name, int fallback) {
+        int value = Integer.parseInt(benchmarkSetting(name, Integer.toString(fallback)));
+        if (value <= 0) {
+            throw new IllegalArgumentException(name + " must be positive");
+        }
+        return value;
+    }
+
     private static <T> void reply(StreamObserver<T> observer, T value) {
         observer.onNext(value);
         observer.onCompleted();
+    }
+
+    private static NodeProto.GetRetinaListResponse retinaNodes(
+            String host, int port, int routeCount) {
+        NodeProto.GetRetinaListResponse.Builder response =
+                NodeProto.GetRetinaListResponse.newBuilder();
+        for (int virtualNodeId = 0; virtualNodeId < routeCount; virtualNodeId++) {
+            response.addNodes(
+                    NodeProto.NodeInfo.newBuilder()
+                            .setAddress(host)
+                            .setPort(port)
+                            .setVirtualNodeId(virtualNodeId));
+        }
+        return response.build();
     }
 
     private static MetadataProto.ResponseHeader ok(MetadataProto.RequestHeader request) {
@@ -439,6 +462,8 @@ public final class SqlIngestFixture implements AutoCloseable {
         owner = host + ":" + retinaPort;
         recoveryCheckpointEnabled = Boolean.parseBoolean(
                 benchmarkSetting("PIXELS_SQL_FIXTURE_RECOVERY_CHECKPOINT", "false"));
+        int routeCount = positiveBenchmarkInteger(
+                "PIXELS_SQL_FIXTURE_ROUTE_COUNT", DEFAULT_FIXTURE_ROUTE_COUNT);
         ConfigFactory config = ConfigFactory.Instance();
         Map<String, String> settings = exportedSettings;
         settings.put("retina.enable", "true");
@@ -486,13 +511,16 @@ public final class SqlIngestFixture implements AutoCloseable {
                 "retina.buffer.flush.interval",
                 benchmarkSetting("PIXELS_SQL_FIXTURE_FLUSH_INTERVAL_SECONDS", "1"));
         settings.put(
+                "retina.buffer.object.flush.threads",
+                benchmarkSetting("PIXELS_SQL_FIXTURE_FILE_FLUSH_THREADS", "4"));
+        settings.put(
                 "retina.buffer.object.storage.folder", root.resolve("objects").toUri().toString());
         settings.put("retina.storage.gc.journal.dir", root.resolve("gc").toUri().toString());
         settings.put("retina.offload.checkpoint.dir", root.resolve("offload").toUri().toString());
         settings.put("index.sqlite.path", root.resolve("sqlite").toString());
         settings.put("enabled.storage.schemes", "file");
-        settings.put("node.bucket.num", "1");
-        settings.put("node.virtual.num", "1");
+        settings.put("node.bucket.num", Integer.toString(routeCount));
+        settings.put("node.virtual.num", Integer.toString(routeCount));
         settings.put("index.bucket.num", "1");
         settings.put("index.cache.enabled", "false");
         settings.put("cache.enabled", "false");
@@ -511,17 +539,35 @@ public final class SqlIngestFixture implements AutoCloseable {
         settings.put(
                 "retina.ingest.max.state.bytes",
                 benchmarkSetting("PIXELS_SQL_FIXTURE_MAX_STATE_BYTES", "67108864"));
+        settings.put(
+                "retina.ingest.max.prepared.rows",
+                benchmarkSetting("PIXELS_SQL_FIXTURE_MAX_PREPARED_ROWS", "1000000"));
+        settings.put(
+                "retina.ingest.install.rpc.timeout.ms",
+                benchmarkSetting("PIXELS_SQL_FIXTURE_INSTALL_RPC_TIMEOUT_MS", "3600000"));
+        settings.put(
+                "retina.ingest.wal.max.bytes",
+                benchmarkSetting("PIXELS_SQL_FIXTURE_WAL_MAX_BYTES", "4294967296"));
+        settings.put(
+                "retina.ingest.wal.max.records",
+                benchmarkSetting("PIXELS_SQL_FIXTURE_WAL_MAX_RECORDS", "10000000"));
+        settings.put(
+                "retina.ingest.wal.group.commit.delay.micros",
+                benchmarkSetting(
+                        "PIXELS_SQL_FIXTURE_WAL_GROUP_COMMIT_DELAY_MICROS", "200"));
+        settings.put(
+                "retina.ingest.wal.read.cache.max.bytes",
+                benchmarkSetting(
+                        "PIXELS_SQL_FIXTURE_WAL_READ_CACHE_MAX_BYTES", "67108864"));
+        settings.put(
+                "retina.ingest.coordinator.group.commit.delay.micros",
+                benchmarkSetting(
+                        "PIXELS_SQL_FIXTURE_COORDINATOR_GROUP_COMMIT_DELAY_MICROS", "200"));
         settings.forEach(config::addProperty);
         catalog = new Catalog(root);
         metadataServer = ServerBuilder.forPort(0).addService(catalog).build().start();
         config.addProperty("metadata.server.host", "127.0.0.1");
         config.addProperty("metadata.server.port", Integer.toString(metadataServer.getPort()));
-        NodeProto.NodeInfo node =
-                NodeProto.NodeInfo.newBuilder()
-                        .setAddress(host)
-                        .setPort(retinaPort)
-                        .setVirtualNodeId(0)
-                        .build();
         nodeServer =
                 ServerBuilder.forPort(0)
                         .addService(
@@ -533,7 +579,10 @@ public final class SqlIngestFixture implements AutoCloseable {
                                         reply(
                                                 o,
                                                 NodeProto.GetRetinaByBucketResponse.newBuilder()
-                                                        .setNode(node)
+                                                        .setNode(NodeProto.NodeInfo.newBuilder()
+                                                                .setAddress(host)
+                                                                .setPort(retinaPort)
+                                                                .setVirtualNodeId(r.getBucket()))
                                                         .build());
                                     }
 
@@ -543,9 +592,8 @@ public final class SqlIngestFixture implements AutoCloseable {
                                             StreamObserver<NodeProto.GetRetinaListResponse> o) {
                                         reply(
                                                 o,
-                                                NodeProto.GetRetinaListResponse.newBuilder()
-                                                        .addNodes(node)
-                                                        .build());
+                                                retinaNodes(
+                                                        host, retinaPort, routeCount));
                                     }
                                 })
                         .build()
@@ -583,7 +631,10 @@ public final class SqlIngestFixture implements AutoCloseable {
                             public boolean install(
                                     String o, Transaction tx, boolean forceFileTail) {
                                 return clients.get()
-                                        .participant(o)
+                                        .participant(
+                                                o,
+                                                ingestOptions.installRpcTimeoutMillis,
+                                                TimeUnit.MILLISECONDS)
                                         .install(
                                                 ParticipantRequest.newBuilder()
                                                         .setOwner(o)
@@ -609,7 +660,8 @@ public final class SqlIngestFixture implements AutoCloseable {
                         ingestOptions.maxStreams,
                         ingestOptions.terminalRetentionMillis,
                         ingestOptions.maxTerminalTransactions,
-                        ingestOptions.installationThreads);
+                        ingestOptions.installationThreads,
+                        ingestOptions.coordinatorGroupCommitDelayMicros);
         // Only the existing read-ID service is a fixture. Write outcomes use the real durable
         // coordinator above.
         TransServiceGrpc.TransServiceImplBase readTransactions =
@@ -716,9 +768,11 @@ public final class SqlIngestFixture implements AutoCloseable {
                         owner,
                         new LocalMutationJournal(
                                 Files.createDirectories(root.resolve("wal")),
-                                4 * 1024 * 1024,
-                                256L * 1024 * 1024,
-                                100000),
+                                ingestOptions.walSegmentBytes,
+                                ingestOptions.walMaxBytes,
+                                ingestOptions.walMaxRecords,
+                                ingestOptions.walGroupCommitDelayMicros,
+                                ingestOptions.walReadCacheMaxBytes),
                         new RetinaIngestParticipant.Decisions() {
                             public Transaction get(long id) {
                                 return client.coordinator().getWrite(IngestWire.id(id));
