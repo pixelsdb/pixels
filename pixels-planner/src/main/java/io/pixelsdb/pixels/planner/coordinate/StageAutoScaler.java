@@ -75,6 +75,10 @@ public class StageAutoScaler implements AutoCloseable
                     "stage is terminal");
         }
         StageScalingDecision decision = policy.evaluate(status, history, config, currentTimeMs);
+        log.info("s3qs_scaling_decision stageId={} direction={} desired={} target={} pending={} running={} accepting={} draining={} reason={}",
+                runtimeController.getStageId(), decision.getDirection(), status.getDesiredWorkerCount(),
+                decision.getTargetWorkerCount(), status.getPendingTaskCount(), status.getRunningTaskCount(),
+                status.getAcceptingWorkerCount(), status.getDrainingWorkerCount(), decision.getReason());
         if (decision.getTargetWorkerCount() != status.getDesiredWorkerCount())
         {
             runtimeController.scaleTo(decision.getTargetWorkerCount());

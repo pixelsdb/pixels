@@ -39,6 +39,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
 
@@ -105,23 +109,29 @@ public class S3QSStageWorkerRunner
 
         WorkerCoordinateService coordinateService = getWorkerCoordinateService(input);
         Worker<CFWorkerInfo> runtimeWorker = null;
+        LeaseHeartbeat heartbeat = null;
         try
         {
             CFWorkerInfo workerInfo = new CFWorkerInfo(InetAddress.getLocalHost().getHostAddress(), -1,
                     input.getTransId(), input.getStageId(), operatorName, new ArrayList<>());
             runtimeWorker = coordinateService.registerWorker(workerInfo);
+            heartbeat = new LeaseHeartbeat(coordinateService, runtimeWorker);
 
             TaskBatch taskBatch = coordinateService.getTasksToExecute(runtimeWorker.getWorkerId());
             while (!taskBatch.isEndOfTasks())
             {
+                heartbeat.checkHealthy();
                 List<TaskInfo> taskInfos = taskBatch.getTasks();
                 for (TaskInfo taskInfo : taskInfos)
                 {
                     executeTask(taskInfo, taskInputClass, taskExecutor, aggregateOutput);
+                    heartbeat.checkHealthy();
                 }
+                heartbeat.checkHealthy();
                 coordinateService.completeTasks(runtimeWorker.getWorkerId(), taskInfos);
                 taskBatch = coordinateService.getTasksToExecute(runtimeWorker.getWorkerId());
             }
+            heartbeat.checkHealthy();
         }
         catch (Throwable e)
         {
@@ -131,6 +141,10 @@ public class S3QSStageWorkerRunner
         }
         finally
         {
+            if (heartbeat != null)
+            {
+                heartbeat.close();
+            }
             if (runtimeWorker != null)
             {
                 try
@@ -145,6 +159,56 @@ public class S3QSStageWorkerRunner
             aggregateOutput.setDurationMs((int) (System.currentTimeMillis() - startTimeMs));
         }
         return aggregateOutput;
+    }
+
+    /** Keeps a long-running task's coordinator ownership alive until the invocation finishes. */
+    private static final class LeaseHeartbeat implements AutoCloseable
+    {
+        private final ScheduledExecutorService executor;
+        private final AtomicReference<Throwable> failure = new AtomicReference<>();
+
+        private LeaseHeartbeat(WorkerCoordinateService coordinateService, Worker<CFWorkerInfo> worker)
+        {
+            long leasePeriodMs = worker.getLeasePeriodMs();
+            if (leasePeriodMs <= 0)
+            {
+                throw new IllegalArgumentException("S3QS worker lease period must be positive");
+            }
+            long intervalMs = Math.max(1L, leasePeriodMs / 3L);
+            this.executor = Executors.newSingleThreadScheduledExecutor(task ->
+            {
+                Thread thread = new Thread(task, "s3qs-worker-lease-" + worker.getWorkerId());
+                thread.setDaemon(true);
+                return thread;
+            });
+            this.executor.scheduleWithFixedDelay(() ->
+            {
+                try
+                {
+                    coordinateService.extendLease(worker.getWorkerId());
+                }
+                catch (Throwable e)
+                {
+                    failure.compareAndSet(null, e);
+                    executor.shutdown();
+                }
+            }, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+        }
+
+        private void checkHealthy()
+        {
+            Throwable cause = failure.get();
+            if (cause != null)
+            {
+                throw new WorkerException("S3QS worker lease renewal failed", cause);
+            }
+        }
+
+        @Override
+        public void close()
+        {
+            executor.shutdownNow();
+        }
     }
 
     private WorkerCoordinateService getWorkerCoordinateService(StageWorkerInput input)

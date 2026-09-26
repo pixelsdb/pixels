@@ -54,6 +54,11 @@ public class Worker<WI extends WorkerInfo>
         return workerId;
     }
 
+    public long getLeasePeriodMs()
+    {
+        return lease.getPeriodMs();
+    }
+
     public void setWorkerPortIndex(int index) { this.workerPortIndex = index; }
 
     public int getWorkerPortIndex() { return workerPortIndex; }

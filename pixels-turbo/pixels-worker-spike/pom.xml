@@ -21,6 +21,11 @@
     <dependencies>
         <dependency>
             <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-invoker-spike</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-worker-common</artifactId>
         </dependency>
         <dependency>
@@ -129,4 +134,27 @@
             </resource>
         </resources>
     </build>
+    <profiles>
+        <profile>
+            <id>issue1277-spike-it</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.junit.vintage</groupId>
+                    <artifactId>junit-vintage-engine</artifactId>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <skipTests>false</skipTests>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

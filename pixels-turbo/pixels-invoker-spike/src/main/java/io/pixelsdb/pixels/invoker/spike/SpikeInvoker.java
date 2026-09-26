@@ -24,11 +24,15 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.pixelsdb.pixels.common.turbo.*;
 import io.pixelsdb.pixels.common.utils.ListenableFutureAdapter;
+import io.pixelsdb.pixels.planner.plan.physical.input.StageWorkerInput;
 import io.pixelsdb.spike.handler.SpikeServiceProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 public abstract class SpikeInvoker implements Invoker
 {
@@ -40,6 +44,13 @@ public abstract class SpikeInvoker implements Invoker
 
     protected SpikeInvoker(String functionName, WorkerType workerType)
     {
+        if (workerType == WorkerType.PARTITION_S3QS ||
+                workerType == WorkerType.PARTITIONED_JOIN_S3QS ||
+                workerType == WorkerType.PARTITIONED_CHAIN_JOIN_S3QS)
+        {
+            checkArgument(functionName != null && !functionName.trim().isEmpty(),
+                    "Spike S3QS function name is not configured for %s", workerType);
+        }
         this.functionName = functionName;
         // TODO: how to set memoryMB?
         this.memoryMB = 0;
@@ -54,7 +65,7 @@ public abstract class SpikeInvoker implements Invoker
         {
             if (response == null)
             {
-                throw new RuntimeException("failed to execute the request, response is null");
+                throw new CompletionException("failed to execute Spike function " + functionName, err);
             }
             else if (response.getErrorCode() == 0)
             {
@@ -79,10 +90,20 @@ public abstract class SpikeInvoker implements Invoker
     {
         SpikeWorkerRequest workerRequest = new SpikeWorkerRequest(this.workerType,
                 JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect));
-        ListenableFuture<SpikeServiceProto.CallFunctionResponse> future = SpikeAsyncClient.Instance().invoke(
+        SpikeAsyncClient client = SpikeAsyncClient.Instance();
+        int requiredCpu = input.getRequiredCpu();
+        int requiredMemory = input.getRequiredMemory();
+        if (input instanceof StageWorkerInput)
+        {
+            checkArgument(requiredCpu >= 0 && requiredMemory >= 0,
+                    "Spike S3QS worker resource request must not be negative");
+            requiredCpu = requiredCpu == 0 ? client.getDefaultCpu() : requiredCpu;
+            requiredMemory = requiredMemory == 0 ? client.getDefaultMemory() : requiredMemory;
+        }
+        ListenableFuture<SpikeServiceProto.CallFunctionResponse> future = client.invoke(
                 this.functionName,
                 JSON.toJSONString(workerRequest, SerializerFeature.DisableCircularReferenceDetect),
-                input.getRequiredCpu(), input.getRequiredMemory());
+                requiredCpu, requiredMemory);
         return genCompletableFuture(future);
     }
 

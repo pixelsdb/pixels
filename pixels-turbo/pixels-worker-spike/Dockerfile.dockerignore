@@ -1,0 +1,12 @@
+**
+!pixels-common/
+!pixels-common/src/
+!pixels-common/src/main/
+!pixels-common/src/main/resources/
+!pixels-common/src/main/resources/pixels.properties
+!pixels-turbo/
+!pixels-turbo/pixels-worker-spike/
+!pixels-turbo/pixels-worker-spike/target/
+!pixels-turbo/pixels-worker-spike/target/spike-java-handler-0.1.1.jar
+!pixels-turbo/pixels-worker-spike/target/pixels-worker-spike-0.2.0-SNAPSHOT.jar
+!pixels-turbo/pixels-worker-spike/target/pixels.properties

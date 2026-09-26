@@ -38,8 +38,10 @@ import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.planner.coordinate.CoordinatedPlanExecution;
 import io.pixelsdb.pixels.planner.coordinate.CoordinatorEndpoint;
+import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinatorFactory;
 import io.pixelsdb.pixels.planner.coordinate.S3QSShuffleResourceLifecycle;
+import io.pixelsdb.pixels.planner.coordinate.StageExecutionHandle;
 import io.pixelsdb.pixels.planner.coordinate.StageWorkerLauncher;
 import io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateServer;
 import io.pixelsdb.pixels.planner.plan.physical.PartitionedJoinS3QSOperator;
@@ -145,6 +147,43 @@ public class TestS3QSSpikeEndToEnd
                     transId, operator, new CoordinatorEndpoint("localhost", coordinatorPort),
                     new S3QSShuffleResourceLifecycle(), new InProcessSpikeStageWorkerLauncher());
             execution.execute();
+            PlanCoordinator coordinator = execution.getPlanCoordinator();
+            int[] stageIds = {smallProducer.getStageId(), largeProducer.getStageId(), consumer.getStageId()};
+            long deadline = System.currentTimeMillis() + 180000;
+            boolean allStagesDone = false;
+            while (System.currentTimeMillis() < deadline)
+            {
+                allStagesDone = true;
+                for (int stageId : stageIds)
+                {
+                    StageExecutionHandle handle = coordinator.getStageExecutionHandle(stageId);
+                    allStagesDone &= handle.getCompletionFuture().isDone();
+                    for (CompletableFuture<?> attempt : handle.getAttemptFutures())
+                    {
+                        if (attempt.isCompletedExceptionally())
+                        {
+                            try
+                            {
+                                attempt.join();
+                            }
+                            catch (CompletionException e)
+                            {
+                                throw new AssertionError("in-process Spike attempt failed in stage " + stageId,
+                                        e.getCause());
+                            }
+                        }
+                    }
+                }
+                if (allStagesDone)
+                {
+                    break;
+                }
+                Thread.sleep(500);
+            }
+            if (!allStagesDone)
+            {
+                fail("in-process Spike execution did not finish within 180 seconds");
+            }
             execution.collectOutputs();
 
             assertEquals(Collections.singleton("1:10:100"), readJoinedRows(s3, resultPath));
@@ -165,8 +204,16 @@ public class TestS3QSSpikeEndToEnd
         }
     }
 
-    private static PartitionInput producerInput(long transId, long timestamp, String tableName,
+    static PartitionInput producerInput(long transId, long timestamp, String tableName,
                                                 String inputPath, String valueColumn, ShuffleInfo shuffleInfo)
+    {
+        return producerInput(transId, timestamp, tableName, inputPath, valueColumn,
+                shuffleInfo, shuffleInfo.getNumPartitions());
+    }
+
+    static PartitionInput producerInput(long transId, long timestamp, String tableName,
+                                        String inputPath, String valueColumn, ShuffleInfo shuffleInfo,
+                                        int numPartitions)
     {
         String[] columns = {"key", valueColumn};
         ScanTableInfo tableInfo = new ScanTableInfo(tableName, true, columns,
@@ -178,14 +225,21 @@ public class TestS3QSSpikeEndToEnd
                 new StorageInfo(Storage.Scheme.s3qs, null, null, null, null), true);
         output.setShuffleInfo(shuffleInfo);
         PartitionInput input = new PartitionInput(transId, timestamp, tableInfo,
-                new boolean[] {true, true}, output, new PartitionInfo(new int[] {0}, 1));
+                new boolean[] {true, true}, output, new PartitionInfo(new int[] {0}, numPartitions));
         input.setProducerTaskId(0);
         return input;
     }
 
-    private static PartitionedJoinInput joinInput(long transId, long timestamp,
+    static PartitionedJoinInput joinInput(long transId, long timestamp,
                                                   ShuffleInfo smallShuffle, ShuffleInfo largeShuffle,
                                                   String resultFolder)
+    {
+        return joinInput(transId, timestamp, smallShuffle, largeShuffle, resultFolder, 0, "join.pxl");
+    }
+
+    static PartitionedJoinInput joinInput(long transId, long timestamp,
+                                          ShuffleInfo smallShuffle, ShuffleInfo largeShuffle,
+                                          String resultFolder, int partitionId, String resultFile)
     {
         PartitionedTableInfo small = partitionedTable("small", "small_value", smallShuffle);
         PartitionedTableInfo large = partitionedTable("large", "large_value", largeShuffle);
@@ -195,10 +249,10 @@ public class TestS3QSSpikeEndToEnd
                 new String[] {"large_value"},
                 new boolean[] {true, true},
                 new boolean[] {false, true},
-                false, null, 1, Collections.singletonList(0));
+                false, null, smallShuffle.getNumPartitions(), Collections.singletonList(partitionId));
         MultiOutputInfo output = new MultiOutputInfo(resultFolder,
                 new StorageInfo(Storage.Scheme.s3, null, null, null, null),
-                true, Collections.singletonList("join.pxl"));
+                true, Collections.singletonList(resultFile));
         return new PartitionedJoinInput(transId, timestamp, small, large, joinInfo,
                 false, null, output);
     }
@@ -214,7 +268,7 @@ public class TestS3QSSpikeEndToEnd
         return tableInfo;
     }
 
-    private static ShuffleInfo shuffleInfo(String shuffleId, String objectPrefix, String queueName)
+    static ShuffleInfo shuffleInfo(String shuffleId, String objectPrefix, String queueName)
     {
         return new ShuffleInfo(shuffleId,
                 new StorageInfo(Storage.Scheme.s3qs, null, null, null, null),
@@ -222,7 +276,20 @@ public class TestS3QSSpikeEndToEnd
                 Collections.singletonList(new ShuffleQueueInfo(0, queueName, null)));
     }
 
-    private static void writeInput(Storage storage, String path, String valueColumn, long[][] rows)
+    static ShuffleInfo shuffleInfo(String shuffleId, String objectPrefix, String queueName,
+                                   int numPartitions)
+    {
+        java.util.List<ShuffleQueueInfo> queues = new java.util.ArrayList<>();
+        for (int partitionId = 0; partitionId < numPartitions; ++partitionId)
+        {
+            queues.add(new ShuffleQueueInfo(partitionId, queueName + "-p" + partitionId, null));
+        }
+        return new ShuffleInfo(shuffleId,
+                new StorageInfo(Storage.Scheme.s3qs, null, null, null, null),
+                objectPrefix, numPartitions, 1, numPartitions, 1, queues);
+    }
+
+    static void writeInput(Storage storage, String path, String valueColumn, long[][] rows)
             throws IOException
     {
         TypeDescription schema = TypeDescription.createStruct()
@@ -269,7 +336,7 @@ public class TestS3QSSpikeEndToEnd
         return rows;
     }
 
-    private static void assertShuffleObjectsDeleted(Storage storage, String prefix) throws Exception
+    static void assertShuffleObjectsDeleted(Storage storage, String prefix) throws Exception
     {
         for (int i = 0; i < 10; ++i)
         {
@@ -282,7 +349,7 @@ public class TestS3QSSpikeEndToEnd
         assertFalse("shuffle object prefix still exists: " + prefix, storage.exists(prefix));
     }
 
-    private static void assertQueueDeleted(S3QS s3qs, String queueName) throws Exception
+    static void assertQueueDeleted(S3QS s3qs, String queueName) throws Exception
     {
         for (int i = 0; i < 20; ++i)
         {
@@ -293,7 +360,12 @@ public class TestS3QSSpikeEndToEnd
             }
             catch (IOException expected)
             {
-                return;
+                Throwable cause = expected.getCause();
+                if (cause instanceof software.amazon.awssdk.services.sqs.model.QueueDoesNotExistException)
+                {
+                    return;
+                }
+                throw expected;
             }
         }
         fail("SQS queue still exists: " + queueName);
@@ -307,7 +379,7 @@ public class TestS3QSSpikeEndToEnd
         }
     }
 
-    private static String trimSlashes(String value)
+    static String trimSlashes(String value)
     {
         if (value == null)
         {

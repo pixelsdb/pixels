@@ -52,7 +52,9 @@ public class SpikeAsyncClient
         this.timeout = Integer.parseInt(config.getProperty("spike.timeout"));
         String host = config.getProperty("spike.hostname");
         int port = Integer.parseInt(config.getProperty("spike.port"));
-        checkArgument(host != null, "illegal rpc host");
+        checkArgument(cpu > 0 && memory > 0, "spike.cpu and spike.memory must be positive");
+        checkArgument(timeout > 0, "spike.timeout must be positive");
+        checkArgument(host != null && !host.trim().isEmpty(), "illegal rpc host");
         checkArgument(port > 0 && port <= 65535, "illegal rpc port");
         this.channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext().build();
@@ -62,6 +64,16 @@ public class SpikeAsyncClient
     public static synchronized SpikeAsyncClient Instance()
     {
         return InstanceHolder.instance;
+    }
+
+    public int getDefaultCpu()
+    {
+        return cpu;
+    }
+
+    public int getDefaultMemory()
+    {
+        return memory;
     }
 
     @Override

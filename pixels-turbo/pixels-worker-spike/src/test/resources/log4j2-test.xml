@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{ISO8601} %-5p %c{1} %m%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Logger name="io.pixelsdb.pixels.planner.coordinate.StageAutoScaler" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Logger name="io.pixelsdb.pixels.planner.coordinate.WorkerCoordinateServiceImpl" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Root level="error">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

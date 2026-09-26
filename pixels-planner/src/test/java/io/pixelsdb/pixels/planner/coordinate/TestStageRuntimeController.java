@@ -121,6 +121,31 @@ public class TestStageRuntimeController
     }
 
     @Test
+    public void drainingWorkerFinishesClaimedTaskButCannotClaimAnother() throws Exception
+    {
+        StageCoordinator stage = stageCoordinator(3);
+        stage.setTaskBatchSize(1);
+        StageRuntimeController controller = controller(stage, new RecordingStageWorkerLauncher());
+        controller.scaleTo(2);
+        Worker<CFWorkerInfo> first = worker(1L);
+        Worker<CFWorkerInfo> second = worker(2L);
+        stage.addWorker(first);
+        stage.addWorker(second);
+
+        List<Task> claimed = stage.getTasksToRun(second.getWorkerId());
+        assertEquals(1, claimed.size());
+        controller.scaleTo(1);
+        assertTrue(stage.isWorkerDraining(second.getWorkerId()));
+        assertFalse(second.isTerminated());
+        assertTrue(stage.getTasksToRun(second.getWorkerId()).isEmpty());
+
+        stage.completeTask(claimed.get(0).getTaskId(), true);
+        assertEquals(1, stage.getCompletedTaskCount());
+        assertFalse(second.isTerminated());
+        assertEquals(1, stage.getTasksToRun(first.getWorkerId()).size());
+    }
+
+    @Test
     public void workerRegisteringAfterScaleToZeroCanNotClaimTasks() throws Exception
     {
         StageCoordinator stage = stageCoordinator(1);

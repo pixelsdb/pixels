@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.worker.common;
 
 import com.alibaba.fastjson.JSON;
 import io.pixelsdb.pixels.common.lease.Lease;
+import io.pixelsdb.pixels.common.exception.WorkerCoordinateException;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.common.turbo.WorkerType;
@@ -38,6 +39,7 @@ import org.mockito.InOrder;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -48,6 +50,9 @@ import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -154,5 +159,87 @@ public class TestS3QSStageWorkerRunner
         }
 
         verifyNoInteractions(coordinateService);
+    }
+
+    @Test
+    public void renewsLeaseWhileExecutingLongTask() throws Exception
+    {
+        runSlowTaskWithLease(false);
+    }
+
+    @Test
+    public void doesNotCompleteTaskAfterLeaseRenewalFailure() throws Exception
+    {
+        runSlowTaskWithLease(true);
+    }
+
+    private void runSlowTaskWithLease(boolean failRenewal) throws Exception
+    {
+        WorkerCoordinateService coordinateService = mock(WorkerCoordinateService.class);
+        WorkerContext context = new WorkerContext(LogManager.getLogger(TestS3QSStageWorkerRunner.class),
+                new WorkerMetrics(), "slow-request-1277");
+        S3QSStageWorkerRunner runner = new S3QSStageWorkerRunner(context, coordinateService);
+        long workerId = 29L;
+        Worker<CFWorkerInfo> worker = new Worker<>(workerId,
+                new Lease(System.currentTimeMillis(), 90L), 0,
+                new CFWorkerInfo("localhost", -1, 1277L, 3,
+                        Constants.PARTITION_OPERATOR_NAME, Collections.emptyList()));
+        TaskInfo task = new TaskInfo(5, JSON.toJSONString("slow-payload"));
+        List<TaskInfo> tasks = Collections.singletonList(task);
+        when(coordinateService.registerWorker(any(CFWorkerInfo.class))).thenReturn(worker);
+        when(coordinateService.getTasksToExecute(workerId)).thenReturn(
+                new TaskBatch(false, tasks), new TaskBatch(true, Collections.emptyList()));
+        if (failRenewal)
+        {
+            when(coordinateService.extendLease(workerId)).thenThrow(
+                    new WorkerCoordinateException("simulated lease failure"));
+        }
+
+        Class<?> taskExecutorClass = Class.forName(
+                "io.pixelsdb.pixels.worker.common.S3QSStageWorkerRunner$TaskExecutor");
+        Object taskExecutor = Proxy.newProxyInstance(taskExecutorClass.getClassLoader(),
+                new Class<?>[] {taskExecutorClass}, (proxy, method, args) ->
+                {
+                    if (!method.getName().equals("execute"))
+                    {
+                        throw new UnsupportedOperationException(method.getName());
+                    }
+                    Thread.sleep(300L);
+                    PartitionOutput output = new PartitionOutput();
+                    output.setSuccessful(true);
+                    return output;
+                });
+        Method run = S3QSStageWorkerRunner.class.getDeclaredMethod("run",
+                StageWorkerInput.class, String.class, WorkerType.class, Class.class,
+                taskExecutorClass, Output.class);
+        run.setAccessible(true);
+        StageWorkerInput input = new StageWorkerInput(1277L, 1000L, 3,
+                "test-s3qs-stage", WorkerType.PARTITION_S3QS);
+
+        if (failRenewal)
+        {
+            try
+            {
+                run.invoke(runner, input, Constants.PARTITION_OPERATOR_NAME,
+                        WorkerType.PARTITION_S3QS, String.class, taskExecutor, new PartitionOutput());
+                fail("expected lease renewal failure");
+            }
+            catch (InvocationTargetException e)
+            {
+                assertTrue(e.getCause() instanceof WorkerException);
+                assertTrue(e.getCause().getMessage().contains("failed to run S3QS stage worker"));
+            }
+            verify(coordinateService, never()).completeTasks(workerId, tasks);
+        }
+        else
+        {
+            PartitionOutput output = (PartitionOutput) run.invoke(runner, input,
+                    Constants.PARTITION_OPERATOR_NAME, WorkerType.PARTITION_S3QS,
+                    String.class, taskExecutor, new PartitionOutput());
+            assertTrue(output.isSuccessful());
+            verify(coordinateService).completeTasks(workerId, tasks);
+        }
+        verify(coordinateService, atLeastOnce()).extendLease(workerId);
+        verify(coordinateService).terminateWorker(workerId);
     }
 }

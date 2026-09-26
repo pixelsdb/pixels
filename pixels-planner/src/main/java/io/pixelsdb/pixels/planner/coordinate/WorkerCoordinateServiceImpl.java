@@ -66,6 +66,11 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
         requireNonNull(stageCoordinator, "stage coordinator is not found");
         stageCoordinator.addWorker(worker);
+        if (stageCoordinator.isQueued())
+        {
+            log.info("s3qs_worker_registered transId={} stageId={} workerId={} address={}",
+                    workerInfo.getTransId(), workerInfo.getStageId(), workerId, workerInfo.getIp());
+        }
         TurboProto.RegisterWorkerResponse response = TurboProto.RegisterWorkerResponse.newBuilder()
                 .setErrorCode(SUCCESS).setWorkerId(workerId).setWorkerPortIndex(worker.getWorkerPortIndex()).setLeasePeriodMs(lease.getPeriodMs())
                 .setLeaseStartTimeMs(lease.getStartMs()).build();
@@ -148,6 +153,11 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                 builder.setErrorCode(SUCCESS);
                 for (Task task : tasks)
                 {
+                    if (stageCoordinator.isQueued())
+                    {
+                        log.info("s3qs_task_claimed transId={} stageId={} workerId={} taskId={}",
+                                workerInfo.getTransId(), workerInfo.getStageId(), workerId, task.getTaskId());
+                    }
                     builder.addTaskInputs(TurboProto.TaskInput.newBuilder()
                             .setTaskId(task.getTaskId()).setPayload(task.getPayload()));
                 }
@@ -174,6 +184,12 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         for (TurboProto.TaskResult taskResult : taskResults)
         {
             stageCoordinator.completeTask(taskResult.getTaskId(), taskResult.getSuccess());
+            if (stageCoordinator.isQueued())
+            {
+                log.info("s3qs_task_completed transId={} stageId={} workerId={} taskId={} success={}",
+                        workerInfo.getTransId(), workerInfo.getStageId(), workerId,
+                        taskResult.getTaskId(), taskResult.getSuccess());
+            }
         }
         builder.setErrorCode(SUCCESS);
         responseObserver.onNext(builder.build());
@@ -207,8 +223,15 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
     {
         long workerId = request.getWorkerId();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
+        CFWorkerInfo workerInfo = worker.getWorkerInfo();
         TurboProto.TerminateWorkerResponse.Builder builder = TurboProto.TerminateWorkerResponse.newBuilder();
         worker.terminate();
+        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
+        if (planCoordinator != null && planCoordinator.getStageRuntimeController(workerInfo.getStageId()) != null)
+        {
+            log.info("s3qs_worker_terminated transId={} stageId={} workerId={}",
+                    workerInfo.getTransId(), workerInfo.getStageId(), workerId);
+        }
         builder.setErrorCode(SUCCESS);
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
