@@ -824,6 +824,11 @@ public final class SqlIngestFixture implements AutoCloseable {
                                 return client.coordinator()
                                         .listWrites(OwnerRequest.newBuilder().setOwner(o).build());
                             }
+
+                            public long publishedTimestamp() {
+                                return client.coordinator().getPublication(
+                                        Empty.getDefaultInstance()).getPublishedTimestamp();
+                            }
                         },
                         installer,
                         resources.getIngestReadPins());

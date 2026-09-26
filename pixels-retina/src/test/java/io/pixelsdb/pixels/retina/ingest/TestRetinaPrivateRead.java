@@ -81,6 +81,43 @@ public class TestRetinaPrivateRead
     @TempDir Path directory;
 
     @Test
+    public void publicationLookupDoesNotHoldParticipantLockAndRechecksShutdown() throws Exception
+    {
+        MutableDecisions decisions = new MutableDecisions();
+        try (LocalMutationJournal journal = new LocalMutationJournal(
+                directory, JOURNAL_PAYLOAD_LIMIT, JOURNAL_BYTE_LIMIT, JOURNAL_RECORD_LIMIT);
+                RetinaIngestParticipant participant = new RetinaIngestParticipant(
+                        OWNER, journal, decisions, new NoOpInstaller(),
+                        new IngestReadPins(READ_LEASE_MILLIS))) {
+            participant.recover();
+            assertThrows(IOException.class, () -> participant.pinRead(
+                    ReadPin.newBuilder().setReadTimestamp(READ_TIMESTAMP + 1).build()));
+            decisions.publicationStarted = new CountDownLatch(1);
+            decisions.continuePublication = new CountDownLatch(1);
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            try {
+                Future<ReadPin> pin = executor.submit(() -> participant.pinRead(
+                        ReadPin.newBuilder().setReadTimestamp(READ_TIMESTAMP).build()));
+                assertTrue(decisions.publicationStarted.await(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                assertTrue(executor.submit(participant::isReady)
+                        .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                executor.submit(() -> { participant.close(); return null; })
+                        .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                decisions.continuePublication.countDown();
+                java.util.concurrent.ExecutionException failure = assertThrows(
+                        java.util.concurrent.ExecutionException.class,
+                        () -> pin.get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                assertTrue(failure.getCause() instanceof IOException);
+                assertTrue(failure.getCause().getMessage().contains("not ready"));
+            } finally {
+                decisions.continuePublication.countDown();
+                executor.shutdownNow();
+                assertTrue(executor.awaitTermination(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            }
+        }
+    }
+
+    @Test
     public void concurrentParticipantSealsShareWalSync() throws Exception
     {
         MutableDecisions decisions = new MutableDecisions();
@@ -307,6 +344,8 @@ public class TestRetinaPrivateRead
             implements RetinaIngestParticipant.Decisions
     {
         private Transaction transaction;
+        private CountDownLatch publicationStarted;
+        private CountDownLatch continuePublication;
 
         public Transaction get(long transactionId) throws IOException
         {
@@ -329,6 +368,17 @@ public class TestRetinaPrivateRead
                 result.addTransactions(transaction);
             }
             return result.build();
+        }
+
+        public long publishedTimestamp() throws Exception
+        {
+            if (publicationStarted != null) {
+                publicationStarted.countDown();
+                if (!continuePublication.await(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    throw new IOException("Publication test timed out");
+                }
+            }
+            return READ_TIMESTAMP;
         }
     }
 

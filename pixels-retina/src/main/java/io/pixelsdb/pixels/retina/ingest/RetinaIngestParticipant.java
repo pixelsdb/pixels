@@ -46,6 +46,8 @@ public final class RetinaIngestParticipant implements Closeable {
         Transaction abort(long id) throws Exception;
 
         TransactionList list(String owner) throws Exception;
+
+        long publishedTimestamp() throws Exception;
     }
 
     public interface Installer extends Closeable {
@@ -422,12 +424,20 @@ public final class RetinaIngestParticipant implements Closeable {
         journal.checkpointTransaction(transactionId);
     }
 
-    public synchronized ReadPin pinRead(ReadPin request) throws Exception {
-        serving();
-        if (request.getReadTimestamp() > decisions.list(owner).getPublishedTimestamp()) {
+    public ReadPin pinRead(ReadPin request) throws Exception {
+        synchronized (this) {
+            serving();
+        }
+        // Publication is monotonic; fetch only its watermark without holding up
+        // unrelated transaction admission while the coordinator RPC completes.
+        long publishedTimestamp = decisions.publishedTimestamp();
+        if (request.getReadTimestamp() > publishedTimestamp) {
             throw new IOException("Cannot pin an unpublished read timestamp");
         }
-        return readPins.pin(request);
+        synchronized (this) {
+            serving();
+            return readPins.pin(request);
+        }
     }
 
     public synchronized PrivateReadPage readPrivate(PrivateReadRequest request) throws Exception {

@@ -208,6 +208,13 @@ public class RetinaServer implements Server
                                     return client.coordinator().listWrites(
                                             OwnerRequest.newBuilder().setOwner(owner).build());
                                 }
+
+                                @Override
+                                public long publishedTimestamp()
+                                {
+                                    return client.coordinator().getPublication(
+                                            com.google.protobuf.Empty.getDefaultInstance()).getPublishedTimestamp();
+                                }
                             }, installer, resources.getIngestReadPins(),
                             options.privateReadMaxBatches, options.privateReadMaxBytes);
                     this.ingestClient = client;

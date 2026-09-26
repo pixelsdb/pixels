@@ -216,6 +216,11 @@ public class TestRetinaIngestParticipantCheckpoint
                     .addTransactions(transaction)
                     .build();
         }
+
+        public long publishedTimestamp()
+        {
+            return transaction.getCommitTimestamp();
+        }
     }
 
     private static final class Installer implements RetinaIngestParticipant.Installer
