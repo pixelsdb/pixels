@@ -36,6 +36,42 @@ import java.util.concurrent.atomic.*;
 public final class SqlIngestFixture implements AutoCloseable {
     private static final long SERVER_SHUTDOWN_TIMEOUT_SECONDS = 5L;
     private static final int DEFAULT_FIXTURE_ROUTE_COUNT = 1;
+    private final Map<String, RpcTiming> rpcTimings = new ConcurrentHashMap<>();
+
+    private static final class RpcTiming {
+        private final AtomicLong calls = new AtomicLong();
+        private final AtomicLong nanos = new AtomicLong();
+        private final AtomicLong maxNanos = new AtomicLong();
+    }
+
+    /** Measures server-handler time only; network and pre-dispatch queueing are excluded. */
+    private ServerInterceptor rpcTimingInterceptor() {
+        final boolean enabled = Boolean.parseBoolean(
+                benchmarkSetting("PIXELS_SQL_FIXTURE_RPC_TIMING", "false"));
+        return new ServerInterceptor() {
+            @Override
+            public <Q, A> ServerCall.Listener<Q> interceptCall(
+                    ServerCall<Q, A> call, Metadata headers, ServerCallHandler<Q, A> next) {
+                if (!enabled) {
+                    return next.startCall(call, headers);
+                }
+                final long start = System.nanoTime();
+                final RpcTiming timing = rpcTimings.computeIfAbsent(
+                        call.getMethodDescriptor().getFullMethodName(), ignored -> new RpcTiming());
+                return next.startCall(
+                        new ForwardingServerCall.SimpleForwardingServerCall<Q, A>(call) {
+                            @Override
+                            public void close(Status status, Metadata trailers) {
+                                long elapsed = System.nanoTime() - start;
+                                timing.nanos.addAndGet(elapsed);
+                                timing.maxNanos.accumulateAndGet(elapsed, Math::max);
+                                timing.calls.incrementAndGet();
+                                super.close(status, trailers);
+                            }
+                        }, headers);
+            }
+        };
+    }
 
     private static String benchmarkSetting(String name, String fallback) {
         String value = System.getenv(name);
@@ -565,7 +601,8 @@ public final class SqlIngestFixture implements AutoCloseable {
                         "PIXELS_SQL_FIXTURE_COORDINATOR_GROUP_COMMIT_DELAY_MICROS", "200"));
         settings.forEach(config::addProperty);
         catalog = new Catalog(root);
-        metadataServer = ServerBuilder.forPort(0).addService(catalog).build().start();
+        metadataServer = ServerBuilder.forPort(0).intercept(rpcTimingInterceptor())
+                .addService(catalog).build().start();
         config.addProperty("metadata.server.host", "127.0.0.1");
         config.addProperty("metadata.server.port", Integer.toString(metadataServer.getPort()));
         nodeServer =
@@ -706,6 +743,7 @@ public final class SqlIngestFixture implements AutoCloseable {
                 };
         transactionServer =
                 ServerBuilder.forPort(0)
+                        .intercept(rpcTimingInterceptor())
                         .addService(readTransactions)
                         .addService(
                                 ServerInterceptors.intercept(
@@ -881,6 +919,7 @@ public final class SqlIngestFixture implements AutoCloseable {
                 };
         retinaServer =
                 ServerBuilder.forPort(retinaPort)
+                        .intercept(rpcTimingInterceptor())
                         .addService(reads)
                         .addService(
                                 ServerInterceptors.intercept(
@@ -941,6 +980,13 @@ public final class SqlIngestFixture implements AutoCloseable {
         status.setProperty("acceptedRows", Long.toString(acceptedRows.get()));
         status.setProperty("bufferReadRPCs", Long.toString(bufferReadRpcCount.get()));
         status.setProperty("fileVisibilityRPCs", Long.toString(fileReadRpcCount.get()));
+        for (Map.Entry<String, RpcTiming> entry : rpcTimings.entrySet()) {
+            String prefix = "rpc." + entry.getKey();
+            RpcTiming timing = entry.getValue();
+            status.setProperty(prefix + ".calls", Long.toString(timing.calls.get()));
+            status.setProperty(prefix + ".totalNanos", Long.toString(timing.nanos.get()));
+            status.setProperty(prefix + ".maxNanos", Long.toString(timing.maxNanos.get()));
+        }
         Path temporary = destination.resolveSibling(destination.getFileName() + ".new");
         try (java.io.OutputStream output = Files.newOutputStream(temporary)) {
             status.store(output, "Integration counters");
