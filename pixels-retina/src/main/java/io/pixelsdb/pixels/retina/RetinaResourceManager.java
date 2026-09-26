@@ -1079,7 +1079,7 @@ public class RetinaResourceManager
                 PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(
                         layout.tableId, layout.schema, layout.orderMapping,
                         layout.orderedPath, layout.compactPath, retinaHostName, i,
-                        minimumFileRows, automaticTailFlush);
+                        minimumFileRows, automaticTailFlush, ingestReadPins);
                 nodeBuffers.put(i, pixelsWriteBuffer);
             }
         } catch (Exception e)

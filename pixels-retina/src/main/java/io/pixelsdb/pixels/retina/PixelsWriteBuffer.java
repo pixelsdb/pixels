@@ -135,6 +135,7 @@ public class PixelsWriteBuffer
     private String retinaHostName;
     private final int virtualNodeId;
     private final IndexOption indexOption;
+    private final io.pixelsdb.pixels.retina.ingest.IngestReadPins ingestReadPins;
 
     public PixelsWriteBuffer(long tableId, TypeDescription schema, int[] orderMapping,
                              Path targetOrderedDirPath, Path targetCompactDirPath,
@@ -155,7 +156,20 @@ public class PixelsWriteBuffer
                              String retinaHostName, int virtualNode,
                              int minimumFileRows, boolean automaticTailFlush) throws RetinaException
     {
+        this(tableId, schema, orderMapping, targetOrderedDirPath, targetCompactDirPath,
+                retinaHostName, virtualNode, minimumFileRows, automaticTailFlush, null);
+    }
+
+    public PixelsWriteBuffer(long tableId, TypeDescription schema, int[] orderMapping,
+                             Path targetOrderedDirPath, Path targetCompactDirPath,
+                             String retinaHostName, int virtualNode,
+                             int minimumFileRows, boolean automaticTailFlush,
+                             io.pixelsdb.pixels.retina.ingest.IngestReadPins ingestReadPins) throws RetinaException
+    {
         this.tableId = tableId;
+        checkArgument(!transactional || ingestReadPins != null,
+                "Transactional buffer requires read-pin ownership");
+        this.ingestReadPins = ingestReadPins;
         this.schema = schema;
         this.orderMapping = orderMapping;
         this.virtualNodeId = virtualNode;
@@ -749,19 +763,20 @@ public class PixelsWriteBuffer
                 }
                 if (transactional)
                 {
-                    // This is append-only publication: the new file contains only future
-                    // commit timestamps for older ReadViews and replaces no existing coverage.
-                    // Waiting for pinned readers here would deadlock FILE+VISIBLE against its
-                    // own transaction pin. Rewrite/retirement publication remains pin-protected.
                     prepareFinishedFile(fileWriterManager);
-                    List<FileWriterManager> publishedFiles = this.ingestFilePublisher.admitReady(
-                            fileWriterManager, this::publishPreparedFile);
-                    for (FileWriterManager publishedFile : publishedFiles)
-                    {
-                        this.fileWriterManagers.remove(publishedFile);
-                        cleanupPublishedObjects(
-                                publishedFile.getFirstBlockId(), publishedFile.getLastBlockId());
-                    }
+                    // File publication replaces query-visible buffer coverage. Keep its
+                    // objects available until every read selecting that coverage is done.
+                    boolean published = ingestReadPins.publish(() -> {
+                        List<FileWriterManager> publishedFiles = this.ingestFilePublisher.admitReady(
+                                fileWriterManager, this::publishPreparedFile);
+                        for (FileWriterManager publishedFile : publishedFiles)
+                        {
+                            this.fileWriterManagers.remove(publishedFile);
+                            cleanupPublishedObjects(
+                                    publishedFile.getFirstBlockId(), publishedFile.getLastBlockId());
+                        }
+                    });
+                    if (!published) { break; }
                 }
                 else
                 {
