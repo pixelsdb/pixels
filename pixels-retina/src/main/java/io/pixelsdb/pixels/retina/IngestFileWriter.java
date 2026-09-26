@@ -72,6 +72,7 @@ public final class IngestFileWriter implements AutoCloseable
     {
         private final File file;
         private final PixelsWriter writer;
+        private final VectorizedRowBatch batch;
         private final int capacity;
         private int rows;
         private long minRowId = Long.MAX_VALUE;
@@ -80,11 +81,12 @@ public final class IngestFileWriter implements AutoCloseable
         private boolean physicalClosed;
         private boolean indexFlushed;
 
-        private ActiveFile(File file, PixelsWriter writer, int capacity)
+        private ActiveFile(File file, PixelsWriter writer, int capacity, VectorizedRowBatch batch)
         {
             this.file = file;
             this.writer = writer;
             this.capacity = capacity;
+            this.batch = batch;
         }
     }
 
@@ -203,7 +205,8 @@ public final class IngestFileWriter implements AutoCloseable
             while (offset < rows.size())
             {
                 int count = Math.min(pixelStride, rows.size() - offset);
-                try (VectorizedRowBatch batch = schema.createRowBatchWithHiddenColumn(count))
+                VectorizedRowBatch batch = active.batch;
+                try
                 {
                     for (int row = 0; row < count; row++)
                     {
@@ -224,6 +227,12 @@ public final class IngestFileWriter implements AutoCloseable
                         batch.size++;
                     }
                     active.writer.addRowBatch(batch);
+                }
+                finally
+                {
+                    // PixelsWriter consumes the batch synchronously, as in the CLI loader.
+                    // Reset releases variable-width row references before the next contribution.
+                    batch.reset();
                 }
                 offset += count;
             }
@@ -336,7 +345,8 @@ public final class IngestFileWriter implements AutoCloseable
                     .setNullsPadding(nullsPadding)
                     .setCompressionBlockSize(1)
                     .build();
-            return new ActiveFile(file, writer, capacity);
+            return new ActiveFile(file, writer, capacity,
+                    schema.createRowBatchWithHiddenColumn(Math.min(pixelStride, capacity)));
         }
         catch (Exception e)
         {
@@ -423,6 +433,7 @@ public final class IngestFileWriter implements AutoCloseable
             if (!active.physicalClosed)
             {
                 active.writer.close();
+                active.batch.close();
                 active.physicalClosed = true;
             }
             if (!active.indexFlushed)
