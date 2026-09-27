@@ -149,6 +149,26 @@ public interface MainIndex extends Closeable
      */
     List<Boolean> putEntries(List<IndexProto.PrimaryIndexEntry> primaryEntries);
 
+    /** Insert consecutive identities and locations without requiring per-row messages. */
+    default boolean putRange(RowIdRange range)
+    {
+        long count = range.getRowIdEnd() - range.getRowIdStart();
+        if (range.getRowIdStart() < 0 || range.getRowIdEnd() <= range.getRowIdStart()
+                || count <= 0 || range.getRgRowOffsetStart() < 0
+                || count != (long) range.getRgRowOffsetEnd() - range.getRgRowOffsetStart())
+        {
+            throw new IllegalArgumentException("Invalid main index range");
+        }
+        boolean success = true;
+        for (int offset = range.getRgRowOffsetStart(); offset < range.getRgRowOffsetEnd(); offset++)
+        {
+            success &= putEntry(range.getRowIdStart() + offset - range.getRgRowOffsetStart(),
+                    IndexProto.RowLocation.newBuilder().setFileId(range.getFileId())
+                            .setRgId(range.getRgId()).setRgRowOffset(offset).build());
+        }
+        return success;
+    }
+
     /**
      * Delete a range of row ids from the main index. This method only has effect on the persistent storage
      * of the main index. {@link #flushCache(long fileId)} should be called before this method

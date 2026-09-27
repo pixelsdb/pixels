@@ -56,6 +56,8 @@ public class TestPixelsIngestStorage {
     private static final long STATEMENT_ID = 1L;
     private static final int INSTALLATION_STATE_BYTES = 16 * 1024 * 1024;
     private static final int INSTALLATION_COMPACTION_BYTES = 8 * 1024 * 1024;
+    private static final int PLAN_JOURNAL_HEADER_BYTES = 2 * Integer.BYTES;
+    private static final int PLAN_FRAME_HEADER_BYTES = 2 * Integer.BYTES;
 
     private static <T> void reply(StreamObserver<T> out, T value) {
         out.onNext(value);
@@ -401,7 +403,10 @@ public class TestPixelsIngestStorage {
             AtomicBoolean failOnce = new AtomicBoolean(true);
             AtomicBoolean rejectCheckpointFlush = new AtomicBoolean();
             AtomicInteger locationLookupCalls = new AtomicInteger();
+            AtomicInteger rangePutCalls = new AtomicInteger();
             IndexService delegate = LocalIndexService.Instance();
+            InstallationStateStore installationState = new InstallationStateStore(
+                    planDirectory, INSTALLATION_STATE_BYTES, INSTALLATION_COMPACTION_BYTES);
             IndexService index =
                     (IndexService)
                             Proxy.newProxyInstance(
@@ -410,6 +415,9 @@ public class TestPixelsIngestStorage {
                                     (proxy, method, args) -> {
                                         if (method.getName().equals("lookupRowLocations")) {
                                             locationLookupCalls.incrementAndGet();
+                                        }
+                                        if (method.getName().equals("putMainIndexRangeOnly")) {
+                                            rangePutCalls.incrementAndGet();
                                         }
                                         if (method.getName().equals("allocateRowIdBatch")) {
                                             int count = (Integer) args[1];
@@ -422,6 +430,18 @@ public class TestPixelsIngestStorage {
                                         if (method.getName().equals("flushMainIndexOfFile")
                                                 && rejectCheckpointFlush.get()) {
                                             return false;
+                                        }
+                                        if (method.getName().equals("putMainIndexEntriesOnly")
+                                                && putCalls.get() == 0) {
+                                            Collection<BatchInstall> durablePlans = installationState.plans().values();
+                                            assertEquals(1, durablePlans.size());
+                                            BatchInstall first = durablePlans.iterator().next();
+                                            assertEquals(1, first.getSpansCount());
+                                            assertEquals(first.getRowIdStart(), first.getSpans(0).getRowIdStart());
+                                            assertEquals(PLAN_JOURNAL_HEADER_BYTES + PLAN_FRAME_HEADER_BYTES
+                                                            + Byte.BYTES + first.getSerializedSize(),
+                                                    Files.size(planDirectory.resolve("plans.log")),
+                                                    "Allocation and first placement must share one durable record");
                                         }
                                         try {
                                             Object result = method.invoke(delegate, args);
@@ -441,9 +461,7 @@ public class TestPixelsIngestStorage {
                                     });
             installer =
                     new PixelsIngestInstaller(
-                            new InstallationStateStore(
-                                    planDirectory, INSTALLATION_STATE_BYTES,
-                                    INSTALLATION_COMPACTION_BYTES),
+                            installationState,
                             new IngestOptions(),
                             "127.0.0.1:18890",
                             resources,
@@ -476,7 +494,13 @@ public class TestPixelsIngestStorage {
             // MainIndex flushes remain real, while buffer-read assertions no longer race the
             // asynchronous publisher that this test later resumes explicitly.
             catalog.rejectPublication.set(true);
-            installer.prepare(tx, Collections.singletonList(batch));
+            AtomicInteger preparePasses = new AtomicInteger();
+            installer.prepare(tx, () -> {
+                assertEquals(1, preparePasses.incrementAndGet(),
+                        "Prepare must not replay WAL payloads just to count rows");
+                return Collections.singletonList(batch).iterator();
+            });
+            assertEquals(1, preparePasses.get());
             assertEquals(0, catalog.files.size());
             PixelsIngestInstaller target = installer;
             assertThrows(
@@ -597,10 +621,26 @@ public class TestPixelsIngestStorage {
             Transaction published = tx.toBuilder().setState(TransactionState.PUBLISHED)
                     .setProgress(PublicationProgress.VISIBLE_NOW).build();
             rejectCheckpointFlush.set(true);
-            assertFalse(installer.checkpoint(published, Collections.singletonList(batch)),
+            Iterable<MutationBatch> blockedCoverage = () -> new java.util.Iterator<MutationBatch>() {
+                private boolean delivered;
+
+                public boolean hasNext() { return true; }
+
+                public MutationBatch next() {
+                    if (delivered) {
+                        throw new AssertionError("Checkpoint must verify coverage before reading more WAL");
+                    }
+                    delivered = true;
+                    return batch;
+                }
+            };
+            assertFalse(installer.checkpoint(published, blockedCoverage),
                     "Failed MainIndex durability proof must retain the installation plan");
             rejectCheckpointFlush.set(false);
             assertTrue(installer.checkpoint(published, Collections.singletonList(batch)));
+            assertTrue(installer.checkpoint(published, () -> {
+                throw new AssertionError("Completed checkpoint must not require reclaimed WAL");
+            }));
             assertTrue(installer.recoveredByCheckpoint(published));
 
             // Rewrite one real Pixels file from this INSERT. Stable rowIds move only in
@@ -719,6 +759,7 @@ public class TestPixelsIngestStorage {
 
             long bufferedBeforeFile = bufferedRows(buffer);
             int lookupsBeforeFile = locationLookupCalls.get();
+            long entryPutsBeforeFile = putCalls.get();
             long objectFilesBefore = countFiles(root.resolve("objects"));
             Set<Long> regularBeforeFile = catalog.files.values().stream()
                     .filter(f -> f.getType() == MetadataProto.File.Type.REGULAR)
@@ -738,7 +779,13 @@ public class TestPixelsIngestStorage {
                     .setCommitToken("storage-test-file-102")
                     .setRepresentation(WriteRepresentation.FILE)
                     .build();
-            installer.prepare(fileTransaction, Collections.singletonList(fileBatch));
+            AtomicInteger filePreparePasses = new AtomicInteger();
+            installer.prepare(fileTransaction, () -> {
+                assertEquals(1, filePreparePasses.incrementAndGet(),
+                        "FILE Prepare must consume each WAL batch in one pass");
+                return Collections.singletonList(fileBatch).iterator();
+            });
+            assertEquals(1, filePreparePasses.get());
             assertFalse(installer.install(
                     fileTransaction, Collections.singletonList(fileBatch), false, false));
             List<byte[][]> nextFileRows = Collections.nCopies(
@@ -757,13 +804,19 @@ public class TestPixelsIngestStorage {
             installer.prepare(nextFileTransaction, Collections.singletonList(nextFileBatch));
             assertFalse(installer.install(
                     nextFileTransaction, Collections.singletonList(nextFileBatch), false, false));
+            Iterable<MutationBatch> noPayloadReplay = () -> {
+                throw new AssertionError("Publication polling must not reread installed WAL payloads");
+            };
             assertFalse(installer.install(
-                    fileTransaction, Collections.singletonList(fileBatch), false, false),
+                    fileTransaction, noPayloadReplay, false, false),
                     "Polling an earlier contribution must accept a later written file prefix");
             assertTrue(installer.install(
-                    nextFileTransaction, Collections.singletonList(nextFileBatch), false, true));
+                    nextFileTransaction, noPayloadReplay, false, true));
             assertEquals(lookupsBeforeFile, locationLookupCalls.get(),
                     "Fresh FILE spans and completion polls must not look up individual rowIds");
+            assertTrue(rangePutCalls.get() > 0, "Fresh FILE spans must use contiguous MainIndex ranges");
+            assertEquals(entryPutsBeforeFile, putCalls.get(),
+                    "Fresh FILE installation must not expand ranges into per-row index messages");
             assertEquals(bufferedBeforeFile, bufferedRows(buffer),
                     "FILE must not install rows into the shared MemTable");
             assertEquals(objectFilesBefore, countFiles(root.resolve("objects")),

@@ -142,6 +142,7 @@ public final class DurableIngestCoordinator implements Closeable {
     private CoordinatorSnapshot snapshot;
     private long stateSequence;
     private long synchronizedSequence;
+    private long publicationSequence;
     private boolean stateSyncInProgress;
     private IOException persistenceFailure;
     private long forceFileThroughTimestamp;
@@ -264,6 +265,7 @@ public final class DurableIngestCoordinator implements Closeable {
             store.store(snapshot);
             stateSequence = 1L;
             synchronizedSequence = stateSequence;
+            publicationSequence = stateSequence;
         } else {
             snapshot = recovered;
             validateRecoveredSnapshot(snapshot);
@@ -327,9 +329,14 @@ public final class DurableIngestCoordinator implements Closeable {
         if (!Thread.holdsLock(this)) {
             throw new IllegalStateException("Coordinator state lock is not held");
         }
+        boolean changesPublication = value.getPublishedTimestamp() != snapshot.getPublishedTimestamp()
+                || !value.getRoutesList().equals(snapshot.getRoutesList());
         store.store(value, StateStore.Durability.DEFERRED);
         snapshot = value;
         stateSequence = Math.addExact(stateSequence, 1L);
+        if (changesPublication) {
+            publicationSequence = stateSequence;
+        }
     }
 
     private void saveDeferred(CoordinatorSnapshot value) throws IOException {
@@ -799,13 +806,15 @@ public final class DurableIngestCoordinator implements Closeable {
     }
 
     public synchronized long publishedTimestamp() {
+        long timestamp = snapshot.getPublishedTimestamp();
         try {
-            synchronizeState(stateSequence);
+            checkOpen();
+            synchronizeState(publicationSequence);
         }
         catch (IOException e) {
             throw new IllegalStateException("Cannot read durable published timestamp", e);
         }
-        return snapshot.getPublishedTimestamp();
+        return timestamp;
     }
 
     public synchronized long lastCommitTimestamp() {
@@ -1090,11 +1099,14 @@ public final class DurableIngestCoordinator implements Closeable {
         synchronized (this) {
             checkOpen();
             pinRoutes(current);
-            synchronizeState(stateSequence);
-            return Publication.newBuilder()
+            Publication publication = Publication.newBuilder()
                     .setPublishedTimestamp(snapshot.getPublishedTimestamp())
                     .addAllRoutes(snapshot.getRoutesList())
                     .build();
+            // Capture the read boundary before synchronization releases the monitor.
+            // Unrelated deferred write state does not advance this boundary.
+            synchronizeState(publicationSequence);
+            return publication;
         }
     }
 
@@ -1375,6 +1387,7 @@ public final class DurableIngestCoordinator implements Closeable {
     }
 
     public Transaction commit(long id) throws Exception {
+        Transaction decided;
         synchronized (this) {
             Transaction tx = transaction(id);
             if (tx.getState() == TransactionState.PUBLISHED) {
@@ -1396,7 +1409,7 @@ public final class DurableIngestCoordinator implements Closeable {
                     throw new IOException(
                             "Commit allocator is not monotonic or exceeds Retina timestamp width");
                 }
-                Transaction decided =
+                decided =
                         tx.toBuilder()
                                 .setState(TransactionState.COMMIT_DECIDED)
                                 .setCommitTimestamp(timestamp)
@@ -1411,13 +1424,20 @@ public final class DurableIngestCoordinator implements Closeable {
                                 .setLastCommitTimestamp(timestamp)
                                 .build());
             }
+            else {
+                // Another caller may still be synchronizing this decision.
+                synchronizeState(stateSequence);
+                decided = tx;
+            }
         }
-        Transaction decided = get(id);
         if (decided.getAckMode() == CommitAckMode.VISIBLE) {
             forceFileThrough(decided.getCommitTimestamp());
             drivePublicationThrough(decided.getCommitTimestamp());
+            return get(id);
         }
-        return get(id);
+        // The decision above is durable. Do not make its acknowledgement wait for
+        // unrelated transactions appended after that durability boundary.
+        return decided;
     }
 
     public void drivePublication() throws Exception {

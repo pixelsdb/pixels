@@ -80,7 +80,7 @@ public final class IngestWire {
                 .setSchemaVersion(b.getSchemaVersion())
                 .setPayloadFormat(b.getPayloadFormat())
                 .setRowCount(b.getRowCount())
-                .setPayload(ByteString.copyFrom(b.getPayload()))
+                .setPayload(b.getPayloadByteString())
                 .setDigest(ByteString.copyFrom(b.getDigest()))
                 .build();
     }
@@ -93,7 +93,7 @@ public final class IngestWire {
                         r.getSchemaVersion(),
                         r.getPayloadFormat(),
                         r.getRowCount(),
-                        r.getPayload().toByteArray());
+                        r.getPayload());
         if (!MessageDigest.isEqual(b.getDigest(), r.getDigest().toByteArray()))
             throw new IOException("Batch digest mismatch");
         return b;

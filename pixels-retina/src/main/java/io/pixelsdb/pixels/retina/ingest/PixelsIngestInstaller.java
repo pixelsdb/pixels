@@ -61,6 +61,8 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
     private final String owner;
     private final Map<String, BatchInstall> plans = new LinkedHashMap<>();
     private final Set<String> installedBatches = new HashSet<>();
+    // Complete input has been installed in this process; only file publication remains.
+    private final Map<Long, Map<IngestFileWriter, Set<Long>>> installedFileInputs = new HashMap<>();
     private final Map<Long, TransactionCheckpoint> checkpoints = new LinkedHashMap<>();
     private final Map<String, Long> keyIntents = new HashMap<>();
     private final Map<Long, Set<String>> transactionKeys = new HashMap<>();
@@ -154,12 +156,16 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
         return plans.get(batchKey);
     }
 
-    private List<byte[][]> rows(Transaction tx, MutationBatch batch) throws IOException {
-        TableSpec table = IngestWire.table(tx, batch.getStreamId().getTableId());
+    private static void validateBatchSchema(TableSpec table, MutationBatch batch) throws IOException {
         if (batch.getSchemaVersion() != table.getSchemaVersion()
                 || batch.getPayloadFormat() != ColumnBatchCodec.FORMAT) {
             throw new IOException("Schema or codec mismatch");
         }
+    }
+
+    private List<byte[][]> rows(Transaction tx, MutationBatch batch) throws IOException {
+        TableSpec table = IngestWire.table(tx, batch.getStreamId().getTableId());
+        validateBatchSchema(table, batch);
         List<byte[][]> result =
                 ColumnBatchCodec.decode(
                         batch.getPayload(),
@@ -185,6 +191,15 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
         }
         long totalRows = 0;
         long reservation = BASE_PLAN_RESERVATION_BYTES;
+        long allReserved = reservedBytes.values().stream().mapToLong(Long::longValue).sum();
+        if (planBytes + allReserved + reservation > options.maxStateBytes) {
+            throw new IOException("Installation plan capacity exhausted");
+        }
+        Set<String> keys = new HashSet<>();
+        long keyBytes = intentBytes.values().stream().mapToLong(Long::longValue).sum();
+        // Replay each payload once: counting separately would read the WAL again when
+        // the transaction exceeds the bounded journal cache. Publish reservations only
+        // after the complete input has passed validation.
         for (MutationBatch batch : batches) {
             totalRows = Math.addExact(totalRows, batch.getRowCount());
             reservation =
@@ -194,23 +209,24 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
                                     + VISIBILITY_WORD_RESERVATION_BYTES
                                     * ((batch.getRowCount() + VISIBILITY_WORD_BITS - 1)
                                     / VISIBILITY_WORD_BITS + VISIBILITY_PADDING_WORDS));
-        }
-        if (totalRows > options.maxPreparedRows) {
-            throw new IOException("Prepared row limit exceeded");
-        }
-        long allReserved = reservedBytes.values().stream().mapToLong(Long::longValue).sum();
-        if (planBytes + allReserved + reservation > options.maxStateBytes) {
-            throw new IOException("Installation plan capacity exhausted");
-        }
-        Set<String> keys = new HashSet<>();
-        long keyBytes = intentBytes.values().stream().mapToLong(Long::longValue).sum();
-        for (MutationBatch batch : batches) {
+            if (totalRows > options.maxPreparedRows) {
+                throw new IOException("Prepared row limit exceeded");
+            }
+            if (planBytes + allReserved + reservation > options.maxStateBytes) {
+                throw new IOException("Installation plan capacity exhausted");
+            }
             TableSpec table = IngestWire.table(tx, batch.getStreamId().getTableId());
             TableIndex primary = IngestRows.primary(table);
+            if (primary == null) {
+                validateBatchSchema(table, batch);
+                IngestRows.Validator validator = new IngestRows.Validator(table);
+                ColumnBatchCodec.visit(batch.getPayload(), batch.getRowCount(), table.getColumnsCount(),
+                        options.maxBatchRows, options.maxBatchBytes,
+                        (column, row, payload, offset, length) ->
+                                validator.validateCell(column, payload, offset, length));
+                continue;
+            }
             for (byte[][] row : rows(tx, batch)) {
-                if (primary == null) {
-                    continue;
-                }
                 ByteString encoded = IngestRows.indexKey(primary, row);
                 int bucket = RetinaUtils.getBucketIdFromByteBuffer(encoded);
                 if (bucket != batch.getStreamId().getShardId()) {
@@ -264,6 +280,7 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
 
     @Override
     public synchronized void release(long txId) {
+        installedFileInputs.remove(txId);
         Set<String> keys = transactionKeys.remove(txId);
         if (keys != null) {
             for (String key : keys) {
@@ -358,17 +375,24 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
         if (tx.getState() != TransactionState.PUBLISHED) {
             return false;
         }
-        List<MutationBatch> transactionBatches = new ArrayList<>();
-        batches.forEach(transactionBatches::add);
         Map<String, BatchInstall> planSnapshot = new LinkedHashMap<>();
         synchronized (this) {
             if (checkpoints.containsKey(tx.getTransactionId())) {
                 return true;
             }
-            for (MutationBatch batch : transactionBatches) {
-                String batchKey = IngestWire.batchKey(
-                        batch.getStreamId(), batch.getSequence());
-                BatchInstall plan = plans.get(batchKey);
+        }
+        Set<Long> coveredFiles = new HashSet<>();
+        Map<Long, List<RowIdRange>> rowRanges = new TreeMap<>();
+        Map<Long, Set<Long>> tableFiles = new TreeMap<>();
+        // Retain coverage descriptors, never the transaction's complete WAL payload.
+        for (MutationBatch batch : batches) {
+            String batchKey = IngestWire.batchKey(batch.getStreamId(), batch.getSequence());
+            BatchInstall plan;
+            synchronized (this) {
+                if (checkpoints.containsKey(tx.getTransactionId())) {
+                    return true;
+                }
+                plan = plans.get(batchKey);
                 if (plan == null
                         || plan.getStream().getTransactionId()
                                 != tx.getTransactionId()) {
@@ -377,13 +401,6 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
                 }
                 planSnapshot.put(batchKey, plan);
             }
-        }
-        Set<Long> coveredFiles = new HashSet<>();
-        Map<Long, List<RowIdRange>> rowRanges = new TreeMap<>();
-        Map<Long, Set<Long>> tableFiles = new TreeMap<>();
-        for (MutationBatch batch : transactionBatches) {
-            BatchInstall plan = planSnapshot.get(IngestWire.batchKey(
-                    batch.getStreamId(), batch.getSequence()));
             TableSpec table = IngestWire.table(tx, batch.getStreamId().getTableId());
             Set<Long> files = tableFiles.computeIfAbsent(table.getTableId(), ignored -> new TreeSet<>());
             if (!verifyMaterializedBatch(tx, table, batch, plan, files)) {
@@ -432,6 +449,7 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
             plans.clear();
             plans.putAll(nextPlans);
             installedBatches.removeAll(planSnapshot.keySet());
+            installedFileInputs.remove(tx.getTransactionId());
             checkpoints.clear();
             checkpoints.putAll(nextCheckpoints);
             synchronized (fileAggregations) {
@@ -537,6 +555,13 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
             boolean recovering,
             boolean forceFileTail)
             throws Exception {
+        Map<IngestFileWriter, Set<Long>> pending;
+        synchronized (this) {
+            pending = installedFileInputs.get(tx.getTransactionId());
+        }
+        if (pending != null) {
+            return awaitFiles(pending, forceFileTail);
+        }
         Map<IngestFileWriter, Set<Long>> requiredFiles = new IdentityHashMap<>();
         for (MutationBatch batch : batches) {
             TableSpec table = IngestWire.table(tx, batch.getStreamId().getTableId());
@@ -578,16 +603,25 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
             }
         }
         if (tx.getRepresentation() == WriteRepresentation.FILE) {
-            for (Map.Entry<IngestFileWriter, Set<Long>> entry : requiredFiles.entrySet()) {
-                if (forceFileTail) {
-                    flushAggregation(entry.getKey(), true);
-                }
-                if (!filesReady(entry.getKey(), entry.getValue())) {
-                    return false;
-                }
+            synchronized (this) {
+                installedFileInputs.put(tx.getTransactionId(), requiredFiles);
             }
+            return awaitFiles(requiredFiles, forceFileTail);
         }
         return true;
+    }
+
+    private boolean awaitFiles(Map<IngestFileWriter, Set<Long>> requiredFiles, boolean forceFileTail)
+            throws Exception {
+        boolean ready = true;
+        for (Map.Entry<IngestFileWriter, Set<Long>> entry : requiredFiles.entrySet()) {
+            if (forceFileTail) {
+                flushAggregation(entry.getKey(), true);
+            }
+            // Visit every writer so a blocked publication cannot prevent other tails draining.
+            ready &= filesReady(entry.getKey(), entry.getValue());
+        }
+        return ready;
     }
 
     private BatchInstall initialPlan(Transaction tx, MutationBatch batch) throws Exception {
@@ -610,7 +644,9 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
                     .setRowCount(batch.getRowCount())
                     .setDigest(ByteString.copyFrom(batch.getDigest()))
                     .build();
-            save(plan);
+            // Persist the allocation together with the first placement, before installing
+            // any row. Failure before that point may leave an unused allocator range,
+            // but no data or index mapping can refer to an unrecorded identity.
         }
         if (plan.getCommitTimestamp() != tx.getCommitTimestamp()
                 || plan.getRowCount() != batch.getRowCount()
@@ -631,20 +667,27 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
             if (isInstalled(plan)) {
                 return plan;
             }
-            List<byte[][]> rows = rows(tx, batch);
+            validateBatchSchema(table, batch);
+            IngestColumnBatch columns = table.getIndexesCount() == 0
+                    ? new IngestColumnBatch(table, batch.getPayload(),
+                            batch.getRowCount(), options.maxBatchRows, options.maxBatchBytes)
+                    : null;
+            List<byte[][]> rows = columns == null ? rows(tx, batch) : null;
             int offset = 0;
             for (BufferSpan span : plan.getSpansList()) {
                 installFileSpan(tx, table, writer, span,
-                        rows.subList(offset, offset + span.getRowCount()), recovering, false);
+                        rows == null ? null : rows.subList(offset, offset + span.getRowCount()),
+                        columns, recovering, false);
                 offset += span.getRowCount();
             }
-            while (offset < rows.size()) {
+            while (offset < batch.getRowCount()) {
                 BufferSpan span = writer.planSpan(
-                        rows.size() - offset, Math.addExact(plan.getRowIdStart(), offset));
+                        batch.getRowCount() - offset, Math.addExact(plan.getRowIdStart(), offset));
                 plan = plan.toBuilder().addSpans(span).build();
                 save(plan);
                 installFileSpan(tx, table, writer, span,
-                        rows.subList(offset, offset + span.getRowCount()), false, true);
+                        rows == null ? null : rows.subList(offset, offset + span.getRowCount()),
+                        columns, false, true);
                 offset += span.getRowCount();
             }
             if (plan.getSpansCount() == 0) {
@@ -842,6 +885,7 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
             IngestFileWriter writer,
             BufferSpan span,
             List<byte[][]> rows,
+            IngestColumnBatch columns,
             boolean recovering,
             boolean freshSpan) throws Exception {
         File file = recovering ? catalogFiles.get(span.getFileId()) : null;
@@ -853,25 +897,36 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
         }
         boolean published = file.getType() == File.Type.REGULAR;
         if (!published) {
-            writer.append(span, rows, tx.getCommitTimestamp());
-            List<IndexProto.PrimaryIndexEntry> locations = new ArrayList<>();
-            for (int i = 0; i < rows.size(); i++) {
-                locations.add(IndexProto.PrimaryIndexEntry.newBuilder()
-                        .setRowId(span.getRowIdStart() + i)
-                        .setRowLocation(IndexProto.RowLocation.newBuilder()
-                                .setFileId(span.getFileId())
-                                .setRgId(0)
-                                .setRgRowOffset(span.getBlockStartOffset() + i)
-                                .build())
-                        .build());
-            }
-            if (freshSpan) {
-                indexes.putMainIndexEntriesOnly(table.getTableId(), locations);
+            if (columns == null) writer.append(span, rows, tx.getCommitTimestamp());
+            else writer.append(span, columns, tx.getCommitTimestamp());
+            if (freshSpan && span.getRowIdStart() <= Long.MAX_VALUE - span.getRowCount()
+                    && span.getBlockStartOffset() <= Integer.MAX_VALUE - span.getRowCount()) {
+                indexes.putMainIndexRangeOnly(table.getTableId(),
+                        new io.pixelsdb.pixels.common.index.RowIdRange(
+                                span.getRowIdStart(), Math.addExact(span.getRowIdStart(), span.getRowCount()),
+                                span.getFileId(), 0, span.getBlockStartOffset(),
+                                Math.addExact(span.getBlockStartOffset(), span.getRowCount())));
             } else {
-                putMissingMainIndexEntries(table.getTableId(), locations);
+                List<IndexProto.PrimaryIndexEntry> locations = new ArrayList<>(span.getRowCount());
+                for (int i = 0; i < span.getRowCount(); i++) {
+                    locations.add(IndexProto.PrimaryIndexEntry.newBuilder()
+                            .setRowId(span.getRowIdStart() + i)
+                            .setRowLocation(IndexProto.RowLocation.newBuilder()
+                                    .setFileId(span.getFileId())
+                                    .setRgId(0)
+                                    .setRgRowOffset(span.getBlockStartOffset() + i)
+                                    .build())
+                            .build());
+                }
+                if (freshSpan) {
+                    indexes.putMainIndexEntriesOnly(table.getTableId(), locations);
+                } else {
+                    putMissingMainIndexEntries(table.getTableId(), locations);
+                }
             }
         }
-        installBusinessIndexes(tx, table, span, rows);
+        if (columns == null) installBusinessIndexes(tx, table, span, rows);
+        else if (published) columns.skip(span.getRowCount());
         if (!published) {
             writer.publishIfFull();
         }
@@ -957,6 +1012,7 @@ public final class PixelsIngestInstaller implements RetinaIngestParticipant.Inst
     @Override
     public synchronized void close() throws IOException {
         installedBatches.clear();
+        installedFileInputs.clear();
         state.close();
     }
 

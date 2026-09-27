@@ -565,10 +565,36 @@ public class SqliteMainIndex implements MainIndex
         this.cacheRwLock.writeLock().lock();
         try
         {
-            for (IndexProto.PrimaryIndexEntry entry : primaryEntries)
+            int start = 0;
+            while (start < primaryEntries.size())
             {
-                boolean res = this.indexBuffer.insert(entry.getRowId(), entry.getRowLocation());
-                builder.add(res);
+                IndexProto.PrimaryIndexEntry first = primaryEntries.get(start);
+                IndexProto.PrimaryIndexEntry last = first;
+                int end = start + 1;
+                while (end < primaryEntries.size())
+                {
+                    IndexProto.PrimaryIndexEntry next = primaryEntries.get(end);
+                    if (last.getRowId() == Long.MAX_VALUE || next.getRowId() != last.getRowId() + 1
+                            || next.getRowLocation().getFileId() != first.getRowLocation().getFileId()
+                            || next.getRowLocation().getRgId() != first.getRowLocation().getRgId()
+                            || (long) next.getRowLocation().getRgRowOffset()
+                                != (long) last.getRowLocation().getRgRowOffset() + 1)
+                        break;
+                    last = next;
+                    end++;
+                }
+                boolean inserted = first.getRowId() >= 0 && last.getRowId() < Long.MAX_VALUE
+                        && first.getRowLocation().getRgRowOffset() >= 0
+                        && last.getRowLocation().getRgRowOffset() < Integer.MAX_VALUE
+                        && this.indexBuffer.insertRange(new RowIdRange(first.getRowId(), last.getRowId() + 1,
+                                first.getRowLocation().getFileId(), first.getRowLocation().getRgId(),
+                                first.getRowLocation().getRgRowOffset(), last.getRowLocation().getRgRowOffset() + 1));
+                for (int index = start; index < end; index++)
+                {
+                    IndexProto.PrimaryIndexEntry entry = primaryEntries.get(index);
+                    builder.add(inserted || this.indexBuffer.insert(entry.getRowId(), entry.getRowLocation()));
+                }
+                start = end;
             }
         }
         finally
@@ -576,6 +602,20 @@ public class SqliteMainIndex implements MainIndex
             this.cacheRwLock.writeLock().unlock();
         }
         return builder.build();
+    }
+
+    @Override
+    public boolean putRange(RowIdRange range)
+    {
+        this.cacheRwLock.writeLock().lock();
+        try
+        {
+            return this.indexBuffer.insertRange(range);
+        }
+        finally
+        {
+            this.cacheRwLock.writeLock().unlock();
+        }
     }
 
     @Override

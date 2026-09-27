@@ -87,74 +87,91 @@ public final class IngestRows {
         new Validator(table).validate(row);
     }
 
-    /** Resolves the pinned column types once for a batch of native encoded rows. */
+    /** Resolves pinned column types and index nullability once per batch. */
     public static final class Validator {
-        private final TableSpec table;
         private final TypeDescription[] types;
+        private final boolean[] indexed;
 
         public Validator(TableSpec table) throws IOException {
-            this.table = table;
             this.types = new TypeDescription[table.getColumnsCount()];
+            this.indexed = new boolean[types.length];
             for (int i = 0; i < types.length; i++) {
                 types[i] = supported(table.getColumns(i).getType());
+            }
+            for (TableIndex index : table.getIndexesList()) {
+                if (index.getUnique() && !index.getPrimary())
+                    throw new IOException("Unique secondary constraints are not enabled");
+                for (int column : index.getColumnsList()) {
+                    if (column < 0 || column >= types.length)
+                        throw new IOException("Invalid indexed column");
+                    indexed[column] = true;
+                }
             }
         }
 
         public void validate(byte[][] row) throws IOException {
-            validateRow(table, types, row);
+            if (row.length != types.length)
+                throw new IOException("Column count differs from pinned schema");
+            for (int column = 0; column < row.length; column++) {
+                byte[] value = row[column];
+                validateCell(column, value, 0, value == null ? -1 : value.length);
+            }
+        }
+
+        /** Validates a scalar directly in its encoded batch; -1 length denotes SQL NULL. */
+        public void validateCell(int column, byte[] payload, int offset, int length) throws IOException {
+            if (column < 0 || column >= types.length)
+                throw new IOException("Column outside pinned schema");
+            if (length == -1) {
+                if (indexed[column]) throw new IOException("NULL indexed column is unsupported");
+                return;
+            }
+            if (payload == null || offset < 0 || length < 0 || offset > payload.length - length)
+                throw new IOException("Invalid scalar range");
+            validateScalar(types[column], payload, offset, length);
         }
     }
 
-    private static void validateRow(TableSpec table, TypeDescription[] types, byte[][] row)
+    private static void validateScalar(TypeDescription type, byte[] bytes, int offset, int length)
             throws IOException {
-        if (row.length != table.getColumnsCount())
-            throw new IOException("Column count differs from pinned schema");
-        for (int i = 0; i < row.length; i++) {
-            TypeDescription t = types[i];
-            byte[] b = row[i];
-            if (b == null) continue;
-            int width = -1;
-            switch (t.getCategory()) {
-                case BOOLEAN:
-                    width = 1;
-                    if (b.length == 1 && b[0] != 0 && b[0] != 1)
-                        throw new IOException("Invalid BOOLEAN");
-                    break;
-                case BYTE:
-                    width = 1;
-                    break;
-                case SHORT:
-                    width = 2;
-                    break;
-                case INT:
-                case DATE:
-                case FLOAT:
-                case TIME:
-                    width = 4;
-                    break;
-                case LONG:
-                case TIMESTAMP:
-                case DOUBLE:
-                    width = 8;
-                    break;
-                case DECIMAL:
-                    width = t.getPrecision() <= 18 ? 8 : 16;
-                    if (b.length == width
-                            && new BigInteger(b).abs().toString().length() > t.getPrecision())
+        int width = -1;
+        switch (type.getCategory()) {
+            case BOOLEAN:
+                width = Byte.BYTES;
+                if (length == width && bytes[offset] != 0 && bytes[offset] != 1)
+                    throw new IOException("Invalid BOOLEAN");
+                break;
+            case BYTE:
+                width = Byte.BYTES;
+                break;
+            case SHORT:
+                width = Short.BYTES;
+                break;
+            case INT:
+            case DATE:
+            case FLOAT:
+            case TIME:
+                width = Integer.BYTES;
+                break;
+            case LONG:
+            case TIMESTAMP:
+            case DOUBLE:
+                width = Long.BYTES;
+                break;
+            case DECIMAL:
+                width = type.getPrecision() <= TypeDescription.MAX_SHORT_DECIMAL_PRECISION
+                        ? Long.BYTES : Long.BYTES * 2;
+                if (length == width) {
+                    byte[] value = offset == 0 && length == bytes.length ? bytes
+                            : java.util.Arrays.copyOfRange(bytes, offset, offset + length);
+                    if (new BigInteger(value).abs().toString().length() > type.getPrecision())
                         throw new IOException("DECIMAL precision overflow");
-                    break;
-                default:
-                    break;
-            }
-            if (width != -1 && b.length != width)
-                throw new IOException("Invalid scalar byte width for " + t);
+                }
+                break;
+            default:
+                break;
         }
-        for (TableIndex index : table.getIndexesList()) {
-            if (index.getUnique() && !index.getPrimary())
-                throw new IOException("Unique secondary constraints are not enabled");
-            for (int column : index.getColumnsList())
-                if (column < 0 || column >= row.length || row[column] == null)
-                    throw new IOException("NULL or invalid indexed column is unsupported");
-        }
+        if (width != -1 && length != width)
+            throw new IOException("Invalid scalar byte width for " + type);
     }
 }

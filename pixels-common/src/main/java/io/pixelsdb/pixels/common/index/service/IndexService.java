@@ -23,6 +23,7 @@ import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.common.index.ResolvedPrimary;
 import io.pixelsdb.pixels.common.index.RollbackEntry;
+import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.List;
@@ -279,6 +280,14 @@ public interface IndexService
     {
         throw new UnsupportedOperationException(
                 "putMainIndexEntriesOnly is not supported by this IndexService scheme");
+    }
+
+    /** Install a freshly allocated contiguous rowId/location range in the existing main index. */
+    default void putMainIndexRangeOnly(long tableId,
+            RowIdRange range) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "putMainIndexRangeOnly is not supported by this IndexService scheme");
     }
 
     default List<IndexProto.PrimaryIndexEntry> getMainIndexEntriesForFiles(

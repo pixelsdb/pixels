@@ -18,6 +18,8 @@
  */
 package io.pixelsdb.pixels.common.ingest;
 
+import com.google.protobuf.ByteString;
+
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -50,16 +52,24 @@ public final class MutationBatch
     private final long schemaVersion;
     private final int payloadFormat;
     private final int rowCount;
-    private final byte[] payload;
+    private final ByteString payload;
     private final byte[] digest;
 
     public MutationBatch(MutationStreamId streamId, long sequence, long schemaVersion,
                          int payloadFormat, int rowCount, byte[] payload)
     {
+        this(streamId, sequence, schemaVersion, payloadFormat, rowCount,
+                ByteString.copyFrom(Objects.requireNonNull(payload, "payload")));
+    }
+
+    /** Retains immutable RPC payload bytes without an intermediate mutable array. */
+    public MutationBatch(MutationStreamId streamId, long sequence, long schemaVersion,
+                         int payloadFormat, int rowCount, ByteString payload)
+    {
         this.streamId = Objects.requireNonNull(streamId, "streamId");
         Objects.requireNonNull(payload, "payload");
         if (sequence < 0 || schemaVersion < 0 || payloadFormat <= 0 || rowCount <= 0
-                || payload.length == 0)
+                || payload.isEmpty())
         {
             throw new IllegalArgumentException("Invalid mutation batch metadata or empty payload");
         }
@@ -67,7 +77,7 @@ public final class MutationBatch
         this.schemaVersion = schemaVersion;
         this.payloadFormat = payloadFormat;
         this.rowCount = rowCount;
-        this.payload = payload.clone();
+        this.payload = payload;
 
         // Fixed-width big-endian encoding; bind identity, metadata, and payload.
         ByteBuffer header = ByteBuffer.allocate(DIGEST_HEADER_BYTES);
@@ -77,10 +87,11 @@ public final class MutationBatch
                 .putLong(streamId.getWriterId())
                 .putLong(streamId.getTableId()).putInt(streamId.getShardId())
                 .putInt(streamId.getKind().getCode()).putLong(sequence).putLong(schemaVersion)
-                .putInt(payloadFormat).putInt(rowCount).putInt(payload.length);
+                .putInt(payloadFormat).putInt(rowCount).putInt(payload.size());
         MessageDigest sha = sha256();
         sha.update(header.array());
-        this.digest = sha.digest(this.payload);
+        sha.update(this.payload.asReadOnlyByteBuffer());
+        this.digest = sha.digest();
     }
 
     public MutationStreamId getStreamId() { return streamId; }
@@ -88,8 +99,9 @@ public final class MutationBatch
     public long getSchemaVersion() { return schemaVersion; }
     public int getPayloadFormat() { return payloadFormat; }
     public int getRowCount() { return rowCount; }
-    public int getPayloadBytes() { return payload.length; }
-    public byte[] getPayload() { return payload.clone(); }
+    public int getPayloadBytes() { return payload.size(); }
+    public byte[] getPayload() { return payload.toByteArray(); }
+    public ByteString getPayloadByteString() { return payload; }
     public byte[] getDigest() { return digest.clone(); }
 
     static MessageDigest sha256()

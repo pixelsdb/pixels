@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.PixelsWriterImpl;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.encoding.EncodingLevel;
+import io.pixelsdb.pixels.core.ingest.IngestColumnBatch;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.ingest.IngestProto.BufferSpan;
 import org.slf4j.Logger;
@@ -51,6 +52,7 @@ public final class IngestFileWriter implements AutoCloseable
     private final long tableId;
     private final TypeDescription schema;
     private final int[] orderMapping;
+    private final int[] outputColumns;
     private final Path targetPath;
     private final Storage storage;
     private final String hostName;
@@ -108,6 +110,16 @@ public final class IngestFileWriter implements AutoCloseable
         this.tableId = tableId;
         this.schema = schema;
         this.orderMapping = orderMapping;
+        this.outputColumns = new int[orderMapping.length];
+        boolean[] mapped = new boolean[orderMapping.length];
+        for (int output = 0; output < orderMapping.length; output++)
+        {
+            int source = orderMapping[output];
+            checkArgument(source >= 0 && source < orderMapping.length && !mapped[source],
+                    "Physical column order must be a permutation");
+            outputColumns[source] = output;
+            mapped[source] = true;
+        }
         this.targetPath = targetPath;
         this.hostName = hostName;
         this.virtualNodeId = virtualNodeId;
@@ -166,8 +178,21 @@ public final class IngestFileWriter implements AutoCloseable
     public synchronized void append(
             BufferSpan span, List<byte[][]> rows, long commitTimestamp) throws RetinaException
     {
+        append(span, rows, null, commitTimestamp);
+    }
+
+    public synchronized void append(
+            BufferSpan span, IngestColumnBatch columns, long commitTimestamp) throws RetinaException
+    {
+        append(span, null, columns, commitTimestamp);
+    }
+
+    private void append(BufferSpan span, List<byte[][]> rows, IngestColumnBatch columns,
+                        long commitTimestamp) throws RetinaException
+    {
         ensureUsable();
-        if (span.getRowCount() != rows.size() || span.getFileCapacity() <= 0)
+        if ((columns == null ? span.getRowCount() != rows.size()
+                : span.getRowCount() > columns.remaining()) || span.getFileCapacity() <= 0)
         {
             throw new RetinaException("Invalid direct-file installation span");
         }
@@ -192,6 +217,17 @@ public final class IngestFileWriter implements AutoCloseable
         }
         if (expectedEnd <= active.rows)
         {
+            if (columns != null)
+            {
+                try
+                {
+                    columns.skip(span.getRowCount());
+                }
+                catch (IOException e)
+                {
+                    throw new RetinaException("Invalid replay window", e);
+                }
+            }
             return;
         }
         if (active.rows != start)
@@ -202,29 +238,36 @@ public final class IngestFileWriter implements AutoCloseable
         try
         {
             int offset = 0;
-            while (offset < rows.size())
+            while (offset < span.getRowCount())
             {
-                int count = Math.min(pixelStride, rows.size() - offset);
+                int count = Math.min(pixelStride, span.getRowCount() - offset);
                 VectorizedRowBatch batch = active.batch;
                 try
                 {
-                    for (int row = 0; row < count; row++)
+                    if (columns != null)
                     {
-                        byte[][] values = rows.get(offset + row);
-                        for (int column = 0; column < orderMapping.length; column++)
+                        columns.appendWindow(batch, outputColumns, count, commitTimestamp);
+                    }
+                    else
+                    {
+                        for (int row = 0; row < count; row++)
                         {
-                            byte[] value = values[orderMapping[column]];
-                            if (value == null)
+                            byte[][] values = rows.get(offset + row);
+                            for (int column = 0; column < orderMapping.length; column++)
                             {
-                                batch.cols[column].addNull();
+                                byte[] value = values[orderMapping[column]];
+                                if (value == null)
+                                {
+                                    batch.cols[column].addNull();
+                                }
+                                else
+                                {
+                                    batch.cols[column].add(value);
+                                }
                             }
-                            else
-                            {
-                                batch.cols[column].add(value);
-                            }
+                            batch.cols[schema.getChildren().size()].add(commitTimestamp);
+                            batch.size++;
                         }
-                        batch.cols[schema.getChildren().size()].add(commitTimestamp);
-                        batch.size++;
                     }
                     active.writer.addRowBatch(batch);
                 }

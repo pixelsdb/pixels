@@ -31,6 +31,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import static io.pixelsdb.pixels.daemon.transaction.ingest.DurableIngestCoordinator.StateStore.Durability.DEFERRED;
 import static io.pixelsdb.pixels.daemon.transaction.ingest.DurableIngestCoordinator.StateStore.Durability.SYNCHRONIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 public class TestCoordinatorDurabilityBoundaries
 {
@@ -77,6 +79,9 @@ public class TestCoordinatorDurabilityBoundaries
                     TABLE_ID, SHARD_ID, MutationStreamId.Kind.APPEND_ROWS);
             coordinator.register(IngestWire.encode(stream));
             assertEquals(Collections.singletonList(DEFERRED), store.durabilities());
+            assertEquals(0L, coordinator.publication().getPublishedTimestamp());
+            assertEquals(0L, coordinator.publishedTimestamp());
+            assertEquals(Collections.singletonList(DEFERRED), store.durabilities());
 
             store.clearDurabilities();
             MutationStreamSeal seal = new MutationStreamSeal(
@@ -96,9 +101,48 @@ public class TestCoordinatorDurabilityBoundaries
             assertEquals(java.util.Arrays.asList(DEFERRED, DEFERRED), store.durabilities());
 
             store.clearDurabilities();
-            coordinator.commit(transaction.getTransactionId());
+            Transaction committed = coordinator.commit(transaction.getTransactionId());
+            assertEquals(TransactionState.COMMIT_DECIDED, committed.getState());
+            assertEquals(DecisionOutcome.COMMIT, committed.getOutcome());
+            assertFalse(committed.getCommitToken().isEmpty());
             assertEquals(java.util.Arrays.asList(DEFERRED, SYNCHRONIZED),
                     store.durabilities());
+            store.clearDurabilities();
+            assertEquals(committed, coordinator.commit(transaction.getTransactionId()));
+            assertEquals(Collections.emptyList(), store.durabilities());
+        }
+    }
+
+    @Test
+    public void publicationPersistsTopologyButDoesNotFlushUnrelatedState() throws Exception
+    {
+        RecordingStore store = new RecordingStore();
+        try (DurableIngestCoordinator coordinator = coordinator(store, new AtomicLong(100L), 0L))
+        {
+            store.clearDurabilities();
+            assertEquals(Collections.singletonList(ROUTE), coordinator.publication().getRoutesList());
+            assertEquals(java.util.Arrays.asList(DEFERRED, SYNCHRONIZED), store.durabilities());
+            store.clearDurabilities();
+            assertEquals(0L, coordinator.publication().getPublishedTimestamp());
+            assertEquals(0L, coordinator.publishedTimestamp());
+            assertEquals(Collections.emptyList(), store.durabilities());
+        }
+    }
+
+    @Test
+    public void publicationFailsClosedWhenItsStateCannotBeSynchronized() throws Exception
+    {
+        RecordingStore store = new RecordingStore();
+        DurableIngestCoordinator coordinator = coordinator(store, new AtomicLong(100L), 0L);
+        try
+        {
+            store.failSynchronization = true;
+            assertThrows(IOException.class, coordinator::publication);
+            assertThrows(IllegalStateException.class, coordinator::publishedTimestamp);
+        }
+        finally
+        {
+            assertThrows(IOException.class, coordinator::close);
         }
     }
 
@@ -202,6 +246,7 @@ public class TestCoordinatorDurabilityBoundaries
     {
         private CoordinatorSnapshot snapshot;
         private final List<Durability> durabilities = new ArrayList<>();
+        private boolean failSynchronization;
 
         @Override
         public CoordinatorSnapshot read()
@@ -217,8 +262,9 @@ public class TestCoordinatorDurabilityBoundaries
         }
 
         @Override
-        public void synchronize()
+        public void synchronize() throws IOException
         {
+            if (failSynchronization) throw new IOException("Injected state synchronization failure");
             durabilities.add(SYNCHRONIZED);
         }
 

@@ -145,8 +145,10 @@ public final class RetinaIngestParticipant implements Closeable {
         }
     }
 
-    public synchronized void append(MutationBatch batch) throws Exception {
-        serving();
+    public void append(MutationBatch batch) throws Exception {
+        synchronized (this) {
+            serving();
+        }
         Transaction tx = decisions.get(batch.getStreamId().getTransactionId());
         owns(tx, batch.getStreamId());
         if (tx.getState() != TransactionState.OPEN) {
@@ -159,13 +161,21 @@ public final class RetinaIngestParticipant implements Closeable {
                 || batch.getStreamId().getKind() != MutationStreamId.Kind.APPEND_ROWS) {
             throw new IOException("Unsupported batch kind, codec, or schema version");
         }
-        journal.append(batch);
+        synchronized (this) {
+            serving();
+            // Abort/checkpoint may finish during authorization. The journal's durable
+            // terminal fence rejects stale input even when the RPC returned OPEN.
+            journal.append(batch);
+        }
     }
 
     public MutationStreamSeal seal(MutationStreamSeal seal) throws Exception {
         synchronized (this) {
             serving();
-            Transaction tx = decisions.get(seal.getStreamId().getTransactionId());
+        }
+        Transaction tx = decisions.get(seal.getStreamId().getTransactionId());
+        synchronized (this) {
+            serving();
             owns(tx, seal.getStreamId());
             if (tx.getState() == TransactionState.ABORTED) {
                 throw new IOException("Transaction aborted");
@@ -232,38 +242,49 @@ public final class RetinaIngestParticipant implements Closeable {
                 };
     }
 
-    public synchronized PrepareToken prepare(Transaction request) throws Exception {
-        serving();
+    public PrepareToken prepare(Transaction request) throws Exception {
+        synchronized (this) {
+            serving();
+        }
         Transaction tx = authoritative(request);
         if (tx.getState() != TransactionState.SEALED
                 && tx.getState() != TransactionState.PREPARED) {
             throw new IOException("Transaction is not in a preparable state");
         }
         ByteString digest = ByteString.copyFrom(IngestWire.prepareDigest(tx, owner));
-        ByteString old = prepared.get(tx.getTransactionId());
-        if (old != null && !old.equals(digest)) {
-            throw new IOException("Prepared digest mismatch");
-        }
-        if (old == null) {
-            Iterable<MutationBatch> batches = batches(tx);
-            try {
-                installer.prepare(tx, batches);
-                prepared.put(tx.getTransactionId(), digest);
-            } catch (Exception e) {
-                installer.release(tx.getTransactionId());
-                throw e;
+        synchronized (this) {
+            serving();
+            // Authorization can race with discard. Checking only sealed batches would
+            // miss an empty transaction and could recreate its released reservations.
+            journal.requireActiveTransaction(tx.getTransactionId());
+            ByteString old = prepared.get(tx.getTransactionId());
+            if (old != null && !old.equals(digest)) {
+                throw new IOException("Prepared digest mismatch");
             }
+            if (old == null) {
+                Iterable<MutationBatch> batches = batches(tx);
+                try {
+                    installer.prepare(tx, batches);
+                    prepared.put(tx.getTransactionId(), digest);
+                } catch (Exception e) {
+                    installer.release(tx.getTransactionId());
+                    throw e;
+                }
+            }
+            return PrepareToken.newBuilder().setOwner(owner).setDigest(digest).build();
         }
-        return PrepareToken.newBuilder().setOwner(owner).setDigest(digest).build();
     }
 
     public boolean install(Transaction request, boolean forceFileTail) throws Exception {
-        Transaction tx;
         synchronized (this) {
             serving();
-            tx = authoritative(request);
+        }
+        Transaction tx = authoritative(request);
+        synchronized (this) {
+            serving();
             while (installing.contains(tx.getTransactionId())) {
                 wait();
+                serving();
             }
             if (installed.contains(tx.getTransactionId())) {
                 return true;

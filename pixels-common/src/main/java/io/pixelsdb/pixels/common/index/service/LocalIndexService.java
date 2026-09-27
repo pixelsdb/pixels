@@ -644,6 +644,22 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
+    public void putMainIndexRangeOnly(long tableId, RowIdRange range) throws IndexException
+    {
+        try
+        {
+            if (!MainIndexFactory.Instance().getMainIndex(tableId).putRange(range))
+            {
+                throw new IndexException("Failed to put main index range, tableId=" + tableId);
+            }
+        }
+        catch (MainIndexException e)
+        {
+            throw new IndexException("Failed to put main index range for tableId=" + tableId, e);
+        }
+    }
+
+    @Override
     public List<IndexProto.PrimaryIndexEntry> getMainIndexEntriesForFiles(
             long tableId, Set<Long> fileIds) throws IndexException
     {

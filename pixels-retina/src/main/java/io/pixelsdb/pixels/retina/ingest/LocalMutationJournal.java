@@ -93,6 +93,8 @@ public final class LocalMutationJournal implements Closeable
     private static final int GENERATION_MARKER_BYTES = 28;
     private static final String LOCK_NAME = "journal.lock";
     private static final int MAX_FIXED_BODY_BYTES = 96;
+    // Record kind, stream identity, sequence/schema, format/row count/payload length.
+    private static final int APPEND_METADATA_BYTES = Byte.BYTES + 6 * Long.BYTES + 5 * Integer.BYTES;
     private static final long MAX_GROUP_COMMIT_DELAY_MICROS =
             TimeUnit.SECONDS.toMicros(1L);
     private static final long CACHED_BATCH_OVERHEAD_BYTES = 128L;
@@ -263,7 +265,7 @@ public final class LocalMutationJournal implements Closeable
             return existing.offset;
         }
         validateNextBatch(state, batch);
-        long offset = appendRecord(encodeBatch(batch));
+        long offset = appendBatch(batch);
         rememberBatch(batch, offset);
         cacheBatch(streams.get(batch.getStreamId()).entries.get((int) batch.getSequence()), batch);
         return offset;
@@ -773,14 +775,31 @@ public final class LocalMutationJournal implements Closeable
 
     private long appendRecord(byte[] body) throws IOException
     {
+        ByteBuffer frame = allocateFrame(body.length);
+        frame.put(body);
+        return appendFrame(frame);
+    }
+
+    /** Reserve the header and reject capacity exhaustion before allocating payload storage. */
+    private ByteBuffer allocateFrame(int bodyLength) throws IOException
+    {
         if (recordCount >= maxRecords
-                || channel.position() > maxJournalBytes - FRAME_HEADER_BYTES - body.length)
+                || channel.position() > maxJournalBytes - FRAME_HEADER_BYTES - bodyLength)
         {
             throw new IOException("Journal capacity exceeded; checkpoint/reclamation is required");
         }
+        ByteBuffer frame = ByteBuffer.allocate(Math.addExact(bodyLength, FRAME_HEADER_BYTES));
+        frame.position(FRAME_HEADER_BYTES);
+        return frame;
+    }
+
+    private long appendFrame(ByteBuffer frame) throws IOException
+    {
         long offset = channel.position();
-        ByteBuffer frame = ByteBuffer.allocate(body.length + FRAME_HEADER_BYTES);
-        frame.putInt(body.length).putInt(checksum(body, 0, body.length)).put(body).flip();
+        int bodyLength = frame.position() - FRAME_HEADER_BYTES;
+        frame.putInt(0, bodyLength);
+        frame.putInt(Integer.BYTES, checksum(frame.array(), FRAME_HEADER_BYTES, bodyLength));
+        frame.flip();
         try
         {
             writeFully(channel, frame);
@@ -819,19 +838,20 @@ public final class LocalMutationJournal implements Closeable
         return body;
     }
 
-    private static byte[] encodeBatch(MutationBatch batch) throws IOException
+    private long appendBatch(MutationBatch batch) throws IOException
     {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(bytes);
-        out.writeByte(APPEND);
-        writeId(out, batch.getStreamId());
-        out.writeLong(batch.getSequence());
-        out.writeLong(batch.getSchemaVersion());
-        out.writeInt(batch.getPayloadFormat());
-        out.writeInt(batch.getRowCount());
-        out.writeInt(batch.getPayloadBytes());
-        out.write(batch.getPayload());
-        return bytes.toByteArray();
+        ByteBuffer frame = allocateFrame(Math.addExact(APPEND_METADATA_BYTES, batch.getPayloadBytes()));
+        MutationStreamId id = batch.getStreamId();
+        frame.put((byte) APPEND)
+                .putLong(id.getTransactionId()).putLong(id.getStatementId())
+                .putLong(id.getWriterId()).putLong(id.getTableId())
+                .putInt(id.getShardId()).putInt(id.getKind().getCode())
+                .putLong(batch.getSequence()).putLong(batch.getSchemaVersion())
+                .putInt(batch.getPayloadFormat()).putInt(batch.getRowCount())
+                .putInt(batch.getPayloadBytes());
+        // Copy immutable input directly into its final WAL frame, without a body staging array.
+        batch.getPayloadByteString().copyTo(frame);
+        return appendFrame(frame);
     }
 
     private MutationBatch decodeBatch(DataInputStream in) throws IOException
@@ -965,6 +985,13 @@ public final class LocalMutationJournal implements Closeable
     {
         if (abortedTransactions.contains(txId)) { throw new IOException("Transaction was aborted: " + txId); }
         if (checkpointedTransactions.contains(txId)) { throw new IOException("Transaction is checkpoint-covered: " + txId); }
+    }
+
+    /** Checks terminal fences even when a transaction has no mutation streams. */
+    synchronized void requireActiveTransaction(long txId) throws IOException
+    {
+        ensureOpen();
+        requireNotAborted(txId);
     }
 
     private void ensureOpen() throws IOException

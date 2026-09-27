@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -79,6 +80,194 @@ public class TestRetinaPrivateRead
             .build();
 
     @TempDir Path directory;
+
+    @Test
+    public void delayedPrepareCannotReviveDiscardedTransaction() throws Exception
+    {
+        blockedPrepareLookup(true);
+    }
+
+    @Test
+    public void delayedPrepareRechecksShutdown() throws Exception
+    {
+        blockedPrepareLookup(false);
+    }
+
+    private void blockedPrepareLookup(boolean abort) throws Exception
+    {
+        MutableDecisions decisions = new MutableDecisions();
+        NoOpInstaller installer = new NoOpInstaller();
+        try (LocalMutationJournal journal = new LocalMutationJournal(
+                directory, JOURNAL_PAYLOAD_LIMIT, JOURNAL_BYTE_LIMIT, JOURNAL_RECORD_LIMIT);
+                RetinaIngestParticipant participant = new RetinaIngestParticipant(
+                        OWNER, journal, decisions, installer, new IngestReadPins(READ_LEASE_MILLIS))) {
+            participant.recover();
+            MutationBatch input = batch(stream(FIRST_STATEMENT_ID, FIRST_WRITER_ID),
+                    FIRST_SEQUENCE, java.nio.ByteBuffer.allocate(Long.BYTES).putLong(1L).array());
+            journal.append(input);
+            MutationStreamSeal receipt = journal.seal(seal(input.getStreamId(), input));
+            Transaction request = Transaction.newBuilder().setTransactionId(TRANSACTION_ID)
+                    .setState(TransactionState.SEALED).setTable(TABLE).addEnlistedTables(TABLE)
+                    .addStreams(IngestWire.encode(input.getStreamId()))
+                    .addSeals(IngestWire.encode(receipt)).build();
+            decisions.transaction = request;
+            decisions.lookupStarted = new CountDownLatch(1);
+            decisions.continueLookup = new CountDownLatch(1);
+            decisions.blockNextLookup.set(true);
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            try {
+                Future<?> pending = executor.submit(() -> participant.prepare(request));
+                assertTrue(decisions.lookupStarted.await(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                assertTrue(executor.submit(participant::isReady)
+                        .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                if (abort) {
+                    decisions.transaction = request.toBuilder().setState(TransactionState.ABORTED).build();
+                    executor.submit(() -> { participant.discard(TRANSACTION_ID); return null; })
+                            .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                } else {
+                    executor.submit(() -> { participant.close(); return null; })
+                            .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                }
+                decisions.continueLookup.countDown();
+                java.util.concurrent.ExecutionException failure = assertThrows(
+                        java.util.concurrent.ExecutionException.class,
+                        () -> pending.get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                assertTrue(failure.getCause() instanceof IOException);
+                assertTrue(failure.getCause().getMessage().contains(abort ? "aborted" : "not ready"));
+                assertEquals(0, installer.prepareCalls);
+            } finally {
+                decisions.continueLookup.countDown();
+                executor.shutdownNow();
+                assertTrue(executor.awaitTermination(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            }
+        }
+    }
+
+    @Test
+    public void delayedInstallationRechecksShutdown() throws Exception
+    {
+        MutableDecisions decisions = new MutableDecisions();
+        NoOpInstaller installer = new NoOpInstaller();
+        try (LocalMutationJournal journal = new LocalMutationJournal(
+                directory, JOURNAL_PAYLOAD_LIMIT, JOURNAL_BYTE_LIMIT, JOURNAL_RECORD_LIMIT);
+                RetinaIngestParticipant participant = new RetinaIngestParticipant(
+                        OWNER, journal, decisions, installer, new IngestReadPins(READ_LEASE_MILLIS))) {
+            participant.recover();
+            MutationBatch input = batch(stream(FIRST_STATEMENT_ID, FIRST_WRITER_ID),
+                    FIRST_SEQUENCE, java.nio.ByteBuffer.allocate(Long.BYTES).putLong(1L).array());
+            journal.append(input);
+            MutationStreamSeal receipt = journal.seal(seal(input.getStreamId(), input));
+            Transaction committed = Transaction.newBuilder().setTransactionId(TRANSACTION_ID)
+                    .setState(TransactionState.COMMIT_DECIDED).setTable(TABLE).addEnlistedTables(TABLE)
+                    .setOutcome(DecisionOutcome.COMMIT)
+                    .addStreams(IngestWire.encode(input.getStreamId()))
+                    .addSeals(IngestWire.encode(receipt))
+                    .setCommitTimestamp(READ_TIMESTAMP + 1).build();
+            Transaction request = committed.toBuilder().addTokens(PrepareToken.newBuilder().setOwner(OWNER)
+                    .setDigest(ByteString.copyFrom(IngestWire.prepareDigest(committed, OWNER)))).build();
+            decisions.transaction = request;
+            decisions.lookupStarted = new CountDownLatch(1);
+            decisions.continueLookup = new CountDownLatch(1);
+            decisions.blockNextLookup.set(true);
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            try {
+                Future<?> pending = executor.submit(() -> participant.install(request, false));
+                assertTrue(decisions.lookupStarted.await(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                executor.submit(() -> { participant.close(); return null; })
+                        .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                decisions.continueLookup.countDown();
+                java.util.concurrent.ExecutionException failure = assertThrows(
+                        java.util.concurrent.ExecutionException.class,
+                        () -> pending.get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                assertTrue(failure.getCause() instanceof IOException);
+                assertTrue(failure.getCause().getMessage().contains("not ready"));
+                assertEquals(0, installer.installCalls);
+                assertEquals(TransactionState.COMMIT_DECIDED, decisions.transaction.getState());
+            } finally {
+                decisions.continueLookup.countDown();
+                executor.shutdownNow();
+                assertTrue(executor.awaitTermination(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            }
+        }
+    }
+
+    @Test
+    public void delayedAppendAuthorizationDoesNotBlockAbort() throws Exception
+    {
+        blockedInputLookup(false, true);
+    }
+
+    @Test
+    public void delayedSealAuthorizationDoesNotBlockAbort() throws Exception
+    {
+        blockedInputLookup(true, true);
+    }
+
+    @Test
+    public void delayedAppendAuthorizationRechecksShutdown() throws Exception
+    {
+        blockedInputLookup(false, false);
+    }
+
+    @Test
+    public void delayedSealAuthorizationRechecksShutdown() throws Exception
+    {
+        blockedInputLookup(true, false);
+    }
+
+    private void blockedInputLookup(boolean sealing, boolean abort) throws Exception
+    {
+        MutableDecisions decisions = new MutableDecisions();
+        MutationBatch delayed = batch(stream(FIRST_STATEMENT_ID, FIRST_WRITER_ID),
+                FIRST_SEQUENCE, FIRST_PAYLOAD);
+        MutationBatch independent = batch(stream(FIRST_STATEMENT_ID, SECOND_WRITER_ID),
+                FIRST_SEQUENCE, SECOND_PAYLOAD);
+        try (LocalMutationJournal journal = new LocalMutationJournal(
+                directory, JOURNAL_PAYLOAD_LIMIT, JOURNAL_BYTE_LIMIT, JOURNAL_RECORD_LIMIT);
+                RetinaIngestParticipant participant = new RetinaIngestParticipant(
+                        OWNER, journal, decisions, new NoOpInstaller(),
+                        new IngestReadPins(READ_LEASE_MILLIS))) {
+            participant.recover();
+            decisions.transaction = Transaction.newBuilder().setTransactionId(TRANSACTION_ID)
+                    .setState(TransactionState.OPEN).setTable(TABLE).addEnlistedTables(TABLE)
+                    .addStreams(IngestWire.encode(delayed.getStreamId()))
+                    .addStreams(IngestWire.encode(independent.getStreamId())).build();
+            if (sealing) participant.append(delayed);
+            decisions.lookupStarted = new CountDownLatch(1);
+            decisions.continueLookup = new CountDownLatch(1);
+            decisions.blockNextLookup.set(true);
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            try {
+                Future<?> pending = executor.submit(() -> {
+                    if (sealing) participant.seal(seal(delayed.getStreamId(), delayed));
+                    else participant.append(delayed);
+                    return null;
+                });
+                assertTrue(decisions.lookupStarted.await(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                executor.submit(() -> { participant.append(independent); return null; })
+                        .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                if (abort) {
+                    decisions.transaction = decisions.transaction.toBuilder()
+                            .setState(TransactionState.ABORTED).build();
+                    executor.submit(() -> { participant.discard(TRANSACTION_ID); return null; })
+                            .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                } else {
+                    executor.submit(() -> { participant.close(); return null; })
+                            .get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                }
+                decisions.continueLookup.countDown();
+                java.util.concurrent.ExecutionException failure = assertThrows(
+                        java.util.concurrent.ExecutionException.class,
+                        () -> pending.get(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+                assertTrue(failure.getCause() instanceof IOException);
+                assertTrue(failure.getCause().getMessage().contains(abort ? "aborted" : "not ready"));
+            } finally {
+                decisions.continueLookup.countDown();
+                executor.shutdownNow();
+                assertTrue(executor.awaitTermination(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            }
+        }
+    }
 
     @Test
     public void publicationLookupDoesNotHoldParticipantLockAndRechecksShutdown() throws Exception
@@ -343,16 +532,25 @@ public class TestRetinaPrivateRead
     private static final class MutableDecisions
             implements RetinaIngestParticipant.Decisions
     {
-        private Transaction transaction;
+        private volatile Transaction transaction;
+        private final AtomicBoolean blockNextLookup = new AtomicBoolean();
+        private CountDownLatch lookupStarted;
+        private CountDownLatch continueLookup;
         private CountDownLatch publicationStarted;
         private CountDownLatch continuePublication;
 
-        public Transaction get(long transactionId) throws IOException
+        public Transaction get(long transactionId) throws Exception
         {
-            if (transaction == null || transaction.getTransactionId() != transactionId) {
+            Transaction snapshot = transaction;
+            if (snapshot == null || snapshot.getTransactionId() != transactionId) {
                 throw new IOException("Unknown transaction");
             }
-            return transaction;
+            if (blockNextLookup.compareAndSet(true, false)) {
+                lookupStarted.countDown();
+                if (!continueLookup.await(GROUP_COMMIT_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    throw new IOException("Input authorization test timed out");
+            }
+            return snapshot;
         }
 
         public Transaction abort(long transactionId) throws IOException
@@ -385,7 +583,10 @@ public class TestRetinaPrivateRead
     private static final class NoOpInstaller
             implements RetinaIngestParticipant.Installer
     {
-        public void prepare(Transaction transaction, Iterable<MutationBatch> batches) {}
+        private int prepareCalls;
+        private int installCalls;
+
+        public void prepare(Transaction transaction, Iterable<MutationBatch> batches) { prepareCalls++; }
 
         public boolean install(
                 Transaction transaction,
@@ -393,6 +594,7 @@ public class TestRetinaPrivateRead
                 boolean recovering,
                 boolean forceFileTail)
         {
+            installCalls++;
             return true;
         }
 

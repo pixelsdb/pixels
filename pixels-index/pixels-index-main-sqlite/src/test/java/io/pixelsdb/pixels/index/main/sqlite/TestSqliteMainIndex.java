@@ -58,6 +58,31 @@ public class TestSqliteMainIndex
     String sqlitePath;
     MainIndex mainIndex;
 
+    @Test
+    public void testDirectRangeSurvivesFlushAndReopen() throws Exception
+    {
+        long fileId = 901L;
+        long firstRow = 1000L;
+        int count = 100;
+        int firstOffset = 5;
+        int rowGroup = 2;
+        RowIdRange range = new RowIdRange(firstRow, firstRow + count, fileId,
+                rowGroup, firstOffset, firstOffset + count);
+        Assertions.assertTrue(mainIndex.putRange(range));
+        Assertions.assertFalse(mainIndex.putRange(range));
+        for (int i = 0; i < count; i++)
+        {
+            assertLocation(firstRow + i, fileId, rowGroup, firstOffset + i);
+        }
+        mainIndex.flushCache(fileId);
+        MainIndexFactory.Instance().closeIndex(tableId, false);
+        mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+        for (int i = 0; i < count; i++)
+        {
+            assertLocation(firstRow + i, fileId, rowGroup, firstOffset + i);
+        }
+    }
+
     @BeforeEach
     public void setUp() throws MainIndexException
     {
@@ -276,6 +301,60 @@ public class TestSqliteMainIndex
         Assertions.assertTrue(mainIndex.flushCache(failingFileId));
         Assertions.assertEquals(1, countRangesForFile(failingFileId));
         Assertions.assertEquals(1, countFlushMarkersForFile(failingFileId));
+    }
+
+    @Test
+    public void testBulkOverlapPreservesPerEntryResultsAndOriginalLocations() throws Exception
+    {
+        long fileId = 52L;
+        assertAllTrue(mainIndex.putEntries(Arrays.asList(
+                primaryEntry(14000L, fileId, 0, 0),
+                primaryEntry(14001L, fileId, 0, 1),
+                primaryEntry(14002L, fileId, 0, 2))));
+        Assertions.assertEquals(Arrays.asList(false, false, true), mainIndex.putEntries(Arrays.asList(
+                primaryEntry(14001L, fileId, 1, 0),
+                primaryEntry(14002L, fileId, 1, 1),
+                primaryEntry(14003L, fileId, 1, 2))));
+        Assertions.assertEquals(Arrays.asList(false, true, false), mainIndex.putEntries(Arrays.asList(
+                primaryEntry(14003L, fileId, 2, 0),
+                primaryEntry(14004L, fileId, 2, 1),
+                primaryEntry(14004L, fileId, 2, 2))));
+        assertLocation(14001L, fileId, 0, 1);
+        assertLocation(14003L, fileId, 1, 2);
+        assertLocation(14004L, fileId, 2, 1);
+        Assertions.assertTrue(mainIndex.flushCache(fileId));
+        MainIndexFactory.Instance().closeIndex(tableId, false);
+        mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+        assertLocation(14001L, fileId, 0, 1);
+        assertLocation(14003L, fileId, 1, 2);
+        assertLocation(14004L, fileId, 2, 1);
+    }
+
+    @Test
+    public void testBulkRangesSurviveFailedFlushAndRetry() throws Exception
+    {
+        long fileId = 53L;
+        assertAllTrue(mainIndex.putEntries(Arrays.asList(
+                primaryEntry(15000L, fileId, 0, 0),
+                primaryEntry(15001L, fileId, 0, 1),
+                primaryEntry(15002L, fileId, 0, 2))));
+        createFailingFlushMarkerTrigger(fileId);
+        try
+        {
+            Assertions.assertThrows(MainIndexException.class, () -> mainIndex.flushCache(fileId));
+            Assertions.assertEquals(0, countRangesForFile(fileId));
+            assertLocation(15001L, fileId, 0, 1);
+        }
+        finally
+        {
+            dropFailingFlushMarkerTrigger();
+        }
+        Assertions.assertTrue(mainIndex.flushCache(fileId));
+        Assertions.assertEquals(1, countRangesForFile(fileId));
+        Assertions.assertEquals(1, countFlushMarkersForFile(fileId));
+        MainIndexFactory.Instance().closeIndex(tableId, false);
+        mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+        assertLocation(15002L, fileId, 0, 2);
     }
 
     @Test
