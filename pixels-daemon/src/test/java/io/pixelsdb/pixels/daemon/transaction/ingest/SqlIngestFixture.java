@@ -137,11 +137,18 @@ public final class SqlIngestFixture implements AutoCloseable {
         private static final String TABLE_B_NAME = "b";
 
         private final AtomicStateFile catalogState;
-        private final Map<String, MetadataProto.Table> tables = new LinkedHashMap<>();
-        private final Map<String, MetadataProto.Layout> layouts = new LinkedHashMap<>();
+        private final Map<String, MetadataProto.Table> tables = new ConcurrentHashMap<>();
+        private final Map<String, MetadataProto.Layout> layouts = new ConcurrentHashMap<>();
+        // Dynamic benchmark DDL is scoped to this fixture process; restart tests use t/a/b.
+        private final Map<String, List<MetadataProto.Column>> benchmarkColumns = new ConcurrentHashMap<>();
+        private final Map<String, MetadataProto.Schema> schemas = new ConcurrentHashMap<>();
+        private final Path catalogRoot;
 
         Catalog(Path root) throws Exception {
             super(root);
+            catalogRoot = root;
+            schemas.put(SCHEMA_NAME, MetadataProto.Schema.newBuilder()
+                    .setId(SCHEMA_ID).setName(SCHEMA_NAME).build());
             catalogState = new AtomicStateFile(root.resolve("fixture-catalog"), MAX_CATALOG_BYTES);
             restoreCatalog(catalogState.read());
             registerTable(root, TABLE_T_NAME, TABLE_T_ID, TABLE_T_LAYOUT_ID,
@@ -270,10 +277,58 @@ public final class SqlIngestFixture implements AutoCloseable {
         }
 
         @Override
+        public synchronized void createSchema(
+                MetadataProto.CreateSchemaRequest r,
+                StreamObserver<MetadataProto.CreateSchemaResponse> o) {
+            schemas.putIfAbsent(r.getSchemaName(), MetadataProto.Schema.newBuilder()
+                    .setId(ids.incrementAndGet()).setName(r.getSchemaName()).build());
+            reply(o, MetadataProto.CreateSchemaResponse.newBuilder()
+                    .setHeader(ok(r.getHeader())).build());
+        }
+
+        @Override
+        public synchronized void createTable(
+                MetadataProto.CreateTableRequest r,
+                StreamObserver<MetadataProto.CreateTableResponse> o) {
+            try {
+                if (!schemas.containsKey(r.getSchemaName()) || tables.containsKey(r.getTableName())
+                        || !r.getTableName().matches("[A-Za-z_][A-Za-z0-9_]*")
+                        || !r.getStorageScheme().equals("file") || r.getColumnsCount() == 0) {
+                    throw new IllegalArgumentException("Unsupported fixture table definition");
+                }
+                long tableId = ids.incrementAndGet();
+                registerTable(catalogRoot.resolve(r.getTableName()), r.getTableName(), tableId,
+                        ids.incrementAndGet(), ids.incrementAndGet(), ids.incrementAndGet());
+                tables.put(r.getTableName(), tables.get(r.getTableName()).toBuilder()
+                        .setSchemaId(schemas.get(r.getSchemaName()).getId()).build());
+                List<MetadataProto.Column> columns = new ArrayList<>();
+                List<String> names = new ArrayList<>();
+                for (MetadataProto.Column column : r.getColumnsList()) {
+                    columns.add(column.toBuilder().setId(ids.incrementAndGet())
+                            .setTableId(tableId).build());
+                    names.add(column.getName());
+                }
+                benchmarkColumns.put(r.getTableName(), columns);
+                layouts.put(r.getTableName(), layouts.get(r.getTableName()).toBuilder()
+                        .setOrdered("{\"columnOrder\":"
+                                + com.alibaba.fastjson.JSON.toJSONString(names) + "}").build());
+                reply(o, MetadataProto.CreateTableResponse.newBuilder()
+                        .setHeader(ok(r.getHeader())).build());
+            } catch (Exception failure) {
+                o.onError(failure);
+            }
+        }
+
+        @Override
         public void getColumns(
                 MetadataProto.GetColumnsRequest r,
                 StreamObserver<MetadataProto.GetColumnsResponse> o) {
             MetadataProto.Table table = requireTable(r.getTableName());
+            if (benchmarkColumns.containsKey(r.getTableName())) {
+                reply(o, MetadataProto.GetColumnsResponse.newBuilder().setHeader(ok(r.getHeader()))
+                        .addAllColumns(benchmarkColumns.get(r.getTableName())).build());
+                return;
+            }
             reply(
                     o,
                     MetadataProto.GetColumnsResponse.newBuilder()
@@ -325,8 +380,7 @@ public final class SqlIngestFixture implements AutoCloseable {
                     o,
                     MetadataProto.GetSchemasResponse.newBuilder()
                             .setHeader(ok(r.getHeader()))
-                            .addSchemas(MetadataProto.Schema.newBuilder()
-                                    .setId(SCHEMA_ID).setName(SCHEMA_NAME))
+                            .addAllSchemas(schemas.values())
                             .build());
         }
 
@@ -338,7 +392,10 @@ public final class SqlIngestFixture implements AutoCloseable {
                     o,
                     MetadataProto.GetTablesResponse.newBuilder()
                             .setHeader(ok(r.getHeader()))
-                            .addAllTables(tables.values())
+                            .addAllTables(tables.values().stream()
+                                    .filter(table -> schemas.containsKey(r.getSchemaName())
+                                            && table.getSchemaId() == schemas.get(r.getSchemaName()).getId())
+                                    .collect(java.util.stream.Collectors.toList()))
                             .build());
         }
 
@@ -350,7 +407,7 @@ public final class SqlIngestFixture implements AutoCloseable {
                     o,
                     MetadataProto.ExistSchemaResponse.newBuilder()
                             .setHeader(ok(r.getHeader()))
-                            .setExists(r.getSchemaName().equals(SCHEMA_NAME))
+                            .setExists(schemas.containsKey(r.getSchemaName()))
                             .build());
         }
 
@@ -362,8 +419,10 @@ public final class SqlIngestFixture implements AutoCloseable {
                     o,
                     MetadataProto.ExistTableResponse.newBuilder()
                             .setHeader(ok(r.getHeader()))
-                            .setExists(r.getSchemaName().equals(SCHEMA_NAME)
-                                    && tables.containsKey(r.getTableName()))
+                            .setExists(schemas.containsKey(r.getSchemaName())
+                                    && tables.containsKey(r.getTableName())
+                                    && tables.get(r.getTableName()).getSchemaId()
+                                            == schemas.get(r.getSchemaName()).getId())
                             .build());
         }
 
