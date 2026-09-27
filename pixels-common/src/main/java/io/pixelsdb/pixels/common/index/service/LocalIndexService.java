@@ -49,6 +49,19 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
+    public List<IndexProto.RowLocation> lookupRowLocations(long tableId, List<Long> rowIds) throws IndexException
+    {
+        try
+        {
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            List<IndexProto.RowLocation> result = new java.util.ArrayList<>(rowIds.size());
+            for (long rowId : rowIds) { result.add(mainIndex.getLocation(rowId)); }
+            return result;
+        }
+        catch (MainIndexException e) { throw new IndexException("Cannot resolve MainIndex rows", e); }
+    }
+
+    @Override
     public IndexProto.RowIdBatch allocateRowIdBatch(long tableId, int numRowIds) throws IndexException
     {
         try
@@ -473,29 +486,24 @@ public class LocalIndexService implements IndexService
     }
 
     @Override
-    public boolean flushIndexEntriesOfFile
-            (long tableId, long indexId, long fileId, boolean isPrimary, IndexOption indexOption) throws IndexException
+    public boolean flushMainIndexOfFile(long tableId, long fileId) throws IndexException
     {
         try
         {
-            if (isPrimary)
-            {
-                // get the MainIndex for the table
-                MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
-                if (mainIndex == null)
-                {
-                    // MainIndex not found
-                    return false;
-                }
-                // flush cache of the specified file
-                mainIndex.flushCache(fileId);
-            }
-            return true;
+            MainIndex mainIndex = MainIndexFactory.Instance().getMainIndex(tableId);
+            return mainIndex != null && mainIndex.flushCache(fileId);
         }
         catch (MainIndexException e)
         {
             throw new IndexException("Failed to flush main index for tableId=" + tableId + ", fileId=" + fileId, e);
         }
+    }
+
+    @Override
+    public boolean flushIndexEntriesOfFile
+            (long tableId, long indexId, long fileId, boolean isPrimary, IndexOption indexOption) throws IndexException
+    {
+        return !isPrimary || flushMainIndexOfFile(tableId, fileId);
     }
 
     @Override
@@ -632,6 +640,64 @@ public class LocalIndexService implements IndexService
         catch (MainIndexException e)
         {
             throw new IndexException("Failed to put main index entries for tableId=" + tableId, e);
+        }
+    }
+
+    @Override
+    public void putMainIndexRangeOnly(long tableId, RowIdRange range) throws IndexException
+    {
+        try
+        {
+            if (!MainIndexFactory.Instance().getMainIndex(tableId).putRange(range))
+            {
+                throw new IndexException("Failed to put main index range, tableId=" + tableId);
+            }
+        }
+        catch (MainIndexException e)
+        {
+            throw new IndexException("Failed to put main index range for tableId=" + tableId, e);
+        }
+    }
+
+    @Override
+    public List<IndexProto.PrimaryIndexEntry> getMainIndexEntriesForFiles(
+            long tableId, Set<Long> fileIds) throws IndexException
+    {
+        try
+        {
+            return MainIndexFactory.Instance().getMainIndex(tableId).getEntriesForFiles(fileIds);
+        }
+        catch (MainIndexException e)
+        {
+            throw new IndexException("Failed to enumerate main index files for tableId=" + tableId, e);
+        }
+    }
+
+    @Override
+    public void relocateMainIndexEntries(long tableId, Set<Long> expectedOldFileIds,
+            List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
+    {
+        try
+        {
+            MainIndexFactory.Instance().getMainIndex(tableId)
+                    .relocateEntries(expectedOldFileIds, entries);
+        }
+        catch (MainIndexException e)
+        {
+            throw new IndexException("Failed to relocate main index entries for tableId=" + tableId, e);
+        }
+    }
+
+    @Override
+    public void deleteMainIndexEntriesForFile(long tableId, long fileId) throws IndexException
+    {
+        try
+        {
+            MainIndexFactory.Instance().getMainIndex(tableId).deleteEntriesForFile(fileId);
+        }
+        catch (MainIndexException e)
+        {
+            throw new IndexException("Failed to delete retired main index entries for tableId=" + tableId, e);
         }
     }
 

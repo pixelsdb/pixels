@@ -1,0 +1,285 @@
+// Transaction-private ingestion for Retina. Row identities remain pixels-index rowIds.
+syntax = "proto3";
+package pixels.ingest;
+option java_package = "io.pixelsdb.pixels.ingest";
+option java_outer_classname = "IngestProto";
+import "google/protobuf/empty.proto";
+
+service IngestCoordinatorService {
+  rpc BeginWrite(BeginWriteRequest) returns (Transaction);
+  rpc BeginStatement(BeginStatementRequest) returns (Transaction);
+  rpc AllocateWriter(AllocateWriterRequest) returns (WriterAssignment);
+  rpc RegisterStream(RegisterStreamRequest) returns (Transaction);
+  rpc CompleteStatement(CompleteStatementRequest) returns (Transaction);
+  rpc PrepareWrite(PrepareWriteRequest) returns (Transaction);
+  rpc CommitWrite(TransactionId) returns (Transaction);
+  rpc AbortWrite(TransactionId) returns (Transaction);
+  rpc GetWrite(TransactionId) returns (Transaction);
+  rpc TouchWrite(TransactionId) returns (Transaction);
+  rpc ListWrites(OwnerRequest) returns (TransactionList);
+  rpc GetPublication(google.protobuf.Empty) returns (Publication);
+  rpc AwaitVisible(VisibilityRequest) returns (Transaction);
+  rpc FlushVisibleBarrier(VisibleBarrierRequest) returns (VisibleBarrier);
+}
+service IngestParticipantService {
+  rpc Append(AppendRequest) returns (google.protobuf.Empty);
+  rpc Seal(StreamSeal) returns (StreamSeal);
+  rpc Prepare(ParticipantRequest) returns (PrepareToken);
+  rpc Install(ParticipantRequest) returns (InstallResult);
+  rpc Checkpoint(TransactionId) returns (google.protobuf.Empty);
+  rpc Discard(TransactionId) returns (google.protobuf.Empty);
+  rpc PinRead(ReadPin) returns (ReadPin);
+  rpc RenewRead(ReadPin) returns (ReadPin);
+  rpc ReleaseRead(ReadPin) returns (google.protobuf.Empty);
+  rpc ReadPrivate(PrivateReadRequest) returns (PrivateReadPage);
+}
+message Route {
+  uint32 shard_id = 1; // existing node distribution bucket
+  string host = 2;
+  uint32 port = 3;
+  uint32 virtual_node_id = 4;
+}
+message TableColumn { uint64 id = 1; string name = 2; string type = 3; }
+message TableIndex {
+  uint64 id = 1;
+  bool primary = 2;
+  bool unique = 3;
+  repeated uint32 columns = 4; // ordinals in the pinned metadata schema
+}
+message TableSpec {
+  uint64 table_id = 1;
+  string schema_name = 2;
+  string table_name = 3;
+  uint64 schema_version = 4;
+  uint64 layout_id = 5;
+  repeated TableColumn columns = 6;
+  repeated TableIndex indexes = 7;
+  repeated Route routes = 8;
+  bytes fingerprint = 9;
+}
+enum MutationKind { UNSPECIFIED_MUTATION = 0; APPEND_ROWS = 1; DELETE_ROWS = 2; }
+message StreamId {
+  uint64 transaction_id = 1;
+  uint64 writer_id = 2;
+  uint64 table_id = 3;
+  uint32 shard_id = 4;
+  MutationKind kind = 5;
+  uint64 statement_id = 6;
+}
+message AppendRequest {
+  StreamId stream = 1;
+  uint64 sequence = 2;
+  uint64 schema_version = 3;
+  uint32 payload_format = 4;
+  uint32 row_count = 5;
+  bytes payload = 6;
+  bytes digest = 7;
+}
+message StreamSeal {
+  StreamId stream = 1;
+  uint64 batch_count = 2;
+  uint64 row_count = 3;
+  uint64 payload_bytes = 4;
+  bytes digest = 5;
+}
+message BeginWriteRequest {
+  string request_id = 1;
+  string schema_name = 2;
+  string table_name = 3;
+  uint64 read_timestamp = 4;
+  uint64 statement_id = 5;
+  string query_id = 6;
+  uint64 statement_ordinal = 7;
+  TransactionScope scope = 8;
+  WriteRepresentation representation = 9;
+  CommitAckMode ack_mode = 10;
+}
+enum TransactionScope { AUTOCOMMIT = 0; EXPLICIT = 1; }
+enum WriteRepresentation { BUFFERED = 0; FILE = 1; }
+enum CommitAckMode { VISIBLE = 0; DURABLE = 1; }
+enum StatementState { STATEMENT_OPEN = 0; STATEMENT_COMPLETE = 1; }
+message StatementManifest {
+  uint64 statement_id = 1;
+  string query_id = 2;
+  uint64 ordinal = 3;
+  uint64 read_own_through_ordinal = 4;
+  uint64 table_id = 5;
+  StatementState state = 6;
+  repeated StreamSeal seals = 7;
+  bytes digest = 8;
+  repeated uint64 read_table_ids = 9;
+}
+message BeginStatementRequest {
+  uint64 transaction_id = 1;
+  uint64 statement_id = 2;
+  string query_id = 3;
+  uint64 ordinal = 4;
+  uint64 read_own_through_ordinal = 5;
+  string schema_name = 6;
+  string table_name = 7;
+  bool write_table = 8;
+}
+message CompleteStatementRequest {
+  uint64 transaction_id = 1;
+  uint64 statement_id = 2;
+  repeated StreamSeal seals = 3;
+}
+// One writer is one sink instance; multiple sinks may share an engine task id.
+message AllocateWriterRequest {
+  uint64 transaction_id = 1;
+  string request_id = 2;
+  uint64 task_id = 3;
+  uint64 statement_id = 4;
+}
+message WriterAssignment {
+  string request_id = 1;
+  uint64 task_id = 2;
+  uint64 writer_id = 3;
+  uint64 statement_id = 4;
+}
+message TransactionId { uint64 transaction_id = 1; }
+message RegisterStreamRequest { StreamId stream = 1; }
+message PrepareWriteRequest { uint64 transaction_id = 1; repeated StreamSeal seals = 2; }
+enum TransactionState {
+  OPEN = 0;
+  SEALED = 1;
+  PREPARED = 2;
+  COMMIT_DECIDED = 3;
+  PUBLISHED = 4;
+  ABORTED = 5;
+}
+message PrepareToken { string owner = 1; bytes digest = 2; }
+message Transaction {
+  uint64 transaction_id = 1;
+  string request_id = 2;
+  uint64 read_timestamp = 3;
+  uint64 commit_timestamp = 4;
+  TransactionState state = 5;
+  TableSpec table = 6;
+  repeated StreamId streams = 7;
+  repeated StreamSeal seals = 8;
+  repeated PrepareToken tokens = 9;
+  uint64 expires_at_millis = 10;
+  repeated WriterAssignment writers = 11;
+  repeated TableSpec enlisted_tables = 12;
+  repeated StatementManifest statements = 13;
+  TransactionScope scope = 14;
+  WriteRepresentation representation = 15;
+  CommitAckMode ack_mode = 16;
+  bool rollback_only = 17;
+  string commit_token = 18;
+  DecisionOutcome outcome = 19;
+  PublicationProgress progress = 20;
+}
+enum DecisionOutcome { UNDECIDED = 0; COMMIT = 1; ABORT = 2; }
+enum PublicationProgress { PRIVATE = 0; INSTALLING = 1; VISIBLE_NOW = 2; }
+message ParticipantRequest {
+  Transaction transaction = 1;
+  string owner = 2;
+  bool force_file_tail = 3;
+}
+message InstallResult { bool ready = 1; }
+message OwnerRequest { string owner = 1; }
+message TransactionList { repeated Transaction transactions = 1; uint64 published_timestamp = 2; }
+message Publication { uint64 published_timestamp = 1; repeated Route routes = 2; }
+message VisibilityRequest { uint64 transaction_id = 1; string commit_token = 2; uint64 deadline_millis = 3; }
+message VisibleBarrierRequest {
+  repeated uint64 table_ids = 1;
+  uint64 deadline_millis = 2;
+}
+message VisibleBarrier {
+  uint64 committed_boundary = 1;
+  uint64 published_timestamp = 2;
+}
+message TerminalTransaction {
+  Transaction transaction = 1;
+  uint64 retired_at_millis = 2;
+}
+message CoordinatorSnapshot {
+  uint32 version = 1;
+  uint64 published_timestamp = 2;
+  uint64 last_commit_timestamp = 3;
+  repeated Transaction transactions = 4;
+  repeated Route routes = 5;
+  repeated TerminalTransaction terminal_transactions = 6;
+  uint64 retired_transaction_id_high_watermark = 7;
+}
+message CoordinatorMutation {
+  uint32 version = 1;
+  uint32 snapshot_version = 2;
+  uint64 published_timestamp = 3;
+  uint64 last_commit_timestamp = 4;
+  repeated Route routes = 5;
+  uint64 retired_transaction_id_high_watermark = 6;
+  repeated Transaction upsert_transactions = 7;
+  repeated uint64 remove_transaction_ids = 8;
+  repeated TerminalTransaction upsert_terminal_transactions = 9;
+  repeated uint64 remove_terminal_transaction_ids = 10;
+}
+message ReadPin {
+  uint64 transaction_id = 1;
+  uint64 read_timestamp = 2;
+  string token = 3;
+  uint64 expires_at_millis = 4;
+}
+message PrivateReadRequest {
+  uint64 transaction_id = 1;
+  uint64 reader_statement_id = 2;
+  uint64 table_id = 3;
+  uint64 read_own_through_ordinal = 4;
+  string read_pin_token = 5;
+  uint64 batch_offset = 6;
+  uint32 max_batches = 7;
+  uint32 max_bytes = 8;
+}
+message PrivateReadPage {
+  repeated AppendRequest batches = 1;
+  uint64 next_batch_offset = 2;
+  bool end_of_input = 3;
+  bytes manifest_digest = 4;
+}
+// Replay plans bind existing rowIds to durable physical placements. BUFFERED spans describe
+// write-buffer blocks; FILE spans describe row ranges in a temporary Pixels file. They are not
+// an index.
+message BufferSpan {
+  uint64 file_id = 1;
+  string file_name = 2;
+  uint64 path_id = 3;
+  uint64 first_block_id = 4;
+  uint64 block_id = 5;
+  uint32 memtable_size = 6;
+  uint32 file_capacity = 7;
+  uint32 block_start_offset = 8;
+  uint32 offset_in_block = 9;
+  uint32 row_count = 10;
+  uint64 row_id_start = 11;
+}
+message BatchInstall {
+  StreamId stream = 1;
+  uint64 sequence = 2;
+  uint64 commit_timestamp = 3;
+  uint64 row_id_start = 4;
+  uint32 row_count = 5;
+  bytes digest = 6;
+  repeated BufferSpan spans = 7;
+}
+message RowIdRange { uint64 row_id_start = 1; uint32 row_count = 2; }
+message TableCheckpointCoverage {
+  uint64 table_id = 1;
+  bytes table_fingerprint = 2;
+  repeated RowIdRange row_ranges = 3;
+  repeated uint64 file_ids = 4;
+}
+// Durable handoff after file, MainIndex, business indexes and visibility are recoverable
+// without the transaction-private payload or its per-batch installation plan.
+message TransactionCheckpoint {
+  uint64 transaction_id = 1;
+  uint64 commit_timestamp = 2;
+  reserved 3 to 7;
+  repeated TableCheckpointCoverage tables = 8;
+}
+message InstallationSnapshot {
+  uint32 version = 1;
+  repeated BatchInstall batches = 2;
+  repeated TransactionCheckpoint checkpoints = 3;
+}

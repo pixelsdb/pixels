@@ -517,21 +517,17 @@ public class PixelsWriterImpl implements PixelsWriter
                 {
                     dataLength.addAndGet(writer.write(columnVector, rowBatchSize));
                     future.complete(null);
-                } catch (ClassCastException e)
+                } catch (Throwable e)
                 {
                     StringBuilder sb = new StringBuilder();
                     for (StackTraceElement element : stackTrace) {
                         sb.append("\n\tat ").append(element);
                     }
-                    throw new CompletionException(
+                    future.completeExceptionally(new CompletionException(
                             "Failed to write column, writer=" + writer +
                                     ", writerId=" + ii +
                                     "\nCall stack:" + sb,
-                            e);
-                }
-                catch (IOException e)
-                {
-                    throw new CompletionException("failed to write column vector", e);
+                            e));
                 }
             });
             futures[i] = future;
@@ -546,9 +542,10 @@ public class PixelsWriterImpl implements PixelsWriter
                     dataLength.addAndGet(hiddenColumnWriter.write(
                             columnVectors[commonColumnLength], rowBatchSize));
                     future.complete(null);
-                } catch (IOException e)
+                } catch (Throwable e)
                 {
-                    throw new CompletionException("failed to write hidden column vector", e);
+                    future.completeExceptionally(
+                            new CompletionException("failed to write hidden column vector", e));
                 }
             });
             futures[commonColumnLength] = future;

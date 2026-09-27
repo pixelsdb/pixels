@@ -28,7 +28,6 @@ import io.pixelsdb.pixels.common.index.RowIdAllocator;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
-import io.pixelsdb.pixels.common.metadata.domain.SinglePointIndex;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
@@ -64,6 +63,9 @@ public class PixelsWriteBuffer
 {
     private static final Logger logger = LogManager.getLogger(PixelsWriteBuffer.class);
 
+    private final boolean transactional = Boolean.parseBoolean(ConfigFactory.Instance().getProperty("retina.ingest.enabled"));
+    private final Map<String, Integer> installedSpanRows = new HashMap<>();
+    private boolean installFailed;
     private final long tableId;
 
     // column information is recorded to create rowBatch
@@ -78,7 +80,7 @@ public class PixelsWriteBuffer
     private final short replication;
     private final EncodingLevel encodingLevel;
     private final boolean nullsPadding;
-    private final int maxMemTableCount;  // threshold number of memTable to be dumped to file
+    private int maxMemTableCount;  // threshold number of memTable to be dumped to file
     private final Path targetOrderedDirPath;
     private final Path targetCompactDirPath;
     private final Storage targetOrderedStorage;
@@ -127,17 +129,47 @@ public class PixelsWriteBuffer
     private final PriorityQueue<Long> outOfOrderFlushedIds;
     private final Object flushLock = new Object();
     private final Object rowLock = new Object();
+    // Prevent the timer from invalidating a placement between durable planning and installation.
+    private int activeInstallations;
 
     private String retinaHostName;
-    private SinglePointIndex index;
     private final int virtualNodeId;
     private final IndexOption indexOption;
+    private final io.pixelsdb.pixels.retina.ingest.IngestReadPins ingestReadPins;
 
     public PixelsWriteBuffer(long tableId, TypeDescription schema, int[] orderMapping,
                              Path targetOrderedDirPath, Path targetCompactDirPath,
                              String retinaHostName, int virtualNode) throws RetinaException
     {
+        this(tableId, schema, orderMapping, targetOrderedDirPath, targetCompactDirPath,
+                retinaHostName, virtualNode, 0, true);
+    }
+
+    /**
+     * Creates a transactional file-building buffer with an independent file-size floor.
+     * Small MemTables still bound encoding memory, while several of them may contribute to one
+     * Pixels file. Disabling the generic idle scheduler leaves tail closure to the ingest
+     * rows/bytes/delay policy and visibility barriers.
+     */
+    public PixelsWriteBuffer(long tableId, TypeDescription schema, int[] orderMapping,
+                             Path targetOrderedDirPath, Path targetCompactDirPath,
+                             String retinaHostName, int virtualNode,
+                             int minimumFileRows, boolean automaticTailFlush) throws RetinaException
+    {
+        this(tableId, schema, orderMapping, targetOrderedDirPath, targetCompactDirPath,
+                retinaHostName, virtualNode, minimumFileRows, automaticTailFlush, null);
+    }
+
+    public PixelsWriteBuffer(long tableId, TypeDescription schema, int[] orderMapping,
+                             Path targetOrderedDirPath, Path targetCompactDirPath,
+                             String retinaHostName, int virtualNode,
+                             int minimumFileRows, boolean automaticTailFlush,
+                             io.pixelsdb.pixels.retina.ingest.IngestReadPins ingestReadPins) throws RetinaException
+    {
         this.tableId = tableId;
+        checkArgument(!transactional || ingestReadPins != null,
+                "Transactional buffer requires read-pin ownership");
+        this.ingestReadPins = ingestReadPins;
         this.schema = schema;
         this.orderMapping = orderMapping;
         this.virtualNodeId = virtualNode;
@@ -162,7 +194,20 @@ public class PixelsWriteBuffer
         this.replication = Short.parseShort(configFactory.getProperty("block.replication"));
         this.encodingLevel = EncodingLevel.from(Integer.parseInt(configFactory.getProperty("retina.buffer.flush.encodingLevel")));
         this.nullsPadding = Boolean.parseBoolean(configFactory.getProperty("retina.buffer.flush.nullsPadding"));
-        this.maxMemTableCount = Integer.parseInt(configFactory.getProperty("retina.buffer.flush.count"));
+        int configuredMemTableCount =
+                Integer.parseInt(configFactory.getProperty("retina.buffer.flush.count"));
+        if (minimumFileRows > 0)
+        {
+            long requiredMemTables = (minimumFileRows + (long) memTableSize - 1L) / memTableSize;
+            checkArgument(requiredMemTables <= Integer.MAX_VALUE,
+                    "Requested file row capacity is too large");
+            this.maxMemTableCount = Math.max(
+                    configuredMemTableCount, (int) requiredMemTables);
+        }
+        else
+        {
+            this.maxMemTableCount = configuredMemTableCount;
+        }
 
         this.immutableMemTables = new ArrayList<>();
         this.objectEntries = new ArrayList<>();
@@ -179,24 +224,151 @@ public class PixelsWriteBuffer
         this.objectStorageManager = ObjectStorageManager.Instance();
         this.objectStorageManager.setIdPrefix(retinaHostName + "_");
 
-        this.currentFileWriterManager = new FileWriterManager(
-                this.tableId, this.schema, this.targetOrderedDirPath,
-                this.targetOrderedStorage, this.memTableSize, this.blockSize,
-                this.replication, this.encodingLevel, this.nullsPadding,
-                idCounter, this.memTableSize * this.maxMemTableCount, retinaHostName, virtualNodeId);
-        this.ingestFilePublisher = new IngestFilePublisher(this.currentFileWriterManager.getFirstBlockId());
-
-        this.activeMemTable = new MemTable(this.idCounter, schema, memTableSize,
-                TypeDescription.VectorLayout.NONE, this.orderMapping,
-                this.currentFileWriterManager.getFileId(), 0, this.memTableSize);
-        this.idCounter++;
-        this.currentMemTableCount = 1;
-
-        // initialization adds reference counts to all data
-        this.currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
+        if (!transactional) { initializeActive(null); }
+        else { this.currentVersion = new SuperVersion(null, immutableMemTables, objectEntries); }
         this.rowIdAllocator = new RowIdAllocator(tableId, this.memTableSize, IndexServiceProvider.ServiceMode.local);
 
-        startFlushObjectToFileScheduler(Long.parseLong(configFactory.getProperty("retina.buffer.flush.interval")));
+        if (automaticTailFlush)
+        {
+            startFlushObjectToFileScheduler(
+                    Long.parseLong(configFactory.getProperty("retina.buffer.flush.interval")));
+        }
+    }
+
+    private void initializeActive(io.pixelsdb.pixels.ingest.IngestProto.BufferSpan restored) throws RetinaException
+    {
+        long first = restored == null ? idCounter : restored.getFirstBlockId();
+        this.currentFileWriterManager = new FileWriterManager(tableId, schema, targetOrderedDirPath,
+                targetOrderedStorage, memTableSize, blockSize, replication, encodingLevel,
+                nullsPadding, first, memTableSize * maxMemTableCount, retinaHostName, virtualNodeId, restored);
+        if (ingestFilePublisher == null) { ingestFilePublisher = new IngestFilePublisher(first); }
+        long block = restored == null ? first : restored.getBlockId();
+        int offset = restored == null ? 0 : restored.getBlockStartOffset();
+        activeMemTable = new MemTable(block, schema, memTableSize, TypeDescription.VectorLayout.NONE,
+                orderMapping, currentFileWriterManager.getFileId(), offset, memTableSize);
+        idCounter = block + 1;
+        currentMemTableCount = offset / memTableSize + 1;
+        SuperVersion old = currentVersion;
+        currentVersion = new SuperVersion(activeMemTable, immutableMemTables, objectEntries);
+        if (old != null) { old.unref(); }
+    }
+
+    /** Assigns a placement before the caller persists its install plan. */
+    public io.pixelsdb.pixels.ingest.IngestProto.BufferSpan planSpan(int remaining, long rowIdStart) throws RetinaException
+    {
+        synchronized (rowLock)
+        {
+            versionLock.writeLock().lock();
+            try
+            {
+                if (!transactional || installFailed || remaining <= 0) { throw new RetinaException("Buffer cannot plan an install"); }
+                if (activeMemTable == null) { initializeActive(null); }
+                if (activeMemTable.isFull()) { retireActiveMemTableLocked(); }
+                int count = Math.min(remaining, memTableSize - activeMemTable.getSize());
+                return io.pixelsdb.pixels.ingest.IngestProto.BufferSpan.newBuilder()
+                        .setFileId(activeMemTable.getFileId()).setFileName(currentFileWriterManager.getFileName())
+                        .setPathId(targetOrderedDirPath.getId()).setFirstBlockId(currentFileWriterManager.getFirstBlockId())
+                        .setBlockId(activeMemTable.getId()).setMemtableSize(memTableSize)
+                        .setFileCapacity(memTableSize * maxMemTableCount).setBlockStartOffset(activeMemTable.getStartIndex())
+                        .setOffsetInBlock(activeMemTable.getSize()).setRowCount(count).setRowIdStart(rowIdStart).build();
+            }
+            finally { versionLock.writeLock().unlock(); }
+        }
+    }
+
+    /** Protects the durable planSpan -> installSpan handoff from timed buffer rotation. */
+    public void beginInstallation() throws RetinaException
+    {
+        synchronized (rowLock)
+        {
+            if (!transactional || installFailed)
+            {
+                throw new RetinaException("Buffer cannot begin a planned installation");
+            }
+            activeInstallations++;
+        }
+    }
+
+    public void endInstallation()
+    {
+        synchronized (rowLock)
+        {
+            if (activeInstallations <= 0)
+            {
+                throw new IllegalStateException("No planned installation is active");
+            }
+            activeInstallations--;
+        }
+    }
+
+    /** Reuses persisted rowIds and placements. Partial live appends fail closed. */
+    public void installSpan(io.pixelsdb.pixels.ingest.IngestProto.BufferSpan span,
+                            List<byte[][]> rows, long timestamp) throws RetinaException
+    {
+        synchronized (rowLock)
+        {
+            versionLock.writeLock().lock();
+            try
+            {
+                if (activeMemTable == null && span.getMemtableSize() == memTableSize
+                        && span.getFileCapacity() >= memTableSize
+                        && span.getFileCapacity() % memTableSize == 0)
+                {
+                    // A persisted placement is authoritative during recovery. This also keeps an
+                    // in-flight file stable if operators change future file sizing while drained.
+                    maxMemTableCount = span.getFileCapacity() / memTableSize;
+                }
+                if (!transactional || installFailed || span.getRowCount() != rows.size()
+                        || span.getMemtableSize() != memTableSize
+                        || span.getFileCapacity() != memTableSize * maxMemTableCount)
+                { throw new RetinaException("Invalid installation placement"); }
+                String key = span.getFileId() + ":" + span.getBlockId() + ":" + span.getOffsetInBlock();
+                int done = installedSpanRows.getOrDefault(key, 0);
+                if (done == rows.size()) { return; }
+                if (activeMemTable == null) { initializeActive(span); }
+                if (activeMemTable.getId() != span.getBlockId() && activeMemTable.isFull())
+                {
+                    // Normal live rotation is planned first; this path restores a recorded next block.
+                    retireActiveMemTableLocked(false,
+                            activeMemTable.getFileId() == span.getFileId() ? null : span);
+                }
+                if (activeMemTable.getFileId() != span.getFileId() || activeMemTable.getId() != span.getBlockId()
+                        || activeMemTable.getStartIndex() != span.getBlockStartOffset()
+                        || activeMemTable.getSize() != span.getOffsetInBlock() + done)
+                {
+                    throw new RetinaException("Recorded placement no longer matches the active buffer:"
+                            + " expectedFile=" + span.getFileId()
+                            + ", actualFile=" + activeMemTable.getFileId()
+                            + ", expectedBlock=" + span.getBlockId()
+                            + ", actualBlock=" + activeMemTable.getId()
+                            + ", expectedStart=" + span.getBlockStartOffset()
+                            + ", actualStart=" + activeMemTable.getStartIndex()
+                            + ", expectedSize=" + (span.getOffsetInBlock() + done)
+                            + ", actualSize=" + activeMemTable.getSize());
+                }
+                for (int i = done; i < rows.size(); i++)
+                {
+                    int position;
+                    try { position = activeMemTable.add(rows.get(i), timestamp); }
+                    catch (Exception failure) { installFailed = true; throw failure; }
+                    if (position != span.getOffsetInBlock() + i) { installFailed = true; throw new RetinaException("Non-contiguous installation"); }
+                    currentFileWriterManager.includeRowId(span.getRowIdStart() + i);
+                    installedSpanRows.put(key, i + 1);
+                }
+            }
+            finally { versionLock.writeLock().unlock(); }
+        }
+    }
+
+    /** Published file contents are read from the catalog, not appended again during recovery. */
+    public void observePublishedSpan(io.pixelsdb.pixels.ingest.IngestProto.BufferSpan span) throws RetinaException
+    {
+        synchronized (rowLock)
+        {
+            if (activeMemTable != null) { throw new RetinaException("Published spans must precede unmaterialized replay"); }
+            idCounter = Math.max(idCounter, span.getBlockId() + 1);
+            continuousFlushedId.set(Math.max(continuousFlushedId.get(), span.getBlockId()));
+        }
     }
 
     /**
@@ -214,6 +386,7 @@ public class PixelsWriteBuffer
      */
     public long addRow(byte[][] values, long timestamp, IndexProto.RowLocation.Builder builder) throws RetinaException
     {
+        if (transactional) { throw new RetinaException("Legacy row ingress is disabled in transactional mode"); }
         checkArgument(values.length == this.schema.getChildren().size(),
                 "Column values count does not match schema column count.");
 
@@ -283,7 +456,21 @@ public class PixelsWriteBuffer
     // Caller must hold versionLock.writeLock().
     private void retireActiveMemTableLocked() throws RetinaException
     {
-        if (this.currentMemTableCount >= this.maxMemTableCount)
+        retireActiveMemTableLocked(false, null);
+    }
+
+    // Caller must hold rowLock when forceFile is true, and versionLock.writeLock() in all cases.
+    private void retireActiveMemTableLocked(boolean forceFile) throws RetinaException
+    {
+        retireActiveMemTableLocked(forceFile, null);
+    }
+
+    // restoredNext is present only while replay crosses a persisted file boundary.
+    private void retireActiveMemTableLocked(boolean forceFile,
+                                            io.pixelsdb.pixels.ingest.IngestProto.BufferSpan restoredNext)
+            throws RetinaException
+    {
+        if (forceFile || this.currentMemTableCount >= this.maxMemTableCount)
         {
             this.currentMemTableCount = 0;
             this.currentFileWriterManager.setLastBlockId(this.activeMemTable.getId());
@@ -292,8 +479,10 @@ public class PixelsWriteBuffer
                     this.tableId, this.schema,
                     this.targetOrderedDirPath, this.targetOrderedStorage,
                     this.memTableSize, this.blockSize, this.replication,
-                    this.encodingLevel, this.nullsPadding, this.idCounter,
-                    this.memTableSize * this.maxMemTableCount, this.retinaHostName, virtualNodeId);
+                    this.encodingLevel, this.nullsPadding,
+                    restoredNext == null ? this.idCounter : restoredNext.getFirstBlockId(),
+                    this.memTableSize * this.maxMemTableCount, this.retinaHostName, virtualNodeId,
+                    restoredNext);
         }
             
         /*
@@ -370,6 +559,10 @@ public class PixelsWriteBuffer
 
                 // unref in the end
                 flushMemTable.unref();
+                if (!flushFileExecutor.isShutdown())
+                {
+                    flushFileExecutor.execute(this::flushReadyFilesSafely);
+                }
             } catch (Exception e)
             {
                 // TODO: Retry on failure.
@@ -393,6 +586,7 @@ public class PixelsWriteBuffer
      */
     public long getEarliestPendingMinTs()
     {
+        if (this.ingestFilePublisher == null) { return Long.MAX_VALUE; }
         long nextBlockId = this.ingestFilePublisher.getNextCommitFirstBlockId();
         SuperVersion sv = getCurrentVersion();
         try
@@ -441,7 +635,7 @@ public class PixelsWriteBuffer
         }
     }
 
-    private List<FileWriterManager> publishFinishedFile(FileWriterManager fileWriterManager) throws RetinaException
+    private void prepareFinishedFile(FileWriterManager fileWriterManager) throws RetinaException
     {
         try
         {
@@ -449,18 +643,9 @@ public class PixelsWriteBuffer
 
             if (!fileWriterManager.isIndexFlushed())
             {
-                if (this.index == null)
-                {
-                    this.index = MetadataService.Instance().getPrimaryIndex(tableId);
-                    if (this.index == null)
-                    {
-                        throw new RetinaException("Primary index not found for table " + tableId);
-                    }
-                }
-
+                // MainIndex is required even when the table has no business key index.
                 boolean flushed = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local)
-                        .flushIndexEntriesOfFile(
-                                tableId, index.getId(), fileWriterManager.getFileId(), true, indexOption);
+                        .flushMainIndexOfFile(tableId, fileWriterManager.getFileId());
                 if (!flushed)
                 {
                     throw new RetinaException("Failed to flush main index for ingest file "
@@ -472,10 +657,12 @@ public class PixelsWriteBuffer
         {
             throw new RetinaException("Failed to flush main index for ingest file "
                     + fileWriterManager.getFileId(), e);
-        } catch (MetadataException e)
-        {
-            throw new RetinaException("Failed to load primary index for table " + tableId, e);
         }
+    }
+
+    private List<FileWriterManager> publishFinishedFile(FileWriterManager fileWriterManager) throws RetinaException
+    {
+        prepareFinishedFile(fileWriterManager);
         return this.ingestFilePublisher.admitReady(fileWriterManager, this::publishPreparedFile);
     }
 
@@ -517,30 +704,103 @@ public class PixelsWriteBuffer
      * been written to Object. If it has been written, execute the file write
      * operation and delete the corresponding ObjectEntry in the unified view.
      */
-    private void startFlushObjectToFileScheduler(long intervalSeconds)
+    private boolean flushIdleActiveMemTable()
     {
-        this.flushFileFuture = this.flushFileExecutor.scheduleWithFixedDelay(() -> {
+        synchronized (rowLock)
+        {
+            if (activeInstallations != 0 || installFailed
+                    || (transactional && RetinaResourceManager.Instance().isRecovering())
+                    || activeMemTable == null || activeMemTable.isEmpty())
+            {
+                return false;
+            }
+            versionLock.writeLock().lock();
             try
             {
-                Iterator<FileWriterManager> iterator = this.fileWriterManagers.iterator();
-                while (iterator.hasNext())
+                retireActiveMemTableLocked(true);
+                return true;
+            }
+            catch (Exception e)
+            {
+                installFailed = transactional;
+                logger.error("Failed to flush active memTable on the configured interval", e);
+                return false;
+            }
+            finally
+            {
+                versionLock.writeLock().unlock();
+            }
+        }
+    }
+
+    /**
+     * Closes the current transactional tail for a visibility barrier or a FILE
+     * aggregation threshold. Object upload, Pixels encoding, MainIndex flush,
+     * and catalog publication continue through the existing flush pipeline.
+     */
+    public boolean requestIngestTailFlush()
+    {
+        if (!transactional)
+        {
+            throw new IllegalStateException("Tail flush is available only for transactional ingestion");
+        }
+        boolean retired = flushIdleActiveMemTable();
+        flushReadyFilesSafely();
+        return retired;
+    }
+
+    private void flushReadyFilesSafely()
+    {
+        try
+        {
+            Iterator<FileWriterManager> iterator = this.fileWriterManagers.iterator();
+            while (iterator.hasNext())
+            {
+                FileWriterManager fileWriterManager = iterator.next();
+                if (fileWriterManager.getLastBlockId() > this.continuousFlushedId.get())
                 {
-                    FileWriterManager fileWriterManager = iterator.next();
-                    if (fileWriterManager.getLastBlockId() > this.continuousFlushedId.get())
-                    {
-                        break;
-                    }
+                    break;
+                }
+                if (transactional)
+                {
+                    prepareFinishedFile(fileWriterManager);
+                    // File publication replaces query-visible buffer coverage. Keep its
+                    // objects available until every read selecting that coverage is done.
+                    boolean published = ingestReadPins.publish(() -> {
+                        List<FileWriterManager> publishedFiles = this.ingestFilePublisher.admitReady(
+                                fileWriterManager, this::publishPreparedFile);
+                        for (FileWriterManager publishedFile : publishedFiles)
+                        {
+                            this.fileWriterManagers.remove(publishedFile);
+                            cleanupPublishedObjects(
+                                    publishedFile.getFirstBlockId(), publishedFile.getLastBlockId());
+                        }
+                    });
+                    if (!published) { break; }
+                }
+                else
+                {
                     List<FileWriterManager> publishedFiles = publishFinishedFile(fileWriterManager);
                     for (FileWriterManager publishedFile : publishedFiles)
                     {
                         this.fileWriterManagers.remove(publishedFile);
-                        cleanupPublishedObjects(publishedFile.getFirstBlockId(), publishedFile.getLastBlockId());
+                        cleanupPublishedObjects(
+                                publishedFile.getFirstBlockId(), publishedFile.getLastBlockId());
                     }
                 }
-            } catch (Exception e)
-            {
-                logger.error("Failed to flush data to disk", e);
             }
+        }
+        catch (Exception e)
+        {
+            logger.error("Failed to flush data to disk", e);
+        }
+    }
+
+    private void startFlushObjectToFileScheduler(long intervalSeconds)
+    {
+        this.flushFileFuture = this.flushFileExecutor.scheduleWithFixedDelay(() -> {
+            flushIdleActiveMemTable();
+            flushReadyFilesSafely();
         }, 0, intervalSeconds, TimeUnit.SECONDS);
     }
 
@@ -606,7 +866,7 @@ public class PixelsWriteBuffer
         this.versionLock.writeLock().lock();
         try
         {
-            if (!this.activeMemTable.isEmpty())
+            if (this.activeMemTable != null && !this.activeMemTable.isEmpty())
             {
                 retireActiveMemTableLocked();
             }

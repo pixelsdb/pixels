@@ -91,6 +91,7 @@ public final class StorageGcWal
     static final byte RT_CREATE           = 1;
     static final byte RT_ROLLBACK_ENTRY   = 2;
     static final byte RT_STATE_TRANSITION = 3;
+    static final byte RT_LOCATION_ROLLBACK = 4;
 
     // ─── State ──────────────────────────────────────────────────────────────
 
@@ -148,12 +149,14 @@ public final class StorageGcWal
         private final long newRowIdStart;
         private final int newRowCount;
         private final List<RollbackEntry> rollbackEntries;
+        private final List<IndexProto.PrimaryIndexEntry> locationRollbacks;
         private final State state;
 
         Task(String taskId, long tableId, int virtualNodeId,
              List<Long> oldFileIds, long newFileId, String newFilePath,
              long newRowIdStart, int newRowCount,
-             List<RollbackEntry> rollbackEntries, State state)
+             List<RollbackEntry> rollbackEntries,
+             List<IndexProto.PrimaryIndexEntry> locationRollbacks, State state)
         {
             this.taskId = taskId;
             this.tableId = tableId;
@@ -164,6 +167,7 @@ public final class StorageGcWal
             this.newRowIdStart = newRowIdStart;
             this.newRowCount = newRowCount;
             this.rollbackEntries = Collections.unmodifiableList(new ArrayList<>(rollbackEntries));
+            this.locationRollbacks = Collections.unmodifiableList(new ArrayList<>(locationRollbacks));
             this.state = state;
         }
 
@@ -176,6 +180,7 @@ public final class StorageGcWal
         public long getNewRowIdStart() { return newRowIdStart; }
         public int getNewRowCount() { return newRowCount; }
         public List<RollbackEntry> getRollbackEntries() { return rollbackEntries; }
+        public List<IndexProto.PrimaryIndexEntry> getLocationRollbacks() { return locationRollbacks; }
         public State getState() { return state; }
     }
 
@@ -218,6 +223,16 @@ public final class StorageGcWal
             out.write(keyBytes);
             out.writeLong(oldRowId);
             out.writeLong(newRowId);
+        }
+
+        /** Persist the old MainIndex location before relocating the stable row identity. */
+        public void appendLocationRollback(IndexProto.PrimaryIndexEntry oldEntry)
+                throws IOException
+        {
+            byte[] bytes = oldEntry.toByteArray();
+            out.writeByte(RT_LOCATION_ROLLBACK);
+            out.writeInt(bytes.length);
+            out.write(bytes);
         }
 
         /**
@@ -357,7 +372,8 @@ public final class StorageGcWal
                 {
                     throw new IllegalStateException(
                             "Corrupted Storage GC WAL file at " + path
-                            + ". Delete this file to allow recovery to proceed.", e);
+                            + ". Service remains unavailable; preserve the file and restore a known-good "
+                            + "checkpoint/WAL set before retrying.", e);
                 }
             }
             return Collections.unmodifiableList(tasks);
@@ -539,6 +555,7 @@ public final class StorageGcWal
 
             // ── Subsequent records (rollback entries + state transitions) ──
             List<RollbackEntry> rollbackEntries = new ArrayList<>();
+            List<IndexProto.PrimaryIndexEntry> locationRollbacks = new ArrayList<>();
             State state = State.INDEX_SWITCHING;
 
             while (true)
@@ -579,6 +596,10 @@ public final class StorageGcWal
                 {
                     state = State.fromCode(rPayload[0]);
                 }
+                else if ((byte) rt == RT_LOCATION_ROLLBACK)
+                {
+                    locationRollbacks.add(IndexProto.PrimaryIndexEntry.parseFrom(rPayload));
+                }
                 else
                 {
                     logger.warn("WAL file {} has unknown record type {}, skipping", path, rt);
@@ -587,7 +608,7 @@ public final class StorageGcWal
 
             return new Task(taskId, tableId, virtualNodeId, oldFileIds,
                     newFileId, newFilePath, newRowIdStart, newRowCount,
-                    rollbackEntries, state);
+                    rollbackEntries, locationRollbacks, state);
         }
     }
 
@@ -694,6 +715,7 @@ public final class StorageGcWal
 
         private void rollbackTask(Task task, boolean restoreOldFiles) throws RetinaException
         {
+            restoreMainIndexLocations(task);
             restorePrimaryIndex(task);
             if (restoreOldFiles)
             {
@@ -706,6 +728,25 @@ public final class StorageGcWal
                 throw new RetinaException(
                         "WAL recovery failed to mark ABORTED for taskId="
                         + task.getTaskId(), e);
+            }
+        }
+
+        private void restoreMainIndexLocations(Task task) throws RetinaException
+        {
+            if (task.getLocationRollbacks().isEmpty())
+            {
+                return;
+            }
+            try
+            {
+                indexService.relocateMainIndexEntries(task.getTableId(),
+                        Collections.singleton(task.getNewFileId()), task.getLocationRollbacks());
+            }
+            catch (IndexException | UnsupportedOperationException e)
+            {
+                throw new RetinaException(
+                        "WAL recovery failed to restore MainIndex locations for taskId="
+                                + task.getTaskId(), e);
             }
         }
 

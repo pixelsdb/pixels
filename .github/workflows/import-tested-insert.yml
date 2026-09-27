@@ -1,0 +1,40 @@
+name: Import verified INSERT source
+
+on:
+  push:
+    branches: [feat/trino-insert-180]
+    paths:
+      - .github/insert-e2e-transfer/**
+      - .github/workflows/import-tested-insert.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    if: github.repository == 'AntiO2/pixels' && github.ref == 'refs/heads/feat/trino-insert-180'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verify patch, commit source, and fast-forward the development branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=feat/trino-insert-180
+          test "$(git rev-parse HEAD^)" = 35ca95051803b92a828bc5ff55596eeb2b70a4c4
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$GITHUB_SHA"
+          cat .github/insert-e2e-transfer/part-*.xz | xz --decompress > "$RUNNER_TEMP/insert.patch"
+          echo "511ca82c40496895cd43870c8dbe1cab3fa935454789133bf1db2eaa3f8c76f7  $RUNNER_TEMP/insert.patch" | sha256sum --check -
+          git apply --check "$RUNNER_TEMP/insert.patch"
+          git apply --index "$RUNNER_TEMP/insert.patch"
+          git diff --cached --check
+          git diff --cached --stat
+          git rm -r .github/insert-e2e-transfer
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m '[pixels-trino #180] Integrate transactional ingestion and snapshot-safe buffer reads' -m 'Add column-batch RPC, durable decisions, private preparation, idempotent installation through existing indexes, and query publication. Repair buffer prefetch completion, bitmap association, and native reader buffer ownership. Add real-storage and separate-process SQL fixtures. The matching connector E2E passed three independent runs; deployment and GC limitations remain documented.'
+          git push origin "HEAD:refs/heads/$branch"
+          echo "Source commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"

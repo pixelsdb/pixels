@@ -1,6 +1,7 @@
 package io.pixelsdb.pixels.daemon;
 
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.ingest.rpc.IngestOptions;
 import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.daemon.cache.CacheCoordinator;
 import io.pixelsdb.pixels.daemon.cache.CacheWorker;
@@ -109,7 +110,15 @@ public class DaemonMain
                     container.addServer("metadata", metadataServer);
                     // start transaction server
                     TransServer transServer = new TransServer(transServerPort);
-                    container.addServer("transaction", transServer, new RetinaReadyCheck());
+                    if (new IngestOptions().enabled)
+                    {
+                        // The coordinator must be reachable before Retina participants can recover.
+                        container.addServer("transaction", transServer);
+                    }
+                    else
+                    {
+                        container.addServer("transaction", transServer, new RetinaReadyCheck());
+                    }
                     // start query schedule server
                     QueryScheduleServer queryScheduleServer = new QueryScheduleServer(queryScheduleServerPort);
                     container.addServer("query_schedule", queryScheduleServer);
@@ -134,6 +143,8 @@ public class DaemonMain
                 catch (Throwable e)
                 {
                     log.error("failed to start coordinator", e);
+                    abortStartup(mainDaemon, container);
+                    return;
                 }
             }
             else if (role.equals(NodeProto.NodeRole.WORKER))
@@ -166,13 +177,11 @@ public class DaemonMain
             else if(role.equals(NodeProto.NodeRole.RETINA))
             {
                 int retinaServerPort = Integer.parseInt(config.getProperty("retina.server.port"));
-
-                // start heartbeat worker
-                HeartbeatWorker heartbeatWorker = new HeartbeatWorker(role);
-                container.addServer("heartbeat_worker", heartbeatWorker);
-
                 try
                 {
+                    // start heartbeat worker
+                    HeartbeatWorker heartbeatWorker = new HeartbeatWorker(role);
+                    container.addServer("heartbeat_worker", heartbeatWorker);
                     // start retina server on worker node
                     RetinaServer retinaServer = new RetinaServer(retinaServerPort);
                     container.addServer("retina", retinaServer,
@@ -189,6 +198,8 @@ public class DaemonMain
                 catch (Exception e)
                 {
                     log.error("failed to start retina", e);
+                    abortStartup(mainDaemon, container);
+                    return;
                 }
             }
 
@@ -242,7 +253,8 @@ public class DaemonMain
                 catch (Throwable e)
                 {
                     log.error("error in the main loop of pixels daemon of {}", roleStr, e);
-                    break;
+                    abortStartup(mainDaemon, container);
+                    return;
                 }
             }
             // the daemon is terminated.
@@ -301,6 +313,28 @@ public class DaemonMain
             {
                 log.error("error when stopping pixels daemon of {}", roleStr, e);
             }
+        }
+    }
+
+    private static void abortStartup(Daemon mainDaemon, ServerContainer container)
+    {
+        mainDaemon.requestShutdown();
+        try
+        {
+            container.shutdownAll();
+            if (!container.awaitTermination(30, TimeUnit.SECONDS))
+            {
+                log.warn("not all servers stopped after startup failure");
+            }
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+            log.warn("interrupted while stopping after startup failure", e);
+        }
+        finally
+        {
+            mainDaemon.releaseLock();
         }
     }
 }

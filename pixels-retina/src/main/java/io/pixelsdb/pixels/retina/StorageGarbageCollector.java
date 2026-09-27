@@ -61,6 +61,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -223,6 +224,10 @@ public class StorageGarbageCollector
          * {@code PendingIndexEntry} with its own old rowId.
          */
         List<Long> oldRowIds;
+        /** Stable row identities, positionally aligned with new-file global row offsets. */
+        final List<Long> keptRowIds = new ArrayList<>();
+        /** Old MainIndex locations used by live rollback; the durable copy is in StorageGcWal. */
+        final List<IndexProto.PrimaryIndexEntry> oldMainIndexEntries = new ArrayList<>();
 
         RewriteResult(FileGroup group, String newFilePath, long newFileId,
                       int newFileRgCount, int[] newFileRgActualRecordNums, int[] newFileRgRowStart,
@@ -664,6 +669,22 @@ public class StorageGarbageCollector
         String[] includeColNames = schema.getFieldNames().toArray(new String[0]);
         List<PendingIndexEntry> pendingIndexEntries = new ArrayList<>();
 
+        Set<Long> oldFileIds = group.files.stream()
+                .map(fc -> fc.fileId).collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<String, IndexProto.PrimaryIndexEntry> rowIdentityByLocation = new HashMap<>();
+        List<Long> pendingStableRowIds = new ArrayList<>();
+        for (IndexProto.PrimaryIndexEntry entry :
+                indexService.getMainIndexEntriesForFiles(group.tableId, oldFileIds))
+        {
+            IndexProto.RowLocation location = entry.getRowLocation();
+            String key = physicalKey(location.getFileId(), location.getRgId(),
+                    location.getRgRowOffset());
+            if (rowIdentityByLocation.put(key, entry) != null)
+            {
+                throw new IOException("Duplicate MainIndex physical location in GC candidates: " + key);
+            }
+        }
+
         // Resolve PK columns for index key capture; null if no primary index exists.
         // keyColumnIds are metadata column IDs — map to file-schema ordinals by name.
         int[] pkColIndices = null;
@@ -780,6 +801,16 @@ public class StorageGarbageCollector
                                     }
                                     else
                                     {
+                                        IndexProto.PrimaryIndexEntry identity = rowIdentityByLocation.get(
+                                                physicalKey(fc.fileId, oldRgId, oldRgRowOffset));
+                                        if (identity == null)
+                                        {
+                                            throw new IOException("Missing MainIndex identity for live row at fileId="
+                                                    + fc.fileId + ", rgId=" + oldRgId
+                                                    + ", rowOffset=" + oldRgRowOffset);
+                                        }
+                                        // Position in this list is the new global physical row offset.
+                                        pendingStableRowIds.add(identity.getRowId());
                                         selected[kept++] = r;
                                         fwdMapping[oldRgRowOffset] = globalNewRowOffset;
                                         if (pkColIndices != null)
@@ -828,24 +859,13 @@ public class StorageGarbageCollector
             }
         }
 
-        // Edge case: all rows in the group were deleted — skip catalog registration,
-        // delete the empty file, and return early.  The old files will be cleaned up
-        // by the delayed-cleanup phase once it is implemented.
+        // Keep a valid zero-row replacement when every old row is dead. Metadata's
+        // atomic swap requires a replacement identity; running the empty file through
+        // the normal WAL/checkpoint path is what makes retirement crash recoverable.
         if (globalNewRowOffset == 0)
         {
-            logger.info("StorageGC: all rows deleted for table={}, vNodeId={}, skipping empty file",
+            logger.info("StorageGC: all rows deleted for table={}, vNodeId={}, committing empty replacement",
                     group.tableId, group.virtualNodeId);
-            try
-            {
-                storage.delete(newFilePath, false);
-            }
-            catch (IOException e)
-            {
-                logger.warn("StorageGC: failed to delete empty rewrite file {}", newFilePath, e);
-            }
-            return new RewriteResult(group, newFilePath, -1,
-                    0, new int[0], new int[]{0}, forwardRgMappings, Collections.emptyList(),
-                    Collections.emptyList());
         }
 
         // Read the new file's Footer to get per-RG row counts.
@@ -917,18 +937,22 @@ public class StorageGarbageCollector
         int registeredRgCount = 0;
         try
         {
-            long minRowId = Long.MAX_VALUE, maxRowId = Long.MIN_VALUE;
-            for (FileCandidate fc : group.files)
-            {
-                minRowId = Math.min(minRowId, fc.file.getMinRowId());
-                maxRowId = Math.max(maxRowId, fc.file.getMaxRowId());
-            }
             File newFile = new File();
             newFile.setName(newFileName);
             newFile.setType(File.Type.TEMPORARY_GC);
             newFile.setNumRowGroup(newFileRgCount);
-            newFile.setMinRowId(minRowId);
-            newFile.setMaxRowId(maxRowId);
+            if (pendingStableRowIds.isEmpty())
+            {
+                long minRowId = group.files.stream().mapToLong(fc -> fc.file.getMinRowId()).min().orElse(0L);
+                long maxRowId = group.files.stream().mapToLong(fc -> fc.file.getMaxRowId()).max().orElse(minRowId);
+                newFile.setMinRowId(minRowId);
+                newFile.setMaxRowId(maxRowId);
+            }
+            else
+            {
+                newFile.setMinRowId(Collections.min(pendingStableRowIds));
+                newFile.setMaxRowId(Collections.max(pendingStableRowIds));
+            }
             newFile.setPathId(group.files.get(0).file.getPathId());
             if (!metadataService.addFiles(Collections.singletonList(newFile)))
             {
@@ -948,9 +972,16 @@ public class StorageGarbageCollector
             throw e;
         }
 
-        return new RewriteResult(group, newFilePath, newFileId,
+        RewriteResult rewritten = new RewriteResult(group, newFilePath, newFileId,
                 newFileRgCount, newFileRgActualRecordNums, newFileRgRowStart,
                 forwardRgMappings, backwardInfos, pendingIndexEntries);
+        rewritten.keptRowIds.addAll(pendingStableRowIds);
+        return rewritten;
+    }
+
+    private static String physicalKey(long fileId, int rgId, int rowOffset)
+    {
+        return fileId + ":" + rgId + ":" + rowOffset;
     }
 
     /**
@@ -1091,6 +1122,65 @@ public class StorageGarbageCollector
         int totalRows = result.newFileRgRowStart[result.newFileRgCount];
         if (totalRows == 0)
         {
+            Set<Long> oldFiles = result.group.files.stream().map(fc -> fc.fileId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            String journalTaskId = RetinaUtils.buildStorageGcJournalTaskId(
+                    tableId, result.group.virtualNodeId, result.newFileId);
+            result.walWriter = wal.createTask(journalTaskId, tableId,
+                    result.group.virtualNodeId, new ArrayList<>(oldFiles), result.newFileId,
+                    result.newFilePath, -1, 0);
+            result.walWriter.flush();
+            return;
+        }
+
+        if (!result.keptRowIds.isEmpty())
+        {
+            if (result.keptRowIds.size() != totalRows)
+            {
+                throw new IOException("Stable row identity count does not match rewritten rows");
+            }
+            List<IndexProto.PrimaryIndexEntry> relocated = new ArrayList<>(totalRows);
+            int curRgId = 0;
+            for (int i = 0; i < totalRows; i++)
+            {
+                while (curRgId + 1 < result.newFileRgCount
+                        && i >= result.newFileRgRowStart[curRgId + 1])
+                {
+                    curRgId++;
+                }
+                relocated.add(IndexProto.PrimaryIndexEntry.newBuilder()
+                        .setRowId(result.keptRowIds.get(i))
+                        .setRowLocation(IndexProto.RowLocation.newBuilder()
+                                .setFileId(result.newFileId).setRgId(curRgId)
+                                .setRgRowOffset(i - result.newFileRgRowStart[curRgId]))
+                        .build());
+            }
+            Set<Long> oldFiles = result.group.files.stream().map(fc -> fc.fileId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            List<IndexProto.PrimaryIndexEntry> oldEntries =
+                    indexService.getMainIndexEntriesForFiles(tableId, oldFiles);
+            Map<Long, IndexProto.PrimaryIndexEntry> oldById = oldEntries.stream()
+                    .collect(Collectors.toMap(IndexProto.PrimaryIndexEntry::getRowId, e -> e));
+            for (long rowId : result.keptRowIds)
+            {
+                IndexProto.PrimaryIndexEntry old = oldById.get(rowId);
+                if (old == null)
+                {
+                    throw new IOException("MainIndex identity disappeared before GC switch: " + rowId);
+                }
+                result.oldMainIndexEntries.add(old);
+            }
+            String journalTaskId = RetinaUtils.buildStorageGcJournalTaskId(
+                    tableId, result.group.virtualNodeId, result.newFileId);
+            result.walWriter = wal.createTask(journalTaskId, tableId,
+                    result.group.virtualNodeId, new ArrayList<>(oldFiles), result.newFileId,
+                    result.newFilePath, -1, totalRows);
+            for (IndexProto.PrimaryIndexEntry old : result.oldMainIndexEntries)
+            {
+                result.walWriter.appendLocationRollback(old);
+            }
+            result.walWriter.flush();
+            indexService.relocateMainIndexEntries(tableId, oldFiles, relocated);
             return;
         }
 
@@ -1274,6 +1364,11 @@ public class StorageGarbageCollector
             {
                 rollbackSinglePointIndex(result);
             }
+            if (!result.oldMainIndexEntries.isEmpty())
+            {
+                indexService.relocateMainIndexEntries(result.group.tableId,
+                        Collections.singleton(result.newFileId), result.oldMainIndexEntries);
+            }
 
             // Only delete the MainIndex range if rowIds were actually allocated. newRowIdStart
             // stays -1 when rollback runs before syncIndex's allocateRowIdBatch (e.g. syncVisibility
@@ -1434,11 +1529,16 @@ public class StorageGarbageCollector
 
             registerDualWrite(result);
 
-            syncVisibility(result, safeGcTs);
-
-            syncIndex(result, group.tableId);
-
-            commitFileGroup(result);
+            RewriteResult publishResult = result;
+            boolean published = resourceManager.getIngestReadPins().publish(() -> {
+                syncVisibility(publishResult, safeGcTs);
+                syncIndex(publishResult, group.tableId);
+                commitFileGroup(publishResult);
+            });
+            if (!published)
+            {
+                throw new IOException("A fixed Retina ReadView is still active");
+            }
 
             logger.info("StorageGC completed for FileGroup tableId={}, vNodeId={}, newFileId={}",
                     group.tableId, group.virtualNodeId, result.newFileId);

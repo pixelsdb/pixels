@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.retina;
 
 import com.google.protobuf.ByteString;
+import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
 import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.index.service.IndexService;
@@ -72,12 +73,129 @@ public class RetinaResourceManager
     private final MetadataService metadataService;
     private final IndexService indexService;
     private final Map<String, RGVisibility> rgVisibilityMap;
+    private final io.pixelsdb.pixels.retina.ingest.IngestReadPins ingestReadPins =
+            new io.pixelsdb.pixels.retina.ingest.IngestReadPins(new io.pixelsdb.pixels.common.ingest.rpc.IngestOptions().readLeaseMillis);
+    public io.pixelsdb.pixels.retina.ingest.IngestReadPins getIngestReadPins() { return ingestReadPins; }
+
+    public synchronized PixelsWriteBuffer getIngestBuffer(String schema, String table, int vnode) throws RetinaException
+    {
+        Map<Integer, PixelsWriteBuffer> existing = pixelsWriteBufferMap.get(RetinaUtils.buildWriteBufferKey(schema, table));
+        if (existing == null || !existing.containsKey(vnode)) { addWriteBuffer(schema, table); }
+        return checkPixelsWriteBuffer(schema, table, vnode);
+    }
+
+    /**
+     * Returns the private FILE-representation builder. It deliberately is not registered in
+     * {@link #pixelsWriteBufferMap}, so regular buffer PageSources cannot expose its rows before
+     * the resulting Pixels file is atomically published.
+     */
+    public synchronized IngestFileWriter getIngestFileWriter(
+            String schema, String table, int vnode) throws RetinaException
+    {
+        String key = RetinaUtils.buildWriteBufferKey(schema, table);
+        Map<Integer, IngestFileWriter> existing = ingestFileWriterMap.get(key);
+        if (existing == null || !existing.containsKey(vnode))
+        {
+            addIngestFileWriters(schema, table);
+        }
+        IngestFileWriter writer = ingestFileWriterMap.get(key).get(vnode);
+        if (writer == null)
+        {
+            throw new RetinaException("Ingest file writer is missing for vnode " + vnode);
+        }
+        return writer;
+    }
+
+    /** Verify that every in-flight installation file is present in recovered visibility. */
+    public void initializeIngestBaseline(Set<Long> managedFiles) throws RetinaException
+    {
+        for (long fileId : managedFiles)
+        {
+            if (!rgVisibilityMap.containsKey(RetinaUtils.buildRgKey(fileId, 0)))
+            { throw new RetinaException("Missing recovered visibility for ingest file " + fileId); }
+        }
+    }
+
+    /**
+     * Removes temporary ingest files that were registered before their installation plan became
+     * durable. This runs during recovery, before the daemon becomes ready, when no writer can
+     * still be using an unreferenced file.
+     */
+    public void cleanupOrphanedIngestFiles(Set<Long> managedFiles) throws RetinaException
+    {
+        try
+        {
+            List<File> temporaryFiles = metadataService.getFilesByType(
+                    EnumSet.of(File.Type.TEMPORARY_INGEST));
+            if (temporaryFiles.isEmpty())
+            {
+                return;
+            }
+            Map<Long, Path> paths = new HashMap<>();
+            for (Schema schema : metadataService.getSchemas())
+            {
+                for (Table table : metadataService.getTables(schema.getName()))
+                {
+                    for (Layout layout : metadataService.getLayouts(
+                            schema.getName(), table.getName()))
+                    {
+                        for (Path path : layout.getOrderedPaths())
+                        {
+                            paths.put(path.getId(), path);
+                        }
+                        for (Path path : layout.getCompactPaths())
+                        {
+                            paths.put(path.getId(), path);
+                        }
+                    }
+                }
+            }
+            for (File file : temporaryFiles)
+            {
+                if (managedFiles.contains(file.getId()))
+                {
+                    continue;
+                }
+                Path parent = paths.get(file.getPathId());
+                if (parent == null)
+                {
+                    throw new RetinaException("Path is missing for orphan ingest file "
+                            + file.getId());
+                }
+                String filePath = File.getFilePath(parent, file);
+                Storage fileStorage = StorageFactory.Instance().getStorage(filePath);
+                if (fileStorage.exists(filePath))
+                {
+                    fileStorage.delete(filePath, false);
+                }
+                removeVisibility(file.getId());
+                if (!metadataService.deleteFiles(Collections.singletonList(file.getId())))
+                {
+                    throw new RetinaException("Failed to delete orphan ingest file metadata "
+                            + file.getId());
+                }
+            }
+        }
+        catch (RetinaException e)
+        {
+            throw e;
+        }
+        catch (Exception e)
+        {
+            throw new RetinaException("Failed to clean orphan ingest files", e);
+        }
+    }
+
     private final Map<String, Map<Integer, PixelsWriteBuffer>> pixelsWriteBufferMap;
+    private final Map<String, Map<Integer, IngestFileWriter>> ingestFileWriterMap;
+    private final int ingestFileTargetRows;
+    private final int ingestFilePixelStride;
     private String retinaHostName;
 
     // GC related fields
     private final ScheduledExecutorService gcExecutor;
     private final AtomicBoolean gcScheduled;
+    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
     private final StorageGcWal storageGcWal;
     private final StorageGarbageCollector storageGarbageCollector;
     // Initialised by startBackgroundGc(); recovery checkpoint publication
@@ -85,6 +203,39 @@ public class RetinaResourceManager
     // then so unit/integration tests that never start the scheduler are
     // unaffected.
     private RecoveryCheckpoint recoveryCheckpoint;
+    private volatile long durableRecoveryCheckpointTimestamp = -1L;
+    private volatile Set<Long> durableRecoveryCheckpointFiles = Collections.emptySet();
+
+    public void adoptRecoveryCheckpoint(RecoveryCheckpoint.Body body)
+    {
+        if (body == null)
+        {
+            durableRecoveryCheckpointTimestamp = -1L;
+            durableRecoveryCheckpointFiles = Collections.emptySet();
+            return;
+        }
+        Set<Long> files = body.getRgEntries().stream()
+                .map(RecoveryCheckpoint.VisibilityEntry::getFileId)
+                .collect(Collectors.toSet());
+        durableRecoveryCheckpointFiles = Collections.unmodifiableSet(files);
+        durableRecoveryCheckpointTimestamp = body.getCheckpointAppliedTs();
+    }
+
+    public boolean isIngestRecoveryCheckpointDurable(long commitTimestamp, Set<Long> fileIds)
+    {
+        return durableRecoveryCheckpointTimestamp >= commitTimestamp
+                && durableRecoveryCheckpointFiles.containsAll(fileIds);
+    }
+
+    /**
+     * Whether the recovered storage baseline includes all publications through the
+     * supplied timestamp. File membership is checked while creating the ingestion
+     * checkpoint; later storage GC may legitimately replace those file identities.
+     */
+    public boolean isIngestRecoveryCheckpointDurable(long commitTimestamp)
+    {
+        return durableRecoveryCheckpointTimestamp >= commitTimestamp;
+    }
 
     private volatile long latestGcTimestamp = -1;
     private final int totalVirtualNodeNum;
@@ -164,8 +315,13 @@ public class RetinaResourceManager
         this.indexService = IndexServiceProvider.getService(IndexServiceProvider.ServiceMode.local);
         this.rgVisibilityMap = new ConcurrentHashMap<>();
         this.pixelsWriteBufferMap = new ConcurrentHashMap<>();
+        this.ingestFileWriterMap = new ConcurrentHashMap<>();
 
         ConfigFactory config = ConfigFactory.Instance();
+        io.pixelsdb.pixels.common.ingest.rpc.IngestOptions ingestOptions =
+                new io.pixelsdb.pixels.common.ingest.rpc.IngestOptions();
+        this.ingestFileTargetRows = ingestOptions.fileTargetRows;
+        this.ingestFilePixelStride = ingestOptions.filePixelStride;
 
         this.gcExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "retina-gc-thread");
@@ -221,6 +377,41 @@ public class RetinaResourceManager
         return storageGcWal;
     }
 
+    /**
+     * Reconcile storage-rewrite state against the selected recovery checkpoint.
+     * Keeping this operation on the resource manager prevents daemon startup
+     * code from depending on the concrete WAL implementation.
+     */
+    public void recoverStorageGc(Set<Long> baselineVisibleFileIds) throws RetinaException
+    {
+        new StorageGcWal.RecoveryHandler(storageGcWal, metadataService, indexService)
+                .recover(baselineVisibleFileIds);
+    }
+
+    /** Return files that startup retirement must preserve for incomplete rewrites. */
+    public Set<Long> getStorageGcRecoveryProtectedFiles()
+    {
+        return storageGcWal.collectPendingFileIds();
+    }
+
+    /**
+     * Delete terminal rewrite journals after their outcome is represented by
+     * the selected checkpoint. The operation is idempotent across restarts.
+     */
+    public int cleanupTerminalStorageGcTasks() throws RetinaException
+    {
+        List<StorageGcWal.Task> terminalTasks = storageGcWal.listTerminalTasks();
+        if (terminalTasks.isEmpty())
+        {
+            return 0;
+        }
+        List<String> taskIds = terminalTasks.stream()
+                .map(StorageGcWal.Task::getTaskId)
+                .collect(Collectors.toList());
+        storageGcWal.deleteTerminalTasks(taskIds);
+        return taskIds.size();
+    }
+
     private static final class InstanceHolder
     {
         private static final RetinaResourceManager instance = new RetinaResourceManager();
@@ -272,6 +463,8 @@ public class RetinaResourceManager
         // or storage backend), refuse to start the GC scheduler rather than
         // silently run without crash recovery.
         this.recoveryCheckpoint = RecoveryCheckpoint.createFromConfig();
+        RecoveryCheckpoint.LoadedCheckpoint loaded = this.recoveryCheckpoint.load();
+        adoptRecoveryCheckpoint(loaded == null ? null : loaded.body);
 
         try
         {
@@ -295,9 +488,107 @@ public class RetinaResourceManager
         return this.gcScheduled.get();
     }
 
+    /**
+     * Quiesce every long-lived Retina resource owned by the daemon.
+     *
+     * <p>The RPC server must stop accepting work before this method is called. Committed rows
+     * still resident in buffers are materialized by {@link PixelsWriteBuffer#close()}; transaction
+     * WAL/installation state is deliberately retained unless its normal recovery checkpoint
+     * handoff has already completed.</p>
+     */
+    public void shutdown() throws RetinaException
+    {
+        if (!shuttingDown.compareAndSet(false, true))
+        {
+            return;
+        }
+
+        RetinaException failure = null;
+        gcExecutor.shutdown();
+        offloadCheckpointExecutor.shutdown();
+        try
+        {
+            if (!gcExecutor.awaitTermination(60, TimeUnit.SECONDS))
+            {
+                gcExecutor.shutdownNow();
+                failure = new RetinaException("Timed out waiting for Retina GC to stop");
+            }
+            if (!offloadCheckpointExecutor.awaitTermination(60, TimeUnit.SECONDS))
+            {
+                offloadCheckpointExecutor.shutdownNow();
+                RetinaException timeout =
+                        new RetinaException("Timed out waiting for Retina checkpoint workers to stop");
+                if (failure == null) failure = timeout;
+                else failure.addSuppressed(timeout);
+            }
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+            gcExecutor.shutdownNow();
+            offloadCheckpointExecutor.shutdownNow();
+            failure = new RetinaException("Interrupted while stopping Retina background workers", e);
+        }
+
+        Set<PixelsWriteBuffer> buffers = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Map<Integer, PixelsWriteBuffer> perTable : pixelsWriteBufferMap.values())
+        {
+            buffers.addAll(perTable.values());
+        }
+        for (Map<Integer, IngestFileWriter> perTable : ingestFileWriterMap.values())
+        {
+            for (IngestFileWriter writer : perTable.values())
+            {
+                try
+                {
+                    writer.close();
+                }
+                catch (RetinaException e)
+                {
+                    if (failure == null) failure = e;
+                    else failure.addSuppressed(e);
+                }
+            }
+        }
+        for (PixelsWriteBuffer buffer : buffers)
+        {
+            try
+            {
+                buffer.close();
+            }
+            catch (RetinaException e)
+            {
+                if (failure == null) failure = e;
+                else failure.addSuppressed(e);
+            }
+        }
+        pixelsWriteBufferMap.clear();
+        ingestFileWriterMap.clear();
+
+        for (RGVisibility visibility : rgVisibilityMap.values())
+        {
+            if (visibility != null)
+            {
+                visibility.close();
+            }
+        }
+        rgVisibilityMap.clear();
+        ingestReadPins.stop();
+
+        if (failure != null)
+        {
+            throw failure;
+        }
+    }
+
     public void setRecovering(boolean recovering)
     {
         this.recovering = recovering;
+    }
+
+    public boolean isRecovering()
+    {
+        return this.recovering;
     }
 
     public void addVisibility(long fileId, int rgId, int recordNum, long timestamp,
@@ -410,11 +701,20 @@ public class RetinaResourceManager
      */
     public void processRetiredFiles()
     {
+        if (ingestReadPins.active() > 0)
+        {
+            return;
+        }
+        Set<Long> recoveryProtectedFiles = storageGcWal.collectPendingFileIds();
         // In-memory queue for files retired in this process.
         long now = System.currentTimeMillis();
         retiredFiles.removeIf(rf ->
         {
             if (now <= rf.retireTimestamp)
+            {
+                return false;
+            }
+            if (recoveryProtectedFiles.contains(rf.fileId))
             {
                 return false;
             }
@@ -459,6 +759,10 @@ public class RetinaResourceManager
             }
             for (File file : dueFiles)
             {
+                if (recoveryProtectedFiles.contains(file.getId()))
+                {
+                    continue;
+                }
                 RetiredPathInfo pathInfo = pathsById.get(file.getPathId());
                 if (pathInfo == null)
                 {
@@ -506,7 +810,7 @@ public class RetinaResourceManager
         {
             try
             {
-                indexService.deleteMainIndexRange(tableId, fileId, rowIdStart, (int) rowCount);
+                indexService.deleteMainIndexEntriesForFile(tableId, fileId);
             }
             catch (Exception e)
             {
@@ -668,50 +972,114 @@ public class RetinaResourceManager
         checkRGVisibility(fileId, rgId, false).importDeletionChain(items);
     }
 
-    public void addWriteBuffer(String schemaName, String tableName) throws RetinaException
+    public synchronized void addWriteBuffer(String schemaName, String tableName) throws RetinaException
+    {
+        addWriteBuffers(schemaName, tableName, pixelsWriteBufferMap, 0, true);
+    }
+
+    private static final class WriteLayout
+    {
+        private final long tableId;
+        private final TypeDescription schema;
+        private final int[] orderMapping;
+        private final Path orderedPath;
+        private final Path compactPath;
+
+        private WriteLayout(long tableId, TypeDescription schema, int[] orderMapping,
+                            Path orderedPath, Path compactPath)
+        {
+            this.tableId = tableId;
+            this.schema = schema;
+            this.orderMapping = orderMapping;
+            this.orderedPath = orderedPath;
+            this.compactPath = compactPath;
+        }
+    }
+
+    private WriteLayout loadWriteLayout(String schemaName, String tableName) throws Exception
+    {
+        Layout latestLayout = this.metadataService.getLatestLayout(schemaName, tableName);
+        List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
+        List<String> layoutColumnOrder = latestLayout.getOrdered().getColumnOrder();
+        List<String> metadataColumnNames = new ArrayList<>(columns.size());
+        for (Column column : columns)
+        {
+            metadataColumnNames.add(column.getName());
+        }
+        int[] orderMapping = new int[layoutColumnOrder.size()];
+        List<String> columnNames = new ArrayList<>(columns.size());
+        List<String> columnTypes = new ArrayList<>(columns.size());
+        for (int i = 0; i < layoutColumnOrder.size(); ++i)
+        {
+            int metadataColumnIndex = metadataColumnNames.indexOf(layoutColumnOrder.get(i));
+            if (metadataColumnIndex < 0)
+            {
+                throw new MetadataException("Layout column is missing from table metadata: "
+                        + layoutColumnOrder.get(i));
+            }
+            orderMapping[i] = metadataColumnIndex;
+            Column column = columns.get(metadataColumnIndex);
+            columnNames.add(column.getName());
+            columnTypes.add(column.getType());
+        }
+        return new WriteLayout(
+                latestLayout.getTableId(),
+                TypeDescription.createSchemaFromStrings(columnNames, columnTypes),
+                orderMapping,
+                latestLayout.getOrderedPaths().get(0),
+                latestLayout.getCompactPaths().get(0));
+    }
+
+    private void addIngestFileWriters(String schemaName, String tableName) throws RetinaException
     {
         try
         {
-            /*
-             * Get ordered and compact dir path.
-             * Already been validated when adding visibility.
-             */
-            Layout latestLayout = this.metadataService.getLatestLayout(schemaName, tableName);
-            List<io.pixelsdb.pixels.common.metadata.domain.Path> orderedPaths = latestLayout.getOrderedPaths();
-            List<io.pixelsdb.pixels.common.metadata.domain.Path> compactPaths = latestLayout.getCompactPaths();
+            WriteLayout layout = loadWriteLayout(schemaName, tableName);
+            String key = RetinaUtils.buildWriteBufferKey(schemaName, tableName);
+            Map<Integer, IngestFileWriter> nodeWriters = ingestFileWriterMap.computeIfAbsent(
+                    key, ignored -> new ConcurrentHashMap<>());
+            for (int vnode = 0; vnode < totalVirtualNodeNum; vnode++)
+            {
+                if (nodeWriters.containsKey(vnode))
+                {
+                    continue;
+                }
+                nodeWriters.put(vnode, new IngestFileWriter(
+                        layout.tableId, layout.schema, layout.orderMapping, layout.orderedPath,
+                        retinaHostName, vnode, ingestFileTargetRows, ingestFilePixelStride,
+                        metadataService, indexService, this));
+            }
+        }
+        catch (Exception e)
+        {
+            throw new RetinaException(String.format(
+                    "Failed to add ingest file writers for schema %s, table %s",
+                    schemaName, tableName), e);
+        }
+    }
 
-            // Build the file schema in layout order while retaining a mapping from
-            // layout positions to the metadata order used by Retina RPC values.
-            List<Column> columns = this.metadataService.getColumns(schemaName, tableName, false);
-            List<String> layoutColumnOrder = latestLayout.getOrdered().getColumnOrder();
-            List<String> metadataColumnNames = new ArrayList<>(columns.size());
-            for (Column column : columns)
-            {
-                metadataColumnNames.add(column.getName());
-            }
-            int[] orderMapping = new int[layoutColumnOrder.size()];
-            for (int i = 0; i < layoutColumnOrder.size(); ++i)
-            {
-                orderMapping[i] = metadataColumnNames.indexOf(layoutColumnOrder.get(i));
-            }
-            List<String> columnNames = new ArrayList<>(columns.size());
-            List<String> columnTypes = new ArrayList<>(columns.size());
-            for (int metadataColumnIndex : orderMapping)
-            {
-                Column column = columns.get(metadataColumnIndex);
-                columnNames.add(column.getName());
-                columnTypes.add(column.getType());
-            }
-            TypeDescription schema = TypeDescription.createSchemaFromStrings(columnNames, columnTypes);
+    private void addWriteBuffers(
+            String schemaName,
+            String tableName,
+            Map<String, Map<Integer, PixelsWriteBuffer>> buffers,
+            int minimumFileRows,
+            boolean automaticTailFlush) throws RetinaException
+    {
+        try
+        {
+            WriteLayout layout = loadWriteLayout(schemaName, tableName);
 
             String writeBufferKey = RetinaUtils.buildWriteBufferKey(schemaName, tableName);
-            Map<Integer, PixelsWriteBuffer> nodeBuffers = pixelsWriteBufferMap.computeIfAbsent(
+            Map<Integer, PixelsWriteBuffer> nodeBuffers = buffers.computeIfAbsent(
                     writeBufferKey, k -> new ConcurrentHashMap<>());
 
             for (int i = 0; i < totalVirtualNodeNum; i++)
             {
-                PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(latestLayout.getTableId(),
-                        schema, orderMapping, orderedPaths.get(0), compactPaths.get(0), retinaHostName, i);
+                if (nodeBuffers.containsKey(i)) { continue; }
+                PixelsWriteBuffer pixelsWriteBuffer = new PixelsWriteBuffer(
+                        layout.tableId, layout.schema, layout.orderMapping,
+                        layout.orderedPath, layout.compactPath, retinaHostName, i,
+                        minimumFileRows, automaticTailFlush, ingestReadPins);
                 nodeBuffers.put(i, pixelsWriteBuffer);
             }
         } catch (Exception e)
@@ -761,7 +1129,7 @@ public class RetinaResourceManager
         RetinaProto.GetWriteBufferResponse.Builder responseBuilder = RetinaProto.GetWriteBufferResponse.newBuilder();
 
         // get super version
-        PixelsWriteBuffer writeBuffer = checkPixelsWriteBuffer(schemaName, tableName, vNodeId);
+        PixelsWriteBuffer writeBuffer = getIngestBuffer(schemaName, tableName, vNodeId);
         SuperVersion superVersion = writeBuffer.getCurrentVersion();
         MemTable activeMemtable = superVersion.getActiveMemTable();
         List<MemTable> immutableMemTables = superVersion.getImmutableMemTables();
@@ -771,7 +1139,14 @@ public class RetinaResourceManager
 
         // Active memTable returns its full appended rows; visibility is masked
         // downstream by the RGVisibility bitmap slice below.
-        int activeSize = activeMemtable.getSize();
+        if (activeMemtable == null)
+        {
+            superVersion.unref();
+            return responseBuilder;
+        }
+        int activeSize;
+        synchronized (activeMemtable) { activeSize = activeMemtable.getSize();
+
         if (activeSize > 0)
         {
             ByteString data = ByteString.copyFrom(activeMemtable.serialize());
@@ -779,6 +1154,8 @@ public class RetinaResourceManager
         } else
         {
             responseBuilder.setData(ByteString.EMPTY);
+        }
+
         }
 
         // statistics on id and fileId
@@ -892,8 +1269,22 @@ public class RetinaResourceManager
      */
     private PixelsWriteBuffer checkPixelsWriteBuffer(String schema, String table, int vNodeId) throws RetinaException
     {
+        return checkPixelsWriteBuffer(pixelsWriteBufferMap, schema, table, vNodeId);
+    }
+
+    private PixelsWriteBuffer checkPixelsWriteBuffer(
+            Map<String, Map<Integer, PixelsWriteBuffer>> buffers,
+            String schema,
+            String table,
+            int vNodeId) throws RetinaException
+    {
         String writeBufferKey = RetinaUtils.buildWriteBufferKey(schema, table);
-        Map<Integer, PixelsWriteBuffer> nodeBuffers = this.pixelsWriteBufferMap.get(writeBufferKey);
+        Map<Integer, PixelsWriteBuffer> nodeBuffers = buffers.get(writeBufferKey);
+        if (nodeBuffers == null)
+        {
+            throw new RetinaException(String.format(
+                    "Writer buffer not found for table: %s.%s", schema, table));
+        }
         PixelsWriteBuffer writeBuffer = nodeBuffers.get(vNodeId);
         if (writeBuffer == null)
         {
@@ -1030,14 +1421,28 @@ public class RetinaResourceManager
                         }
                     }
                 }
+                for (Map<Integer, IngestFileWriter> perTable : this.ingestFileWriterMap.values())
+                {
+                    for (IngestFileWriter writer : perTable.values())
+                    {
+                        long ts = writer.getEarliestPendingMinTs();
+                        if (ts != Long.MAX_VALUE)
+                        {
+                            segments.add(new PendingSegmentEntry(writer.getVirtualNodeId(), ts));
+                        }
+                    }
+                }
                 recoveryCheckpoint.generate(timestamp, rgEntries, segments);
+
+                Set<Long> checkpointFileIds = rgEntries.stream()
+                        .map(VisibilityEntry::getFileId)
+                        .collect(Collectors.toSet());
+                durableRecoveryCheckpointFiles = Collections.unmodifiableSet(checkpointFileIds);
+                durableRecoveryCheckpointTimestamp = timestamp;
 
                 if (!rgEntries.isEmpty())
                 {
                     // A checkpoint containing the new file makes the GC WAL task durable.
-                    Set<Long> checkpointFileIds = rgEntries.stream()
-                            .map(VisibilityEntry::getFileId)
-                            .collect(Collectors.toSet());
                     for (StorageGcWal.Task task : storageGcWal.listAllTasks())
                     {
                         if (task.getState() != StorageGcWal.State.SWAPPED_NOT_CHECKPOINTED

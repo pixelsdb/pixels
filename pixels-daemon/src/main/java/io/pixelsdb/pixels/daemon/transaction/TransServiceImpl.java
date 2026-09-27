@@ -40,6 +40,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 import static io.pixelsdb.pixels.common.utils.Constants.TRANS_LEASE_PERIOD_MS;
 
@@ -72,6 +73,11 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
      */
     private static final AtomicLong lowWatermark;
     private static final AtomicLong highWatermark;
+    /**
+     * When transactional ingestion is enabled, reads and visibility folding may only cross the
+     * coordinator's durable publication point. Null preserves the legacy transaction behavior.
+     */
+    private static volatile LongSupplier ingestPublishedTimestamp;
 
     private static final ScheduledExecutorService watermarksCheckpoint;
     private static final ScheduledExecutorService leaseCheckAndCleanup;
@@ -136,11 +142,45 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     {
     }
 
+    public static long allocateIngestTimestamp() throws EtcdException
+    {
+        return transId.getAndIncrement();
+    }
+
+    public static long legacyPublishedTimestamp()
+    {
+        return Math.max(0, highWatermark.get() - 1);
+    }
+
+    public static void setIngestPublishedTimestamp(LongSupplier supplier)
+    {
+        ingestPublishedTimestamp = supplier;
+    }
+
+    private static long publishedReadTimestamp()
+    {
+        LongSupplier supplier = ingestPublishedTimestamp;
+        return supplier == null ? highWatermark.get() - 1 : supplier.getAsLong();
+    }
+
+    private static boolean ingestOwnsWrites()
+    {
+        return ingestPublishedTimestamp != null;
+    }
+
     @Override
     public void beginTrans(TransProto.BeginTransRequest request,
                            StreamObserver<TransProto.BeginTransResponse> responseObserver)
     {
         TransProto.BeginTransResponse response;
+        if (!request.getReadOnly() && ingestOwnsWrites())
+        {
+            logger.warn("Rejected legacy write transaction after transactional ingest cutover");
+            responseObserver.onNext(TransProto.BeginTransResponse.newBuilder()
+                    .setErrorCode(ErrorCode.TRANS_INVALID_ARGUMENT).build());
+            responseObserver.onCompleted();
+            return;
+        }
         try
         {
             long transId = TransServiceImpl.transId.getAndIncrement();
@@ -148,7 +188,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
              * HWM means all transactions with a timestamp below it are commited, hence query should get a
              * timestamp = HWM -1 instead of HWM.
              */
-            long timestamp = request.getReadOnly() ? highWatermark.get() - 1 : transId;
+            long timestamp = request.getReadOnly() ? publishedReadTimestamp() : transId;
             TransContext context;
             if (request.getReadOnly())
             {
@@ -183,6 +223,14 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                                 StreamObserver<TransProto.BeginTransBatchResponse> responseObserver)
     {
         TransProto.BeginTransBatchResponse.Builder response = TransProto.BeginTransBatchResponse.newBuilder();
+        if (!request.getReadOnly() && ingestOwnsWrites())
+        {
+            logger.warn("Rejected legacy write transaction batch after transactional ingest cutover");
+            responseObserver.onNext(response
+                    .setErrorCode(ErrorCode.TRANS_INVALID_ARGUMENT).setExactNumTrans(0).build());
+            responseObserver.onCompleted();
+            return;
+        }
         try
         {
             final int numTrans = request.getExpectNumTrans();
@@ -194,7 +242,7 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
                  * HWM means all transactions with a timestamp below it are commited, hence query should get a
                  * timestamp = HWM -1 instead of HWM.
                  */
-                long timestamp = highWatermark.get() - 1;
+                long timestamp = publishedReadTimestamp();
                 for (int i = 0; i < numTrans; i++, transId++)
                 {
                     response.addTransIds(transId).addTimestamps(timestamp);
@@ -632,10 +680,22 @@ public class TransServiceImpl extends TransServiceGrpc.TransServiceImplBase
     public void getSafeVisibilityFoldingTimestamp(TransProto.GetSafeVisibilityFoldingTimestampRequest request,
                                                   StreamObserver<TransProto.GetSafeVisibilityFoldingTimestampResponse> responseObserver)
     {
-        long writerSafeTs = Math.max(0, highWatermark.get() - 1);
-        long safeTs = request.getIncludeRunningQueries()
-                ? Math.min(lowWatermark.get(), writerSafeTs)
-                : writerSafeTs;
+        long writerSafeTs = Math.max(0, publishedReadTimestamp());
+        long safeTs = writerSafeTs;
+        if (request.getIncludeRunningQueries())
+        {
+            // A persisted low watermark can legitimately remain at zero before the first
+            // read-only transaction terminates. Treating that stale value as an active read
+            // pin prevents the normal Retina checkpoint from ever advancing. The context
+            // manager is the live-query authority: when it has no running read, publication
+            // is the safe bound; otherwise the oldest query and publication both constrain it.
+            long oldestRunningRead =
+                    TransContextManager.Instance().getMinRunningTransTimestamp(true);
+            if (oldestRunningRead >= 0)
+            {
+                safeTs = Math.min(oldestRunningRead, writerSafeTs);
+            }
+        }
         TransProto.GetSafeVisibilityFoldingTimestampResponse response =
                 TransProto.GetSafeVisibilityFoldingTimestampResponse.newBuilder()
                         .setErrorCode(ErrorCode.SUCCESS)

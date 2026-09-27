@@ -24,14 +24,12 @@ import io.grpc.stub.StreamObserver;
 import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.error.ErrorCode;
 import io.pixelsdb.pixels.common.index.ResolvedPrimary;
 import io.pixelsdb.pixels.common.index.service.IndexService;
 import io.pixelsdb.pixels.common.index.service.LocalIndexService;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
-import io.pixelsdb.pixels.common.metadata.domain.Layout;
-import io.pixelsdb.pixels.common.metadata.domain.Path;
-import io.pixelsdb.pixels.common.metadata.domain.Permission;
 import io.pixelsdb.pixels.common.metadata.domain.Schema;
 import io.pixelsdb.pixels.common.metadata.domain.Table;
 import io.pixelsdb.pixels.daemon.ServerContainer;
@@ -85,12 +83,13 @@ public class TestRetinaServer
         MetadataService metadataService = mock(MetadataService.class);
         IndexService indexService = mock(LocalIndexService.class);
         RetinaResourceManager resourceManager = mock(RetinaResourceManager.class);
+        prepareRecoveryMocks(metadataService, resourceManager);
 
         when(metadataService.getSchemas()).thenThrow(new MetadataException("metadata unavailable"));
 
         try
         {
-            RetinaServerImpl server = new RetinaServerImpl(metadataService, indexService, resourceManager);
+            RetinaServerImpl server = newServer(metadataService, indexService, resourceManager);
             fail("RetinaServerImpl must fail closed when initialization fails: " + server);
         }
         catch (IllegalStateException e)
@@ -108,40 +107,20 @@ public class TestRetinaServer
         MetadataService metadataService = mock(MetadataService.class);
         IndexService indexService = mock(LocalIndexService.class);
         RetinaResourceManager resourceManager = mock(RetinaResourceManager.class);
+        prepareRecoveryMocks(metadataService, resourceManager);
 
         Schema schema = new Schema();
         schema.setName("gc_schema");
         Table table = new Table();
         table.setName("gc_table");
-        Path orderedPath = new Path();
-        orderedPath.setId(11L);
-        orderedPath.setUri("file:///tmp/pixels/ordered");
-        Path compactPath = new Path();
-        compactPath.setId(12L);
-        compactPath.setUri("file:///tmp/pixels/compact");
-        Layout layout = new Layout();
-        layout.setPermission(Permission.READ_WRITE);
-        layout.setOrderedPaths(Collections.singletonList(orderedPath));
-        layout.setCompactPaths(Collections.singletonList(compactPath));
-        File orderedFile = new File();
-        orderedFile.setName("ordered.pxl");
-        File compactFile = new File();
-        compactFile.setName("compact.pxl");
         List<String> lifecycleEvents = Collections.synchronizedList(new ArrayList<>());
 
         when(metadataService.getSchemas()).thenReturn(Collections.singletonList(schema));
         when(metadataService.getTables(schema.getName())).thenReturn(Collections.singletonList(table));
-        when(metadataService.getLayouts(schema.getName(), table.getName())).thenReturn(Collections.singletonList(layout));
-        when(metadataService.getRegularFiles(orderedPath.getId())).thenReturn(Collections.singletonList(orderedFile));
-        when(metadataService.getRegularFiles(compactPath.getId())).thenReturn(Collections.singletonList(compactFile));
         doAnswer(invocation -> {
             lifecycleEvents.add("recover");
             return null;
         }).when(resourceManager).recoverOffloadCheckpoints();
-        doAnswer(invocation -> {
-            lifecycleEvents.add("visibility:" + invocation.getArgument(0));
-            return null;
-        }).when(resourceManager).addVisibility(org.mockito.ArgumentMatchers.anyString());
         doAnswer(invocation -> {
             lifecycleEvents.add("writeBuffer");
             return null;
@@ -151,18 +130,12 @@ public class TestRetinaServer
             return null;
         }).when(resourceManager).startBackgroundGc();
 
-        new RetinaServerImpl(metadataService, indexService, resourceManager);
+        newServer(metadataService, indexService, resourceManager);
 
         assertTrue(lifecycleEvents.indexOf("recover") >= 0);
-        assertTrue(lifecycleEvents.contains("visibility:file:///tmp/pixels/ordered/ordered.pxl"));
-        assertTrue(lifecycleEvents.contains("visibility:file:///tmp/pixels/compact/compact.pxl"));
         int writeBufferIndex = lifecycleEvents.indexOf("writeBuffer");
         assertTrue(writeBufferIndex > lifecycleEvents.indexOf("recover"));
-        assertTrue(writeBufferIndex > lifecycleEvents.indexOf("visibility:file:///tmp/pixels/ordered/ordered.pxl"));
-        assertTrue(writeBufferIndex > lifecycleEvents.indexOf("visibility:file:///tmp/pixels/compact/compact.pxl"));
         assertTrue(lifecycleEvents.indexOf("startGc") > writeBufferIndex);
-        verify(resourceManager).addVisibility("file:///tmp/pixels/ordered/ordered.pxl");
-        verify(resourceManager).addVisibility("file:///tmp/pixels/compact/compact.pxl");
         verify(resourceManager).startBackgroundGc();
     }
 
@@ -172,6 +145,7 @@ public class TestRetinaServer
         MetadataService metadataService = mock(MetadataService.class);
         IndexService indexService = mock(LocalIndexService.class);
         RetinaResourceManager resourceManager = mock(RetinaResourceManager.class);
+        prepareRecoveryMocks(metadataService, resourceManager);
 
         when(metadataService.getSchemas()).thenReturn(Collections.emptyList());
         doThrow(new RetinaException("gc disabled by invalid lifecycle"))
@@ -179,7 +153,7 @@ public class TestRetinaServer
 
         try
         {
-            RetinaServerImpl server = new RetinaServerImpl(metadataService, indexService, resourceManager);
+            RetinaServerImpl server = newServer(metadataService, indexService, resourceManager);
             fail("RetinaServerImpl must fail closed when background GC cannot start: " + server);
         }
         catch (IllegalStateException e)
@@ -204,8 +178,9 @@ public class TestRetinaServer
                                                       RetinaResourceManager rm) throws Exception
     {
         MetadataService metadataService = mock(MetadataService.class);
+        prepareRecoveryMocks(metadataService, rm);
         when(metadataService.getSchemas()).thenReturn(Collections.emptyList());
-        return new RetinaServerImpl(metadataService, localIndex, rm);
+        return newServer(metadataService, localIndex, rm);
     }
 
     private static IndexProto.IndexKey makeKey(long tableId, long indexId, String key, long ts)
@@ -459,7 +434,10 @@ public class TestRetinaServer
 
         RetinaServerImpl server = buildServerWithLocalIndex(localIndex, rm);
         AtomicReference<RetinaProto.UpdateRecordResponse> respHolder = new AtomicReference<>();
-        server.updateRecord(makeInsertRequest(tableId, indexId, "s", "tbl", ts, "k0", "k1"),
+        // Keep both rows in one bucket. The production path processes buckets in parallel and
+        // deliberately stops after the first failing bucket, so using two unrelated keys here
+        // made the number of rows appended before cancellation scheduler-dependent.
+        server.updateRecord(makeInsertRequest(tableId, indexId, "s", "tbl", ts, "k0", "k0"),
                 new StreamObserver<RetinaProto.UpdateRecordResponse>()
                 {
                     @Override public void onNext(RetinaProto.UpdateRecordResponse v) { respHolder.set(v); }
@@ -468,7 +446,7 @@ public class TestRetinaServer
                 });
 
         assertNotNull(respHolder.get());
-        assertEquals(2, respHolder.get().getHeader().getErrorCode());
+        assertEquals(ErrorCode.RETINA_UPDATE_FAILED, respHolder.get().getHeader().getErrorCode());
         verify(rm).deleteRecord(eq(loc0), eq(ts));
         verify(rm).deleteRecord(eq(loc1), eq(ts));
     }
@@ -584,7 +562,7 @@ public class TestRetinaServer
         });
 
         assertNotNull(respHolder.get());
-        assertEquals(2, respHolder.get().getHeader().getErrorCode());
+        assertEquals(ErrorCode.RETINA_UPDATE_FAILED, respHolder.get().getHeader().getErrorCode());
 
         InOrder inOrder = inOrder(localIndex, rm);
         inOrder.verify(localIndex).resolvePrimary(eq(tableId), eq(indexId),
@@ -638,7 +616,7 @@ public class TestRetinaServer
         });
 
         assertNotNull(respHolder.get());
-        assertEquals(2, respHolder.get().getHeader().getErrorCode());
+        assertEquals(ErrorCode.RETINA_UPDATE_FAILED, respHolder.get().getHeader().getErrorCode());
         verify(rm, never()).insertRecord(ArgumentMatchers.anyString(), ArgumentMatchers.anyString(),
                 ArgumentMatchers.<byte[][]>any(), ArgumentMatchers.anyLong(), ArgumentMatchers.anyInt());
         verify(localIndex, never()).putMainIndexEntriesOnly(anyLong(),
@@ -648,22 +626,105 @@ public class TestRetinaServer
     }
 
     @Test
-    public void testFailsClosedOnNonLocalIndexService() throws Exception
+    public void testRecoveryAcceptsConfiguredIndexService() throws Exception
     {
-        // UpdateRecord uses LocalIndexService-only primary-index operations.
         IndexService nonLocal = mock(IndexService.class);
         RetinaResourceManager rm = mock(RetinaResourceManager.class);
         MetadataService md = mock(MetadataService.class);
+        prepareRecoveryMocks(md, rm);
+        when(md.getSchemas()).thenReturn(Collections.emptyList());
+
+        newServer(md, nonLocal, rm);
+
+        verify(rm).recoverStorageGc(Collections.emptySet());
+        verify(rm).startBackgroundGc();
+    }
+
+    @Test
+    public void testRecoveryRejectsRegularFileWithoutCheckpointOrTransactionPlan()
+            throws Exception
+    {
+        MetadataService metadata = mock(MetadataService.class);
+        IndexService indexes = mock(IndexService.class);
+        RetinaResourceManager resources = mock(RetinaResourceManager.class);
+        prepareRecoveryMocks(metadata, resources);
+        when(metadata.getFilesByType(ArgumentMatchers.anySet()))
+                .thenReturn(Collections.singletonList(regularFile(41L)));
+
         try
         {
-            new RetinaServerImpl(md, nonLocal, rm);
-            fail("RetinaServerImpl must require LocalIndexService");
+            newServer(metadata, indexes, resources, Collections.emptySet());
+            fail("Uncovered REGULAR file must keep recovery fail-closed");
         }
-        catch (IllegalStateException e)
+        catch (IllegalStateException expected)
         {
-            assertTrue(e.getMessage().contains("LocalIndexService")
-                    || (e.getCause() != null && e.getCause().getMessage() != null
-                        && e.getCause().getMessage().contains("LocalIndexService")));
+            assertTrue(expected.getCause().getMessage().contains("REGULAR files [41]"));
         }
+    }
+
+    @Test
+    public void testRecoveryDefersReadyForRegularFileCoveredByTransactionPlan()
+            throws Exception
+    {
+        MetadataService metadata = mock(MetadataService.class);
+        IndexService indexes = mock(IndexService.class);
+        RetinaResourceManager resources = mock(RetinaResourceManager.class);
+        prepareRecoveryMocks(metadata, resources);
+        when(metadata.getSchemas()).thenReturn(Collections.emptyList());
+        when(metadata.getFilesByType(ArgumentMatchers.anySet()))
+                .thenReturn(Collections.singletonList(regularFile(42L)));
+
+        RetinaServerImpl server = newServer(
+                metadata, indexes, resources, Collections.singleton(42L));
+
+        assertTrue(server.isRecovering());
+        verify(resources, never()).startBackgroundGc();
+    }
+
+    private static File regularFile(long fileId)
+    {
+        File file = new File();
+        file.setId(fileId);
+        file.setType(File.Type.REGULAR);
+        return file;
+    }
+
+    private static void prepareRecoveryMocks(
+            MetadataService metadataService, RetinaResourceManager resourceManager)
+            throws Exception
+    {
+        when(resourceManager.getStorageGcRecoveryProtectedFiles())
+                .thenReturn(Collections.emptySet());
+        when(metadataService.getFilesByType(ArgumentMatchers.anySet()))
+                .thenReturn(Collections.emptyList());
+    }
+
+    private static RetinaServerImpl newServer(
+            MetadataService metadataService, IndexService indexService,
+            RetinaResourceManager resourceManager)
+    {
+        return newServer(
+                metadataService, indexService, resourceManager, Collections.emptySet());
+    }
+
+    private static RetinaServerImpl newServer(
+            MetadataService metadataService, IndexService indexService,
+            RetinaResourceManager resourceManager, java.util.Set<Long> bootstrapRecoveryFileIds)
+    {
+        return new RetinaServerImpl(metadataService, indexService, resourceManager,
+                new RetinaServerImpl.CheckpointSource()
+                {
+                    @Override
+                    public int getVirtualNodesPerNode()
+                    {
+                        return 1;
+                    }
+
+                    @Override
+                    public io.pixelsdb.pixels.retina.RecoveryCheckpoint.LoadedCheckpoint load()
+                    {
+                        return null;
+                    }
+                }, bootstrapRecoveryFileIds);
     }
 }

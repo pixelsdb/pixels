@@ -55,6 +55,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
 
     private final int virtualNode;
     private final int bucketNum;
+    private final int retinaServerPort;
 
     // Consistent Hash Ring: Hash Value -> NodeInfo (using TreeMap for SortedMap)
     // The keys in this map will range from 0 to bucketNum - 1.
@@ -74,6 +75,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
         virtualNode = Integer.parseInt(config.getProperty("node.virtual.num"));
         // bucketNum is the total number of hash points
         bucketNum = Integer.parseInt(config.getProperty("node.bucket.num"));
+        retinaServerPort = Integer.parseInt(config.getProperty("retina.server.port"));
         this.heartbeatConfig = new HeartbeatConfig();
         // Initial load from Etcd
         reloadRetinaNodesFromEtcd();
@@ -101,6 +103,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
             {
                 NodeProto.NodeInfo.Builder node = NodeProto.NodeInfo.newBuilder()
                         .setAddress(getAddressFromKV(kv))
+                        .setPort(retinaServerPort)
                         .setRole(NodeProto.NodeRole.RETINA);
                 addNodeInternal(node);
             }
@@ -177,6 +180,7 @@ public class NodeServiceImpl extends NodeServiceGrpc.NodeServiceImplBase
                 {
                     NodeProto.NodeInfo.Builder node = NodeProto.NodeInfo.newBuilder()
                             .setAddress(newAddr)
+                            .setPort(retinaServerPort)
                             .setRole(NodeProto.NodeRole.RETINA);
                     addNodeInternal(node);
                     logger.info("Added node to hash ring: " + newAddr);

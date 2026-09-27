@@ -39,7 +39,7 @@ public class SuperVersion implements Referenceable
         this.immutableMemTables  = new ArrayList<>(immutableMemTables);
         this.objectEntries = new ArrayList<>(objectEntries);
 
-        this.activeMemTable.ref();
+        if (this.activeMemTable != null) { this.activeMemTable.ref(); }
         for (MemTable immutableMemTable : this.immutableMemTables)
         {
             immutableMemTable.ref();
@@ -78,7 +78,7 @@ public class SuperVersion implements Referenceable
         boolean shouldDelete = this.refCounter.unref();
         if (shouldDelete)
         {
-            this.activeMemTable.unref();
+            if (this.activeMemTable != null) { this.activeMemTable.unref(); }
             for (MemTable immutableMemTable : this.immutableMemTables)
             {
                 immutableMemTable.unref();

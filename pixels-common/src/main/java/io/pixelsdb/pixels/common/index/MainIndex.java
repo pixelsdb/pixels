@@ -26,6 +26,7 @@ import io.pixelsdb.pixels.index.IndexProto;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * The main index of a table is the mapping from row id to the row offset in the data file.
@@ -119,6 +120,20 @@ public interface MainIndex extends Closeable
      */
     List<IndexProto.RowLocation> getLocations(List<Long> rowIds) throws MainIndexException;
 
+    /** Enumerate durable row identities whose current locations belong to the files. */
+    List<IndexProto.PrimaryIndexEntry> getEntriesForFiles(Set<Long> fileIds)
+            throws MainIndexException;
+
+    /**
+     * Atomically move existing row identities to new physical locations. Repeating the
+     * same relocation is idempotent; any unrelated current location fails closed.
+     */
+    void relocateEntries(Set<Long> expectedOldFileIds,
+            List<IndexProto.PrimaryIndexEntry> entries) throws MainIndexException;
+
+    /** Delete only mappings that still point at the given retired file. */
+    void deleteEntriesForFile(long fileId) throws MainIndexException;
+
     /**
      * Put a single row id into the main index.
      * @param rowId the row id
@@ -133,6 +148,26 @@ public interface MainIndex extends Closeable
      * @return true on success for each entry
      */
     List<Boolean> putEntries(List<IndexProto.PrimaryIndexEntry> primaryEntries);
+
+    /** Insert consecutive identities and locations without requiring per-row messages. */
+    default boolean putRange(RowIdRange range)
+    {
+        long count = range.getRowIdEnd() - range.getRowIdStart();
+        if (range.getRowIdStart() < 0 || range.getRowIdEnd() <= range.getRowIdStart()
+                || count <= 0 || range.getRgRowOffsetStart() < 0
+                || count != (long) range.getRgRowOffsetEnd() - range.getRgRowOffsetStart())
+        {
+            throw new IllegalArgumentException("Invalid main index range");
+        }
+        boolean success = true;
+        for (int offset = range.getRgRowOffsetStart(); offset < range.getRgRowOffsetEnd(); offset++)
+        {
+            success &= putEntry(range.getRowIdStart() + offset - range.getRgRowOffsetStart(),
+                    IndexProto.RowLocation.newBuilder().setFileId(range.getFileId())
+                            .setRgId(range.getRgId()).setRgRowOffset(offset).build());
+        }
+        return success;
+    }
 
     /**
      * Delete a range of row ids from the main index. This method only has effect on the persistent storage
