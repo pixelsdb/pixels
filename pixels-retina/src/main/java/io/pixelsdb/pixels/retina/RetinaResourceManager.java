@@ -412,9 +412,16 @@ public class RetinaResourceManager
     {
         // In-memory queue for files retired in this process.
         long now = System.currentTimeMillis();
+        final Set<Long> pending;
+        try { pending = storageGcWal.collectPendingFileIds(); }
+        catch (RuntimeException e)
+        {
+            logger.warn("processRetiredFiles: cannot establish checkpoint protection; skipping cleanup", e);
+            return;
+        }
         retiredFiles.removeIf(rf ->
         {
-            if (now <= rf.retireTimestamp)
+            if (now <= rf.retireTimestamp || pending.contains(rf.fileId))
             {
                 return false;
             }
@@ -459,6 +466,7 @@ public class RetinaResourceManager
             }
             for (File file : dueFiles)
             {
+                if (pending.contains(file.getId())) continue;
                 RetiredPathInfo pathInfo = pathsById.get(file.getPathId());
                 if (pathInfo == null)
                 {
@@ -1041,7 +1049,7 @@ public class RetinaResourceManager
                     for (StorageGcWal.Task task : storageGcWal.listAllTasks())
                     {
                         if (task.getState() != StorageGcWal.State.SWAPPED_NOT_CHECKPOINTED
-                                || !checkpointFileIds.contains(task.getNewFileId()))
+                                || !task.isCoveredByCheckpoint(checkpointFileIds, timestamp))
                         {
                             continue;
                         }

@@ -261,7 +261,7 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             recoverableFileIds.add(fileId);
         }
 
-        context.storageGcWalRecoveryHandler.recover(recoverableFileIds);
+        context.storageGcWalRecoveryHandler.recover(recoverableFileIds, body.getCheckpointAppliedTs());
 
         for (VisibilityEntry ve : validRgEntries)
         {
