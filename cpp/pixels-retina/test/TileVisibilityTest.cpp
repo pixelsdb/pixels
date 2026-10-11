@@ -856,6 +856,31 @@ TEST_F(TileVisibilityCowFoldTest, DuplicateFoldOnAlreadyDeletedRowIsIdempotent) 
 }
 
 // All writers deliberately share a tile and repeatedly cross block boundaries.
+TEST_F(TileVisibilityTest, OutOfOrderDeletesRespectSnapshotTimestamp) {
+    v->deleteTileRecord(1, 500);
+    v->deleteTileRecord(2, 100);
+    uint64_t bitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(200, bitmap);
+    EXPECT_FALSE(GET_BITMAP_BIT(bitmap, 1));
+    EXPECT_TRUE(GET_BITMAP_BIT(bitmap, 2));
+}
+
+TEST_F(TileVisibilityTest, OutOfOrderDeletesRespectGcBoundary) {
+    v->deleteTileRecord(1, 500);
+    v->deleteTileRecord(2, 100);
+    uint64_t bitmap[BITMAP_SIZE] = {0};
+    v->collectTileGarbage(200, bitmap);
+    EXPECT_FALSE(GET_BITMAP_BIT(bitmap, 1));
+    EXPECT_TRUE(GET_BITMAP_BIT(bitmap, 2));
+    std::vector<std::pair<uint32_t, uint64_t>> futureDeletes;
+    v->exportChainItemsAfter(0, 200, futureDeletes);
+    ASSERT_EQ(futureDeletes.size(), 1);
+    EXPECT_EQ(futureDeletes[0], std::make_pair(uint32_t{1}, uint64_t{500}));
+    v->getTileVisibilityBitmap(600, bitmap);
+    EXPECT_TRUE(GET_BITMAP_BIT(bitmap, 1));
+    EXPECT_TRUE(GET_BITMAP_BIT(bitmap, 2));
+}
+
 TEST_F(TileVisibilityTest, ConcurrentDeletesRemainVisibleBeforeAndAfterGC) {
     for (int round = 0; round < 20; ++round) {
         TileVisibility<RETINA_CAPACITY> tile;
