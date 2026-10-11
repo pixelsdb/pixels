@@ -47,13 +47,16 @@ import java.util.Set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -620,5 +623,74 @@ public class TestStorageGcWal
                 .setKey(ByteString.copyFromUtf8(value))
                 .setTimestamp(33L)
                 .build();
+    }
+
+    @Test
+    public void retirementUsesCheckpointTimestampWithoutReplacement() throws Exception
+    {
+        StorageGcWal wal = newWal();
+        try (StorageGcWal.Writer writer = wal.createTask("empty", 11, 2,
+                Collections.singletonList(101L), 0, "", 0, 0))
+        {
+            writer.appendRetirementOnly(500);
+            writer.flush();
+            writer.markSwapped();
+        }
+        StorageGcWal.Task task = wal.getTask("empty").get();
+        assertTrue(task.isRetirementOnly());
+        assertEquals(500, task.getRetirementSafeGcTs());
+        assertFalse(task.isCoveredByCheckpoint(Collections.emptySet(), 499));
+        assertTrue(task.isCoveredByCheckpoint(Collections.emptySet(), 500));
+        assertFalse(wal.collectPendingFileIds().contains(0L));
+        assertTrue(wal.collectPendingFileIds().contains(101L));
+        MetadataService metadata = mock(MetadataService.class);
+        IndexService index = mock(IndexService.class);
+        new StorageGcWal.RecoveryHandler(wal, metadata, index).recover(Collections.emptySet(), 500);
+        assertEquals(StorageGcWal.State.CHECKPOINTED, wal.getTask("empty").get().getState());
+        verifyNoInteractions(metadata, index);
+    }
+
+    @Test
+    public void retirementBeforeCheckpointRollsBackCatalogOnly() throws Exception
+    {
+        StorageGcWal wal = newWal();
+        try (StorageGcWal.Writer writer = wal.createTask("empty-rollback", 11, 2,
+                Collections.singletonList(101L), 0, "", 0, 0))
+        {
+            writer.appendRetirementOnly(500);
+            writer.markSwapped();
+        }
+        MetadataService metadata = mock(MetadataService.class);
+        IndexService index = mock(IndexService.class);
+        File old = catalogFile(101L, File.Type.RETIRED, 123456L);
+        when(metadata.getFileById(101)).thenReturn(old);
+        when(metadata.updateFile(any(File.class))).thenReturn(true);
+        new StorageGcWal.RecoveryHandler(wal, metadata, index).recover(Collections.emptySet(), 499);
+        assertEquals(File.Type.REGULAR, old.getType());
+        assertNull(old.getCleanupAt());
+        assertEquals(StorageGcWal.State.ABORTED, wal.getTask("empty-rollback").get().getState());
+        verify(index, never()).deleteMainIndexRange(anyLong(), anyLong(), anyLong(), anyInt());
+        verify(metadata, never()).getFileById(0);
+    }
+
+    @Test
+    public void retirementRejectsOlderCheckpointAfterConfirmation() throws Exception
+    {
+        StorageGcWal wal = newWal();
+        try (StorageGcWal.Writer writer = wal.createTask("empty-confirmed", 11, 2,
+                Collections.singletonList(101L), 0, "", 0, 0))
+        {
+            writer.appendRetirementOnly(500);
+            writer.markSwapped();
+        }
+        wal.markCheckpointed("empty-confirmed");
+        StorageGcWal.RecoveryHandler handler = new StorageGcWal.RecoveryHandler(
+                wal, mock(MetadataService.class), mock(IndexService.class));
+        try
+        {
+            handler.recover(Collections.emptySet(), 499);
+            fail("Older checkpoint must not accept a confirmed retirement");
+        }
+        catch (RetinaException expected) { assertTrue(expected.getMessage().contains("predates")); }
     }
 }
