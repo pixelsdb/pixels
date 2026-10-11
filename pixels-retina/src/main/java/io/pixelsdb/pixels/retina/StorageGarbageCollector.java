@@ -37,6 +37,7 @@ import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.NetUtils;
+import io.pixelsdb.pixels.common.utils.IndexUtils;
 import io.pixelsdb.pixels.common.utils.PixelsFileNameUtils;
 import io.pixelsdb.pixels.common.utils.RetinaUtils;
 import io.pixelsdb.pixels.core.PixelsFooterCache;
@@ -1113,7 +1114,7 @@ public class StorageGarbageCollector
 
         if (!result.pendingIndexEntries.isEmpty())
         {
-            result.oldRowIds = updateSinglePointIndex(result, tableId, primaryIndexId, indexOption, newRowIdStart);
+            result.oldRowIds = updateSinglePointIndex(result, tableId, primaryIndexId, newRowIdStart);
         }
     }
 
@@ -1159,7 +1160,7 @@ public class StorageGarbageCollector
      * {@code IndexService} grows a batch API that returns the rowIds atomically replaced.
      */
     private List<Long> updateSinglePointIndex(RewriteResult result, long tableId, long primaryIndexId,
-                                              IndexOption indexOption, long newRowIdStart) throws Exception
+                                              long newRowIdStart) throws Exception
     {
         int size = result.pendingIndexEntries.size();
         List<IndexProto.IndexKey> keys = new ArrayList<>(size);
@@ -1176,27 +1177,43 @@ public class StorageGarbageCollector
                     .build());
         }
 
-        List<Optional<ResolvedPrimary>> resolved =
-                indexService.resolvePrimary(tableId, primaryIndexId, keys, indexOption);
-        List<Long> oldRowIds = new ArrayList<>(size);
+        Map<Integer, List<Integer>> buckets = new LinkedHashMap<>();
         for (int i = 0; i < size; i++)
         {
-            long oldRowId = resolved.get(i).map(ResolvedPrimary::getRowId).orElse(-1L);
-            oldRowIds.add(oldRowId);
-            if (oldRowId < 0)
+            int bucket = IndexUtils.getBucketIdFromByteBuffer(keys.get(i).getKey());
+            buckets.computeIfAbsent(bucket, ignored -> new ArrayList<>()).add(i);
+        }
+        List<Long> oldRowIds = new ArrayList<>(Collections.nCopies(size, -1L));
+        for (Map.Entry<Integer, List<Integer>> bucket : buckets.entrySet())
+        {
+            List<IndexProto.IndexKey> bucketKeys = new ArrayList<>();
+            for (int i : bucket.getValue()) bucketKeys.add(keys.get(i));
+            List<Optional<ResolvedPrimary>> resolved = indexService.resolvePrimary(tableId, primaryIndexId,
+                    bucketKeys, IndexOption.builder().vNodeId(bucket.getKey()).build());
+            if (resolved.size() != bucketKeys.size()) throw new IllegalStateException("GC primary resolve count mismatch");
+            for (int i = 0; i < resolved.size(); i++)
+                oldRowIds.set(bucket.getValue().get(i), resolved.get(i).map(ResolvedPrimary::getRowId).orElse(-1L));
+        }
+        // Persist every rollback entry before switching any bucket; preserve row-order alignment.
+        for (int i = 0; i < size; i++)
+        {
+            if (oldRowIds.get(i) < 0)
             {
                 logger.warn("StorageGC syncIndex: no resolvable primary for tableId={}, " +
                         "newGlobalRowOffset={} — index may be inconsistent",
                         tableId, result.pendingIndexEntries.get(i).newGlobalRowOffset);
             }
-            result.walWriter.appendRollbackEntry(
-                    keys.get(i), oldRowId, entries.get(i).getRowId());
+            result.walWriter.appendRollbackEntry(keys.get(i), oldRowIds.get(i), entries.get(i).getRowId());
         }
-        // Flush all rollback entries to durable storage before the batch index update so
-        // that recovery can restore the old rowIds if we crash between this flush and commit.
         result.walWriter.flush();
-
-        indexService.updatePrimaryIndexEntriesOnly(tableId, primaryIndexId, entries, indexOption);
+        result.oldRowIds = oldRowIds;
+        for (Map.Entry<Integer, List<Integer>> bucket : buckets.entrySet())
+        {
+            List<IndexProto.PrimaryIndexEntry> bucketEntries = new ArrayList<>();
+            for (int i : bucket.getValue()) bucketEntries.add(entries.get(i));
+            indexService.updatePrimaryIndexEntriesOnly(tableId, primaryIndexId, bucketEntries,
+                    IndexOption.builder().vNodeId(bucket.getKey()).build());
+        }
         return oldRowIds;
     }
 
@@ -1358,6 +1375,15 @@ public class StorageGarbageCollector
         }
     }
 
+    static Map<Integer, List<RollbackEntry>> indexRollbackBuckets(List<RollbackEntry> entries)
+    {
+        Map<Integer, List<RollbackEntry>> buckets = new LinkedHashMap<>();
+        for (RollbackEntry entry : entries)
+            buckets.computeIfAbsent(IndexUtils.getBucketIdFromByteBuffer(entry.getIndexKey().getKey()),
+                    ignored -> new ArrayList<>()).add(entry);
+        return buckets;
+    }
+
     private void rollbackSinglePointIndex(RewriteResult result)
     {
         try
@@ -1369,8 +1395,6 @@ public class StorageGarbageCollector
                 return;
             }
             long primaryIndexId = primaryIndex.getId();
-            IndexOption indexOption = IndexOption.builder().vNodeId(result.group.virtualNodeId).build();
-
             // Alignment invariant: oldRowIds.size() == pendingIndexEntries.size()
             // (established in updateSinglePointIndex). Walk them in lockstep by
             // position and skip -1 placeholders — those slots had no prior entry
@@ -1399,8 +1423,9 @@ public class StorageGarbageCollector
             }
             if (!rollbackEntries.isEmpty())
             {
-                indexService.restorePrimaryIndexEntries(
-                        result.group.tableId, primaryIndexId, rollbackEntries, indexOption);
+                for (Map.Entry<Integer, List<RollbackEntry>> bucket : indexRollbackBuckets(rollbackEntries).entrySet())
+                    indexService.restorePrimaryIndexEntries(result.group.tableId, primaryIndexId,
+                            bucket.getValue(), IndexOption.builder().vNodeId(bucket.getKey()).build());
             }
         }
         catch (Exception e)
