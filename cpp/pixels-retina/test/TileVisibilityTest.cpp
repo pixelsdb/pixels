@@ -908,6 +908,31 @@ TEST_F(TileVisibilityTest, ConcurrentDeletesRemainVisibleBeforeAndAfterGC) {
     }
 }
 
+TEST_F(TileVisibilityTest, ConcurrentSameTimestampDeletesRemainVisibleBeforeAndAfterGC) {
+    for (int round = 0; round < 20; ++round) {
+        TileVisibility<RETINA_CAPACITY> tile;
+        std::vector<std::thread> writers;
+        std::atomic<bool> start{false};
+        for (int worker = 0; worker < 8; ++worker) {
+            writers.emplace_back([&, worker] {
+                while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+                for (int i = worker; i < RETINA_CAPACITY; i += 8)
+                    tile.deleteTileRecord(i, 100000);
+            });
+        }
+        start.store(true, std::memory_order_release);
+        for (auto& writer : writers) writer.join();
+        uint64_t bitmap[BITMAP_SIZE] = {0};
+        tile.getTileVisibilityBitmap(UINT64_MAX, bitmap);
+        for (int i = 0; i < RETINA_CAPACITY; ++i)
+            ASSERT_TRUE(GET_BITMAP_BIT(bitmap, i)) << "before GC round=" << round << " row=" << i;
+        tile.collectTileGarbage(200000, bitmap);
+        tile.getTileVisibilityBitmap(UINT64_MAX, bitmap);
+        for (int i = 0; i < RETINA_CAPACITY; ++i)
+            ASSERT_TRUE(GET_BITMAP_BIT(bitmap, i)) << "after GC round=" << round << " row=" << i;
+    }
+}
+
 TEST_F(TileVisibilityTest, ConcurrentAppendImportReadAndPartialGC) {
     for (int round = 0; round < 10; ++round) {
         TileVisibility<RETINA_CAPACITY> tile;
