@@ -29,6 +29,8 @@
 #endif
 #include "RetinaBase.h"
 #include <atomic>
+#include <array>
+#include <memory>
 #include <cstring>
 #include <cstddef>
 #include <cstdint>
@@ -54,9 +56,8 @@ inline uint64_t extractTimestamp(uint64_t raw) {
  * NORMAL is the live append path: the caller provides a current delete
  * timestamp and the record is appended to the chain. VERSIONED is used when
  * replay may race with READY readers; historical deletes publish a new
- * VersionedData with a folded baseBitmap. EXCLUSIVE is used only while recovery
- * blocks readers and GC; historical deletes may update baseBitmap in place, but
- * concurrent recovery writers still need tile-level synchronization.
+ * VersionedData with a folded baseBitmap. EXCLUSIVE is used during recovery. Both replay modes publish historical
+ * bitmap folds with CAS, so concurrent recovery writers do not lose updates.
  */
 enum class ReplayMode : uint8_t {
     NORMAL = 0,
@@ -64,45 +65,58 @@ enum class ReplayMode : uint8_t {
     EXCLUSIVE = 2
 };
 
+// Blocks are immutable after publication. Only a private, unpublished block may
+// be filled or linked. The newest block is at the head of the persistent chain.
 struct DeleteIndexBlock : public pixels::RetinaBase<DeleteIndexBlock> {
     static constexpr size_t BLOCK_CAPACITY = 8;
     uint64_t items[BLOCK_CAPACITY] = {0};
-    std::atomic<DeleteIndexBlock *> next{nullptr};
+    size_t count = 0;
+    DeleteIndexBlock* next = nullptr;
 };
 
-/**
- * VersionedData - A versioned snapshot of the base state
- * Used for Copy-on-Write during garbage collection
- * IMPORTANT: head is part of the version to ensure atomic visibility
- */
 template<size_t CAPACITY>
 struct VersionedData : public pixels::RetinaBase<VersionedData<CAPACITY>> {
     static constexpr size_t NUM_WORDS = BITMAP_WORDS(CAPACITY);
-    uint64_t baseBitmap[NUM_WORDS];
+    struct Bitmap : public pixels::RetinaBase<Bitmap> {
+        std::array<uint64_t, NUM_WORDS> words;
+        uint64_t* data() { return words.data(); }
+        const uint64_t* data() const { return words.data(); }
+        void fill(uint64_t value) { words.fill(value); }
+    };
+    // Ordinary appends share the immutable bitmap rather than copying it.
+    std::shared_ptr<const Bitmap> base;
+    const uint64_t* baseBitmap;
     uint64_t baseTimestamp;
-    DeleteIndexBlock* head; // Delete chain head, part of the version
+    DeleteIndexBlock* head;
 
-    // timestamp defaults to 0; bitmap defaults to all-zeros.
-    explicit VersionedData(uint64_t ts = 0, const uint64_t* bitmap = nullptr, DeleteIndexBlock* h = nullptr)
-        : baseTimestamp(ts), head(h) {
-        if (bitmap)
-            std::memcpy(baseBitmap, bitmap, NUM_WORDS * sizeof(uint64_t));
-        else
-            std::memset(baseBitmap, 0, sizeof(baseBitmap));
+    explicit VersionedData(uint64_t ts = 0, const uint64_t* bitmap = nullptr,
+                           DeleteIndexBlock* h = nullptr)
+        : base(makeBitmap(bitmap)), baseBitmap(base->data()), baseTimestamp(ts), head(h) {}
+
+    VersionedData(const VersionedData& old, DeleteIndexBlock* h)
+        : base(old.base), baseBitmap(base->data()), baseTimestamp(old.baseTimestamp), head(h) {}
+
+private:
+    static std::shared_ptr<const Bitmap> makeBitmap(const uint64_t* bitmap) {
+        auto result = std::make_shared<Bitmap>();
+        if (bitmap) std::memcpy(result->data(), bitmap, NUM_WORDS * sizeof(uint64_t));
+        else result->fill(0);
+        return result;
     }
 };
 
-/**
- * RetiredVersion - Tracks a retired version for epoch-based reclamation
- */
 template<size_t CAPACITY>
 struct RetiredVersion : public pixels::RetinaBase<RetiredVersion<CAPACITY>> {
-    VersionedData<CAPACITY>* data; // Fixed: added <CAPACITY>
+    VersionedData<CAPACITY>* data;
     DeleteIndexBlock* blocksToDelete;
+    // A copied head retires one block; a successful GC retires the entire old
+    // chain, which shares no blocks with its rebuilt replacement.
+    bool wholeChain;
     uint64_t retireEpoch;
+    RetiredVersion* next = nullptr;
 
-    RetiredVersion(VersionedData<CAPACITY>* d, DeleteIndexBlock* b, uint64_t e)
-        : data(d), blocksToDelete(b), retireEpoch(e) {}
+    RetiredVersion(VersionedData<CAPACITY>* d, DeleteIndexBlock* b, bool all, uint64_t e)
+        : data(d), blocksToDelete(b), wholeChain(all), retireEpoch(e) {}
 };
 
 template<size_t CAPACITY>
@@ -133,25 +147,21 @@ class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     // EXCLUSIVE: recovery replay without readers; historical deletes fold in place.
     void deleteTileRecordExclusive(uint16_t rowId, uint64_t ts);
 
-    std::atomic<VersionedData<CAPACITY>*> currentVersion;
-    std::atomic<DeleteIndexBlock *> tail;
-    std::atomic<size_t> tailUsed;
-    
-    // Retired versions awaiting epoch-based reclamation.  Only the GC thread
-    // (collectTileGarbage / reclaimRetiredVersions) reads and writes this vector,
-    // so no locking is needed.
-    std::vector<RetiredVersion<CAPACITY>> retired;
+    void retireVersion(VersionedData<CAPACITY>* version,
+                       DeleteIndexBlock* blocks, bool wholeChain);
+    static void deleteChain(DeleteIndexBlock* head);
+    static DeleteIndexBlock* buildChain(const std::vector<uint64_t>& items,
+                                       DeleteIndexBlock* next = nullptr);
 
-    // Lock-free staging slot between deleteTileRecord (CDC threads) and GC.
-    // deleteTileRecord's empty-chain path replaces currentVersion but cannot
-    // write `retired` directly — that would race with the GC thread.  Instead
-    // it atomically stores oldVer here.  The GC thread drains this slot at the
-    // start of collectTileGarbage, moving it into `retired` with a proper epoch.
-    // Flow:  deleteTileRecord → pendingRetire.store → collectTileGarbage →
-    //        pendingRetire.exchange(nullptr) → retired.emplace_back → reclaimRetiredVersions
-    // At most one version is pending per GC cycle (the empty-chain path fires
-    // at most once between consecutive GC compactions).
-    std::atomic<VersionedData<CAPACITY>*> pendingRetire{nullptr};
+    // The successful CAS is the publication point for bitmap, timestamp, and
+    // complete chain together. Readers and writers protect old states by epoch.
+    std::atomic<VersionedData<CAPACITY>*> currentVersion;
+    std::atomic<RetiredVersion<CAPACITY>*> pendingRetire{nullptr};
+    std::atomic<unsigned> retireCount{0};
+    // This try-only guard coordinates reclamation bookkeeping, never reads or
+    // publication. A busy collector is skipped; no operation waits for it.
+    std::atomic_flag reclaiming = ATOMIC_FLAG_INIT;
+    std::vector<RetiredVersion<CAPACITY>*> retired;
 };
 
 #endif // PIXELS_RETINA_TILE_VISIBILITY_H

@@ -54,6 +54,9 @@ void EpochManager::enterEpoch() {
     ThreadInfo* info = getOrCreateThreadInfo();
     uint64_t currentEpoch = globalEpoch.load(std::memory_order_acquire);
     info->localEpoch.store(currentEpoch, std::memory_order_release);
+    // Publish participation before loading any epoch-protected pointer. Paired
+    // with the collector fence, this prevents both sides missing each other.
+    std::atomic_thread_fence(std::memory_order_seq_cst);
 }
 
 void EpochManager::exitEpoch() {
@@ -67,7 +70,15 @@ uint64_t EpochManager::advanceEpoch() {
 }
 
 bool EpochManager::canReclaim(uint64_t retireEpoch) const {
+    return retireEpoch < oldestActiveEpoch();
+}
+
+uint64_t EpochManager::oldestActiveEpoch() const {
+    // The retired state was unpublished before this scan. A reader either
+    // observes the replacement or its epoch announcement must be visible.
+    std::atomic_thread_fence(std::memory_order_seq_cst);
     // Scan all threads to find the minimum active epoch
+    uint64_t oldest = globalEpoch.load(std::memory_order_acquire) + 1;
     ThreadInfo* current = threadListHead.load(std::memory_order_acquire);
     
     while (current) {
@@ -79,14 +90,10 @@ bool EpochManager::canReclaim(uint64_t retireEpoch) const {
         uint64_t localEpoch = current->localEpoch.load(std::memory_order_acquire);
         
         // localEpoch == 0 means the thread is not in critical section, skip it
-        if (localEpoch != 0 && localEpoch <= retireEpoch) {
-            // Found a thread still in or before the retire epoch
-            return false;
-        }
+        if (localEpoch != 0 && localEpoch < oldest) oldest = localEpoch;
         
         current = current->next;
     }
     
-    // All threads have advanced past the retire epoch
-    return true;
+    return oldest;
 }

@@ -63,6 +63,9 @@ public:
      */
     bool canReclaim(uint64_t retireEpoch) const;
 
+    // One scan supplies the exclusive reclaim boundary for a whole batch.
+    uint64_t oldestActiveEpoch() const;
+
     /**
      * Get the current global epoch.
      */
