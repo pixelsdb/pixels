@@ -39,8 +39,8 @@ import static org.junit.Assert.fail;
  * Unit tests for {@link File} that exercise the c01.1 contract:
  * <ul>
  *   <li>{@link File.Type} now carries an explicit numeric tag (no longer relies on {@code ordinal()}).</li>
- *   <li>The four enum constants — {@code TEMPORARY_INGEST(0)}, {@code REGULAR(1)},
- *       {@code TEMPORARY_GC(2)}, {@code RETIRED(3)} — must round-trip cleanly through both
+ *   <li>The five enum constants — {@code TEMPORARY_INGEST(0)}, {@code REGULAR(1)},
+ *       {@code TEMPORARY_GC(2)}, {@code RETIRED(3)}, {@code VIRTUAL(4)} — must round-trip cleanly through both
  *       {@link MetadataProto.File} and the domain object.</li>
  *   <li>{@link File#getCleanupAt()} is an optional field: it must be preserved across
  *       {@link File#toProto()} / {@code new File(MetadataProto.File)} when present and absent.</li>
@@ -72,6 +72,8 @@ public class TestFileDomain
                 File.Type.TEMPORARY_GC.getNumber());
         assertEquals(MetadataProto.File.Type.RETIRED.getNumber(),
                 File.Type.RETIRED.getNumber());
+        assertEquals(MetadataProto.File.Type.VIRTUAL.getNumber(),
+                File.Type.VIRTUAL.getNumber());
     }
 
     // -------------------------------------------------------------------------
@@ -85,13 +87,14 @@ public class TestFileDomain
         assertSame(File.Type.REGULAR, File.Type.valueOf(1));
         assertSame(File.Type.TEMPORARY_GC, File.Type.valueOf(2));
         assertSame(File.Type.RETIRED, File.Type.valueOf(3));
+        assertSame(File.Type.VIRTUAL, File.Type.valueOf(4));
     }
 
     @Test
     public void typeValueOf_rejectsInvalidNumbers()
     {
         // Test various boundary cases for invalid type numbers
-        int[] invalidNumbers = {-1, 4, Integer.MAX_VALUE, Integer.MIN_VALUE};
+        int[] invalidNumbers = {-1, 5, Integer.MAX_VALUE, Integer.MIN_VALUE};
         
         for (int invalidNumber : invalidNumbers)
         {

@@ -178,6 +178,7 @@ message File {
         REGULAR = 1;
         TEMPORARY_GC = 2;
         RETIRED = 3;
+        VIRTUAL = 4;
     }
     uint64 id = 1;
     string name = 2;

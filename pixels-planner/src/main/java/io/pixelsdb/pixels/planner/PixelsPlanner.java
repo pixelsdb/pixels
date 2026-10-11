@@ -70,6 +70,7 @@ public class PixelsPlanner
     private final Table rootTable;
     private final ConfigFactory config;
     private final MetadataService metadataService;
+    private final TableFileSnapshot fileSnapshot;
     private final int fixedSplitSize;
     private final boolean projectionReadEnabled;
     private final boolean orderedPathEnabled;
@@ -108,21 +109,19 @@ public class PixelsPlanner
         StreamStorageInfo = StorageInfoBuilder.BuildFromConfig(Storage.Scheme.httpstream);
     }
 
-    /**
-     * Create an executor for the join plan that is represented as a joined table.
-     * In the join plan, all multi-pipeline joins are of small-left endian, all single-pipeline
-     * joins have joined table on the left. There is no requirement for the end-point joins of
-     * table base tables.
-     *
-     * @param transId the transaction id
-     * @param rootTable the join plan
-     * @param orderedPathEnabled whether ordered path is enabled
-     * @param compactPathEnabled whether compact path is enabled
-     * @param metadataService the metadata service to access Pixels metadata
-     * @throws IOException
-     */
     public PixelsPlanner(long transId, long timestamp, Table rootTable, boolean orderedPathEnabled,
                          boolean compactPathEnabled, Optional<MetadataService> metadataService) throws IOException
+    {
+        this(transId, timestamp, rootTable, orderedPathEnabled, compactPathEnabled, metadataService,
+                new TableFileSnapshot(metadataService.orElseGet(MetadataService::Instance)));
+    }
+
+    /**
+     * Create an executor that shares a query-scoped, lazy file snapshot with its caller.
+     */
+    public PixelsPlanner(long transId, long timestamp, Table rootTable, boolean orderedPathEnabled,
+                         boolean compactPathEnabled, Optional<MetadataService> metadataService,
+                         TableFileSnapshot fileSnapshot) throws IOException
     {
         this.transId = transId;
         this.timestamp = timestamp;
@@ -133,6 +132,7 @@ public class PixelsPlanner
                 "currently, PixelsPlanner only supports scan, join, and aggregation");
         this.config = ConfigFactory.Instance();
         this.metadataService = metadataService.orElseGet(MetadataService::Instance);
+        this.fileSnapshot = requireNonNull(fileSnapshot, "fileSnapshot is null");
         this.fixedSplitSize = Integer.parseInt(config.getProperty("fixed.split.size"));
         this.projectionReadEnabled = Boolean.parseBoolean(config.getProperty("projection.read.enabled"));
         this.orderedPathEnabled = orderedPathEnabled;
@@ -1844,7 +1844,7 @@ public class PixelsPlanner
                 // 1. add splits in orderedPath
                 if (orderedPathEnabled)
                 {
-                    List<String> orderedPaths = getFilePaths(layout.getOrderedPaths(), metadataService);
+                    List<String> orderedPaths = this.fileSnapshot.regularFilePaths(layout.getOrderedPaths());
 
                     for (int i = 0; i < orderedPaths.size();)
                     {
@@ -1861,7 +1861,7 @@ public class PixelsPlanner
                 // 2. add splits in compactPath
                 if (compactPathEnabled)
                 {
-                    List<String> compactFilePaths = getFilePaths(compactPaths, metadataService);
+                    List<String> compactFilePaths = this.fileSnapshot.regularFilePaths(compactPaths);
 
                     int curFileRGIdx;
                     for (String path : compactFilePaths)
@@ -1883,24 +1883,6 @@ public class PixelsPlanner
         }
 
         return splitsBuilder.build();
-    }
-
-    public static List<String> getFilePaths(List<Path> dirPaths, MetadataService metadataService) throws MetadataException
-    {
-        ImmutableList.Builder<String> filePaths = ImmutableList.builder();
-        for (Path dirPath : dirPaths)
-        {
-            String base = dirPath.getUri();
-            if (!base.endsWith("/"))
-            {
-                base += "/";
-            }
-            for (File file : metadataService.getRegularFiles(dirPath.getId()))
-            {
-                filePaths.add(base + file.getName());
-            }
-        }
-        return filePaths.build();
     }
 
     private SplitsIndex buildSplitsIndex(long version, Ordered ordered, Splits splits, SchemaTableName schemaTableName)

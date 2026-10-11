@@ -97,7 +97,7 @@ public class FileWriterManager
             MetadataService metadataService = MetadataService.Instance();
             file = new File();
             this.file.setName(targetFileName);
-            this.file.setType(File.Type.TEMPORARY_INGEST);
+            this.file.setType(File.Type.VIRTUAL);
             this.file.setNumRowGroup(1);
             this.file.setPathId(targetOrderedDirPath.getId());
             if (!metadataService.addFiles(Collections.singletonList(file)))
@@ -293,7 +293,7 @@ public class FileWriterManager
         catch (MetadataException e)
         {
             throw new RetinaException(
-                    "Failed to delete TEMPORARY_INGEST file metadata, fileId=" + getFileId(), e);
+                    "Failed to delete VIRTUAL file metadata, fileId=" + getFileId(), e);
         }
         RetinaResourceManager.Instance().removeVisibility(this.file.getId());
     }

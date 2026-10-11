@@ -38,7 +38,8 @@ public class File extends Base
         TEMPORARY_INGEST(0),
         REGULAR(1),
         TEMPORARY_GC(2),
-        RETIRED(3);
+        RETIRED(3),
+        VIRTUAL(4);
 
         private final int number;
 
@@ -64,6 +65,8 @@ public class File extends Base
                     return TEMPORARY_GC;
                 case 3:
                     return RETIRED;
+                case 4:
+                    return VIRTUAL;
                 default:
                     throw new InvalidArgumentException("invalid number for File.Type");
             }

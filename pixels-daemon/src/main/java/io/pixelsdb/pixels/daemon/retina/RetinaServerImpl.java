@@ -183,9 +183,11 @@ public class RetinaServerImpl extends RetinaWorkerServiceGrpc.RetinaWorkerServic
             context.storageGcWalRecoveryHandler.recover(Collections.emptySet());
             try
             {
-                if (!metadataService.getFilesByType(EnumSet.of(File.Type.REGULAR)).isEmpty())
+                if (!metadataService.getFilesByType(
+                        EnumSet.of(File.Type.REGULAR, File.Type.VIRTUAL)).isEmpty())
                 {
-                    throw new RetinaException("Recovery aborted: no checkpoint body found but catalog has REGULAR files");
+                    throw new RetinaException(
+                            "Recovery aborted: no checkpoint body found but catalog has REGULAR or VIRTUAL files");
                 }
             }
             catch (MetadataException e)

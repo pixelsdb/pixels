@@ -64,11 +64,13 @@ public class TestRdbFileDao
             MetadataProto.File.Type.TEMPORARY_INGEST;
     private static final MetadataProto.File.Type TEMPORARY_GC =
             MetadataProto.File.Type.TEMPORARY_GC;
+    private static final MetadataProto.File.Type VIRTUAL = MetadataProto.File.Type.VIRTUAL;
 
     private static final int REGULAR_VALUE = REGULAR.getNumber();
     private static final int RETIRED_VALUE = RETIRED.getNumber();
     private static final int TEMPORARY_INGEST_VALUE = TEMPORARY_INGEST.getNumber();
     private static final int TEMPORARY_GC_VALUE = TEMPORARY_GC.getNumber();
+    private static final int VIRTUAL_VALUE = VIRTUAL.getNumber();
 
     private Connection mockConn;
     private Connection originalConn;
@@ -174,14 +176,16 @@ public class TestRdbFileDao
         MetadataProto.File regular = baseFile("r.pxl", REGULAR_VALUE).build();
         MetadataProto.File temporaryNoDeadline = baseFile("t.pxl", TEMPORARY_GC_VALUE).build();
         MetadataProto.File ingestNoDeadline = baseFile("i.pxl", TEMPORARY_INGEST_VALUE).build();
+        MetadataProto.File virtualNoDeadline = baseFile("v.pxl", VIRTUAL_VALUE).build();
         MetadataProto.File retiredWithDeadline = baseFile("d.pxl", RETIRED_VALUE)
                 .setCleanupAt(42L).build();
 
         assertTrue(dao.insertBatch(
-                Arrays.asList(regular, temporaryNoDeadline, ingestNoDeadline, retiredWithDeadline)));
+                Arrays.asList(regular, temporaryNoDeadline, ingestNoDeadline,
+                        virtualNoDeadline, retiredWithDeadline)));
 
-        // Three non-RETIRED rows bind NULL; the single RETIRED row binds its deadline.
-        verify(pst, times(3)).setNull(7, Types.BIGINT);
+        // Four non-RETIRED rows bind NULL; the single RETIRED row binds its deadline.
+        verify(pst, times(4)).setNull(7, Types.BIGINT);
         verify(pst, times(1)).setLong(7, 42L);
         verify(pst).executeBatch();
     }
@@ -380,7 +384,7 @@ public class TestRdbFileDao
     {
         PreparedStatement pst = stubEmptyQuery();
 
-        dao.getFilesByType(9L, Arrays.asList(TEMPORARY_INGEST, RETIRED));
+        dao.getFilesByType(9L, Arrays.asList(REGULAR, VIRTUAL));
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(mockConn).prepareStatement(sqlCaptor.capture());
@@ -393,8 +397,8 @@ public class TestRdbFileDao
                 sql.contains("ORDER BY FILE_ID"));
 
         verify(pst).setLong(1, 9L);
-        verify(pst).setInt(2, TEMPORARY_INGEST_VALUE);
-        verify(pst).setInt(3, RETIRED_VALUE);
+        verify(pst).setInt(2, REGULAR_VALUE);
+        verify(pst).setInt(3, VIRTUAL_VALUE);
     }
 
     /**
