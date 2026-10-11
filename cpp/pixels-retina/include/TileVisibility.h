@@ -29,6 +29,7 @@
 #endif
 #include "RetinaBase.h"
 #include <atomic>
+#include <mutex>
 #include <cstring>
 #include <cstddef>
 #include <cstdint>
@@ -133,6 +134,9 @@ class TileVisibility : public pixels::RetinaBase<TileVisibility<CAPACITY>> {
     // EXCLUSIVE: recovery replay without readers; historical deletes fold in place.
     void deleteTileRecordExclusive(uint16_t rowId, uint64_t ts);
 
+    // Publish the chain head, tail, and used slots as one tile-local operation.
+    // Readers must not observe a reserved slot before its item is initialized.
+    mutable std::mutex chainMutex;
     std::atomic<VersionedData<CAPACITY>*> currentVersion;
     std::atomic<DeleteIndexBlock *> tail;
     std::atomic<size_t> tailUsed;

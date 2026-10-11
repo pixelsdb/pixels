@@ -77,6 +77,7 @@ TileVisibility<CAPACITY>::~TileVisibility() {
 template<size_t CAPACITY>
 void TileVisibility<CAPACITY>::deleteTileRecord(uint16_t rowId, uint64_t ts,
                                                 ReplayMode replayMode) {
+    std::lock_guard<std::mutex> lock(chainMutex);
     switch (replayMode) {
         case ReplayMode::NORMAL:
             appendDeleteChain(rowId, ts);
@@ -264,6 +265,7 @@ inline void process_bitmap_block_128(const DeleteIndexBlock *blk,
 
 template<size_t CAPACITY>
 void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* outBitmap) const {
+    std::lock_guard<std::mutex> lock(chainMutex);
     // Enter epoch protection
     EpochGuard guard;
     // Load current version under epoch protection
@@ -333,6 +335,7 @@ void TileVisibility<CAPACITY>::getTileVisibilityBitmap(uint64_t ts, uint64_t* ou
 
 template<size_t CAPACITY>
 void TileVisibility<CAPACITY>::collectTileGarbage(uint64_t ts, uint64_t* gcSnapshotBitmap) {
+    std::lock_guard<std::mutex> lock(chainMutex);
     // Drain the pending retirement slot left by deleteTileRecord's empty-chain path.
     VersionedData<CAPACITY>* pending = pendingRetire.exchange(nullptr, std::memory_order_acquire);
     if (pending) {
@@ -493,6 +496,7 @@ template<size_t CAPACITY>
 void TileVisibility<CAPACITY>::exportChainItemsAfter(
     uint32_t tileId, uint64_t safeGcTs,
     std::vector<std::pair<uint32_t, uint64_t>>& gcChainItems) const {
+    std::lock_guard<std::mutex> lock(chainMutex);
     auto* ver = currentVersion.load(std::memory_order_acquire);
     auto* tailSnap = tail.load(std::memory_order_acquire);
     size_t tailUsedSnap = tailUsed.load(std::memory_order_acquire);
@@ -523,6 +527,7 @@ void TileVisibility<CAPACITY>::exportChainItemsAfter(
 
 template<size_t CAPACITY>
 void TileVisibility<CAPACITY>::importDeletionItems(std::vector<uint64_t>& bucket) {
+    std::lock_guard<std::mutex> lock(chainMutex);
     std::sort(bucket.begin(), bucket.end(), [](uint64_t a, uint64_t b) {
         return extractTimestamp(a) < extractTimestamp(b);
     });
