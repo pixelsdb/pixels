@@ -3,7 +3,7 @@ Pixels
 [![Pixels Daily Build](https://github.com/pixelsdb/pixels/actions/workflows/daily-build.yml/badge.svg)](https://github.com/pixelsdb/pixels/releases/tag/daily-latest)
 ![GitHub commits](https://img.shields.io/github/commit-activity/m/pixelsdb/pixels/master)
 [![GitHub License](https://img.shields.io/github/license/pixelsdb/pixels)](https://github.com/pixelsdb/pixels/blob/master/LICENSE)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/pixelsdb/pixels)
+[![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-blue)](https://deepwiki.com/pixelsdb/pixels)
 
 The core of Pixels is a columnar storage engine designed for data lakes and warehouses.
 It is optimized for analytical tables stored in on-premises and cloud-native storage systems,
