@@ -1,7 +1,10 @@
 io.pixelsdb.pixels.invoker.lambda.ScanInvokerProvider
 io.pixelsdb.pixels.invoker.lambda.PartitionInvokerProvider
+io.pixelsdb.pixels.invoker.lambda.S3QSPartitionInvokerProvider
 io.pixelsdb.pixels.invoker.lambda.PartitionedJoinInvokerProvider
+io.pixelsdb.pixels.invoker.lambda.S3QSPartitionedJoinInvokerProvider
 io.pixelsdb.pixels.invoker.lambda.PartitionedChainJoinInvokerProvider
+io.pixelsdb.pixels.invoker.lambda.S3QSPartitionedChainJoinInvokerProvider
 io.pixelsdb.pixels.invoker.lambda.SortInvokerProvider
 io.pixelsdb.pixels.invoker.lambda.SortedJoinInvokerProvider
 io.pixelsdb.pixels.invoker.lambda.BroadcastJoinInvokerProvider

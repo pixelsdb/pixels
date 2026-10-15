@@ -66,10 +66,22 @@ public class RequestHandlerImpl implements RequestHandler
                             new WorkerService<>(PartitionedChainJoinWorker.class, PartitionedChainJoinInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
+                case PARTITIONED_CHAIN_JOIN_S3QS:
+                {
+                    WorkerService<S3QSPartitionedChainJoinWorker, StageWorkerInput, JoinOutput> service =
+                            new WorkerService<>(S3QSPartitionedChainJoinWorker.class, StageWorkerInput.class);
+                    return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
+                }
                 case PARTITIONED_JOIN:
                 {
                     WorkerService<PartitionedJoinWorker, PartitionedJoinInput, JoinOutput> service =
                             new WorkerService<>(PartitionedJoinWorker.class, PartitionedJoinInput.class);
+                    return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
+                }
+                case PARTITIONED_JOIN_S3QS:
+                {
+                    WorkerService<S3QSPartitionedJoinWorker, StageWorkerInput, JoinOutput> service =
+                            new WorkerService<>(S3QSPartitionedJoinWorker.class, StageWorkerInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case PARTITIONED_JOIN_STREAMING:
@@ -82,6 +94,12 @@ public class RequestHandlerImpl implements RequestHandler
                 {
                     WorkerService<PartitionWorker, PartitionInput, PartitionOutput> service =
                             new WorkerService<>(PartitionWorker.class, PartitionInput.class);
+                    return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
+                }
+                case PARTITION_S3QS:
+                {
+                    WorkerService<S3QSPartitionWorker, StageWorkerInput, PartitionOutput> service =
+                            new WorkerService<>(S3QSPartitionWorker.class, StageWorkerInput.class);
                     return service.execute(workerRequest.getWorkerPayload(), request.getRequestId());
                 }
                 case PARTITION_STREAMING:

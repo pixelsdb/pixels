@@ -89,6 +89,21 @@ public class Worker<WI extends WorkerInfo>
     }
 
     /**
+     * Whether this worker has explicitly finished or been terminated.
+     *
+     * This is different from {@link #isAlive()}: a lease can expire while a
+     * physical invocation is still running and must still be considered by
+     * coordinator admission or drain control.
+     */
+    public boolean isTerminated()
+    {
+        synchronized (this.lease)
+        {
+            return this.terminated;
+        }
+    }
+
+    /**
      * Extent the lease of this worker if the worker is alive. This method should only be called on the coordinator.
      * @return the new start time (milliseconds since the Unix epoch) of the extended lease
      * @throws WorkerCoordinateException if the worker is terminated or the lease has already expired

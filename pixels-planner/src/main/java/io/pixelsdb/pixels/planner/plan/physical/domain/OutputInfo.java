@@ -37,6 +37,10 @@ public class OutputInfo
      * Whether the output file should be encoded.
      */
     private boolean encoding;
+    /**
+     * The optional shuffle metadata for intermediate shuffle output.
+     */
+    private ShuffleInfo shuffleInfo;
 
     /**
      * Default constructor for Jackson.
@@ -86,5 +90,15 @@ public class OutputInfo
     public void setEncoding(boolean encoding)
     {
         this.encoding = encoding;
+    }
+
+    public ShuffleInfo getShuffleInfo()
+    {
+        return shuffleInfo;
+    }
+
+    public void setShuffleInfo(ShuffleInfo shuffleInfo)
+    {
+        this.shuffleInfo = shuffleInfo;
     }
 }

@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.planner.plan.physical;
 
 import com.alibaba.fastjson.JSON;
 import com.google.common.collect.ImmutableList;
+import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.turbo.Output;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
@@ -28,6 +29,8 @@ import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.StageDependency;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
+import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 
@@ -52,6 +55,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     protected CompletableFuture<? extends Output>[] largePartitionOutputs = null;
     protected int smallPartitionStageId;
     protected int largePartitionStageId;
+    protected PlanCoordinator planCoordinator;
 
     public PartitionedJoinOperator(String name, List<PartitionInput> smallPartitionInputs,
                                    List<PartitionInput> largePartitionInputs,
@@ -136,6 +140,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
     @Override
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
+        this.planCoordinator = planCoordinator;
         this.parentStageId = parentStageId;
         this.joinStageId = planCoordinator.assignStageId();
         for (JoinInput joinInput : this.joinInputs)
@@ -185,17 +190,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                     partitionInput.setStageId(this.smallPartitionStageId);
                 }
                 StageDependency partitionStageDependency = new StageDependency(smallPartitionStageId, joinStageId, true);
-                List<Task> tasks = new ArrayList<>();
-                int taskId = 0;
-                for (PartitionInput partitionInput : this.smallPartitionInputs)
-                {
-                    List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
-                    for (InputSplit inputSplit : inputSplits)
-                    {
-                        partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
-                        tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
-                    }
-                }
+                List<Task> tasks = createPartitionStageTasks(this.smallPartitionInputs);
                 smallWorkerNum = this.smallPartitionInputs.size();
                 StageCoordinator partitionStageCoordinator = new StageCoordinator(smallPartitionStageId, tasks, 0);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
@@ -209,17 +204,7 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
                     partitionInput.setStageId(this.largePartitionStageId);
                 }
                 StageDependency partitionStageDependency = new StageDependency(largePartitionStageId, joinStageId, true);
-                List<Task> tasks = new ArrayList<>();
-                int taskId = 0;
-                for (PartitionInput partitionInput : this.largePartitionInputs)
-                {
-                    List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
-                    for (InputSplit inputSplit : inputSplits)
-                    {
-                        partitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
-                        tasks.add(new Task(taskId++, JSON.toJSONString(partitionInput)));
-                    }
-                }
+                List<Task> tasks = createPartitionStageTasks(this.largePartitionInputs);
                 StageCoordinator partitionStageCoordinator = new StageCoordinator(largePartitionStageId, tasks, smallWorkerNum);
                 planCoordinator.addStageCoordinator(partitionStageCoordinator, partitionStageDependency);
             }
@@ -228,6 +213,53 @@ public abstract class PartitionedJoinOperator extends SingleStageJoinOperator
         {
             throw new UnsupportedOperationException("join algorithm '" + joinAlgo + "' is unsupported");
         }
+    }
+
+    private List<Task> createPartitionStageTasks(List<PartitionInput> partitionInputs)
+    {
+        List<Task> tasks = new ArrayList<>();
+        int nextTaskId = 0;
+        for (PartitionInput partitionInput : partitionInputs)
+        {
+            if (isS3QSProducerInput(partitionInput))
+            {
+                PartitionInput taskPartitionInput = copyPartitionInput(partitionInput);
+                taskPartitionInput.setProducerTaskId(nextTaskId);
+                tasks.add(new Task(nextTaskId, JSON.toJSONString(taskPartitionInput)));
+                nextTaskId++;
+                continue;
+            }
+
+            List<InputSplit> inputSplits = partitionInput.getTableInfo().getInputSplits();
+            for (InputSplit inputSplit : inputSplits)
+            {
+                PartitionInput taskPartitionInput = copyPartitionInput(partitionInput);
+                taskPartitionInput.getTableInfo().setInputSplits(ImmutableList.of(inputSplit));
+                tasks.add(new Task(nextTaskId++, JSON.toJSONString(taskPartitionInput)));
+            }
+        }
+        return tasks;
+    }
+
+    private PartitionInput copyPartitionInput(PartitionInput partitionInput)
+    {
+        return JSON.parseObject(JSON.toJSONString(partitionInput), PartitionInput.class);
+    }
+
+    private boolean isS3QSProducerInput(PartitionInput partitionInput)
+    {
+        if (partitionInput == null)
+        {
+            return false;
+        }
+        OutputInfo outputInfo = partitionInput.getOutput();
+        if (outputInfo == null)
+        {
+            return false;
+        }
+        ShuffleInfo shuffleInfo = outputInfo.getShuffleInfo();
+        return shuffleInfo != null && shuffleInfo.getStorageInfo() != null &&
+                shuffleInfo.getStorageInfo().getScheme() == Storage.Scheme.s3qs;
     }
 
     @Override

@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.UUID;
 
 import static software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT;
 
@@ -64,7 +65,7 @@ public class S3Queue implements Closeable
         }
     }
 
-    private final Queue<Map.Entry<String, String>> s3PathQueue = new ConcurrentLinkedQueue<>();
+    private final Queue<S3QueuePollResult> messageQueue = new ConcurrentLinkedQueue<>();
 
     private final String queueUrl;
 
@@ -72,15 +73,11 @@ public class S3Queue implements Closeable
 
     private final S3QS s3qs;
 
-    private final HashSet<Integer>consumerSet;
-
     private final Lock lock = new ReentrantLock();
 
     private boolean closed = false;
 
-    private boolean stopInput = false;
-
-    private int invisibleTime;
+    private final int invisibleTime;
 
     public S3Queue(S3QS s3qs, String queueUrl, int invisibleTime)
     {
@@ -88,7 +85,6 @@ public class S3Queue implements Closeable
         this.queueUrl = queueUrl;
         this.sqsClient = this.s3qs.getSqsClient();
         this.invisibleTime = invisibleTime;
-        this.consumerSet = new HashSet<>();
     }
     public S3Queue(S3QS s3qs, String queueUrl)
     {
@@ -107,52 +103,21 @@ public class S3Queue implements Closeable
     }
 
 
-    //s3qs is the highest manager of a shuffle, so producerSet is in charge of s3qs.
-    private void removeProducer(int workerId) throws IOException
-    {
-        this.s3qs.producerSet.remove(workerId);
-        if(this.s3qs.producerSet.isEmpty())
-        {
-            this.stopInput();
-            //this.push("");
-        }
-    }
-
-    public void addConsumer(int workerId)
-    {
-        if(!(this.consumerSet).contains(workerId))
-        {
-            this.consumerSet.add(workerId);
-        }
-    }
-
-    //maybe unnecessary
-    public boolean removeConsumer(int workerId)
-    {
-        this.consumerSet.remove(workerId);
-        // TODO: close queue
-        return consumerSet.isEmpty();
-    }
-
-    //TODO(OUT-OF-DATE): Implement DLQ to handle bad message.
-
-
     /**
-     * Poll one object path from the SQS queue and create a physical reader for the object.
-     * Calling this method can receive a batch of object paths from SQS using long polling
-     * (the batch size is configured by s3qs.poll.batch.size in PIXELS_HOME/pixels.properties)
-     * and add the paths into a local in-memory queue. Thus reduces the receive-message requests sent to SQS.
+     * Poll one structured shuffle message from the SQS queue.
+     *
+     * This method does not open S3 objects. The caller should inspect the
+     * message type first and only create a reader for DATA messages.
      *
      * @param timeoutSec the max time in seconds to wait if the queue is currently empty,
      *                   a valid wait time should be between 1 and 20 seconds
      * @return null if the queue is still empty after timeout
-     * @throws IOException if fails to create the physical reader for the path
+     * @throws IOException if fails to parse the queue message
      */
-    public Map.Entry<String,PhysicalReader>  poll(int timeoutSec) throws IOException, SqsException,TaskErrorException
-
+    public S3QueuePollResult pollMessage(int timeoutSec) throws IOException, SqsException, TaskErrorException
     {
-        Map.Entry<String,String> s3Path = this.s3PathQueue.poll();
-        if (s3Path == null)
+        S3QueuePollResult result = this.messageQueue.poll();
+        if (result == null)
         {
             if (timeoutSec < 1)
             {
@@ -165,8 +130,7 @@ public class S3Queue implements Closeable
             this.lock.lock();
             try
             {
-                // try poll from queue again to see if another thread has received the messages from sqs
-                while ((s3Path = this.s3PathQueue.poll()) == null)
+                while ((result = this.messageQueue.poll()) == null)
                 {
                     ReceiveMessageRequest request = ReceiveMessageRequest.builder()
                             .queueUrl(queueUrl)
@@ -178,27 +142,23 @@ public class S3Queue implements Closeable
                     {
                         for (Message message : response.messages())
                         {
-                            String path = message.body();
-                            String receiptHandle = message.receiptHandle();
-                            this.s3PathQueue.add(new AbstractMap.SimpleEntry<>(path, receiptHandle));
-
                             String countStr = message.attributes().get(APPROXIMATE_RECEIVE_COUNT);
                             if (countStr == null)
                             {
-                                // If no value is returned, it may be because the property was not requested or the message does not contain that property.
                                 throw new TaskErrorException("ApproximateReceiveCount not returned");
                             }
-                            else
+                            int count = Integer.parseInt(countStr);
+                            if (count > 2)
                             {
-                                int count = Integer.parseInt(countStr);
-                                // because we can only promise two receipts can be handled
-                                if (count > 2) throw new TaskErrorException("Dead message occurred");
+                                throw new TaskErrorException("Dead message occurred");
                             }
+
+                            S3QueueMessage queueMessage = S3QueueMessage.fromMessageBody(message.body());
+                            this.messageQueue.add(new S3QueuePollResult(message.receiptHandle(), queueMessage));
                         }
                     }
                     else
                     {
-                        // the sqs queue is also empty，timeout，invoker handle this situation, which means timeout.
                         return null;
                     }
                 }
@@ -208,9 +168,40 @@ public class S3Queue implements Closeable
                 this.lock.unlock();
             }
         }
-        String receiptHandle = s3Path.getValue();
-        PhysicalReader reader =  PhysicalReaderUtil.newPhysicalReader(this.s3qs, s3Path.getKey());
-        return new AbstractMap.SimpleEntry<String,PhysicalReader>(receiptHandle, reader);
+        return result;
+    }
+
+    /**
+     * Poll one DATA message and create a physical reader for its S3 object.
+     *
+     * This method is kept as a compatibility adapter for existing tests and
+     * should not be used by the S3QS shuffle consumer path because control
+     * messages do not have S3 objects.
+     *
+     * Calling this method can receive a batch of object paths from SQS using long polling
+     * (the batch size is configured by s3qs.poll.batch.size in PIXELS_HOME/pixels.properties)
+     * and add the paths into a local in-memory queue. Thus reduces the receive-message requests sent to SQS.
+     *
+     * @param timeoutSec the max time in seconds to wait if the queue is currently empty,
+     *                   a valid wait time should be between 1 and 20 seconds
+     * @return null if the queue is still empty after timeout
+     * @throws IOException if fails to create the physical reader for the path
+     */
+    public Map.Entry<String,PhysicalReader>  poll(int timeoutSec) throws IOException, SqsException,TaskErrorException
+
+    {
+        S3QueuePollResult result = pollMessage(timeoutSec);
+        if (result == null)
+        {
+            return null;
+        }
+        S3QueueMessage message = result.getMessage();
+        if (!message.isData())
+        {
+            throw new IOException("polled a non-DATA message from compatibility poll: " + message.getMessageType());
+        }
+        PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.s3qs, message.getObjectPath());
+        return new AbstractMap.SimpleEntry<String,PhysicalReader>(result.getReceiptHandle(), reader);
     }
 
     // do not need to delete local queue
@@ -227,10 +218,18 @@ public class S3Queue implements Closeable
 
     protected void push(String objectPath) throws IOException
     {
+        push(S3QueueMessage.data("", 0, 0, 0, 0L, objectPath));
+    }
+
+    /**
+     * Push one structured shuffle message into this SQS queue.
+     */
+    protected void push(S3QueueMessage message) throws IOException
+    {
         try
         {
             SendMessageRequest request = SendMessageRequest.builder()
-                    .queueUrl(queueUrl).messageBody(objectPath).build();
+                    .queueUrl(queueUrl).messageBody(message.toMessageBody()).build();
             sqsClient.sendMessage(request);
         }
         catch (Exception e)
@@ -248,23 +247,16 @@ public class S3Queue implements Closeable
      */
     public PhysicalWriter offer(S3QueueMessage body) throws IOException
     {
-        //TODO: same name issue
         String objectPath = getObjectPath(body);
         PhysicalS3QSWriter writer = (PhysicalS3QSWriter) PhysicalWriterUtil
                 .newPhysicalWriter(this.s3qs, objectPath, false);
-        writer.setQueue(this);
-        if(endWork(body)) removeProducer(body.getWorkerNum());
+        writer.setQueue(this, body.setMessageType(S3QueueMessage.MessageType.DATA));
         return writer;
     }
 
     private String getObjectPath(S3QueueMessage body) throws IOException
     {
-        return body.getObjectPath()+body.getPartitionNum() + "/"+ String.valueOf(System.currentTimeMillis()) ;
-    }
-
-    private boolean endWork(S3QueueMessage body) throws IOException
-    {
-        return body.getEndWork();
+        return body.getObjectPath() + body.getPartitionNum() + "/" + UUID.randomUUID();
     }
 
 
@@ -273,20 +265,10 @@ public class S3Queue implements Closeable
         return closed;
     }
 
-    public void stopInput()
-    {
-        this.stopInput = true;
-    }
-
-    public boolean getStopInput()
-    {
-        return this.stopInput;
-    }
-
     @Override
     public void close() throws IOException
     {
-        this.s3PathQueue.clear();
+        this.messageQueue.clear();
         this.closed = true;
         // do not close the s3qs storage and the sqs client as they are cached
     }

@@ -41,6 +41,10 @@ public class PartitionedTableInfo extends TableInfo
      * The ids of the join-key columns of the table.
      */
     private int[] keyColumnIds;
+    /**
+     * The optional shuffle metadata for reading partitioned intermediate data.
+     */
+    private ShuffleInfo shuffleInfo;
 
     /**
      * Default constructor for Jackson.
@@ -85,5 +89,15 @@ public class PartitionedTableInfo extends TableInfo
     public void setKeyColumnIds(int[] keyColumnIds)
     {
         this.keyColumnIds = keyColumnIds;
+    }
+
+    public ShuffleInfo getShuffleInfo()
+    {
+        return shuffleInfo;
+    }
+
+    public void setShuffleInfo(ShuffleInfo shuffleInfo)
+    {
+        this.shuffleInfo = shuffleInfo;
     }
 }

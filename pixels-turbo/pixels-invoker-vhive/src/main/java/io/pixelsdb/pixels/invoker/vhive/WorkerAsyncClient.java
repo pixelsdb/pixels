@@ -129,6 +129,15 @@ public class WorkerAsyncClient
         return this.stub.process(request);
     }
 
+    public ListenableFuture<TurboProto.vHiveWorkerResponse> partitionChainJoinS3QS(StageWorkerInput input)
+    {
+        TurboProto.vHiveWorkerRequest request = TurboProto.vHiveWorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.PARTITIONED_CHAIN_JOIN_S3QS))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
+                .build();
+        return this.stub.process(request);
+    }
+
     public ListenableFuture<TurboProto.vHiveWorkerResponse> partitionJoin(PartitionedJoinInput input)
     {
         TurboProto.vHiveWorkerRequest request = TurboProto.vHiveWorkerRequest.newBuilder()
@@ -147,6 +156,15 @@ public class WorkerAsyncClient
         return this.stub.process(request);
     }
 
+    public ListenableFuture<TurboProto.vHiveWorkerResponse> partitionJoinS3QS(StageWorkerInput input)
+    {
+        TurboProto.vHiveWorkerRequest request = TurboProto.vHiveWorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.PARTITIONED_JOIN_S3QS))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
+                .build();
+        return this.stub.process(request);
+    }
+
     public ListenableFuture<TurboProto.vHiveWorkerResponse> partition(PartitionInput input)
     {
         TurboProto.vHiveWorkerRequest request = TurboProto.vHiveWorkerRequest.newBuilder()
@@ -160,6 +178,15 @@ public class WorkerAsyncClient
     {
         TurboProto.vHiveWorkerRequest request = TurboProto.vHiveWorkerRequest.newBuilder()
                 .setWorkerType(String.valueOf(WorkerType.PARTITION_STREAMING))
+                .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
+                .build();
+        return this.stub.process(request);
+    }
+
+    public ListenableFuture<TurboProto.vHiveWorkerResponse> partitionS3QS(StageWorkerInput input)
+    {
+        TurboProto.vHiveWorkerRequest request = TurboProto.vHiveWorkerRequest.newBuilder()
+                .setWorkerType(String.valueOf(WorkerType.PARTITION_S3QS))
                 .setJson(JSON.toJSONString(input, SerializerFeature.DisableCircularReferenceDetect))
                 .build();
         return this.stub.process(request);

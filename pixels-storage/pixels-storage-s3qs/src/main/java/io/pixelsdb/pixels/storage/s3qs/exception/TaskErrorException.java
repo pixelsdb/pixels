@@ -20,7 +20,7 @@
 package io.pixelsdb.pixels.storage.s3qs.exception;
 
 /**
- * @author yanhaoting
+ * @author Haoting Yan
  * @create 2025-12-19
  */
 public class TaskErrorException extends Exception

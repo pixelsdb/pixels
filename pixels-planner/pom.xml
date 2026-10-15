@@ -31,6 +31,10 @@
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-executor</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-s3qs</artifactId>
+        </dependency>
 
         <!-- grpc -->
         <dependency>
@@ -57,7 +61,6 @@
         <dependency>
             <groupId>io.pixelsdb</groupId>
             <artifactId>pixels-storage-s3</artifactId>
-            <scope>test</scope>
             <optional>true</optional>
         </dependency>
         <dependency>

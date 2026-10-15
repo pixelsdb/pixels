@@ -20,6 +20,7 @@
 package io.pixelsdb.pixels.worker.common;
 
 import com.alibaba.fastjson.JSON;
+import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsWriter;
@@ -32,9 +33,12 @@ import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.executor.scan.Scanner;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
 import io.pixelsdb.pixels.planner.plan.physical.input.PartitionInput;
 import io.pixelsdb.pixels.planner.plan.physical.output.PartitionOutput;
+import io.pixelsdb.pixels.storage.s3qs.S3QS;
+import io.pixelsdb.pixels.storage.s3qs.S3QueueMessage;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
@@ -102,6 +106,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 
             WorkerCommon.initStorage(inputStorageInfo);
             WorkerCommon.initStorage(outputStorageInfo);
+            WorkerCommon.initOptionalShuffleStorage(event.getOutput().getShuffleInfo());
 
             String[] columnsToRead = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
@@ -150,30 +155,38 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
                 writerSchema.set(resultSchema);
             }
-            PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema.get(),
-                    WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                    true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
             Set<Integer> hashValues = new HashSet<>(numPartition);
-
-            for (int hash = 0; hash < numPartition; ++hash)
+            ShuffleInfo shuffleInfo = event.getOutput().getShuffleInfo();
+            if (isS3QSShuffle(shuffleInfo))
             {
-                ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
-                if (!batches.isEmpty())
+                writeS3QSPartitionOutput(event, shuffleInfo, writerSchema.get(), partitioned, hashValues);
+            }
+            else
+            {
+                PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema.get(),
+                        WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
+                        true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
+
+                for (int hash = 0; hash < numPartition; ++hash)
                 {
-                    for (VectorizedRowBatch batch : batches)
+                    ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
+                    if (!batches.isEmpty())
                     {
-                        pixelsWriter.addRowBatch(batch, hash);
+                        for (VectorizedRowBatch batch : batches)
+                        {
+                            pixelsWriter.addRowBatch(batch, hash);
+                        }
+                        hashValues.add(hash);
                     }
-                    hashValues.add(hash);
                 }
+
+                pixelsWriter.close();
+                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
             }
             partitionOutput.addOutput(outputPath);
             partitionOutput.setHashValues(hashValues);
-
-            pixelsWriter.close();
             workerMetrics.addOutputCostNs(writeCostTimer.stop());
-            workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-            workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
 
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(partitionOutput, workerMetrics);
@@ -186,6 +199,92 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             partitionOutput.setErrorMessage(e.getMessage());
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return partitionOutput;
+        }
+    }
+
+    static boolean isS3QSShuffle(ShuffleInfo shuffleInfo)
+    {
+        return shuffleInfo != null &&
+                shuffleInfo.getStorageInfo() != null &&
+                shuffleInfo.getStorageInfo().getScheme() == Storage.Scheme.s3qs;
+    }
+
+    static S3QueueMessage createS3QSDataMessage(ShuffleInfo shuffleInfo, int partitionId,
+                                                int producerTaskId, int producerAttemptId,
+                                                long sequenceId, TypeDescription writerSchema)
+    {
+        return S3QueueMessage.data(shuffleInfo.getShuffleId(), partitionId,
+                producerTaskId, producerAttemptId, sequenceId,
+                shuffleInfo.getObjectPathPrefix())
+                .setMetadata(writerSchema.toString());
+    }
+
+    static S3QueueMessage createS3QSProducerEndMessage(ShuffleInfo shuffleInfo, int partitionId,
+                                                       int producerTaskId, int producerAttemptId,
+                                                       long sequenceId, TypeDescription writerSchema)
+    {
+        return S3QueueMessage.producerEnd(shuffleInfo.getShuffleId(), partitionId,
+                producerTaskId, producerAttemptId, sequenceId)
+                .setMetadata(writerSchema.toString());
+    }
+
+    /**
+     * Write the partitioned output of one producer task into S3QS.
+     *
+     * Each non-empty partition is written as one S3 object and published as a
+     * DATA message. After data objects are written, this producer task sends a
+     * PRODUCER_END marker to every partition queue so consumers can determine
+     * partition completion without relying on live worker membership.
+     */
+    private void writeS3QSPartitionOutput(PartitionInput event, ShuffleInfo shuffleInfo, TypeDescription writerSchema,
+                                          List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned,
+                                          Set<Integer> hashValues) throws Exception
+    {
+        if (event.getProducerTaskId() < 0)
+        {
+            throw new WorkerException("producerTaskId is not set for s3qs shuffle");
+        }
+        Storage storage = WorkerCommon.getStorage(Storage.Scheme.s3qs);
+        if (!(storage instanceof S3QS))
+        {
+            throw new WorkerException("storage of scheme s3qs is not S3QS");
+        }
+        S3QS s3qs = (S3QS) storage;
+        int producerTaskId = event.getProducerTaskId();
+        int producerAttemptId = 0;
+        long[] sequenceIds = new long[partitioned.size()];
+
+        for (int partitionId = 0; partitionId < partitioned.size(); ++partitionId)
+        {
+            ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(partitionId);
+            if (!batches.isEmpty())
+            {
+                S3QueueMessage dataMessage = createS3QSDataMessage(shuffleInfo, partitionId,
+                        producerTaskId, producerAttemptId, sequenceIds[partitionId]++, writerSchema);
+                PhysicalWriter physicalWriter = s3qs.offer(dataMessage);
+                PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema, storage,
+                        physicalWriter.getPath(), physicalWriter, false, null);
+                try
+                {
+                    for (VectorizedRowBatch batch : batches)
+                    {
+                        pixelsWriter.addRowBatch(batch);
+                    }
+                }
+                finally
+                {
+                    pixelsWriter.close();
+                }
+                hashValues.add(partitionId);
+                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+            }
+        }
+
+        for (int partitionId = 0; partitionId < partitioned.size(); ++partitionId)
+        {
+            s3qs.publish(createS3QSProducerEndMessage(shuffleInfo, partitionId,
+                    producerTaskId, producerAttemptId, sequenceIds[partitionId]++, writerSchema));
         }
     }
 
