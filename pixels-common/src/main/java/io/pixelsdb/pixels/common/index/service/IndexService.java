@@ -23,13 +23,21 @@ import io.pixelsdb.pixels.common.exception.IndexException;
 import io.pixelsdb.pixels.common.index.IndexOption;
 import io.pixelsdb.pixels.common.index.ResolvedPrimary;
 import io.pixelsdb.pixels.common.index.RollbackEntry;
+import io.pixelsdb.pixels.common.index.RowIdRange;
 import io.pixelsdb.pixels.index.IndexProto;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface IndexService
 {
+    /** Resolve existing storage rowIds in input order; missing entries are null. */
+    default List<IndexProto.RowLocation> lookupRowLocations(long tableId, List<Long> rowIds) throws IndexException
+    {
+        throw new UnsupportedOperationException("MainIndex row lookup is unsupported by this service");
+    }
+
     /**
      * Allocate a batch of continuous row ids for the primary index on a table.
      * These row ids are to be put into the primary index by the client (e.g., retina or sink)
@@ -183,6 +191,17 @@ public interface IndexService
                               List<IndexProto.IndexKey> indexKeys, boolean isPrimary, IndexOption indexOption) throws IndexException;
 
     /**
+     * Persist the existing MainIndex mappings for one file independently of a
+     * business primary index. The default delegates to the existing RPC contract,
+     * whose primary flag controls MainIndex flushing; index id is unused for this
+     * operation. Backends must return false if the mapping cannot be made durable.
+     */
+    default boolean flushMainIndexOfFile(long tableId, long fileId) throws IndexException
+    {
+        return flushIndexEntriesOfFile(tableId, 0L, fileId, true, IndexOption.builder().build());
+    }
+
+    /**
      * Flush the index entries of an index corresponding to a buffered Pixels data file.
      * In Pixels, the index entries corresponding to a write-buffered data file (usually stored in the write buffer)
      * may be buffered in memory by the index server. This method tells to index server to flush such buffered index
@@ -261,6 +280,34 @@ public interface IndexService
     {
         throw new UnsupportedOperationException(
                 "putMainIndexEntriesOnly is not supported by this IndexService scheme");
+    }
+
+    /** Install a freshly allocated contiguous rowId/location range in the existing main index. */
+    default void putMainIndexRangeOnly(long tableId,
+            RowIdRange range) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "putMainIndexRangeOnly is not supported by this IndexService scheme");
+    }
+
+    default List<IndexProto.PrimaryIndexEntry> getMainIndexEntriesForFiles(
+            long tableId, Set<Long> fileIds) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "getMainIndexEntriesForFiles is not supported by this IndexService scheme");
+    }
+
+    default void relocateMainIndexEntries(long tableId, Set<Long> expectedOldFileIds,
+            List<IndexProto.PrimaryIndexEntry> entries) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "relocateMainIndexEntries is not supported by this IndexService scheme");
+    }
+
+    default void deleteMainIndexEntriesForFile(long tableId, long fileId) throws IndexException
+    {
+        throw new UnsupportedOperationException(
+                "deleteMainIndexEntriesForFile is not supported by this IndexService scheme");
     }
 
     /**
@@ -348,4 +395,3 @@ public interface IndexService
                 "deleteMainIndexRange is not supported by this IndexService scheme");
     }
 }
-

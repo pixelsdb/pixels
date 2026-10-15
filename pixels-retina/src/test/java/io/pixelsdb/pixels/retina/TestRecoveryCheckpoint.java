@@ -558,19 +558,27 @@ public class TestRecoveryCheckpoint
     }
 
     @Test
-    public void testGenerate_sameTimestampSkipsAfterSuccessfulPublish() throws Exception
+    public void testGenerate_sameTimestampPublishesNewBodyWithoutOverwritingCurrent() throws Exception
     {
-        stubPointer(null);
+        KeyValue current = mock(KeyValue.class);
+        when(current.getValue()).thenReturn(
+                ByteSequence.from(generatedBodyPath(4003L), StandardCharsets.UTF_8));
+        when(etcd.getKeyValue(anyString())).thenReturn(null, current);
         stubCreateCapturingBody();
         when(etcd.compareAndPut(eq(POINTER_KEY), eq(null), eq(generatedBodyPath(4003L)))).thenReturn(true);
+        when(etcd.compareAndPut(eq(POINTER_KEY), eq(generatedBodyPath(4003L)), anyString()))
+                .thenReturn(true);
 
         checkpoint.generate(4003L, new ArrayList<>(), new ArrayList<>());
         checkpoint.generate(4003L, new ArrayList<>(Collections.singletonList(
                 new RecoveryCheckpoint.VisibilityEntry(1L, 0, 0, 0L, new long[0]))), new ArrayList<>());
 
-        verify(storage, times(1)).create(anyString(), eq(true), anyInt());
+        verify(storage, times(2)).create(anyString(), eq(true), anyInt());
         verify(etcd, times(1)).compareAndPut(eq(POINTER_KEY), eq(null), eq(generatedBodyPath(4003L)));
-        assertEquals(1, createdBodies.size());
+        assertEquals(2, createdBodies.size());
+        assertNotEquals(createdPaths.get(0), createdPaths.get(1));
+        assertTrue(createdPaths.get(1).startsWith(generatedBodyPath(4003L) + "-"));
+        verify(storage).delete(generatedBodyPath(4003L), false);
     }
 
     @Test

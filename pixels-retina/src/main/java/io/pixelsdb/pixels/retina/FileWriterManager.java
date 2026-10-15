@@ -84,17 +84,30 @@ public class FileWriterManager
                              EncodingLevel encodingLevel, boolean nullsPadding,
                              long firstBlockId, int recordNum, String hostName, int virtualNodeId) throws RetinaException
     {
+        this(tableId, schema, targetOrderedDirPath, targetOrderedStorage, pixelsStride,
+                blockSize, replication, encodingLevel, nullsPadding, firstBlockId,
+                recordNum, hostName, virtualNodeId, null);
+    }
+
+    public FileWriterManager(long tableId, TypeDescription schema,
+                             Path targetOrderedDirPath, Storage targetOrderedStorage,
+                             int pixelsStride, long blockSize, short replication,
+                             EncodingLevel encodingLevel, boolean nullsPadding,
+                             long firstBlockId, int recordNum, String hostName, int virtualNodeId, io.pixelsdb.pixels.ingest.IngestProto.BufferSpan restored) throws RetinaException
+    {
         this.tableId = tableId;
         this.firstBlockId = firstBlockId;
         this.virtualNodeId = virtualNodeId;
 
         // Create pixels writer.
-        String targetFileName = PixelsFileNameUtils.buildOrderedFileName(hostName, virtualNodeId);
+        String targetFileName = restored == null ? PixelsFileNameUtils.buildOrderedFileName(hostName, virtualNodeId) : restored.getFileName();
         String targetFilePath = targetOrderedDirPath.getUri() + "/" + targetFileName;
         try
         {
             // Add file information to the metadata.
             MetadataService metadataService = MetadataService.Instance();
+            if (restored == null)
+            {
             file = new File();
             this.file.setName(targetFileName);
             this.file.setType(File.Type.TEMPORARY_INGEST);
@@ -105,6 +118,15 @@ public class FileWriterManager
                 throw new MetadataException("failed to add metadata for ingest file " + targetFilePath);
             }
             this.file.setId(metadataService.getFileId(targetFilePath));
+            }
+            else
+            {
+                file = metadataService.getFileById(restored.getFileId());
+                if (file == null || file.getType() != File.Type.TEMPORARY_INGEST
+                        || file.getPathId() != restored.getPathId()
+                        || !file.getName().equals(restored.getFileName()))
+                { throw new MetadataException("Recorded ingest file cannot be restored"); }
+            }
         } catch (MetadataException e)
         {
             throw new RetinaException("Failed to add file information to the metadata, " +
@@ -125,6 +147,7 @@ public class FileWriterManager
                     .setRowGroupSize(Integer.MAX_VALUE)
                     .setStorage(targetOrderedStorage)
                     .setPath(targetFilePath)
+                    .setOverwrite(restored != null)
                     .setBlockSize(blockSize)
                     .setReplication(replication)
                     .setBlockPadding(true)
@@ -247,12 +270,13 @@ public class FileWriterManager
                 ObjectStorageManager objectStorageManager = ObjectStorageManager.Instance();
                 for (long blockId = firstBlockId; blockId <= lastBlockId; ++blockId)
                 {
-                    /*
-                     * Issue-1083: Since we obtain a read-only ByteBuffer from the S3 Reader,
-                     * we cannot read a byte[]. Instead, we should return the ByteBuffer directly.
-                     */
+                    // ObjectStorageManager returns an owned buffer that remains valid after
+                    // its PhysicalReader closes, including LocalFS direct/mapped readers.
                     ByteBuffer data = objectStorageManager.read(this.tableId, virtualNodeId, blockId);
-                    this.writer.addRowBatch(VectorizedRowBatch.deserialize(data));
+                    try (VectorizedRowBatch batch = VectorizedRowBatch.deserialize(data))
+                    {
+                        this.writer.addRowBatch(batch);
+                    }
                 }
             }
             this.writer.close();

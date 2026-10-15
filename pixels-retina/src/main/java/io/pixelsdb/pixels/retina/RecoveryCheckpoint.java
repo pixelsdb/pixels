@@ -37,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -422,20 +423,14 @@ public final class RecoveryCheckpoint
      *         Sorted in-place to the canonical on-disk order.
      * @param segments per-scope earliest pending commit timestamps already
      *         snapshotted by the caller. Sorted in-place.
-     *         <p>A no-op when {@code checkpointAppliedTs} has not advanced since
-     *         the last successful round (no new committed transactions, nothing
-     *         to flush). The published body and pointer are logged at INFO.
+     *         The applied timestamp may remain unchanged while a transactional buffer
+     *         finishes publishing another REGULAR file. Such a round still publishes a
+     *         new uniquely named body so the current pointer is never overwritten in place.
      */
     public void generate(long checkpointAppliedTs,
                          List<VisibilityEntry> rgEntries,
                          List<PendingSegmentEntry> segments) throws RetinaException
     {
-        if (checkpointAppliedTs == lastCheckpointAppliedTs)
-        {
-            logger.debug("Recovery checkpoint: checkpointAppliedTs={} unchanged since last round; skipping",
-                    checkpointAppliedTs);
-            return;
-        }
         long now = System.currentTimeMillis();
 
         rgEntries.sort((a, b) -> {
@@ -456,6 +451,10 @@ public final class RecoveryCheckpoint
 
         String bodyPath = RetinaUtils.buildCheckpointPath(
                 checkpointDir, RetinaUtils.CHECKPOINT_PREFIX_RECOVERY, retinaNodeId, checkpointAppliedTs);
+        if (checkpointAppliedTs == lastCheckpointAppliedTs)
+        {
+            bodyPath += "-" + UUID.randomUUID();
+        }
         try (DataOutputStream out = storage.create(bodyPath, true, Constants.CHECKPOINT_BUFFER_SIZE))
         {
             body.writeTo(out);
@@ -578,6 +577,7 @@ public final class RecoveryCheckpoint
         // A mismatched node id or illegal timestamp is corruption, not a
         // fresh-deployment signal.
         ensureAcceptable(body, bodyPath);
+        lastCheckpointAppliedTs = body.getCheckpointAppliedTs();
         return new LoadedCheckpoint(bodyPath, body);
     }
 

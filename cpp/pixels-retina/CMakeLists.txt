@@ -29,6 +29,9 @@ if(ENABLE_JEMALLOC)
     set(JEMALLOC_LIB_PATH "${JEMALLOC_INSTALL_DIR}/lib/libjemalloc.so")
     set(JEMALLOC_INCLUDE_DIR "${JEMALLOC_INSTALL_DIR}/include")
     file(MAKE_DIRECTORY ${JEMALLOC_INCLUDE_DIR})
+    # Retina launchers preload jemalloc so C and C++ allocation share one heap.
+    # Keep jemalloc's initial-exec TLS model for process-start interposition;
+    # dynamic TLS may allocate recursively while the loader initializes TLS.
     ExternalProject_Add(jemalloc_ext
             URL https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
             CONFIGURE_COMMAND <SOURCE_DIR>/configure
@@ -36,7 +39,6 @@ if(ENABLE_JEMALLOC)
             --enable-prof
             --enable-stats
             --enable-shared
-            --disable-initial-exec-tls
             "EXTRA_CFLAGS=-fPIC"
             BUILD_COMMAND make -j
             INSTALL_COMMAND make install

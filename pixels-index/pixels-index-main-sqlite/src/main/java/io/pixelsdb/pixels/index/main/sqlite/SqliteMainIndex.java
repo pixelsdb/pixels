@@ -42,6 +42,7 @@ import java.sql.*;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -278,6 +279,230 @@ public class SqliteMainIndex implements MainIndex
         return builder.build();
     }
 
+    @Override
+    public List<IndexProto.PrimaryIndexEntry> getEntriesForFiles(Set<Long> fileIds)
+            throws MainIndexException
+    {
+        if (fileIds == null || fileIds.isEmpty())
+        {
+            return ImmutableList.of();
+        }
+        for (long fileId : fileIds)
+        {
+            flushCache(fileId);
+        }
+        this.dbRwLock.readLock().lock();
+        try
+        {
+            ImmutableList.Builder<IndexProto.PrimaryIndexEntry> entries = ImmutableList.builder();
+            try (PreparedStatement pst = connection.prepareStatement(
+                    "SELECT * FROM row_id_ranges WHERE file_id = ? ORDER BY rg_id, rg_row_offset_start"))
+            {
+                for (long fileId : fileIds)
+                {
+                    pst.setLong(1, fileId);
+                    try (ResultSet rs = pst.executeQuery())
+                    {
+                        while (rs.next())
+                        {
+                            long start = rs.getLong("row_id_start");
+                            long end = rs.getLong("row_id_end");
+                            int rgId = rs.getInt("rg_id");
+                            int offset = rs.getInt("rg_row_offset_start");
+                            for (long rowId = start; rowId < end; rowId++)
+                            {
+                                entries.add(IndexProto.PrimaryIndexEntry.newBuilder()
+                                        .setRowId(rowId)
+                                        .setRowLocation(IndexProto.RowLocation.newBuilder()
+                                                .setFileId(fileId).setRgId(rgId)
+                                                .setRgRowOffset(offset + (int) (rowId - start)))
+                                        .build());
+                            }
+                        }
+                    }
+                }
+            }
+            return entries.build();
+        }
+        catch (SQLException e)
+        {
+            throw new MainIndexException("Failed to enumerate main index entries by file", e);
+        }
+        finally
+        {
+            this.dbRwLock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public void relocateEntries(Set<Long> expectedOldFileIds,
+            List<IndexProto.PrimaryIndexEntry> entries) throws MainIndexException
+    {
+        if (entries == null || entries.isEmpty())
+        {
+            return;
+        }
+        for (long fileId : expectedOldFileIds)
+        {
+            flushCache(fileId);
+        }
+        this.cacheRwLock.writeLock().lock();
+        this.dbRwLock.writeLock().lock();
+        List<RowIdRange> evict = new java.util.ArrayList<>();
+        try
+        {
+            boolean originalAutoCommit = connection.getAutoCommit();
+            try
+            {
+                connection.setAutoCommit(false);
+                for (IndexProto.PrimaryIndexEntry entry : entries)
+                {
+                    long rowId = entry.getRowId();
+                    IndexProto.RowLocation desired = entry.getRowLocation();
+                    RowIdRange current = getRowIdRangeFromSqlite(rowId);
+                    if (current == null)
+                    {
+                        throw new MainIndexException("Missing rowId during relocation: " + rowId);
+                    }
+                    IndexProto.RowLocation old = IndexProto.RowLocation.newBuilder()
+                            .setFileId(current.getFileId()).setRgId(current.getRgId())
+                            .setRgRowOffset(current.getRgRowOffsetStart()
+                                    + (int) (rowId - current.getRowIdStart())).build();
+                    if (old.equals(desired))
+                    {
+                        continue;
+                    }
+                    if (!expectedOldFileIds.contains(old.getFileId()))
+                    {
+                        throw new MainIndexException("Unexpected current file for rowId=" + rowId
+                                + ": " + old.getFileId());
+                    }
+                    replaceOneRow(current, rowId, desired);
+                    evict.add(current);
+                }
+                connection.commit();
+            }
+            catch (SQLException | RowIdException | MainIndexException e)
+            {
+                rollbackQuietly(e);
+                throw e;
+            }
+            finally
+            {
+                connection.setAutoCommit(originalAutoCommit);
+            }
+            for (RowIdRange range : evict)
+            {
+                indexCache.evictRange(range);
+            }
+            for (IndexProto.PrimaryIndexEntry entry : entries)
+            {
+                indexCache.evict(entry.getRowId());
+                indexCache.admit(entry.getRowId(), entry.getRowLocation());
+            }
+        }
+        catch (SQLException | RowIdException e)
+        {
+            throw new MainIndexException("Failed to relocate main index entries", e);
+        }
+        finally
+        {
+            this.dbRwLock.writeLock().unlock();
+            this.cacheRwLock.writeLock().unlock();
+        }
+    }
+
+    private void replaceOneRow(RowIdRange current, long rowId,
+            IndexProto.RowLocation desired) throws SQLException, RowIdException
+    {
+        try (PreparedStatement delete = connection.prepareStatement(
+                "DELETE FROM row_id_ranges WHERE row_id_start = ? AND row_id_end = ?"))
+        {
+            delete.setLong(1, current.getRowIdStart());
+            delete.setLong(2, current.getRowIdEnd());
+            if (delete.executeUpdate() != 1)
+            {
+                throw new RowIdException("Concurrent rowId range change during relocation");
+            }
+        }
+        List<RowIdRange> replacement = new java.util.ArrayList<>(3);
+        if (current.getRowIdStart() < rowId)
+        {
+            int width = (int) (rowId - current.getRowIdStart());
+            replacement.add(current.toBuilder().setRowIdEnd(rowId)
+                    .setRgRowOffsetEnd(current.getRgRowOffsetStart() + width).build());
+        }
+        replacement.add(new RowIdRange(rowId, rowId + 1, desired.getFileId(),
+                desired.getRgId(), desired.getRgRowOffset(), desired.getRgRowOffset() + 1));
+        if (rowId + 1 < current.getRowIdEnd())
+        {
+            int consumed = (int) (rowId + 1 - current.getRowIdStart());
+            replacement.add(current.toBuilder().setRowIdStart(rowId + 1)
+                    .setRgRowOffsetStart(current.getRgRowOffsetStart() + consumed).build());
+        }
+        try (PreparedStatement insert = connection.prepareStatement(insertRangeSql))
+        {
+            for (RowIdRange range : replacement)
+            {
+                bindRangeInsertStatement(insert, range);
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
+    @Override
+    public void deleteEntriesForFile(long fileId) throws MainIndexException
+    {
+        flushCache(fileId);
+        this.cacheRwLock.writeLock().lock();
+        this.dbRwLock.writeLock().lock();
+        try
+        {
+            List<RowIdRange> ranges = new java.util.ArrayList<>();
+            try (PreparedStatement query = connection.prepareStatement(
+                    "SELECT * FROM row_id_ranges WHERE file_id = ?"))
+            {
+                query.setLong(1, fileId);
+                try (ResultSet rs = query.executeQuery())
+                {
+                    while (rs.next())
+                    {
+                        ranges.add(new RowIdRange(rs.getLong("row_id_start"), rs.getLong("row_id_end"),
+                                fileId, rs.getInt("rg_id"), rs.getInt("rg_row_offset_start"),
+                                rs.getInt("rg_row_offset_end")));
+                    }
+                }
+            }
+            try (PreparedStatement delete = connection.prepareStatement(
+                    "DELETE FROM row_id_ranges WHERE file_id = ?"))
+            {
+                delete.setLong(1, fileId);
+                delete.executeUpdate();
+            }
+            try (PreparedStatement marker = connection.prepareStatement(
+                    "DELETE FROM row_id_range_flush_markers WHERE file_id = ?"))
+            {
+                marker.setLong(1, fileId);
+                marker.executeUpdate();
+            }
+            for (RowIdRange range : ranges)
+            {
+                indexCache.evictRange(range);
+            }
+            indexCache.evictAllEntries();
+        }
+        catch (SQLException e)
+        {
+            throw new MainIndexException("Failed to delete main index entries for fileId=" + fileId, e);
+        }
+        finally
+        {
+            this.dbRwLock.writeLock().unlock();
+            this.cacheRwLock.writeLock().unlock();
+        }
+    }
+
     private IndexProto.RowLocation getRowLocationFromSqlite(long rowId) throws MainIndexException
     {
         /*
@@ -340,10 +565,36 @@ public class SqliteMainIndex implements MainIndex
         this.cacheRwLock.writeLock().lock();
         try
         {
-            for (IndexProto.PrimaryIndexEntry entry : primaryEntries)
+            int start = 0;
+            while (start < primaryEntries.size())
             {
-                boolean res = this.indexBuffer.insert(entry.getRowId(), entry.getRowLocation());
-                builder.add(res);
+                IndexProto.PrimaryIndexEntry first = primaryEntries.get(start);
+                IndexProto.PrimaryIndexEntry last = first;
+                int end = start + 1;
+                while (end < primaryEntries.size())
+                {
+                    IndexProto.PrimaryIndexEntry next = primaryEntries.get(end);
+                    if (last.getRowId() == Long.MAX_VALUE || next.getRowId() != last.getRowId() + 1
+                            || next.getRowLocation().getFileId() != first.getRowLocation().getFileId()
+                            || next.getRowLocation().getRgId() != first.getRowLocation().getRgId()
+                            || (long) next.getRowLocation().getRgRowOffset()
+                                != (long) last.getRowLocation().getRgRowOffset() + 1)
+                        break;
+                    last = next;
+                    end++;
+                }
+                boolean inserted = first.getRowId() >= 0 && last.getRowId() < Long.MAX_VALUE
+                        && first.getRowLocation().getRgRowOffset() >= 0
+                        && last.getRowLocation().getRgRowOffset() < Integer.MAX_VALUE
+                        && this.indexBuffer.insertRange(new RowIdRange(first.getRowId(), last.getRowId() + 1,
+                                first.getRowLocation().getFileId(), first.getRowLocation().getRgId(),
+                                first.getRowLocation().getRgRowOffset(), last.getRowLocation().getRgRowOffset() + 1));
+                for (int index = start; index < end; index++)
+                {
+                    IndexProto.PrimaryIndexEntry entry = primaryEntries.get(index);
+                    builder.add(inserted || this.indexBuffer.insert(entry.getRowId(), entry.getRowLocation()));
+                }
+                start = end;
             }
         }
         finally
@@ -351,6 +602,20 @@ public class SqliteMainIndex implements MainIndex
             this.cacheRwLock.writeLock().unlock();
         }
         return builder.build();
+    }
+
+    @Override
+    public boolean putRange(RowIdRange range)
+    {
+        this.cacheRwLock.writeLock().lock();
+        try
+        {
+            return this.indexBuffer.insertRange(range);
+        }
+        finally
+        {
+            this.cacheRwLock.writeLock().unlock();
+        }
     }
 
     @Override

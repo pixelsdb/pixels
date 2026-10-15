@@ -113,7 +113,15 @@ public class ObjectStorageManager
         try (PhysicalReader reader = PhysicalReaderUtil.newPhysicalReader(this.storage, key))
         {
             int length = (int) reader.getFileLength();
-            return reader.readFully(length);
+            ByteBuffer source = reader.readFully(length).duplicate();
+            source.position(0);
+            source.limit(length);
+            // LocalFS readers own their direct or mapped buffers and release them in close().
+            // Return an independent buffer so callers never access freed native memory.
+            ByteBuffer owned = ByteBuffer.allocate(length);
+            owned.put(source);
+            owned.flip();
+            return owned;
         } catch (IOException e)
         {
             throw new RetinaException("Failed to read data from object storage", e);

@@ -131,6 +131,16 @@ public class TestServerContainer
 
         assertEquals(0, server.runCount.get());
         assertEquals(1L, server.started.getCount());
+
+        try
+        {
+            container.startServer("failing");
+            fail("failed startup must not be retried in the same process");
+        }
+        catch (IllegalStateException expected)
+        {
+            assertTrue(expected.getMessage().contains("cannot be restarted"));
+        }
     }
 
     @Test

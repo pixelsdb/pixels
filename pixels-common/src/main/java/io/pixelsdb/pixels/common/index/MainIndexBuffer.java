@@ -50,6 +50,8 @@ public class MainIndexBuffer implements Closeable
      * fileId -> {tableRowId -> rowLocation}.
      */
     private final Map<Long, Map<Long, IndexProto.RowLocation>> indexBuffer;
+    /** Continuous bulk writes retain the same ranges that the backing index persists. */
+    private final Map<Long, NavigableMap<Long, RowIdRange>> bufferedRanges = new HashMap<>();
     private final MainIndexCache indexCache;
     private boolean populateCache = false;
 
@@ -106,6 +108,10 @@ public class MainIndexBuffer implements Closeable
      */
     public boolean insert(long rowId, IndexProto.RowLocation location)
     {
+        if (containingRange(location.getFileId(), rowId) != null)
+        {
+            return false;
+        }
         Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(location.getFileId());
         if (fileBuffer == null)
         {
@@ -138,6 +144,101 @@ public class MainIndexBuffer implements Closeable
         }
     }
 
+    /**
+     * Insert a non-overlapping continuous mapping. On overlap nothing changes, so callers
+     * can fall back to point insertion and retain per-entry duplicate results.
+     */
+    public boolean insertRange(RowIdRange range)
+    {
+        long start = range.getRowIdStart(), end = range.getRowIdEnd();
+        checkArgument(start >= 0 && end > start && range.getRgRowOffsetStart() >= 0
+                && (long) range.getRgRowOffsetEnd() - range.getRgRowOffsetStart() == end - start,
+                "Invalid buffered row id range");
+        NavigableMap<Long, RowIdRange> ranges = bufferedRanges.get(range.getFileId());
+        if (ranges != null)
+        {
+            Map.Entry<Long, RowIdRange> before = ranges.floorEntry(start);
+            Map.Entry<Long, RowIdRange> after = ranges.ceilingEntry(start);
+            if ((before != null && before.getValue().getRowIdEnd() > start)
+                    || (after != null && after.getKey() < end))
+            {
+                return false;
+            }
+        }
+        Map<Long, IndexProto.RowLocation> points = indexBuffer.get(range.getFileId());
+        if (points != null)
+        {
+            for (long rowId : points.keySet())
+            {
+                if (rowId >= start && rowId < end) return false;
+            }
+        }
+        else
+        {
+            if (indexBuffer.size() > CACHE_POP_ENABLE_THRESHOLD) populateCache = true;
+            indexBuffer.put(range.getFileId(), new HashMap<>());
+        }
+        if (ranges == null)
+        {
+            ranges = new TreeMap<>();
+            bufferedRanges.put(range.getFileId(), ranges);
+        }
+        Map.Entry<Long, RowIdRange> before = ranges.lowerEntry(start);
+        if (before != null && adjacent(before.getValue(), range))
+        {
+            range = merge(before.getValue(), range);
+            ranges.remove(before.getKey());
+        }
+        Map.Entry<Long, RowIdRange> after = ranges.ceilingEntry(range.getRowIdEnd());
+        if (after != null && adjacent(range, after.getValue()))
+        {
+            range = merge(range, after.getValue());
+            ranges.remove(after.getKey());
+        }
+        ranges.put(range.getRowIdStart(), range);
+        return true;
+    }
+
+    private RowIdRange containingRange(long fileId, long rowId)
+    {
+        NavigableMap<Long, RowIdRange> ranges = bufferedRanges.get(fileId);
+        if (ranges == null) return null;
+        Map.Entry<Long, RowIdRange> floor = ranges.floorEntry(rowId);
+        return floor != null && rowId < floor.getValue().getRowIdEnd() ? floor.getValue() : null;
+    }
+
+    private IndexProto.RowLocation rangeLocation(long fileId, long rowId)
+    {
+        RowIdRange range = containingRange(fileId, rowId);
+        return range == null ? null : IndexProto.RowLocation.newBuilder().setFileId(fileId)
+                .setRgId(range.getRgId()).setRgRowOffset(range.getRgRowOffsetStart()
+                        + (int) (rowId - range.getRowIdStart())).build();
+    }
+
+    private static boolean adjacent(RowIdRange left, RowIdRange right)
+    {
+        return left.getRowIdEnd() == right.getRowIdStart() && left.getFileId() == right.getFileId()
+                && left.getRgId() == right.getRgId()
+                && left.getRgRowOffsetEnd() == right.getRgRowOffsetStart();
+    }
+
+    private static RowIdRange merge(RowIdRange left, RowIdRange right)
+    {
+        return new RowIdRange(left.getRowIdStart(), right.getRowIdEnd(), left.getFileId(),
+                left.getRgId(), left.getRgRowOffsetStart(), right.getRgRowOffsetEnd());
+    }
+
+    private int entryCount(long fileId)
+    {
+        long count = indexBuffer.get(fileId).size();
+        NavigableMap<Long, RowIdRange> ranges = bufferedRanges.get(fileId);
+        if (ranges != null)
+        {
+            for (RowIdRange range : ranges.values()) count += range.getRowIdEnd() - range.getRowIdStart();
+        }
+        return Math.toIntExact(count);
+    }
+
     protected IndexProto.RowLocation lookup(long fileId, long rowId) throws MainIndexException
     {
         Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(fileId);
@@ -146,6 +247,7 @@ public class MainIndexBuffer implements Closeable
             return null;
         }
         IndexProto.RowLocation location = fileBuffer.get(rowId);
+        if (location == null) location = rangeLocation(fileId, rowId);
         if (location == null)
         {
             location = this.indexCache.lookup(rowId);
@@ -166,6 +268,7 @@ public class MainIndexBuffer implements Closeable
             {
                 long fileId = entry.getKey();
                 location = entry.getValue().get(rowId);
+                if (location == null) location = rangeLocation(fileId, rowId);
                 if (location != null)
                 {
                     checkArgument(fileId == location.getFileId());
@@ -245,7 +348,19 @@ public class MainIndexBuffer implements Closeable
         {
             throw new MainIndexException("FileBuffer changed while building flush snapshot");
         }
-        return new FlushSnapshot(fileId, rowIds.length, ranges.build());
+        List<RowIdRange> combined = new ArrayList<>(ranges.build());
+        NavigableMap<Long, RowIdRange> bulk = bufferedRanges.get(fileId);
+        if (bulk != null) combined.addAll(bulk.values());
+        Collections.sort(combined);
+        List<RowIdRange> compacted = new ArrayList<>();
+        for (RowIdRange range : combined)
+        {
+            int previous = compacted.size() - 1;
+            if (previous >= 0 && adjacent(compacted.get(previous), range))
+                compacted.set(previous, merge(compacted.get(previous), range));
+            else compacted.add(range);
+        }
+        return new FlushSnapshot(fileId, entryCount(fileId), compacted);
     }
 
     /**
@@ -260,12 +375,13 @@ public class MainIndexBuffer implements Closeable
             return;
         }
         Map<Long, IndexProto.RowLocation> fileBuffer = this.indexBuffer.get(snapshot.getFileId());
-        if (fileBuffer == null || fileBuffer.size() != snapshot.getEntryCount())
+        if (fileBuffer == null || entryCount(snapshot.getFileId()) != snapshot.getEntryCount())
         {
             throw new MainIndexException("FileBuffer changed before committed flush discard");
         }
         fileBuffer.clear();
         this.indexBuffer.remove(snapshot.getFileId());
+        this.bufferedRanges.remove(snapshot.getFileId());
         if (this.indexBuffer.size() <= CACHE_POP_ENABLE_THRESHOLD)
         {
             this.populateCache = false;
@@ -282,6 +398,7 @@ public class MainIndexBuffer implements Closeable
     public void close() throws IOException
     {
         this.indexBuffer.clear();
+        this.bufferedRanges.clear();
         this.indexCache.close();
     }
 }

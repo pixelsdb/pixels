@@ -517,8 +517,10 @@ public class TestStorageGcWal
         {
             assertTrue("error message must contain the corrupted file path",
                     e.getMessage().contains("corrupted-99"));
-            assertTrue("error message must guide operators to delete the file",
-                    e.getMessage().contains("Delete this file"));
+            assertTrue("error message must keep startup fail-closed",
+                    e.getMessage().contains("Service remains unavailable"));
+            assertTrue("error message must preserve recovery evidence",
+                    e.getMessage().contains("preserve the file"));
         }
     }
 
@@ -594,6 +596,44 @@ public class TestStorageGcWal
         // oldRowId=-1 → no prior entry → restorePrimaryIndexEntries must NOT be called
         verify(indexService, never()).restorePrimaryIndexEntries(
                 anyLong(), anyLong(), any(List.class), any(IndexOption.class));
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void testRecoveryRestoresStableRowIdLocationsBeforeRemovingNewFile() throws Exception
+    {
+        StorageGcWal wal = newWal();
+        IndexProto.PrimaryIndexEntry oldLocation = IndexProto.PrimaryIndexEntry.newBuilder()
+                .setRowId(7001L)
+                .setRowLocation(IndexProto.RowLocation.newBuilder()
+                        .setFileId(101L).setRgId(2).setRgRowOffset(3).build())
+                .build();
+        try (StorageGcWal.Writer w = wal.createTask(
+                "stable-rowid", 11L, 2, Collections.singletonList(101L), 201L, "", -1L, 1))
+        {
+            w.appendLocationRollback(oldLocation);
+            w.flush();
+            w.markSwapped();
+        }
+
+        MetadataService metadataService = mock(MetadataService.class);
+        IndexService indexService = mock(IndexService.class);
+        File oldFile = catalogFile(101L, File.Type.RETIRED, 123456L);
+        File newFile = catalogFile(201L, File.Type.REGULAR, null);
+        when(metadataService.getFileById(101L)).thenReturn(oldFile);
+        when(metadataService.getFileById(201L)).thenReturn(newFile);
+        when(metadataService.updateFile(any(File.class))).thenReturn(true);
+        when(metadataService.deleteFiles(any())).thenReturn(true);
+
+        new StorageGcWal.RecoveryHandler(wal, metadataService, indexService)
+                .recover(Collections.emptySet());
+
+        verify(indexService).relocateMainIndexEntries(
+                eq(11L), eq(Collections.singleton(201L)), eq(Collections.singletonList(oldLocation)));
+        verify(indexService, never()).restorePrimaryIndexEntries(
+                anyLong(), anyLong(), any(List.class), any(IndexOption.class));
+        verify(metadataService).deleteFiles(Collections.singletonList(201L));
+        assertEquals(StorageGcWal.State.ABORTED, wal.getTask("stable-rowid").get().getState());
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

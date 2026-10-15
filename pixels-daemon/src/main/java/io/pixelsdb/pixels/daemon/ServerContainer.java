@@ -44,6 +44,7 @@ public class ServerContainer
         private final List<StartupCheck> startupChecks;
         private Thread thread;
         private boolean shutdownInvoked;
+        private Throwable terminalFailure;
 
         private ServerHandle(Server server, List<StartupCheck> startupChecks)
         {
@@ -99,6 +100,12 @@ public class ServerContainer
         {
             log.debug("Server container is shutting down, skip starting {}", name);
             return;
+        }
+        if (handle.terminalFailure != null)
+        {
+            throw new IllegalStateException(
+                    "server failed and cannot be restarted without a process restart: " + name,
+                    handle.terminalFailure);
         }
         Thread serverThread = handle.thread;
         if ((serverThread != null && serverThread.isAlive())
@@ -326,6 +333,10 @@ public class ServerContainer
             catch (Throwable e)
             {
                 log.error("Server {} failed during startup or execution", name, e);
+                synchronized (ServerContainer.this)
+                {
+                    handle.terminalFailure = e;
+                }
             }
             finally
             {
