@@ -604,4 +604,26 @@ public class TestRdbFileDao
         f.set(MetaDBUtil.Instance(), replacement);
         return previous;
     }
+
+    @Test
+    public void atomicSwapFiles_retiresFullyDeletedGroupWithoutReplacement() throws Exception
+    {
+        PreparedStatement statement = mock(PreparedStatement.class);
+        when(mockConn.prepareStatement(anyString())).thenReturn(statement);
+        assertTrue(dao.atomicSwapFiles(0, Arrays.asList(11L, 12L), 123456L));
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(mockConn).prepareStatement(sql.capture());
+        assertFalse(sql.getValue().contains("FILE_CLEANUP_AT=NULL"));
+        verify(statement).setLong(3, 11L);
+        verify(statement).setLong(3, 12L);
+        verify(statement).executeBatch();
+        verify(mockConn).commit();
+    }
+
+    @Test
+    public void atomicSwapFiles_rejectsRetirementWithoutOldFiles() throws Exception
+    {
+        assertFalse(dao.atomicSwapFiles(0, Collections.emptyList(), 123456L));
+        verify(mockConn, never()).commit();
+    }
 }

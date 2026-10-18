@@ -1676,7 +1676,7 @@ public class MetadataService
 
     /**
      * Atomically promote a temporary GC file to REGULAR and retire the old files.
-     * @param newFileId the id of the new temporary GC file to promote
+     * @param newFileId the new temporary GC file to promote, or zero to retire without a replacement
      * @param oldFileIds the ids of old files to retire
      * @param cleanupAt the cleanup deadline to write on retired old files
      * @throws MetadataException if the request fails

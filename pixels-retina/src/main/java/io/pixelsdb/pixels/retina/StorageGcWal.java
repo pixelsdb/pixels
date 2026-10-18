@@ -91,6 +91,7 @@ public final class StorageGcWal
     static final byte RT_CREATE           = 1;
     static final byte RT_ROLLBACK_ENTRY   = 2;
     static final byte RT_STATE_TRANSITION = 3;
+    static final byte RT_RETIREMENT_ONLY = 4;
 
     // ─── State ──────────────────────────────────────────────────────────────
 
@@ -149,11 +150,12 @@ public final class StorageGcWal
         private final int newRowCount;
         private final List<RollbackEntry> rollbackEntries;
         private final State state;
+        private final long retirementSafeGcTs;
 
         Task(String taskId, long tableId, int virtualNodeId,
              List<Long> oldFileIds, long newFileId, String newFilePath,
              long newRowIdStart, int newRowCount,
-             List<RollbackEntry> rollbackEntries, State state)
+             List<RollbackEntry> rollbackEntries, State state, long retirementSafeGcTs)
         {
             this.taskId = taskId;
             this.tableId = tableId;
@@ -165,6 +167,7 @@ public final class StorageGcWal
             this.newRowCount = newRowCount;
             this.rollbackEntries = Collections.unmodifiableList(new ArrayList<>(rollbackEntries));
             this.state = state;
+            this.retirementSafeGcTs = retirementSafeGcTs;
         }
 
         public String getTaskId() { return taskId; }
@@ -177,6 +180,14 @@ public final class StorageGcWal
         public int getNewRowCount() { return newRowCount; }
         public List<RollbackEntry> getRollbackEntries() { return rollbackEntries; }
         public State getState() { return state; }
+        public boolean isRetirementOnly() { return newFileId == 0 && newRowCount == 0; }
+        public long getRetirementSafeGcTs() { return retirementSafeGcTs; }
+        public boolean isCoveredByCheckpoint(Set<Long> visibleFileIds, long checkpointAppliedTs)
+        {
+            return isRetirementOnly()
+                    ? retirementSafeGcTs >= 0 && checkpointAppliedTs >= retirementSafeGcTs
+                    : visibleFileIds.contains(newFileId);
+        }
     }
 
     // ─── Writer (per-task write handle) ─────────────────────────────────────
@@ -228,6 +239,15 @@ public final class StorageGcWal
         public void flush() throws IOException
         {
             out.flush();
+        }
+
+        /** Records the visibility-fold timestamp before retiring a fully deleted group. */
+        public void appendRetirementOnly(long safeGcTs) throws IOException
+        {
+            if (safeGcTs < 0) throw new IllegalArgumentException("Negative retirement timestamp");
+            out.writeByte(RT_RETIREMENT_ONLY);
+            out.writeInt(Long.BYTES);
+            out.writeLong(safeGcTs);
         }
 
         /** Writes {@code SWAPPED_NOT_CHECKPOINTED} record and closes the stream. */
@@ -397,7 +417,7 @@ public final class StorageGcWal
         {
             if (task.getState().isPending())
             {
-                fileIds.add(task.getNewFileId());
+                if (task.getNewFileId() > 0) fileIds.add(task.getNewFileId());
                 fileIds.addAll(task.getOldFileIds());
             }
         }
@@ -540,6 +560,7 @@ public final class StorageGcWal
             // ── Subsequent records (rollback entries + state transitions) ──
             List<RollbackEntry> rollbackEntries = new ArrayList<>();
             State state = State.INDEX_SWITCHING;
+            long retirementSafeGcTs = -1;
 
             while (true)
             {
@@ -575,6 +596,14 @@ public final class StorageGcWal
                     rollbackEntries.add(new RollbackEntry(
                             IndexProto.IndexKey.parseFrom(keyBytes), oldRowId, newRowId));
                 }
+                else if ((byte) rt == RT_RETIREMENT_ONLY)
+                {
+                    if (newFileId != 0 || newRowCount != 0 || rLen != Long.BYTES)
+                        throw new IllegalStateException("Invalid retirement-only WAL record");
+                    retirementSafeGcTs = new DataInputStream(new ByteArrayInputStream(rPayload)).readLong();
+                    if (retirementSafeGcTs < 0)
+                        throw new IllegalStateException("Negative retirement timestamp in WAL");
+                }
                 else if ((byte) rt == RT_STATE_TRANSITION)
                 {
                     state = State.fromCode(rPayload[0]);
@@ -587,7 +616,7 @@ public final class StorageGcWal
 
             return new Task(taskId, tableId, virtualNodeId, oldFileIds,
                     newFileId, newFilePath, newRowIdStart, newRowCount,
-                    rollbackEntries, state);
+                    rollbackEntries, state, retirementSafeGcTs);
         }
     }
 
@@ -615,6 +644,11 @@ public final class StorageGcWal
 
         public void recover(Set<Long> baselineVisibleFileIds) throws RetinaException
         {
+            recover(baselineVisibleFileIds, -1L);
+        }
+
+        public void recover(Set<Long> baselineVisibleFileIds, long checkpointAppliedTs) throws RetinaException
+        {
             Set<Long> baseline = baselineVisibleFileIds == null
                     ? Collections.emptySet() : baselineVisibleFileIds;
 
@@ -626,6 +660,11 @@ public final class StorageGcWal
             // back, restoring old files only when the catalog confirms the swap committed.
             for (Task task : wal.listAllTasks())
             {
+                if (task.isRetirementOnly())
+                {
+                    recoverRetirement(task, checkpointAppliedTs);
+                    continue;
+                }
                 switch (task.getState())
                 {
                     case CHECKPOINTED:
@@ -690,6 +729,26 @@ public final class StorageGcWal
                         break;
                 }
             }
+        }
+
+        private void recoverRetirement(Task task, long checkpointAppliedTs) throws RetinaException
+        {
+            boolean covered = task.isCoveredByCheckpoint(Collections.emptySet(), checkpointAppliedTs);
+            if (task.getState() == State.ABORTED) return;
+            if (task.getState() == State.CHECKPOINTED)
+            {
+                if (!covered) throw new RetinaException("Checkpoint predates retirement task " + task.getTaskId());
+                return;
+            }
+            if (task.getState() == State.SWAPPED_NOT_CHECKPOINTED && covered)
+            {
+                try { wal.markCheckpointed(task.getTaskId()); }
+                catch (IOException e) { throw new RetinaException("Cannot checkpoint retirement " + task.getTaskId(), e); }
+                return;
+            }
+            if (task.getState() == State.INDEX_SWITCHING && covered)
+                throw new RetinaException("Unfinished retirement appears in checkpoint: " + task.getTaskId());
+            rollbackTask(task, isSwapCommitted(task));
         }
 
         private void rollbackTask(Task task, boolean restoreOldFiles) throws RetinaException
@@ -784,6 +843,7 @@ public final class StorageGcWal
 
         private void cleanupNewFile(Task task) throws RetinaException
         {
+            if (task.isRetirementOnly()) return;
             if (task.getNewRowCount() > 0)
             {
                 try
@@ -847,7 +907,7 @@ public final class StorageGcWal
 
         private boolean isSwapCommitted(Task task) throws RetinaException
         {
-            File newFile = loadOptionalFile(task.getNewFileId());
+            File newFile = task.isRetirementOnly() ? null : loadOptionalFile(task.getNewFileId());
             if (newFile != null && newFile.getType() == File.Type.REGULAR)
             {
                 return true;

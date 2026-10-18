@@ -64,6 +64,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.logging.log4j.LogManager;
@@ -481,14 +482,16 @@ public class StorageGarbageCollector
             {
                 int vNodeId = vnodeEntry.getKey();
                 List<FileCandidate> files = vnodeEntry.getValue();
-                files.sort(Comparator.comparingDouble((FileCandidate c) -> c.invalidRatio).reversed());
+                files.sort(Comparator.comparingDouble((FileCandidate c) -> c.invalidRatio).reversed()
+                        .thenComparingLong(c -> c.fileId));
                 splitIntoGroups(groups, tableId, vNodeId, files);
             }
         }
 
         groups.sort(Comparator.comparingDouble(
                 (FileGroup g) -> g.files.stream().mapToDouble(c -> c.invalidRatio).average().orElse(0.0))
-                .reversed());
+                .reversed().thenComparingLong(g -> g.files.stream().mapToLong(c -> c.fileId)
+                        .min().orElse(Long.MAX_VALUE)));
 
         if (groups.size() > maxFileGroupsPerRun)
         {
@@ -828,12 +831,10 @@ public class StorageGarbageCollector
             }
         }
 
-        // Edge case: all rows in the group were deleted — skip catalog registration,
-        // delete the empty file, and return early.  The old files will be cleaned up
-        // by the delayed-cleanup phase once it is implemented.
+        // Fully deleted groups need no replacement; the caller journals and retires the old files.
         if (globalNewRowOffset == 0)
         {
-            logger.info("StorageGC: all rows deleted for table={}, vNodeId={}, skipping empty file",
+            logger.info("StorageGC: all rows deleted for table={}, vNodeId={}, retiring without replacement",
                     group.tableId, group.virtualNodeId);
             try
             {
@@ -1414,6 +1415,68 @@ public class StorageGarbageCollector
     // Per-group orchestration
     // -------------------------------------------------------------------------
 
+    void retireEmptyFileGroup(RewriteResult result, long safeGcTs) throws Exception
+    {
+        if (result.newFileId > 0 || result.newFileRgCount != 0 || !result.pendingIndexEntries.isEmpty())
+            throw new IllegalArgumentException("Retirement requires a fully deleted rewrite result");
+        List<Long> oldFileIds = result.group.files.stream().map(fc -> fc.fileId).collect(Collectors.toList());
+        String taskId = "empty_" + RetinaUtils.buildStorageGcJournalTaskId(
+                result.group.tableId, result.group.virtualNodeId, oldFileIds.get(0));
+        long deadline = System.currentTimeMillis() + retireDelayMs;
+        result.walWriter = wal.createTask(taskId, result.group.tableId, result.group.virtualNodeId,
+                oldFileIds, 0, "", 0, 0);
+        try
+        {
+            result.walWriter.appendRetirementOnly(safeGcTs);
+            result.walWriter.flush();
+            try
+            {
+                metadataService.atomicSwapFiles(0, oldFileIds, deadline);
+            }
+            catch (Exception e)
+            {
+                for (long id : oldFileIds)
+                {
+                    File file = metadataService.getFileById(id);
+                    if (file == null || file.getType() != File.Type.RETIRED
+                            || !Objects.equals(file.getCleanupAt(), deadline)) throw e;
+                }
+            }
+            result.walWriter.markSwapped();
+            result.walWriter = null;
+            for (FileCandidate file : result.group.files)
+                resourceManager.scheduleRetiredFile(new RetinaResourceManager.RetiredFile(
+                        file.fileId, file.rgCount, file.filePath, deadline, Collections.emptyList()));
+        }
+        catch (Exception e)
+        {
+            try
+            {
+                for (long id : oldFileIds)
+                {
+                    File file = metadataService.getFileById(id);
+                    if (file == null) throw new MetadataException("Missing retirement rollback file " + id);
+                    if (file.getType() == File.Type.RETIRED)
+                    {
+                        file.setType(File.Type.REGULAR);
+                        file.setCleanupAt(null);
+                        if (!metadataService.updateFile(file))
+                            throw new MetadataException("Cannot roll back retirement file " + id);
+                    }
+                }
+                if (result.walWriter != null) result.walWriter.markAborted();
+            }
+            catch (Exception rollbackError) { e.addSuppressed(rollbackError); }
+            finally
+            {
+                if (result.walWriter != null) result.walWriter.close();
+                result.walWriter = null;
+            }
+            throw e;
+        }
+    }
+
+
     /**
      * Processes a single file group through the complete GC pipeline:
      * rewrite → dual-write → visibility sync → index sync → commit.
@@ -1429,6 +1492,9 @@ public class StorageGarbageCollector
 
             if (result.newFileId <= 0)
             {
+                retireEmptyFileGroup(result, safeGcTs);
+                logger.info("StorageGC completed for FileGroup tableId={}, vNodeId={}, retirementOnly=true",
+                        group.tableId, group.virtualNodeId);
                 return;
             }
 

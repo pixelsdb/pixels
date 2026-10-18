@@ -351,10 +351,13 @@ public class RdbFileDao extends FileDao
     @Override
     public boolean atomicSwapFiles(long newFileId, List<Long> oldFileIds, long cleanupAt)
     {
+        if (newFileId < 0 || (newFileId == 0 && (oldFileIds == null || oldFileIds.isEmpty())))
+            return false;
         Connection conn = db.getConnection();
         try
         {
             conn.setAutoCommit(false);
+            if (newFileId > 0)
             try (PreparedStatement pst = conn.prepareStatement(
                     "UPDATE FILES SET FILE_TYPE=?, FILE_CLEANUP_AT=NULL WHERE FILE_ID=?"))
             {
