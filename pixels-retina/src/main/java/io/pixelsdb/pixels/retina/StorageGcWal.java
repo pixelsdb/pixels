@@ -46,6 +46,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -724,12 +725,12 @@ public final class StorageGcWal
                 return;
             }
             long primaryIndexId = getPrimaryIndexId(task.getTableId());
-            IndexOption indexOption = IndexOption.builder()
-                    .vNodeId(task.getVirtualNodeId()).build();
             try
             {
-                indexService.restorePrimaryIndexEntries(
-                        task.getTableId(), primaryIndexId, entries, indexOption);
+                for (Map.Entry<Integer, List<RollbackEntry>> bucket :
+                        StorageGarbageCollector.indexRollbackBuckets(entries).entrySet())
+                    indexService.restorePrimaryIndexEntries(task.getTableId(), primaryIndexId,
+                            bucket.getValue(), IndexOption.builder().vNodeId(bucket.getKey()).build());
             }
             catch (IndexException | UnsupportedOperationException e)
             {
