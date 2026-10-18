@@ -80,9 +80,9 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
-            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
-                    new WorkerThreadFactory(exceptionHandler));
+            context.getCancellation().check();
+            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger, context.getCancellation());
+            ExecutorService threadPool = context.createThreadPool(cores * 2, exceptionHandler);
 
             long transId = event.getTransId();
             long timestamp = event.getTimestamp();
@@ -184,7 +184,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                 if (leftS3QS)
                 {
                     leftSchema.set(BasePartitionedJoinWorker.getS3QSFileSchema(
-                            event.getSmallTable().getShuffleInfo(), hashValues, leftPendingMessages));
+                            event.getSmallTable().getShuffleInfo(), hashValues, leftPendingMessages, context.getCancellation()));
                 }
                 else
                 {
@@ -194,7 +194,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                 if (rightS3QS)
                 {
                     rightSchema.set(BasePartitionedJoinWorker.getS3QSFileSchema(
-                            event.getLargeTable().getShuffleInfo(), hashValues, rightPendingMessages));
+                            event.getLargeTable().getShuffleInfo(), hashValues, rightPendingMessages, context.getCancellation()));
                 }
                 else
                 {
@@ -236,7 +236,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                 {
                     BasePartitionedJoinWorker.buildHashTableS3QS(transId, timestamp, (HashJoiner) partitionJoiner,
                             event.getSmallTable().getShuffleInfo(), leftPendingMessages, leftColumnsToRead,
-                            hashValues, workerMetrics);
+                            hashValues, workerMetrics, context.getCancellation());
                 }
                 else
                 {
@@ -281,13 +281,13 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         {
                             joinWithRightTableAndPartitionS3QS(transId, timestamp, partitionJoiner, chainJoiner,
                                     event.getLargeTable().getShuffleInfo(), rightPendingMessages, rightColumnsToRead,
-                                    hashValues, outputPartitionInfo, result, workerMetrics);
+                                    hashValues, outputPartitionInfo, result, workerMetrics, context.getCancellation());
                         }
                         else
                         {
                             joinWithRightTableS3QS(transId, timestamp, partitionJoiner, chainJoiner,
                                     event.getLargeTable().getShuffleInfo(), rightPendingMessages, rightColumnsToRead,
-                                    hashValues, result.get(0), workerMetrics);
+                                    hashValues, result.get(0), workerMetrics, context.getCancellation());
                         }
                     }
                     else
@@ -325,7 +325,10 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                         threadPool.shutdown();
                         try
                         {
-                            while (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) ;
+                            while (!threadPool.awaitTermination(100, TimeUnit.MILLISECONDS))
+                            {
+                                context.getCancellation().check();
+                            }
                         } catch (InterruptedException e)
                         {
                             throw new WorkerException("interrupted while waiting for the termination of join", e);
@@ -338,7 +341,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     {
                         BasePartitionedJoinWorker.drainS3QSPartition(
                                 event.getLargeTable().getShuffleInfo(), hashValue, rightPendingMessages,
-                                message -> { });
+                                message -> { }, context.getCancellation());
                     }
                 }
             }
@@ -350,7 +353,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     {
                         BasePartitionedJoinWorker.drainS3QSPartition(
                                 event.getSmallTable().getShuffleInfo(), hashValue, leftPendingMessages,
-                                message -> { });
+                                message -> { }, context.getCancellation());
                     }
                 }
                 if (rightS3QS)
@@ -359,7 +362,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                     {
                         BasePartitionedJoinWorker.drainS3QSPartition(
                                 event.getLargeTable().getShuffleInfo(), hashValue, rightPendingMessages,
-                                message -> { });
+                                message -> { }, context.getCancellation());
                     }
                 }
             }
@@ -368,6 +371,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                 threadPool.shutdown();
             }
 
+            context.getCancellation().check();
             String outputPath = outputFolder + outputInfo.getFileNames().get(0);
             try
             {
@@ -428,7 +432,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
         {
             logger.error("error during join", e);
             joinOutput.setSuccessful(false);
-            joinOutput.setErrorMessage(e.getMessage());
+            joinOutput.setErrorMessage(failureMessage(e));
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return joinOutput;
         }
@@ -494,6 +498,15 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             List<Integer> hashValues, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult,
             WorkerMetrics workerMetrics) throws Exception
     {
+        return joinWithRightTableS3QS(transId, timestamp, partitionedJoiner, chainJoiner, shuffleInfo,
+                pendingMessages, rightCols, hashValues, joinResult, workerMetrics, WorkerCancellation.disabled());
+    }
+
+    protected static int joinWithRightTableS3QS(long transId, long timestamp, Joiner partitionedJoiner,
+            Joiner chainJoiner, ShuffleInfo shuffleInfo, Map<Integer, Queue<S3QueuePollResult>> pendingMessages,
+            String[] rightCols, List<Integer> hashValues, ConcurrentLinkedQueue<VectorizedRowBatch> joinResult,
+            WorkerMetrics workerMetrics, WorkerCancellation cancellation) throws Exception
+    {
         final int[] joinedRows = {0};
         for (int partitionId : hashValues)
         {
@@ -518,7 +531,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
                                         }
                                     }
                                 }
-                            }));
+                            }, cancellation), cancellation);
         }
         return joinedRows[0];
     }
@@ -529,6 +542,17 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             List<Integer> hashValues, PartitionInfo postPartitionInfo,
             List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics)
             throws Exception
+    {
+        return joinWithRightTableAndPartitionS3QS(transId, timestamp, partitionedJoiner, chainJoiner, shuffleInfo,
+                pendingMessages, rightCols, hashValues, postPartitionInfo, partitionResult,
+                workerMetrics, WorkerCancellation.disabled());
+    }
+
+    protected static int joinWithRightTableAndPartitionS3QS(long transId, long timestamp, Joiner partitionedJoiner,
+            Joiner chainJoiner, ShuffleInfo shuffleInfo, Map<Integer, Queue<S3QueuePollResult>> pendingMessages,
+            String[] rightCols, List<Integer> hashValues, PartitionInfo postPartitionInfo,
+            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult, WorkerMetrics workerMetrics,
+            WorkerCancellation cancellation) throws Exception
     {
         requireNonNull(postPartitionInfo, "outputPartitionInfo is null");
         Partitioner partitioner = new Partitioner(postPartitionInfo.getNumPartition(),
@@ -563,7 +587,7 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
 
                                     }
                                 }
-                            }));
+                            }, cancellation), cancellation);
         }
 
         VectorizedRowBatch[] tailBatches = partitioner.getRowBatches();

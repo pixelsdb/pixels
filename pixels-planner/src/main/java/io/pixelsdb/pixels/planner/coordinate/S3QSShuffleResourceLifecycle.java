@@ -31,6 +31,9 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -45,9 +48,20 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
 {
     private final List<OwnedQueue> ownedQueues = new ArrayList<>();
     private final Set<String> ownedObjectPrefixes = new LinkedHashSet<>();
+    private final Set<String> allOwnedObjectPrefixes = new LinkedHashSet<>();
     private S3QS s3qs;
     private boolean prepared;
     private boolean cleaned;
+    private Consumer<Map<String, Object>> progressListener = ignored -> {};
+
+    @Override
+    public synchronized void setProgressListener(Consumer<Map<String, Object>> listener)
+    {
+        this.progressListener = listener;
+    }
+
+    S3QSShuffleResourceLifecycle(S3QS s3qs) { this.s3qs = s3qs; }
+    public S3QSShuffleResourceLifecycle() {}
 
     @Override
     public synchronized void prepare(Collection<ShuffleInfo> shuffleInfos) throws IOException
@@ -69,16 +83,28 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
                     continue;
                 }
                 S3QS storage = getS3QS();
+                io.pixelsdb.pixels.common.physical.ObjectPath prefix =
+                        new io.pixelsdb.pixels.common.physical.ObjectPath(shuffleInfo.getObjectPathPrefix());
+                if (!prefix.valid || prefix.key == null || prefix.key.trim().isEmpty() || !prefix.isFolder)
+                {
+                    throw new IOException("query shuffle ownership requires a non-root object prefix ending in '/'");
+                }
                 ownedObjectPrefixes.add(shuffleInfo.getObjectPathPrefix());
+                allOwnedObjectPrefixes.add(shuffleInfo.getObjectPathPrefix());
+                recordProgress();
                 for (ShuffleQueueInfo queue : shuffleInfo.getQueues())
                 {
                     String queueUrl = queue.getQueueUrl();
                     if (queueUrl == null || queueUrl.trim().isEmpty())
                     {
+                        OwnedQueue owned = new OwnedQueue(shuffleInfo.getShuffleId(), queue.getPartitionId(),
+                                queue.getQueueName());
+                        ownedQueues.add(owned);
+                        recordProgress();
                         queueUrl = storage.createQueue(queue.getQueueName());
+                        owned.queueUrl = queueUrl;
                         queue.setQueueUrl(queueUrl);
-                        ownedQueues.add(new OwnedQueue(
-                                shuffleInfo.getShuffleId(), queue.getPartitionId(), queueUrl));
+                        recordProgress();
                     }
                 }
             }
@@ -89,7 +115,7 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
             {
                 cleanup();
             }
-            catch (IOException cleanupFailure)
+            catch (IOException | RuntimeException cleanupFailure)
             {
                 e.addSuppressed(cleanupFailure);
             }
@@ -104,7 +130,6 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
         {
             return;
         }
-        cleaned = true;
         IOException failure = null;
 
         if (s3qs != null)
@@ -113,30 +138,47 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
             {
                 try
                 {
-                    s3qs.deleteQueue(queue.queueUrl);
+                    if (!queue.deleted)
+                    {
+                        if (queue.queueUrl == null)
+                        {
+                            queue.queueUrl = s3qs.getQueueUrl(queue.queueName);
+                            recordProgress();
+                        }
+                        s3qs.deleteQueue(queue.queueUrl);
+                        queue.deleted = true;
+                        recordProgress();
+                    }
                 }
-                catch (IOException e)
+                catch (IOException | RuntimeException e)
                 {
-                    failure = addFailure(failure, e);
+                    failure = addFailure(failure, asIOException(e));
                 }
                 try
                 {
-                    s3qs.unregisterQueue(queue.shuffleId, queue.partitionId);
+                    if (queue.deleted && !queue.unregistered)
+                    {
+                        s3qs.unregisterQueue(queue.shuffleId, queue.partitionId);
+                        queue.unregistered = true;
+                        recordProgress();
+                    }
                 }
-                catch (IOException e)
+                catch (IOException | RuntimeException e)
                 {
-                    failure = addFailure(failure, e);
+                    failure = addFailure(failure, asIOException(e));
                 }
             }
-            for (String objectPrefix : ownedObjectPrefixes)
+            for (String objectPrefix : new ArrayList<>(ownedObjectPrefixes))
             {
                 try
                 {
                     s3qs.delete(objectPrefix, true);
+                    ownedObjectPrefixes.remove(objectPrefix);
+                    recordProgress();
                 }
-                catch (IOException e)
+                catch (IOException | RuntimeException e)
                 {
-                    failure = addFailure(failure, e);
+                    failure = addFailure(failure, asIOException(e));
                 }
             }
         }
@@ -145,6 +187,35 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
         {
             throw failure;
         }
+        cleaned = true;
+        recordProgress();
+    }
+
+    private static IOException asIOException(Exception failure)
+    {
+        return failure instanceof IOException ? (IOException) failure : new IOException(failure);
+    }
+
+    private void recordProgress()
+    {
+        Map<String, Object> resources = new LinkedHashMap<>();
+        List<Map<String, Object>> queues = new ArrayList<>();
+        for (OwnedQueue queue : ownedQueues)
+        {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("shuffleId", queue.shuffleId);
+            item.put("partitionId", queue.partitionId);
+            item.put("url", queue.queueUrl);
+            item.put("name", queue.queueName);
+            item.put("deleted", queue.deleted);
+            item.put("unregistered", queue.unregistered);
+            queues.add(item);
+        }
+        resources.put("ownedQueues", queues);
+        resources.put("ownedObjectPrefixes", new ArrayList<>(allOwnedObjectPrefixes));
+        resources.put("remainingOwnedObjectPrefixes", new ArrayList<>(ownedObjectPrefixes));
+        resources.put("cleaned", cleaned);
+        progressListener.accept(resources);
     }
 
     private S3QS getS3QS() throws IOException
@@ -175,13 +246,16 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
     {
         private final String shuffleId;
         private final int partitionId;
-        private final String queueUrl;
+        private final String queueName;
+        private String queueUrl;
+        private boolean deleted;
+        private boolean unregistered;
 
-        private OwnedQueue(String shuffleId, int partitionId, String queueUrl)
+        private OwnedQueue(String shuffleId, int partitionId, String queueName)
         {
             this.shuffleId = shuffleId;
             this.partitionId = partitionId;
-            this.queueUrl = queueUrl;
+            this.queueName = queueName;
         }
     }
 }

@@ -55,23 +55,56 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                                StreamObserver<TurboProto.RegisterWorkerResponse> responseObserver)
     {
         CFWorkerInfo workerInfo = new CFWorkerInfo(request.getWorkerInfo());
+        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
+        StageCoordinator stageCoordinator = planCoordinator == null ? null :
+                planCoordinator.getStageCoordinator(workerInfo.getStageId());
+        if (stageCoordinator == null)
+        {
+            responseObserver.onNext(TurboProto.RegisterWorkerResponse.newBuilder()
+                    .setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND).build());
+            responseObserver.onCompleted();
+            return;
+        }
         Lease lease = new Lease(System.currentTimeMillis(), WorkerLeasePeriodMs);
         long workerId = CFWorkerManager.Instance().createWorkerId();
         Worker<CFWorkerInfo> worker = new Worker<>(workerId, lease, 0, workerInfo);
-        CFWorkerManager.Instance().registerCFWorker(worker);
+        synchronized (planCoordinator.getQueryState())
+        {
+            int error = SUCCESS;
+            if (planCoordinator.getQueryState().getStatus() != QueryExecutionState.Status.RUNNING)
+            {
+                error = ErrorCode.WORKER_COORDINATE_QUERY_ABORTED;
+            }
+            else if (planCoordinator.getStageRuntimeController(workerInfo.getStageId()) != null)
+            {
+                if (workerInfo.getCancellationProtocolVersion() != 1)
+                {
+                    error = ErrorCode.WORKER_COORDINATE_PROTOCOL_MISMATCH;
+                }
+                else if (!planCoordinator.getQueryState().registerInvocation(
+                        workerInfo.getInvocationId(), workerInfo.getStageId(), workerId))
+                {
+                    error = ErrorCode.WORKER_COORDINATE_TASK_REJECTED;
+                }
+            }
+            if (error != SUCCESS)
+            {
+                responseObserver.onNext(TurboProto.RegisterWorkerResponse.newBuilder().setErrorCode(error).build());
+                responseObserver.onCompleted();
+                return;
+            }
+            stageCoordinator.addWorker(worker);
+            CFWorkerManager.Instance().registerCFWorker(worker);
+        }
         log.debug("register worker, local address: {}, transId: {}, stageId: {}, workerId: {}",
                 workerInfo.getIp(), workerInfo.getTransId(), workerInfo.getStageId(), workerId);
-        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
-        requireNonNull(planCoordinator, "plan coordinator is not found");
-        StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
-        requireNonNull(stageCoordinator, "stage coordinator is not found");
-        stageCoordinator.addWorker(worker);
         if (stageCoordinator.isQueued())
         {
             log.info("s3qs_worker_registered transId={} stageId={} workerId={} address={}",
                     workerInfo.getTransId(), workerInfo.getStageId(), workerId, workerInfo.getIp());
         }
         TurboProto.RegisterWorkerResponse response = TurboProto.RegisterWorkerResponse.newBuilder()
+                .setCancellationProtocolVersion(1)
                 .setErrorCode(SUCCESS).setWorkerId(workerId).setWorkerPortIndex(worker.getWorkerPortIndex()).setLeasePeriodMs(lease.getPeriodMs())
                 .setLeaseStartTimeMs(lease.getStartMs()).build();
         responseObserver.onNext(response);
@@ -137,13 +170,33 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
     {
         long workerId = request.getWorkerId();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
+        if (worker == null)
+        {
+            responseObserver.onNext(TurboProto.GetTasksToExecuteResponse.newBuilder()
+                    .setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND).build());
+            responseObserver.onCompleted();
+            return;
+        }
         CFWorkerInfo workerInfo = worker.getWorkerInfo();
         PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
+        if (planCoordinator == null)
+        {
+            responseObserver.onNext(TurboProto.GetTasksToExecuteResponse.newBuilder()
+                    .setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND).build());
+            responseObserver.onCompleted();
+            return;
+        }
         StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
         TurboProto.GetTasksToExecuteResponse.Builder builder = TurboProto.GetTasksToExecuteResponse.newBuilder();
         try
         {
-            List<Task> tasks = stageCoordinator.getTasksToRun(workerId);
+            List<Task> tasks;
+            synchronized (planCoordinator.getQueryState())
+            {
+                planCoordinator.getQueryState().requireRunning();
+                if (!worker.isAlive()) { throw new WorkerCoordinateException("worker lease expired"); }
+                tasks = stageCoordinator.getTasksToRun(workerId);
+            }
             if (tasks.isEmpty())
             {
                 builder.setErrorCode(ErrorCode.WORKER_COORDINATE_END_OF_TASKS);
@@ -162,7 +215,12 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
                             .setTaskId(task.getTaskId()).setPayload(task.getPayload()));
                 }
             }
-        } catch (WorkerCoordinateException e)
+        }
+        catch (java.util.concurrent.CancellationException e)
+        {
+            builder.setErrorCode(ErrorCode.WORKER_COORDINATE_QUERY_ABORTED);
+        }
+        catch (WorkerCoordinateException e)
         {
             builder.setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND);
         }
@@ -177,21 +235,47 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         long workerId = request.getWorkerId();
         List<TurboProto.TaskResult> taskResults = request.getTaskResultsList();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
-        CFWorkerInfo workerInfo = worker.getWorkerInfo();
-        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
-        StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
         TurboProto.CompleteTasksResponse.Builder builder = TurboProto.CompleteTasksResponse.newBuilder();
-        for (TurboProto.TaskResult taskResult : taskResults)
+        PlanCoordinator planCoordinator = planFor(worker);
+        if (planCoordinator == null)
         {
-            stageCoordinator.completeTask(taskResult.getTaskId(), taskResult.getSuccess());
-            if (stageCoordinator.isQueued())
-            {
-                log.info("s3qs_task_completed transId={} stageId={} workerId={} taskId={} success={}",
-                        workerInfo.getTransId(), workerInfo.getStageId(), workerId,
-                        taskResult.getTaskId(), taskResult.getSuccess());
-            }
+            builder.setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND);
         }
-        builder.setErrorCode(SUCCESS);
+        else
+        {
+            CFWorkerInfo workerInfo = worker.getWorkerInfo();
+            StageCoordinator stageCoordinator = planCoordinator.getStageCoordinator(workerInfo.getStageId());
+            boolean failedTask = false;
+            synchronized (planCoordinator.getQueryState())
+            {
+                if (planCoordinator.getQueryState().getStatus() != QueryExecutionState.Status.RUNNING)
+                {
+                    builder.setErrorCode(ErrorCode.WORKER_COORDINATE_QUERY_ABORTED);
+                }
+                else
+                {
+                    builder.setErrorCode(SUCCESS);
+                    for (TurboProto.TaskResult result : taskResults)
+                    {
+                        if (!stageCoordinator.completeTask(result.getTaskId(), result.getSuccess(), workerId))
+                        {
+                            builder.setErrorCode(ErrorCode.WORKER_COORDINATE_TASK_REJECTED);
+                            break;
+                        }
+                        failedTask |= !result.getSuccess();
+                        if (stageCoordinator.isQueued())
+                        {
+                            log.info("s3qs_task_completed transId={} stageId={} workerId={} taskId={} success={}",
+                                    workerInfo.getTransId(), workerInfo.getStageId(), workerId,
+                                    result.getTaskId(), result.getSuccess());
+                        }
+                    }
+                }
+            }
+            if (failedTask && planCoordinator.getStageRuntimeController(workerInfo.getStageId()) != null)
+            { planCoordinator.getQueryState().abort(new IllegalStateException(
+                    "worker " + workerId + " reported a failed task")); }
+        }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
@@ -203,11 +287,28 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         long workerId = request.getWorkerId();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
         TurboProto.ExtendLeaseResponse.Builder builder = TurboProto.ExtendLeaseResponse.newBuilder();
+        PlanCoordinator plan = planFor(worker);
+        if (plan == null)
+        {
+            builder.setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND);
+            responseObserver.onNext(builder.build());
+            responseObserver.onCompleted();
+            return;
+        }
         try
         {
-            long startTimeMs = worker.extendLease();
-            builder.setErrorCode(SUCCESS);
-            builder.setLeaseStartTimeMs(startTimeMs);
+            synchronized (plan.getQueryState())
+            {
+                if (plan.getQueryState().getStatus() != QueryExecutionState.Status.RUNNING)
+                {
+                    builder.setErrorCode(ErrorCode.WORKER_COORDINATE_QUERY_ABORTED)
+                            .setQueryStatus(TurboProto.QueryStatus.QUERY_ABORTED);
+                }
+                else
+                {
+                    builder.setErrorCode(SUCCESS).setLeaseStartTimeMs(worker.extendLease());
+                }
+            }
         } catch (WorkerCoordinateException e)
         {
             log.error("failed to extend the lease as the worker is not alive");
@@ -223,11 +324,29 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
     {
         long workerId = request.getWorkerId();
         Worker<CFWorkerInfo> worker = CFWorkerManager.Instance().getCFWorker(workerId);
-        CFWorkerInfo workerInfo = worker.getWorkerInfo();
         TurboProto.TerminateWorkerResponse.Builder builder = TurboProto.TerminateWorkerResponse.newBuilder();
-        worker.terminate();
-        PlanCoordinator planCoordinator = PlanCoordinatorFactory.Instance().getPlanCoordinator(workerInfo.getTransId());
-        if (planCoordinator != null && planCoordinator.getStageRuntimeController(workerInfo.getStageId()) != null)
+        if (worker == null)
+        {
+            responseObserver.onNext(builder.setErrorCode(ErrorCode.WORKER_COORDINATE_WORKER_NOT_FOUND).build());
+            responseObserver.onCompleted();
+            return;
+        }
+        CFWorkerInfo workerInfo = worker.getWorkerInfo();
+        PlanCoordinator planCoordinator = planFor(worker);
+        if (planCoordinator != null && !request.getFailureMessage().isEmpty())
+        {
+            planCoordinator.getQueryState().abort(new IllegalStateException(request.getFailureMessage()));
+        }
+        if (request.getQuiescent() || workerInfo.getCancellationProtocolVersion() == 0)
+        {
+            worker.terminate();
+            if (planCoordinator != null && workerInfo.getCancellationProtocolVersion() == 1)
+            {
+                planCoordinator.getQueryState().workerStopped(workerInfo.getInvocationId(), workerId);
+            }
+        }
+        if (worker.isTerminated() && planCoordinator != null &&
+                planCoordinator.getStageRuntimeController(workerInfo.getStageId()) != null)
         {
             log.info("s3qs_worker_terminated transId={} stageId={} workerId={}",
                     workerInfo.getTransId(), workerInfo.getStageId(), workerId);
@@ -235,5 +354,11 @@ public class WorkerCoordinateServiceImpl extends WorkerCoordinateServiceGrpc.Wor
         builder.setErrorCode(SUCCESS);
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+    }
+
+    private static PlanCoordinator planFor(Worker<CFWorkerInfo> worker)
+    {
+        return worker == null ? null : PlanCoordinatorFactory.Instance().getPlanCoordinator(
+                worker.getWorkerInfo().getTransId());
     }
 }

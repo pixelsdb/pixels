@@ -44,13 +44,26 @@ public class WorkerCoordinateService
 {
     private final ManagedChannel channel;
     private final WorkerCoordinateServiceGrpc.WorkerCoordinateServiceBlockingStub stub;
+    private final long controlTimeoutMs;
 
     public WorkerCoordinateService(String host, int port)
+    {
+        this(host, port, 0);
+    }
+
+    /** A positive budget bounds each control RPC; legacy streaming callers keep their old behavior. */
+    public WorkerCoordinateService(String host, int port, long controlTimeoutMs)
     {
         assert (host != null);
         assert (port > 0 && port <= 65535);
         this.channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
         this.stub = WorkerCoordinateServiceGrpc.newBlockingStub(channel);
+        this.controlTimeoutMs = controlTimeoutMs;
+    }
+
+    private WorkerCoordinateServiceGrpc.WorkerCoordinateServiceBlockingStub rpc()
+    {
+        return controlTimeoutMs > 0 ? stub.withDeadlineAfter(controlTimeoutMs, TimeUnit.MILLISECONDS) : stub;
     }
 
     public void shutdown() throws InterruptedException
@@ -78,10 +91,14 @@ public class WorkerCoordinateService
     {
         TurboProto.RegisterWorkerRequest request = TurboProto.RegisterWorkerRequest.newBuilder()
                 .setWorkerInfo(workerInfo.toProto()).build();
-        TurboProto.RegisterWorkerResponse response = this.stub.registerWorker(request);
+        TurboProto.RegisterWorkerResponse response = rpc().registerWorker(request);
         if (response.getErrorCode() != SUCCESS)
         {
             throw new WorkerCoordinateException("failed to register worker, error code=" + response.getErrorCode());
+        }
+        if (workerInfo.getCancellationProtocolVersion() == 1 && response.getCancellationProtocolVersion() != 1)
+        {
+            throw new WorkerCoordinateException("coordinator does not support S3QS cancellation protocol version 1");
         }
         return new Worker<>(response.getWorkerId(),
                 new Lease(response.getLeaseStartTimeMs(), response.getLeasePeriodMs()), response.getWorkerPortIndex(), workerInfo);
@@ -98,7 +115,7 @@ public class WorkerCoordinateService
     {
         TurboProto.GetDownstreamWorkersRequest request = TurboProto.GetDownstreamWorkersRequest.newBuilder()
                 .setWorkerId(workerId).build();
-        TurboProto.GetDownstreamWorkersResponse response = this.stub.getDownstreamWorkers(request);
+        TurboProto.GetDownstreamWorkersResponse response = rpc().getDownstreamWorkers(request);
         if (response.getErrorCode() != SUCCESS)
         {
             if (response.getErrorCode() == WORKER_COORDINATE_NO_DOWNSTREAM)
@@ -127,7 +144,7 @@ public class WorkerCoordinateService
     {
         TurboProto.GetTasksToExecuteRequest request = TurboProto.GetTasksToExecuteRequest.newBuilder()
                 .setWorkerId(workerId).build();
-        TurboProto.GetTasksToExecuteResponse response = this.stub.getTasksToExecute(request);
+        TurboProto.GetTasksToExecuteResponse response = rpc().getTasksToExecute(request);
         boolean endOfTasks = false;
         if (response.getErrorCode() != SUCCESS)
         {
@@ -162,7 +179,7 @@ public class WorkerCoordinateService
         {
             request.addTaskResults(taskInfo.toTaskResultProto());
         }
-        TurboProto.CompleteTasksResponse response = this.stub.completeTasks(request.build());
+        TurboProto.CompleteTasksResponse response = rpc().completeTasks(request.build());
         if (response.getErrorCode() != SUCCESS)
         {
             throw new WorkerCoordinateException("failed to complete tasks, error code=" + response.getErrorCode());
@@ -180,8 +197,8 @@ public class WorkerCoordinateService
     {
         TurboProto.ExtendLeaseRequest request = TurboProto.ExtendLeaseRequest.newBuilder()
                 .setWorkerId(workerId).build();
-        TurboProto.ExtendLeaseResponse response = this.stub.extendLease(request);
-        if (response.getErrorCode() != SUCCESS)
+        TurboProto.ExtendLeaseResponse response = rpc().extendLease(request);
+        if (response.getErrorCode() != SUCCESS || response.getQueryStatus() != TurboProto.QueryStatus.QUERY_RUNNING)
         {
             throw new WorkerCoordinateException("failed to extend lease, error code=" + response.getErrorCode());
         }
@@ -196,11 +213,24 @@ public class WorkerCoordinateService
     public void terminateWorker(long workerId) throws WorkerCoordinateException
     {
         TurboProto.TerminateWorkerRequest request = TurboProto.TerminateWorkerRequest.newBuilder()
-                .setWorkerId(workerId).build();
-        TurboProto.TerminateWorkerResponse response = this.stub.terminateWorker(request);
+                .setWorkerId(workerId).setQuiescent(true).build();
+        TurboProto.TerminateWorkerResponse response = rpc().terminateWorker(request);
         if (response.getErrorCode() != SUCCESS)
         {
             throw new WorkerCoordinateException("failed to terminate worker, error code=" + response.getErrorCode());
+        }
+    }
+
+    /** Failure notification does not assert that the worker or its children have stopped. */
+    public void reportWorkerFailure(long workerId, String message) throws WorkerCoordinateException
+    {
+        TurboProto.TerminateWorkerResponse response = rpc().terminateWorker(
+                TurboProto.TerminateWorkerRequest.newBuilder().setWorkerId(workerId)
+                        .setFailureMessage(message == null || message.isEmpty() ? "S3QS worker failed" : message)
+                        .setQuiescent(false).build());
+        if (response.getErrorCode() != SUCCESS)
+        {
+            throw new WorkerCoordinateException("failed to report worker failure, error code=" + response.getErrorCode());
         }
     }
 }

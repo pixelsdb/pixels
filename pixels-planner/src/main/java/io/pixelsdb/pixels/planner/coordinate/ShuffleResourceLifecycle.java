@@ -36,4 +36,7 @@ public interface ShuffleResourceLifecycle
     void prepare(Collection<ShuffleInfo> shuffleInfos) throws IOException;
 
     void cleanup() throws IOException;
+
+    /** Exact, credential-free resources recorded after each lifecycle mutation. */
+    default void setProgressListener(java.util.function.Consumer<java.util.Map<String, Object>> listener) {}
 }

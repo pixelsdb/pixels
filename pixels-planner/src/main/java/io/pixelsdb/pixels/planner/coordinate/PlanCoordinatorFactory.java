@@ -109,10 +109,18 @@ public class PlanCoordinatorFactory
                                                         ShuffleResourceLifecycle shuffleResourceLifecycle,
                                                         StageWorkerLauncher stageWorkerLauncher)
     {
+        return createPlanExecution(transId, planRootOperator, coordinatorEndpoint, shuffleResourceLifecycle,
+                stageWorkerLauncher, QueryExecutionConfig.fromConfig());
+    }
+
+    public CoordinatedPlanExecution createPlanExecution(long transId, Operator planRootOperator,
+            CoordinatorEndpoint coordinatorEndpoint, ShuffleResourceLifecycle shuffleResourceLifecycle,
+            StageWorkerLauncher stageWorkerLauncher, QueryExecutionConfig config)
+    {
         PlanCoordinator planCoordinator =
                 createPlanCoordinator(transId, planRootOperator, coordinatorEndpoint, stageWorkerLauncher);
         return new CoordinatedPlanExecution(transId, planRootOperator, planCoordinator, this,
-                requireNonNull(shuffleResourceLifecycle, "shuffleResourceLifecycle is null"));
+                requireNonNull(shuffleResourceLifecycle, "shuffleResourceLifecycle is null"), config);
     }
 
     /**
@@ -131,7 +139,14 @@ public class PlanCoordinatorFactory
      */
     public boolean removePlanCoordinator(long transId, PlanCoordinator planCoordinator)
     {
-        return this.transIdToPlanCoordinator.remove(transId,
-                requireNonNull(planCoordinator, "planCoordinator is null"));
+        requireNonNull(planCoordinator, "planCoordinator is null");
+        PlanCoordinator current = this.transIdToPlanCoordinator.get(transId);
+        return current != null && current.getQueryState() == planCoordinator.getQueryState() &&
+                this.transIdToPlanCoordinator.remove(transId, current);
+    }
+
+    void retainTerminalCoordinator(long transId, PlanCoordinator coordinator)
+    {
+        this.transIdToPlanCoordinator.replace(transId, coordinator, coordinator.terminalTombstone());
     }
 }

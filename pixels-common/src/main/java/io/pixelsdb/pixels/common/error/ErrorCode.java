@@ -133,6 +133,9 @@ public class ErrorCode
     public static final int WORKER_COORDINATE_WORKER_NOT_FOUND = ERROR_WORKER_COORDINATE + 2;
     public static final int WORKER_COORDINATE_END_OF_TASKS = ERROR_WORKER_COORDINATE + 3;
     public static final int WORKER_COORDINATE_LEASE_EXPIRED = ERROR_WORKER_COORDINATE + 4;
+    public static final int WORKER_COORDINATE_QUERY_ABORTED = ERROR_WORKER_COORDINATE + 5;
+    public static final int WORKER_COORDINATE_TASK_REJECTED = ERROR_WORKER_COORDINATE + 6;
+    public static final int WORKER_COORDINATE_PROTOCOL_MISMATCH = ERROR_WORKER_COORDINATE + 7;
 
     // end error code for transactions
 

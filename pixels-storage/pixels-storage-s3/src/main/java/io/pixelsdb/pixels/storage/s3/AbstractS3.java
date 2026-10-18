@@ -354,7 +354,11 @@ public abstract class AbstractS3 implements Storage
                 {
                     DeleteObjectsRequest request = DeleteObjectsRequest.builder().bucket(p.bucket)
                             .delete(Delete.builder().objects(objectsToDelete).build()).build();
-                    s3.deleteObjects(request);
+                    DeleteObjectsResponse response = s3.deleteObjects(request);
+                    if (response.hasErrors())
+                    {
+                        throw new IOException("S3 rejected object deletions: " + response.errors());
+                    }
                 } catch (Exception e)
                 {
                     throw new IOException("Failed to delete objects under '" + path + "'.", e);

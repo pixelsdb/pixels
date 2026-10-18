@@ -129,13 +129,23 @@ public class TaskQueue<E extends Task>
         E task = this.runningTasks.remove(taskId);
         if (task != null)
         {
-            task.complete(success);
-            return task;
+            return task.complete(success) ? task : null;
         }
         else
         {
             return null;
         }
+    }
+
+    public boolean complete(int taskId, boolean success, long workerId)
+    {
+        E task = runningTasks.get(taskId);
+        if (task == null || !task.complete(success, workerId))
+        {
+            return false;
+        }
+        runningTasks.remove(taskId, task);
+        return true;
     }
 
     /**

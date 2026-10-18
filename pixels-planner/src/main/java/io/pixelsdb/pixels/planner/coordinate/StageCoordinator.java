@@ -285,11 +285,17 @@ public class StageCoordinator
      * @param taskId the task id
      * @param success whether the task is completed successfully or not
      */
-    public void completeTask(int taskId, boolean success)
+    public boolean completeTask(int taskId, boolean success)
     {
         checkArgument(this.isQueued && this.taskQueue != null,
                 "can not complete task on a non-queued stage");
-        this.taskQueue.complete(taskId, success);
+        return this.taskQueue.complete(taskId, success) != null;
+    }
+
+    public boolean completeTask(int taskId, boolean success, long workerId)
+    {
+        checkArgument(this.isQueued && this.taskQueue != null, "can not complete task on a non-queued stage");
+        return this.taskQueue.complete(taskId, success, workerId);
     }
 
     /**

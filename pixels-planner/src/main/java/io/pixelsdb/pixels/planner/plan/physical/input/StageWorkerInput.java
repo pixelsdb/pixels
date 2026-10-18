@@ -33,6 +33,11 @@ public class StageWorkerInput extends Input
     private String coordinatorHost;
     private int coordinatorPort;
     private WorkerType workerType;
+    private String invocationId;
+
+    public String getInvocationId() { return invocationId; }
+
+    public void setInvocationId(String invocationId) { this.invocationId = invocationId; }
 
     public StageWorkerInput()
     {

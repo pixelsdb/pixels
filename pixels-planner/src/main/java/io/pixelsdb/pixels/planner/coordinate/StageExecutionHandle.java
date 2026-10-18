@@ -126,6 +126,12 @@ public class StageExecutionHandle
 
     private void tryComplete()
     {
+        if (firstFailure != null)
+        {
+            launchesClosed = true;
+            completionFuture.completeExceptionally(QueryExecutionState.unwrap(firstFailure));
+            return;
+        }
         if (!launchesClosed || activeAttemptCount != 0 || completionFuture.isDone())
         {
             return;

@@ -33,6 +33,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -42,6 +44,43 @@ import static org.junit.Assert.assertTrue;
 public class TestCoordinatedPlanExecution
 {
     private static final AtomicLong NextTransId = new AtomicLong(12770000L);
+
+    @Test(timeout = 5000)
+    public void closeDoesNotWaitForBlockedOutputCollector() throws Exception
+    {
+        long transId = NextTransId.getAndIncrement();
+        RecordingOperator operator = new RecordingOperator(transId);
+        operator.executionFuture = new CompletableFuture<>();
+        CoordinatedPlanExecution execution = PlanCoordinatorFactory.Instance().createPlanExecution(
+                transId, operator, new CoordinatorEndpoint("localhost", 18894));
+        execution.execute();
+        CountDownLatch collecting = new CountDownLatch(1);
+        CompletableFuture<Void> collector = CompletableFuture.runAsync(() ->
+        {
+            collecting.countDown();
+            try
+            {
+                execution.collectOutputs();
+            }
+            catch (Exception expected)
+            {
+                // Explicit close should release the caller with cancellation.
+            }
+        });
+        collecting.await();
+        CompletableFuture<Void> closing = CompletableFuture.runAsync(execution::close);
+        try
+        {
+            closing.get(1, TimeUnit.SECONDS);
+            collector.get(1, TimeUnit.SECONDS);
+        }
+        finally
+        {
+            operator.executionFuture.complete(new CompletableFuture[0]);
+            collector.get(2, TimeUnit.SECONDS);
+            closing.get(2, TimeUnit.SECONDS);
+        }
+    }
 
     @Test
     public void coordinatorRemainsRegisteredUntilOutputsAreCollected() throws Exception

@@ -16,6 +16,7 @@ core-site.xml
 hdfs-site.xml
 mvnw.cmd
 logs/
+/var/s3qs/
 package-info.java
 *.sql
 *.log

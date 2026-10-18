@@ -74,14 +74,14 @@ public class S3QSStageWorkerRunner
     public PartitionOutput runPartition(StageWorkerInput input)
     {
         return run(input, Constants.PARTITION_OPERATOR_NAME, WorkerType.PARTITION_S3QS,
-                PartitionInput.class, taskInput -> new BasePartitionWorker(context).process(taskInput),
+                PartitionInput.class, (taskInput, taskContext) -> new BasePartitionWorker(taskContext).process(taskInput),
                 new PartitionOutput());
     }
 
     public JoinOutput runPartitionedJoin(StageWorkerInput input)
     {
         return run(input, Constants.PARTITION_JOIN_OPERATOR_NAME, WorkerType.PARTITIONED_JOIN_S3QS,
-                PartitionedJoinInput.class, taskInput -> new BasePartitionedJoinWorker(context).process(taskInput),
+                PartitionedJoinInput.class, (taskInput, taskContext) -> new BasePartitionedJoinWorker(taskContext).process(taskInput),
                 new JoinOutput());
     }
 
@@ -89,10 +89,10 @@ public class S3QSStageWorkerRunner
     {
         return run(input, Constants.PARTITION_JOIN_OPERATOR_NAME, WorkerType.PARTITIONED_CHAIN_JOIN_S3QS,
                 PartitionedChainJoinInput.class,
-                taskInput -> new BasePartitionedChainJoinWorker(context).process(taskInput), new JoinOutput());
+                (taskInput, taskContext) -> new BasePartitionedChainJoinWorker(taskContext).process(taskInput), new JoinOutput());
     }
 
-    private <I, O extends Output> O run(StageWorkerInput input, String operatorName, WorkerType expectedWorkerType,
+    <I, O extends Output> O run(StageWorkerInput input, String operatorName, WorkerType expectedWorkerType,
                                         Class<I> taskInputClass, TaskExecutor<I, O> taskExecutor, O aggregateOutput)
     {
         requireNonNull(input, "input is null");
@@ -110,12 +110,17 @@ public class S3QSStageWorkerRunner
         WorkerCoordinateService coordinateService = getWorkerCoordinateService(input);
         Worker<CFWorkerInfo> runtimeWorker = null;
         LeaseHeartbeat heartbeat = null;
+        WorkerCancellation cancellation = new WorkerCancellation();
+        WorkerContext taskContext = context.withCancellation(cancellation);
+        Throwable invocationFailure = null;
         try
         {
             CFWorkerInfo workerInfo = new CFWorkerInfo(InetAddress.getLocalHost().getHostAddress(), -1,
                     input.getTransId(), input.getStageId(), operatorName, new ArrayList<>());
+            workerInfo.setInvocationId(input.getInvocationId());
+            workerInfo.setCancellationProtocolVersion(1);
             runtimeWorker = coordinateService.registerWorker(workerInfo);
-            heartbeat = new LeaseHeartbeat(coordinateService, runtimeWorker);
+            heartbeat = new LeaseHeartbeat(coordinateService, runtimeWorker, cancellation);
 
             TaskBatch taskBatch = coordinateService.getTasksToExecute(runtimeWorker.getWorkerId());
             while (!taskBatch.isEndOfTasks())
@@ -124,7 +129,8 @@ public class S3QSStageWorkerRunner
                 List<TaskInfo> taskInfos = taskBatch.getTasks();
                 for (TaskInfo taskInfo : taskInfos)
                 {
-                    executeTask(taskInfo, taskInputClass, taskExecutor, aggregateOutput);
+                    cancellation.check();
+                    executeTask(taskInfo, taskInputClass, taskExecutor, aggregateOutput, taskContext);
                     heartbeat.checkHealthy();
                 }
                 heartbeat.checkHealthy();
@@ -135,8 +141,15 @@ public class S3QSStageWorkerRunner
         }
         catch (Throwable e)
         {
+            invocationFailure = e;
+            cancellation.cancel(e);
             aggregateOutput.setSuccessful(false);
             aggregateOutput.setErrorMessage(e.getMessage());
+            if (runtimeWorker != null)
+            {
+                try { coordinateService.reportWorkerFailure(runtimeWorker.getWorkerId(), describeFailure(e)); }
+                catch (Throwable reportFailure) { e.addSuppressed(reportFailure); }
+            }
             throw new WorkerException("failed to run S3QS stage worker", e);
         }
         finally
@@ -145,7 +158,20 @@ public class S3QSStageWorkerRunner
             {
                 heartbeat.close();
             }
-            if (runtimeWorker != null)
+            boolean quiescent = cancellation.stopAndAwait(2000L);
+            WorkerException unknown = null;
+            if (!quiescent)
+            {
+                unknown = new WorkerException("S3QS invocation has child work still running; quiescence unknown");
+                aggregateOutput.setSuccessful(false);
+                if (invocationFailure != null) { invocationFailure.addSuppressed(unknown); }
+                else if (runtimeWorker != null)
+                {
+                    try { coordinateService.reportWorkerFailure(runtimeWorker.getWorkerId(), unknown.getMessage()); }
+                    catch (Throwable reportFailure) { unknown.addSuppressed(reportFailure); }
+                }
+            }
+            if (runtimeWorker != null && quiescent)
             {
                 try
                 {
@@ -157,6 +183,15 @@ public class S3QSStageWorkerRunner
                 }
             }
             aggregateOutput.setDurationMs((int) (System.currentTimeMillis() - startTimeMs));
+            if (workerCoordinateService == null)
+            {
+                try { coordinateService.shutdown(); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            }
+            if (unknown != null && invocationFailure == null)
+            {
+                throw unknown;
+            }
         }
         return aggregateOutput;
     }
@@ -167,7 +202,8 @@ public class S3QSStageWorkerRunner
         private final ScheduledExecutorService executor;
         private final AtomicReference<Throwable> failure = new AtomicReference<>();
 
-        private LeaseHeartbeat(WorkerCoordinateService coordinateService, Worker<CFWorkerInfo> worker)
+        private LeaseHeartbeat(WorkerCoordinateService coordinateService, Worker<CFWorkerInfo> worker,
+                               WorkerCancellation cancellation)
         {
             long leasePeriodMs = worker.getLeasePeriodMs();
             if (leasePeriodMs <= 0)
@@ -190,6 +226,7 @@ public class S3QSStageWorkerRunner
                 catch (Throwable e)
                 {
                     failure.compareAndSet(null, e);
+                    cancellation.cancel(e);
                     executor.shutdown();
                 }
             }, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
@@ -217,16 +254,25 @@ public class S3QSStageWorkerRunner
         {
             return workerCoordinateService;
         }
-        return new WorkerCoordinateService(input.getCoordinatorHost(), input.getCoordinatorPort());
+        String configured = io.pixelsdb.pixels.common.utils.ConfigFactory.Instance()
+                .getProperty("executor.s3qs.control.rpc.timeout.ms");
+        long timeout = configured == null || configured.trim().isEmpty() ? 2000L : Long.parseLong(configured);
+        if (timeout <= 0) { throw new IllegalArgumentException("S3QS control RPC timeout must be positive"); }
+        return new WorkerCoordinateService(input.getCoordinatorHost(), input.getCoordinatorPort(), timeout);
     }
 
     private <I, O extends Output> void executeTask(TaskInfo taskInfo, Class<I> taskInputClass,
-                                                  TaskExecutor<I, O> taskExecutor, O aggregateOutput)
+                                                  TaskExecutor<I, O> taskExecutor, O aggregateOutput,
+                                                  WorkerContext taskContext)
     {
         try
         {
             I taskInput = JSON.parseObject(taskInfo.getPayload(), taskInputClass);
-            O taskOutput = taskExecutor.execute(taskInput);
+            O taskOutput = taskExecutor.execute(taskInput, taskContext);
+            if (taskOutput == null || !taskOutput.isSuccessful())
+            {
+                throw new WorkerException(taskOutput == null ? "task returned null output" : taskOutput.getErrorMessage());
+            }
             taskInfo.setSuccess(taskOutput.isSuccessful());
             mergeOutput(aggregateOutput, taskOutput);
         }
@@ -280,8 +326,19 @@ public class S3QSStageWorkerRunner
         }
     }
 
-    private interface TaskExecutor<I, O extends Output>
+    interface TaskExecutor<I, O extends Output>
     {
-        O execute(I input);
+        O execute(I input, WorkerContext context);
+    }
+
+    private static String describeFailure(Throwable failure)
+    {
+        StringBuilder message = new StringBuilder();
+        for (int depth = 0; failure != null && depth < 8; depth++, failure = failure.getCause())
+        {
+            if (depth > 0) { message.append("; caused by: "); }
+            message.append(failure);
+        }
+        return message.substring(0, Math.min(message.length(), 4096));
     }
 }

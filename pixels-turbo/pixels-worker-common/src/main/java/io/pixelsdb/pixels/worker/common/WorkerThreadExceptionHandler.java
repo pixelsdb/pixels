@@ -31,19 +31,33 @@ public class WorkerThreadExceptionHandler implements Thread.UncaughtExceptionHan
 {
     private final Logger logger;
     private final AtomicBoolean hasException;
+    private final WorkerCancellation cancellation;
+    private final java.util.concurrent.atomic.AtomicReference<Throwable> firstFailure = new java.util.concurrent.atomic.AtomicReference<>();
 
     public WorkerThreadExceptionHandler(Logger logger)
     {
+        this(logger, WorkerCancellation.disabled());
+    }
+
+    WorkerThreadExceptionHandler(Logger logger, WorkerCancellation cancellation)
+    {
         this.logger = logger;
         this.hasException = new AtomicBoolean(false);
+        this.cancellation = cancellation;
     }
 
     @Override
     public void uncaughtException(Thread t, Throwable e)
     {
-        logger.error(String.format("error occurred in thread: %s", t.getName()), e);
-        hasException.set(true);
+        if (firstFailure.compareAndSet(null, e))
+        {
+            hasException.set(true);
+            cancellation.cancel(e);
+            logger.error(String.format("error occurred in thread: %s", t.getName()), e);
+        }
     }
+
+    public Throwable getException() { return firstFailure.get(); }
 
     public boolean hasException()
     {

@@ -38,4 +38,15 @@ public abstract class Worker<I extends Input, O extends Output>
     }
 
     public abstract O process(I input);
+
+    protected static String failureMessage(Throwable failure)
+    {
+        StringBuilder message = new StringBuilder();
+        for (int depth = 0; failure != null && depth < 8; depth++, failure = failure.getCause())
+        {
+            if (depth > 0) { message.append("; caused by: "); }
+            message.append(failure);
+        }
+        return message.substring(0, Math.min(message.length(), 4096));
+    }
 }

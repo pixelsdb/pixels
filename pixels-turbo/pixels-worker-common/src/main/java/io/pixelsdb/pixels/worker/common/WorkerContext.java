@@ -30,12 +30,69 @@ public class WorkerContext
     private final Logger logger;
     private final WorkerMetrics workerMetrics;
     private final String requestId;
+    private final WorkerCancellation cancellation;
 
     public WorkerContext(Logger logger, WorkerMetrics workerMetrics, String requestId)
+    {
+        this(logger, workerMetrics, requestId, WorkerCancellation.disabled());
+    }
+
+    private WorkerContext(Logger logger, WorkerMetrics workerMetrics, String requestId, WorkerCancellation cancellation)
     {
         this.logger = logger;
         this.workerMetrics = workerMetrics;
         this.requestId = requestId;
+        this.cancellation = cancellation;
+    }
+
+    public WorkerContext withCancellation(WorkerCancellation cancellation)
+    {
+        return new WorkerContext(logger, workerMetrics, requestId, cancellation);
+    }
+
+    public WorkerCancellation getCancellation() { return cancellation; }
+
+    java.util.concurrent.ExecutorService createThreadPool(int threads, WorkerThreadExceptionHandler handler)
+    {
+        java.util.concurrent.ExecutorService executor = new java.util.concurrent.ThreadPoolExecutor(
+                threads, threads, 0, java.util.concurrent.TimeUnit.MILLISECONDS,
+                new java.util.concurrent.LinkedBlockingQueue<>(), new WorkerThreadFactory(handler))
+        {
+            @Override
+            protected void afterExecute(Runnable task, Throwable failure)
+            {
+                // Publish an execute() task's failure before the pool can
+                // signal termination. JVM uncaught handlers run too late.
+                if (failure != null) { handler.uncaughtException(Thread.currentThread(), failure); }
+                super.afterExecute(task, failure);
+            }
+
+            @Override
+            protected <T> java.util.concurrent.RunnableFuture<T> newTaskFor(java.util.concurrent.Callable<T> callable)
+            {
+                return new java.util.concurrent.FutureTask<T>(callable)
+                {
+                    @Override
+                    public T get() throws InterruptedException, java.util.concurrent.ExecutionException
+                    {
+                        while (true)
+                        {
+                            cancellation.check();
+                            try { return super.get(100, java.util.concurrent.TimeUnit.MILLISECONDS); }
+                            catch (java.util.concurrent.TimeoutException ignored) { /* Check cancellation again. */ }
+                        }
+                    }
+                };
+            }
+
+            @Override
+            protected <T> java.util.concurrent.RunnableFuture<T> newTaskFor(Runnable runnable, T result)
+            {
+                return newTaskFor(java.util.concurrent.Executors.callable(runnable, result));
+            }
+        };
+        cancellation.own(executor);
+        return executor;
     }
 
     public Logger getLogger()

@@ -66,6 +66,15 @@ public final class S3QS extends AbstractS3
         this(30);
     }
 
+    /** Explicit client ownership for embedded deployments and fault-injection tests. */
+    public S3QS(S3Client s3, SqsClient sqs, int invisibleTime)
+    {
+        this.s3 = java.util.Objects.requireNonNull(s3, "s3 is null");
+        this.sqs = java.util.Objects.requireNonNull(sqs, "sqs is null");
+        this.partitionQueues = new ConcurrentHashMap<>();
+        this.invisibleTime = invisibleTime;
+    }
+
     public S3QS(int invisibleTime){
         this.connect();
         this.partitionQueues = new ConcurrentHashMap<>();
@@ -74,8 +83,12 @@ public final class S3QS extends AbstractS3
 
     private synchronized void connect()
     {
-        sqs = SqsClient.builder().build();
-        s3 = S3Client.builder().httpClientBuilder(ApacheHttpClient.builder()
+        software.amazon.awssdk.core.client.config.ClientOverrideConfiguration budgets =
+                software.amazon.awssdk.core.client.config.ClientOverrideConfiguration.builder()
+                        .apiCallTimeout(Duration.ofSeconds(30))
+                        .apiCallAttemptTimeout(Duration.ofSeconds(25)).build();
+        sqs = SqsClient.builder().overrideConfiguration(budgets).build();
+        s3 = S3Client.builder().overrideConfiguration(budgets).httpClientBuilder(ApacheHttpClient.builder()
                 .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
                 .socketTimeout(Duration.ofSeconds(ConnTimeoutSec))
                 .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))

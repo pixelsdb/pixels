@@ -73,6 +73,11 @@ public class PlanCoordinator
     private final StageWorkerLauncher stageWorkerLauncher;
     private final StageScalingConfig stageScalingConfig;
     private ScheduledExecutorService scalingExecutor;
+    private final QueryExecutionState queryState;
+    private volatile boolean closed;
+    private final java.util.Set<Integer> activatedStages = new java.util.HashSet<>();
+
+    public QueryExecutionState getQueryState() { return queryState; }
     /**
      * The assigner of stage id.
      */
@@ -106,10 +111,27 @@ public class PlanCoordinator
                            StageWorkerLauncher stageWorkerLauncher,
                            StageScalingConfig stageScalingConfig)
     {
+        this(transId, coordinatorEndpoint, stageWorkerLauncher, stageScalingConfig, new QueryExecutionState());
+    }
+
+    private PlanCoordinator(long transId, CoordinatorEndpoint coordinatorEndpoint,
+            StageWorkerLauncher stageWorkerLauncher, StageScalingConfig stageScalingConfig, QueryExecutionState queryState)
+    {
         this.transId = transId;
         this.coordinatorEndpoint = requireNonNull(coordinatorEndpoint, "coordinatorEndpoint is null");
         this.stageWorkerLauncher = requireNonNull(stageWorkerLauncher, "stageWorkerLauncher is null");
         this.stageScalingConfig = requireNonNull(stageScalingConfig, "stageScalingConfig is null");
+        this.queryState = queryState;
+    }
+
+    PlanCoordinator terminalTombstone()
+    {
+        checkArgument(queryState.getStatus() != QueryExecutionState.Status.RUNNING, "query is still running");
+        queryState.setInvocationRecorder(() -> {});
+        PlanCoordinator tombstone = new PlanCoordinator(transId, coordinatorEndpoint,
+                new InvokerStageWorkerLauncher(), stageScalingConfig, queryState);
+        tombstone.closed = true;
+        return tombstone;
     }
 
     /**
@@ -157,7 +179,7 @@ public class PlanCoordinator
         // reserving the whole logical task queue.
         stageCoordinator.setTaskBatchSize(1);
         this.stageRuntimeControllers.put(stageId,
-                new StageRuntimeController(stageCoordinator, descriptor, this.stageWorkerLauncher));
+                new StageRuntimeController(stageCoordinator, descriptor, this.stageWorkerLauncher, queryState));
     }
 
     public StageRuntimeController getStageRuntimeController(int stageId)
@@ -178,14 +200,16 @@ public class PlanCoordinator
      * Activate a queued stage and return a stable handle that also observes
      * worker attempts launched by later scaling decisions.
      */
-    public synchronized StageExecutionHandle activateStageExecution(int stageId)
+    public StageExecutionHandle activateStageExecution(int stageId)
     {
         StageRuntimeController runtimeController = requireNonNull(
                 this.stageRuntimeControllers.get(stageId), "stage runtime controller is not found");
         StageExecutionHandle handle = runtimeController.getExecutionHandle();
-        if (!handle.getAttemptFutures().isEmpty() || this.stageAutoScalers.containsKey(stageId))
+        synchronized (this)
         {
-            return handle;
+            queryState.requireRunning();
+            checkArgument(!closed, "plan coordinator is closed");
+            if (!activatedStages.add(stageId)) { return handle; }
         }
 
         StageCoordinator stageCoordinator = requireNonNull(this.stageCoordinators.get(stageId),
@@ -200,9 +224,15 @@ public class PlanCoordinator
             runtimeController.scaleTo(initialTarget);
             StageAutoScaler autoScaler = new StageAutoScaler(runtimeController,
                     new PendingTaskScalingPolicy(), stageScalingConfig);
-            this.stageAutoScalers.put(stageId, autoScaler);
-            autoScaler.start(getOrCreateScalingExecutor());
-            handle.getCompletionFuture().whenComplete((outputs, failure) -> stopStageAutoScaler(stageId));
+            synchronized (this)
+            {
+                if (!closed)
+                {
+                    this.stageAutoScalers.put(stageId, autoScaler);
+                    autoScaler.start(getOrCreateScalingExecutor());
+                }
+            }
+            handle.getCompletionFuture().whenCompleteAsync((outputs, failure) -> stopStageAutoScaler(stageId));
         }
         else
         {
@@ -238,17 +268,29 @@ public class PlanCoordinator
         return autoScaler.runOnce(currentTimeMs);
     }
 
-    public synchronized void close()
+    public void close()
     {
-        for (StageAutoScaler autoScaler : this.stageAutoScalers.values())
+        List<StageAutoScaler> scalers;
+        ScheduledExecutorService executor;
+        synchronized (this)
+        {
+            closed = true;
+            scalers = new ArrayList<>(this.stageAutoScalers.values());
+            this.stageAutoScalers.clear();
+            executor = this.scalingExecutor;
+            this.scalingExecutor = null;
+        }
+        if (queryState.getStatus() == QueryExecutionState.Status.RUNNING)
+        {
+            queryState.abort(new java.util.concurrent.CancellationException("plan coordinator closed"));
+        }
+        for (StageAutoScaler autoScaler : scalers)
         {
             autoScaler.close();
         }
-        this.stageAutoScalers.clear();
-        if (this.scalingExecutor != null)
+        if (executor != null)
         {
-            this.scalingExecutor.shutdownNow();
-            this.scalingExecutor = null;
+            executor.shutdownNow();
         }
     }
 

@@ -37,6 +37,13 @@ public class CFWorkerInfo implements WorkerInfo
     private final int stageId;
     private final String operatorName;
     private final List<Integer> hashValues;
+    private String invocationId = "";
+    private int cancellationProtocolVersion;
+
+    public String getInvocationId() { return invocationId; }
+    public void setInvocationId(String invocationId) { this.invocationId = invocationId; }
+    public int getCancellationProtocolVersion() { return cancellationProtocolVersion; }
+    public void setCancellationProtocolVersion(int version) { this.cancellationProtocolVersion = version; }
 
     public CFWorkerInfo(String ip, int port, long transId, int stageId,
                         String operatorName, List<Integer> hashValues)
@@ -57,6 +64,8 @@ public class CFWorkerInfo implements WorkerInfo
         this.stageId = workerInfo.getStageId();
         this.operatorName = workerInfo.getOperatorName();
         this.hashValues = workerInfo.getHashValuesList();
+        this.invocationId = workerInfo.getInvocationId();
+        this.cancellationProtocolVersion = workerInfo.getCancellationProtocolVersion();
     }
 
     public String getIp()
@@ -94,6 +103,8 @@ public class CFWorkerInfo implements WorkerInfo
         TurboProto.WorkerInfo.Builder builder = TurboProto.WorkerInfo.newBuilder()
                 .setIp(this.ip).setPort(this.port).setTransId(this.transId)
                 .setOperatorName(this.operatorName).setStageId(this.stageId);
+        builder.setInvocationId(invocationId == null ? "" : invocationId)
+                .setCancellationProtocolVersion(cancellationProtocolVersion);
         if (this.hashValues != null && !this.hashValues.isEmpty())
         {
             builder.addAllHashValues(this.hashValues);

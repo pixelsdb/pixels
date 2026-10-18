@@ -45,6 +45,28 @@ import static org.junit.Assert.fail;
 
 public class TestStageRuntimeController
 {
+    @Test(timeout = 3000)
+    public void failedAttemptDoesNotWaitForConsumerMissingEnd() throws Exception
+    {
+        RecordingStageWorkerLauncher launcher = new RecordingStageWorkerLauncher();
+        StageRuntimeController controller = controller(stageCoordinator(2), launcher);
+        List<CompletableFuture<? extends Output>> attempts = controller.scaleTo(2);
+        IllegalStateException original = new IllegalStateException("producer failed before END");
+        attempts.get(0).completeExceptionally(original);
+        try
+        {
+            controller.getExecutionHandle().getCompletionFuture().get(1, TimeUnit.SECONDS);
+            fail("stage must fail");
+        }
+        catch (ExecutionException expected)
+        {
+            assertSame(original, expected.getCause());
+        }
+        assertFalse(attempts.get(1).isDone());
+        controller.scaleTo(3);
+        assertEquals(2, launcher.inputs.size());
+    }
+
     @Test
     public void planCoordinatorExposesStageActivationAndScaling()
     {

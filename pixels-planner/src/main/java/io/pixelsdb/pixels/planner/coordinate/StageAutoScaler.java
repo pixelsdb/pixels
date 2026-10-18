@@ -38,8 +38,8 @@ public class StageAutoScaler implements AutoCloseable
     private final StageScalingPolicy policy;
     private final StageScalingConfig config;
     private final StageScalingHistory history = new StageScalingHistory();
-    private ScheduledFuture<?> scheduledFuture;
-    private boolean closed;
+    private volatile ScheduledFuture<?> scheduledFuture;
+    private volatile boolean closed;
 
     public StageAutoScaler(StageRuntimeController runtimeController,
                            StageScalingPolicy policy, StageScalingConfig config)
@@ -87,12 +87,13 @@ public class StageAutoScaler implements AutoCloseable
     }
 
     @Override
-    public synchronized void close()
+    public void close()
     {
         closed = true;
-        if (scheduledFuture != null)
+        ScheduledFuture<?> scheduled = scheduledFuture;
+        if (scheduled != null)
         {
-            scheduledFuture.cancel(false);
+            scheduled.cancel(false);
             scheduledFuture = null;
         }
     }

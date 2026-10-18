@@ -39,6 +39,10 @@ public class PhysicalS3QSWriter implements PhysicalWriter
     private final DataOutputStream out;
     private S3Queue queue = null;
     private S3QueueMessage message = null;
+    private Runnable publishGuard = () -> {};
+
+    /** Invocation-local check immediately before publishing the completed object. */
+    public void setPublishGuard(Runnable publishGuard) { this.publishGuard = publishGuard; }
 
     public PhysicalS3QSWriter(Storage storage, String path) throws IOException
     {
@@ -126,6 +130,7 @@ public class PhysicalS3QSWriter implements PhysicalWriter
         try
         {
             this.out.close();
+            publishGuard.run();
             if (this.queue != null && !this.queue.isClosed())
             {
                 if (this.message == null)

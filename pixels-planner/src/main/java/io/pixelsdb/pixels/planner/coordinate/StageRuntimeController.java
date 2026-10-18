@@ -19,6 +19,7 @@
 package io.pixelsdb.pixels.planner.coordinate;
 
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.planner.plan.physical.input.StageWorkerInput;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,12 +43,20 @@ public class StageRuntimeController
     private final StageWorkerLauncher workerLauncher;
     private final List<CompletableFuture<? extends Output>> activeAttempts = new ArrayList<>();
     private final StageExecutionHandle executionHandle;
+    private final QueryExecutionState queryState;
     private int desiredWorkerCount;
 
     public StageRuntimeController(StageCoordinator stageCoordinator,
                                   StageExecutionDescriptor descriptor,
                                   StageWorkerLauncher workerLauncher)
     {
+        this(stageCoordinator, descriptor, workerLauncher, new QueryExecutionState());
+    }
+
+    StageRuntimeController(StageCoordinator stageCoordinator, StageExecutionDescriptor descriptor,
+                           StageWorkerLauncher workerLauncher, QueryExecutionState queryState)
+    {
+        this.queryState = requireNonNull(queryState, "queryState is null");
         this.stageCoordinator = requireNonNull(stageCoordinator, "stageCoordinator is null");
         this.descriptor = requireNonNull(descriptor, "descriptor is null");
         this.workerLauncher = requireNonNull(workerLauncher, "workerLauncher is null");
@@ -68,7 +77,7 @@ public class StageRuntimeController
     {
         checkArgument(targetWorkerCount >= 0, "targetWorkerCount is negative");
         refreshCompletion();
-        if (executionHandle.isLaunchesClosed())
+        if (executionHandle.isLaunchesClosed() || queryState.getStatus() != QueryExecutionState.Status.RUNNING)
         {
             desiredWorkerCount = 0;
             stageCoordinator.setDesiredRuntimeWorkerCount(0);
@@ -89,9 +98,30 @@ public class StageRuntimeController
         List<CompletableFuture<? extends Output>> visibleAttempts = new ArrayList<>(activeAttempts);
         for (int i = 0; i < workersToLaunch; ++i)
         {
-            CompletableFuture<? extends Output> launchedAttempt = requireNonNull(
-                    workerLauncher.launch(descriptor.getWorkerType(), descriptor.createWorkerInput()),
-                    "worker launcher returned null future");
+            String invocationId;
+            try
+            {
+                invocationId = queryState.reserveInvocation(descriptor.getStageId());
+            }
+            catch (java.util.concurrent.CancellationException cancelled)
+            {
+                break;
+            }
+            StageWorkerInput input = descriptor.createWorkerInput();
+            input.setInvocationId(invocationId);
+            CompletableFuture<? extends Output> launchedAttempt;
+            try
+            {
+                launchedAttempt = requireNonNull(workerLauncher.launch(descriptor.getWorkerType(), input),
+                        "worker launcher returned null future");
+            }
+            catch (Throwable failure)
+            {
+                queryState.invocationReturned(invocationId, false);
+                queryState.abort(failure);
+                executionHandle.closeLaunches(failure);
+                throw failure;
+            }
             CompletableFuture<? extends Output> attempt = launchedAttempt.thenApply(output ->
             {
                 if (output == null)
@@ -113,6 +143,11 @@ public class StageRuntimeController
             visibleAttempts.add(attempt);
             attempt.whenComplete((output, error) ->
             {
+                queryState.invocationReturned(invocationId, error == null);
+                if (error != null)
+                {
+                    queryState.abort(error);
+                }
                 removeCompletedAttempt(attempt);
                 refreshCompletion();
             });

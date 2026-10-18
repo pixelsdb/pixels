@@ -56,11 +56,18 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- testing -->
+        <!-- S3QS runners use the coordinator RPC client on every platform. -->
         <dependency>
             <groupId>io.grpc</groupId>
-            <artifactId>grpc-api</artifactId>
-            <scope>test</scope>
+            <artifactId>grpc-netty-shaded</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
         </dependency>
     </dependencies>
 

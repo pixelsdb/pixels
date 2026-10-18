@@ -39,8 +39,9 @@ public class Task
 
     private final Integer taskId;
     private final String payload;
-    private Status status;
-    private Worker<? extends WorkerInfo> worker;
+    private volatile Status status;
+    private volatile Worker<? extends WorkerInfo> worker;
+    private final Object stateLock = new Object();
 
     public Task(int taskId, String payload)
     {
@@ -53,7 +54,7 @@ public class Task
     protected boolean start(Worker<? extends WorkerInfo> worker)
     {
         requireNonNull(worker, "worker is null");
-        synchronized (this.taskId)
+        synchronized (this.stateLock)
         {
             if (this.status != Status.PENDING)
             {
@@ -72,7 +73,7 @@ public class Task
 
     protected boolean complete(boolean success)
     {
-        synchronized (this.taskId)
+        synchronized (this.stateLock)
         {
             if (!isRunningWell())
             {
@@ -90,9 +91,17 @@ public class Task
         }
     }
 
+    protected boolean complete(boolean success, long workerId)
+    {
+        synchronized (this.stateLock)
+        {
+            return this.worker != null && this.worker.getWorkerId() == workerId && complete(success);
+        }
+    }
+
     protected boolean abort()
     {
-        synchronized (this.taskId)
+        synchronized (this.stateLock)
         {
             if (!isRunningWell())
             {

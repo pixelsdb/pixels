@@ -83,9 +83,9 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
-            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger);
-            ExecutorService threadPool = Executors.newFixedThreadPool(cores * 2,
-                    new WorkerThreadFactory(exceptionHandler));
+            context.getCancellation().check();
+            WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger, context.getCancellation());
+            ExecutorService threadPool = context.createThreadPool(cores * 2, exceptionHandler);
 
             long transId = event.getTransId();
             long timestamp = event.getTimestamp();
@@ -136,7 +136,10 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             threadPool.shutdown();
             try
             {
-                while (!threadPool.awaitTermination(60, TimeUnit.SECONDS));
+                while (!threadPool.awaitTermination(100, TimeUnit.MILLISECONDS))
+                {
+                    context.getCancellation().check();
+                }
             } catch (InterruptedException e)
             {
                 throw new WorkerException("interrupted while waiting for the termination of partitioning", e);
@@ -144,9 +147,10 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 
             if (exceptionHandler.hasException())
             {
-                throw new WorkerException("error occurred threads, please check the stacktrace before this log record");
+                throw new WorkerException("error during partitioning", exceptionHandler.getException());
             }
 
+            context.getCancellation().check();
             WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
             if (writerSchema.get() == null)
             {
@@ -196,7 +200,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         {
             logger.error("error during partition", e);
             partitionOutput.setSuccessful(false);
-            partitionOutput.setErrorMessage(e.getMessage());
+            partitionOutput.setErrorMessage(failureMessage(e));
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return partitionOutput;
         }
@@ -256,18 +260,22 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 
         for (int partitionId = 0; partitionId < partitioned.size(); ++partitionId)
         {
+            context.getCancellation().check();
             ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(partitionId);
             if (!batches.isEmpty())
             {
                 S3QueueMessage dataMessage = createS3QSDataMessage(shuffleInfo, partitionId,
                         producerTaskId, producerAttemptId, sequenceIds[partitionId]++, writerSchema);
                 PhysicalWriter physicalWriter = s3qs.offer(dataMessage);
+                ((io.pixelsdb.pixels.storage.s3qs.PhysicalS3QSWriter) physicalWriter)
+                        .setPublishGuard(context.getCancellation()::check);
                 PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema, storage,
                         physicalWriter.getPath(), physicalWriter, false, null);
                 try
                 {
                     for (VectorizedRowBatch batch : batches)
                     {
+                        context.getCancellation().check();
                         pixelsWriter.addRowBatch(batch);
                     }
                 }
@@ -283,6 +291,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 
         for (int partitionId = 0; partitionId < partitioned.size(); ++partitionId)
         {
+            context.getCancellation().check();
             s3qs.publish(createS3QSProducerEndMessage(shuffleInfo, partitionId,
                     producerTaskId, producerAttemptId, sequenceIds[partitionId]++, writerSchema));
         }
@@ -316,6 +325,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         int numReadRequests = 0;
         for (InputInfo inputInfo : scanInputs)
         {
+            context.getCancellation().check();
             readCostTimer.start();
             try (PixelsReader pixelsReader = WorkerCommon.getReader(
                     inputInfo.getPath(), WorkerCommon.getStorage(inputScheme)))
@@ -351,6 +361,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 computeCostTimer.start();
                 do
                 {
+                    context.getCancellation().check();
                     rowBatch = scanner.filterAndProject(recordReader.readBatch(WorkerCommon.rowBatchSize));
                     if (rowBatch.size > 0)
                     {

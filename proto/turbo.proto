@@ -98,6 +98,8 @@ message WorkerInfo {
   int32 stageId = 4; // the id of the stage in the operator this worker is working for
   string operatorName = 5; // the name of the operator this stage belongs to
   repeated int32 hashValues = 6; // in a hash-partitioned shuffle, the hash values to be processed by this worker
+  string invocationId = 7; // coordinator reservation; S3QS only
+  int32 cancellationProtocolVersion = 8; // 1 = cooperative cancellation and quiescent termination
 }
 
 message RegisterWorkerRequest {
@@ -110,6 +112,7 @@ message RegisterWorkerResponse {
   int64 workerId = 3; // the unique id assigned by the coordinator for this worker
   int64 leaseStartTimeMs = 4; // the time since the epoch in milliseconds of the lease
   int64 leasePeriodMs = 5; // the valid period in milliseconds of the lease
+  int32 cancellationProtocolVersion = 6;
 }
 
 message GetDownstreamWorkersRequest {
@@ -156,10 +159,19 @@ message ExtendLeaseRequest {
 message ExtendLeaseResponse {
   int32 errorCode = 1;
   int64 leaseStartTimeMs = 2; // the new start time in milliseconds since the epoch
+  QueryStatus queryStatus = 3;
+}
+
+enum QueryStatus {
+  QUERY_RUNNING = 0;
+  QUERY_SUCCEEDED = 1;
+  QUERY_ABORTED = 2;
 }
 
 message TerminateWorkerRequest {
   int64 workerId = 1;
+  string failureMessage = 2; // worker failure can be reported before quiescence
+  bool quiescent = 3; // all invocation-owned child work and I/O have exited
 }
 
 message TerminateWorkerResponse {

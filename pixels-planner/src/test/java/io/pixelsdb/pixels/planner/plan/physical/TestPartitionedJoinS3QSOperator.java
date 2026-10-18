@@ -473,7 +473,9 @@ public class TestPartitionedJoinS3QSOperator
         public CompletableFuture<Output> invoke(Input input)
         {
             inputs.add(input);
-            return CompletableFuture.completedFuture(new Output() { });
+            Output output = new Output() { };
+            output.setSuccessful(true);
+            return CompletableFuture.completedFuture(output);
         }
 
         @Override
