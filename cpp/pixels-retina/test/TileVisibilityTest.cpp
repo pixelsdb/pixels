@@ -652,7 +652,7 @@ TEST_F(TileVisibilityTest, ImportDeletionItems_TruncationDedup) {
     EXPECT_TRUE(checkBitmap(actualBitmap, expectedBitmap));
 }
 
-TEST_F(TileVisibilityTest, ImportDeletionItems_FullOverlap) {
+TEST_F(TileVisibilityTest, ImportDeletionItems_SameTimestampsDifferentRows) {
     v->deleteTileRecord(20, 100);
     v->deleteTileRecord(21, 200);
 
@@ -663,6 +663,8 @@ TEST_F(TileVisibilityTest, ImportDeletionItems_FullOverlap) {
     v->importDeletionItems(bucket);
 
     uint64_t expectedBitmap[BITMAP_SIZE] = {0};
+    SET_BITMAP_BIT(expectedBitmap, 1);
+    SET_BITMAP_BIT(expectedBitmap, 2);
     SET_BITMAP_BIT(expectedBitmap, 20);
     SET_BITMAP_BIT(expectedBitmap, 21);
 
@@ -853,4 +855,141 @@ TEST_F(TileVisibilityCowFoldTest, DuplicateFoldOnAlreadyDeletedRowIsIdempotent) 
     v->getTileVisibilityBitmap(kBaseTimestamp + 5, afterGc);
     EXPECT_TRUE(bitSet(afterGc, 13));
     EXPECT_TRUE(bitSet(afterGc, 14));
+}
+
+// All writers deliberately share a tile and repeatedly cross block boundaries.
+TEST_F(TileVisibilityTest, OutOfOrderDeletesRespectSnapshotTimestamp) {
+    v->deleteTileRecord(1, 500);
+    v->deleteTileRecord(2, 100);
+    uint64_t bitmap[BITMAP_SIZE] = {0};
+    v->getTileVisibilityBitmap(200, bitmap);
+    EXPECT_FALSE(GET_BITMAP_BIT(bitmap, 1));
+    EXPECT_TRUE(GET_BITMAP_BIT(bitmap, 2));
+}
+
+TEST_F(TileVisibilityTest, OutOfOrderDeletesRespectGcBoundary) {
+    v->deleteTileRecord(1, 500);
+    v->deleteTileRecord(2, 100);
+    uint64_t bitmap[BITMAP_SIZE] = {0};
+    v->collectTileGarbage(200, bitmap);
+    EXPECT_FALSE(GET_BITMAP_BIT(bitmap, 1));
+    EXPECT_TRUE(GET_BITMAP_BIT(bitmap, 2));
+    std::vector<std::pair<uint32_t, uint64_t>> futureDeletes;
+    v->exportChainItemsAfter(0, 200, futureDeletes);
+    ASSERT_EQ(futureDeletes.size(), 1);
+    EXPECT_EQ(futureDeletes[0], std::make_pair(uint32_t{1}, uint64_t{500}));
+    v->getTileVisibilityBitmap(600, bitmap);
+    EXPECT_TRUE(GET_BITMAP_BIT(bitmap, 1));
+    EXPECT_TRUE(GET_BITMAP_BIT(bitmap, 2));
+}
+
+TEST_F(TileVisibilityTest, ConcurrentDeletesRemainVisibleBeforeAndAfterGC) {
+    for (int round = 0; round < 20; ++round) {
+        TileVisibility<RETINA_CAPACITY> tile;
+        std::vector<std::thread> writers;
+        std::atomic<bool> start{false};
+        for (int worker = 0; worker < 8; ++worker) {
+            writers.emplace_back([&, worker] {
+                while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+                for (int i = worker; i < RETINA_CAPACITY; i += 8)
+                    tile.deleteTileRecord(i, 100000 + i);
+            });
+        }
+        start.store(true, std::memory_order_release);
+        for (auto& writer : writers) writer.join();
+        uint64_t bitmap[BITMAP_SIZE] = {0};
+        tile.getTileVisibilityBitmap(UINT64_MAX, bitmap);
+        for (int i = 0; i < RETINA_CAPACITY; ++i)
+            ASSERT_TRUE(GET_BITMAP_BIT(bitmap, i)) << "before GC round=" << round << " row=" << i;
+        tile.collectTileGarbage(200000, bitmap);
+        tile.getTileVisibilityBitmap(UINT64_MAX, bitmap);
+        for (int i = 0; i < RETINA_CAPACITY; ++i)
+            ASSERT_TRUE(GET_BITMAP_BIT(bitmap, i)) << "after GC round=" << round << " row=" << i;
+    }
+}
+
+TEST_F(TileVisibilityTest, ConcurrentSameTimestampDeletesRemainVisibleBeforeAndAfterGC) {
+    for (int round = 0; round < 20; ++round) {
+        TileVisibility<RETINA_CAPACITY> tile;
+        std::vector<std::thread> writers;
+        std::atomic<bool> start{false};
+        for (int worker = 0; worker < 8; ++worker) {
+            writers.emplace_back([&, worker] {
+                while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+                for (int i = worker; i < RETINA_CAPACITY; i += 8)
+                    tile.deleteTileRecord(i, 100000);
+            });
+        }
+        start.store(true, std::memory_order_release);
+        for (auto& writer : writers) writer.join();
+        uint64_t bitmap[BITMAP_SIZE] = {0};
+        tile.getTileVisibilityBitmap(UINT64_MAX, bitmap);
+        for (int i = 0; i < RETINA_CAPACITY; ++i)
+            ASSERT_TRUE(GET_BITMAP_BIT(bitmap, i)) << "before GC round=" << round << " row=" << i;
+        tile.collectTileGarbage(200000, bitmap);
+        tile.getTileVisibilityBitmap(UINT64_MAX, bitmap);
+        for (int i = 0; i < RETINA_CAPACITY; ++i)
+            ASSERT_TRUE(GET_BITMAP_BIT(bitmap, i)) << "after GC round=" << round << " row=" << i;
+    }
+}
+
+TEST_F(TileVisibilityTest, ConcurrentAppendImportReadAndPartialGC) {
+    for (int round = 0; round < 10; ++round) {
+        TileVisibility<RETINA_CAPACITY> tile;
+        std::vector<std::atomic<bool>> completed(RETINA_CAPACITY);
+        for (auto& flag : completed) flag.store(false);
+        std::atomic<bool> start{false}, stop{false}, missed{false};
+        std::atomic<unsigned> gcCount{0};
+        std::thread collector([&] {
+            while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+            while (!stop.load(std::memory_order_acquire)) {
+                uint64_t bitmap[BITMAP_SIZE] = {0};
+                tile.collectTileGarbage(200, bitmap);
+                gcCount.fetch_add(1);
+                std::this_thread::yield();
+            }
+        });
+        std::thread reader([&] {
+            while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+            while (!stop.load(std::memory_order_acquire)) {
+                std::vector<bool> known(RETINA_CAPACITY);
+                for (int i = 0; i < RETINA_CAPACITY; ++i)
+                    known[i] = completed[i].load(std::memory_order_acquire);
+                uint64_t bitmap[BITMAP_SIZE] = {0};
+                tile.getTileVisibilityBitmap(600, bitmap);
+                for (int i = 0; i < RETINA_CAPACITY; ++i)
+                    if (known[i] && !GET_BITMAP_BIT(bitmap, i)) missed.store(true);
+            }
+        });
+        std::vector<std::thread> writers;
+        for (int worker = 0; worker < 8; ++worker) {
+            writers.emplace_back([&, worker] {
+                while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+                for (int i = worker; i < RETINA_CAPACITY; i += 8) {
+                    uint64_t ts = (i % 2) ? 100 : 500;
+                    if (worker < 4) tile.deleteTileRecord(i, ts);
+                    else {
+                        std::vector<uint64_t> items{makeDeleteIndex(i, ts)};
+                        tile.importDeletionItems(items);
+                    }
+                    completed[i].store(true, std::memory_order_release);
+                }
+            });
+        }
+        start.store(true, std::memory_order_release);
+        for (auto& writer : writers) writer.join();
+        stop.store(true, std::memory_order_release);
+        collector.join();
+        reader.join();
+        ASSERT_GT(gcCount.load(), 0u);
+        ASSERT_FALSE(missed.load()) << "round=" << round;
+        uint64_t bitmap[BITMAP_SIZE] = {0};
+        tile.getTileVisibilityBitmap(600, bitmap);
+        for (int i = 0; i < RETINA_CAPACITY; ++i)
+            ASSERT_TRUE(GET_BITMAP_BIT(bitmap, i)) << "round=" << round << " row=" << i;
+        tile.collectTileGarbage(600, bitmap);
+        tile.getTileVisibilityBitmap(600, bitmap);
+        for (int i = 0; i < RETINA_CAPACITY; ++i)
+            ASSERT_TRUE(GET_BITMAP_BIT(bitmap, i)) << "after GC round=" << round << " row=" << i;
+    }
 }
