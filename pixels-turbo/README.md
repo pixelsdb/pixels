@@ -73,7 +73,11 @@ bounded I/O pool while scanning continues. Each background task encodes bounded 
 then publishes their DATA messages. All DATA tasks must succeed before the producer publishes any END.
 Consumers acknowledge processed DATA and END messages in a separate bounded pool and await all
 acknowledgements before returning partition success. Background failures fail the task; no application-level
-recovery is added. Batch shuffle and the existing S3QS termination/integrity checks are unchanged.
+recovery is added. An END sequence N promises DATA sequences [0, N) from that logical producer to that
+partition. Consumers deduplicate successfully processed DATA by producer and sequence, and finish once
+every producer's range is complete and ACKs succeed, without a final empty poll. END may arrive before
+DATA; missing sequences keep the consumer polling with cancellation checks, even after empty responses.
+Sequence-boundary and producer-attempt checks are retained. Batch shuffle is unchanged.
 
 These optional properties in the worker's `PIXELS_HOME/etc/pixels.properties` have defaults for compatibility
 with older configurations:

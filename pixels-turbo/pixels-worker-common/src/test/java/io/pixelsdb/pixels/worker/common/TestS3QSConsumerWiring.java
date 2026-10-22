@@ -61,6 +61,8 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName.APPROXIMATE_RECEIVE_COUNT;
@@ -132,7 +134,7 @@ public class TestS3QSConsumerWiring
             when(sqs.receiveMessage(any(ReceiveMessageRequest.class)))
                     .thenReturn(receive("receipt-data", data))
                     .thenReturn(receive("receipt-end", end))
-                    .thenReturn(ReceiveMessageResponse.builder().build());
+                    .thenThrow(new AssertionError("complete partition must not poll again"));
 
             AtomicInteger dataMessages = new AtomicInteger();
             BasePartitionedJoinWorker.drainS3QSPartition(shuffleInfo, 0,
@@ -145,6 +147,7 @@ public class TestS3QSConsumerWiring
                     });
 
             assertEquals(1, dataMessages.get());
+            verify(sqs, times(2)).receiveMessage(any(ReceiveMessageRequest.class));
             verify(sqs).deleteMessage(DeleteMessageRequest.builder()
                     .queueUrl("queue-url-0").receiptHandle("receipt-data").build());
             verify(sqs).deleteMessage(DeleteMessageRequest.builder()
@@ -160,31 +163,32 @@ public class TestS3QSConsumerWiring
     public void s3qsEmptyProducerRequiresZeroEndSequence() throws Exception
     {
         assertEquals(0, drainMessages(end(0)));
-        assertThrows(WorkerException.class, () -> drainMessages(end(1)));
+        assertIncomplete(1, end(1));
     }
 
     @Test
     public void s3qsMissingDataCannotBeHiddenByDuplicates() throws Exception
     {
-        assertThrows(WorkerException.class, () -> drainMessages(data(0), data(0), end(2)));
+        assertIncomplete(1, data(0), data(0), end(2));
     }
 
     @Test
     public void s3qsEqualCountWithSequenceGapIsRejected() throws Exception
     {
         assertThrows(WorkerException.class, () -> drainMessages(data(0), data(2), end(2)));
+        assertThrows(WorkerException.class, () -> drainMessages(end(2), data(2)));
     }
 
     @Test
     public void s3qsOutOfOrderCompleteDataAndDuplicateMessagesAreAcceptedOnce() throws Exception
     {
-        assertEquals(2, drainMessages(end(2), data(1), data(0), data(0), end(2)));
+        assertEquals(2, drainMessages(end(2), data(1), data(1), end(2), data(0)));
     }
 
     @Test
     public void s3qsConflictingEndsAndMixedAttemptsAreRejected() throws Exception
     {
-        assertThrows(WorkerException.class, () -> drainMessages(end(0), end(1)));
+        assertThrows(WorkerException.class, () -> drainMessages(end(2), end(1)));
         assertThrows(WorkerException.class, () -> drainMessages(data(0), end(1).setProducerAttemptId(1)));
         assertThrows(WorkerException.class, () -> drainMessages(data(-1), end(1)));
     }
@@ -193,10 +197,37 @@ public class TestS3QSConsumerWiring
     public void s3qsEachProducerMustFulfilItsOwnEndSequence() throws Exception
     {
         // Two DATA from producer 0 cannot compensate for producer 1's missing DATA.
-        assertThrows(WorkerException.class, () -> drainMessages(2,
-                data(0), data(1), end(2), end(1).setProducerId(1)));
+        assertIncomplete(2, data(0), data(1), end(2), end(1).setProducerId(1));
         assertEquals(2, drainMessages(2, data(0), end(1),
                 data(0).setProducerId(1), end(1).setProducerId(1)));
+    }
+
+    @Test(timeout = 5000)
+    public void s3qsEndBeforeDataWaitsAcrossEmptyPollsUntilGapIsFilled() throws Exception
+    {
+        SqsClient sqs = mock(SqsClient.class);
+        S3QS storage = new S3QS(mock(S3Client.class), sqs, 30);
+        storage.registerQueue("shuffle-1", 0, "ignored", "queue-url-0");
+        when(sqs.receiveMessage(any(ReceiveMessageRequest.class)))
+                .thenReturn(receive("end", end(3)))
+                .thenReturn(receive("data-0", data(0)))
+                .thenReturn(receive("data-2", data(2)))
+                .thenReturn(receive("duplicate-2", data(2)))
+                .thenReturn(ReceiveMessageResponse.builder().build())
+                .thenReturn(ReceiveMessageResponse.builder().build())
+                .thenReturn(receive("data-1", data(1)))
+                .thenThrow(new AssertionError("complete partition must not poll again"));
+        setWorkerCommonS3QS(storage);
+        try
+        {
+            AtomicInteger handled = new AtomicInteger();
+            BasePartitionedJoinWorker.drainS3QSPartition(shuffleInfo(Storage.Scheme.s3qs), 0,
+                    new HashMap<>(), message -> handled.incrementAndGet(), new WorkerCancellation());
+            assertEquals(3, handled.get());
+            verify(sqs, times(7)).receiveMessage(any(ReceiveMessageRequest.class));
+            verify(sqs, times(5)).deleteMessage(any(DeleteMessageRequest.class));
+        }
+        finally { setWorkerCommonS3QS(null); }
     }
 
     private static S3QueueMessage data(long sequence)
@@ -216,6 +247,18 @@ public class TestS3QSConsumerWiring
 
     private static int drainMessages(int producers, S3QueueMessage... messages) throws Exception
     {
+        return drainMessages(producers, false, messages);
+    }
+
+    private static void assertIncomplete(int producers, S3QueueMessage... messages)
+    {
+        WorkerException failure = assertThrows(WorkerException.class,
+                () -> drainMessages(producers, true, messages));
+        assertEquals("incomplete test partition", failure.getCause().getMessage());
+    }
+
+    private static int drainMessages(int producers, boolean cancelOnEmpty, S3QueueMessage... messages) throws Exception
+    {
         SqsClient sqs = mock(SqsClient.class);
         S3QS storage = new S3QS(mock(S3Client.class), sqs, 30);
         storage.registerQueue("shuffle-1", 0, "ignored", "queue-url-0");
@@ -226,8 +269,12 @@ public class TestS3QSConsumerWiring
         }
         Map<Integer, Queue<S3QueuePollResult>> pendingMessages = new HashMap<>();
         pendingMessages.put(0, pending);
-        when(sqs.receiveMessage(any(ReceiveMessageRequest.class)))
-                .thenReturn(ReceiveMessageResponse.builder().build());
+        WorkerCancellation cancellation = new WorkerCancellation();
+        when(sqs.receiveMessage(any(ReceiveMessageRequest.class))).thenAnswer(call -> {
+            if (!cancelOnEmpty) { throw new AssertionError("complete partition must not poll again"); }
+            cancellation.cancel(new WorkerException("incomplete test partition"));
+            return ReceiveMessageResponse.builder().build();
+        });
         setWorkerCommonS3QS(storage);
         try
         {
@@ -236,7 +283,9 @@ public class TestS3QSConsumerWiring
                     new StorageInfo(Storage.Scheme.s3qs, null, null, null, null),
                     "s3://bucket/shuffle-1/", 1, producers, 1, 1, Collections.emptyList());
             BasePartitionedJoinWorker.drainS3QSPartition(shuffle, 0, pendingMessages,
-                    message -> handled.incrementAndGet());
+                    message -> handled.incrementAndGet(), cancellation);
+            verify(sqs, never()).receiveMessage(any(ReceiveMessageRequest.class));
+            verify(sqs, times(messages.length)).deleteMessage(any(DeleteMessageRequest.class));
             return handled.get();
         }
         finally

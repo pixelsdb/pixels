@@ -559,9 +559,9 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
     }
 
     /**
-     * Drain one S3QS partition queue until all producer end markers are seen and
-     * one final long poll returns empty. DATA messages are acknowledged only
-     * after the handler has processed the referenced S3 object.
+     * Drain until every producer's DATA sequences [0, END) have been processed.
+     * No final empty poll is needed; END may arrive before its DATA. DATA is
+     * acknowledged only after successful processing, and all ACKs must complete.
      */
     protected static void drainS3QSPartition(ShuffleInfo shuffleInfo, int partitionId,
                                              Map<Integer, Queue<S3QueuePollResult>> pendingMessages,
@@ -588,27 +588,7 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 S3QueuePollResult result = pollS3QSMessage(s3qs, shuffleInfo, partitionId, pendingMessages, cancellation);
                 if (result == null)
                 {
-                    if (endedProducers.size() >= shuffleInfo.getLogicalProducerTaskCount())
-                    {
-                        for (Map.Entry<Integer, Long> end : endedProducers.entrySet())
-                        {
-                            Set<Long> sequences = dataSequences.getOrDefault(end.getKey(), Collections.emptySet());
-                            // END sequence N promises exactly DATA sequences [0, N), not merely N deliveries.
-                            if (sequences.size() != end.getValue() ||
-                                    sequences.stream().anyMatch(sequence -> sequence >= end.getValue()))
-                            {
-                                throw new WorkerException("incomplete s3qs DATA for producer " + end.getKey() +
-                                        " in partition " + partitionId + ": expected sequences [0, " +
-                                        end.getValue() + "), received " + sequences);
-                            }
-                        }
-                        if (!endedProducers.keySet().containsAll(dataSequences.keySet()))
-                        {
-                            throw new WorkerException("s3qs DATA received from a producer without END");
-                        }
-                        acknowledgements.await();
-                        return;
-                    }
+                    // An empty response does not prove that delayed DATA is missing permanently.
                     continue;
                 }
 
@@ -631,10 +611,22 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     {
                         throw new WorkerException("inconsistent s3qs producer END for producer " + message.getProducerId());
                     }
+                    Set<Long> sequences = dataSequences.getOrDefault(message.getProducerId(), Collections.emptySet());
+                    if (sequences.stream().anyMatch(sequence -> sequence >= message.getSequenceId()))
+                    {
+                        throw new WorkerException("s3qs DATA sequence outside END boundary for producer " +
+                                message.getProducerId());
+                    }
                     acknowledgeS3QSMessage(s3qs, message, acknowledgements);
                 }
                 else if (message.isData())
                 {
+                    Long end = endedProducers.get(message.getProducerId());
+                    if (end != null && message.getSequenceId() >= end)
+                    {
+                        throw new WorkerException("s3qs DATA sequence outside END boundary for producer " +
+                                message.getProducerId());
+                    }
                     Set<Long> sequences = dataSequences.computeIfAbsent(message.getProducerId(), id -> new HashSet<>());
                     if (!sequences.contains(message.getSequenceId()))
                     {
@@ -647,6 +639,23 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                 else
                 {
                     throw new WorkerException("unsupported s3qs message type: " + message.getMessageType());
+                }
+
+                if (endedProducers.size() == shuffleInfo.getLogicalProducerTaskCount())
+                {
+                    if (!endedProducers.keySet().containsAll(dataSequences.keySet()))
+                    {
+                        throw new WorkerException("s3qs DATA received from a producer without END");
+                    }
+                    // Sequences are unique and in [0, END), so matching the count proves no gaps.
+                    // Only compare counts here; do not rescan all DATA sequences after each message.
+                    boolean complete = endedProducers.entrySet().stream().allMatch(end ->
+                            dataSequences.getOrDefault(end.getKey(), Collections.emptySet()).size() == end.getValue());
+                    if (complete)
+                    {
+                        acknowledgements.await();
+                        return;
+                    }
                 }
             }
         }

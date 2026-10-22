@@ -232,6 +232,7 @@ public class TestS3QSAsyncIO
                 release.countDown();
                 drain.get(2, TimeUnit.SECONDS);
                 verify(f.sqs, times(3)).deleteMessage(any(DeleteMessageRequest.class));
+                verify(f.sqs, never()).receiveMessage(any(ReceiveMessageRequest.class));
             }
             finally { release.countDown(); }
         }
@@ -251,6 +252,7 @@ public class TestS3QSAsyncIO
                     f.shuffle, 0, pending(data(0), end(1)), message -> {}, f.context.getCancellation()));
             while (failure.getCause() instanceof Exception) { failure = (Exception) failure.getCause(); }
             assertTrue(failure.getMessage(), failure.getMessage().contains("failed to acknowledge"));
+            verify(f.sqs, never()).receiveMessage(any(ReceiveMessageRequest.class));
         }
         assertTrue(f.context.getCancellation().isQuiescent());
     }
@@ -301,6 +303,7 @@ public class TestS3QSAsyncIO
                 assertEquals(1, handled.get());
                 assertEquals(new HashSet<>(Arrays.asList("r0", "r1", "r2")), new HashSet<>(receipts));
                 assertEquals(3, receipts.size());
+                verify(f.sqs, never()).receiveMessage(any(ReceiveMessageRequest.class));
             }
             finally { release.countDown(); }
         }
