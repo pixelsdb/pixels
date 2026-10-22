@@ -40,9 +40,19 @@ public class PhysicalS3QSWriter implements PhysicalWriter
     private S3Queue queue = null;
     private S3QueueMessage message = null;
     private Runnable publishGuard = () -> {};
+    private boolean published;
 
     /** Invocation-local check immediately before publishing the completed object. */
     public void setPublishGuard(Runnable publishGuard) { this.publishGuard = publishGuard; }
+
+    /** Detect a failed close even when the enclosing Pixels writer swallowed its IOException. */
+    public void requirePublished() throws IOException
+    {
+        if (!published)
+        {
+            throw new IOException("S3QS DATA was not successfully published: " + pathStr);
+        }
+    }
 
     public PhysicalS3QSWriter(Storage storage, String path) throws IOException
     {
@@ -141,6 +151,7 @@ public class PhysicalS3QSWriter implements PhysicalWriter
                 {
                     this.queue.push(this.message.setObjectPath(this.pathStr));
                 }
+                this.published = true;
             }
         }
         catch (IOException e)

@@ -20,7 +20,6 @@
 package io.pixelsdb.pixels.worker.common;
 
 import com.alibaba.fastjson.JSON;
-import io.pixelsdb.pixels.common.physical.PhysicalWriter;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.core.PixelsWriter;
@@ -44,7 +43,6 @@ import org.apache.logging.log4j.Logger;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -78,14 +76,14 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         partitionOutput.setSuccessful(true);
         partitionOutput.setErrorMessage("");
         workerMetrics.clear();
-
+        ExecutorService threadPool = null;
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             context.getCancellation().check();
             WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger, context.getCancellation());
-            ExecutorService threadPool = context.createThreadPool(cores * 2, exceptionHandler);
+            threadPool = context.createThreadPool(cores * 2, exceptionHandler);
 
             long transId = event.getTransId();
             long timestamp = event.getTimestamp();
@@ -110,87 +108,99 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 
             String[] columnsToRead = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
-            AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
-            // The partitioned data would be kept in memory.
-            List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned = new ArrayList<>(numPartition);
-            for (int i = 0; i < numPartition; ++i)
-            {
-                partitioned.add(new ConcurrentLinkedQueue<>());
-            }
-            for (InputSplit inputSplit : inputSplits)
-            {
-                List<InputInfo> scanInputs = inputSplit.getInputInfos();
-
-                threadPool.execute(() -> {
-                    try
-                    {
-                        partitionFile(transId, timestamp, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
-                                filter, keyColumnIds, projection, partitioned, writerSchema);
-                    }
-                    catch (Throwable e)
-                    {
-                        throw new WorkerException("error during partitioning", e);
-                    }
-                });
-            }
-            threadPool.shutdown();
-            try
-            {
-                while (!threadPool.awaitTermination(100, TimeUnit.MILLISECONDS))
-                {
-                    context.getCancellation().check();
-                }
-            } catch (InterruptedException e)
-            {
-                throw new WorkerException("interrupted while waiting for the termination of partitioning", e);
-            }
-
-            if (exceptionHandler.hasException())
-            {
-                throw new WorkerException("error during partitioning", exceptionHandler.getException());
-            }
-
-            context.getCancellation().check();
-            WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
-            if (writerSchema.get() == null)
-            {
-                TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(
-                        WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
-                TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
-                writerSchema.set(resultSchema);
-            }
-            Set<Integer> hashValues = new HashSet<>(numPartition);
             ShuffleInfo shuffleInfo = event.getOutput().getShuffleInfo();
-            if (isS3QSShuffle(shuffleInfo))
+            try (S3QSAsyncPartitionOutput asyncOutput = isS3QSShuffle(shuffleInfo) ?
+                    createS3QSOutput(event, shuffleInfo, numPartition) : null)
             {
-                writeS3QSPartitionOutput(event, shuffleInfo, writerSchema.get(), partitioned, hashValues);
-            }
-            else
-            {
-                PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema.get(),
-                        WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
-                        true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
-
-                for (int hash = 0; hash < numPartition; ++hash)
+                AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
+                // Batch shuffle retains batches here; S3QS transfers them to bounded background jobs.
+                List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned = new ArrayList<>(numPartition);
+                for (int i = 0; i < numPartition; ++i)
                 {
-                    ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
-                    if (!batches.isEmpty())
-                    {
-                        for (VectorizedRowBatch batch : batches)
+                    partitioned.add(new ConcurrentLinkedQueue<>());
+                }
+                for (InputSplit inputSplit : inputSplits)
+                {
+                    List<InputInfo> scanInputs = inputSplit.getInputInfos();
+
+                    threadPool.execute(() -> {
+                        try
                         {
-                            pixelsWriter.addRowBatch(batch, hash);
+                            if (asyncOutput == null)
+                            {
+                                partitionFile(transId, timestamp, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
+                                        filter, keyColumnIds, projection, partitioned, writerSchema);
+                            }
+                            else
+                            {
+                                partitionFile(transId, timestamp, scanInputs, columnsToRead, inputStorageInfo.getScheme(),
+                                        filter, keyColumnIds, projection, partitioned, writerSchema, asyncOutput);
+                            }
                         }
-                        hashValues.add(hash);
+                        catch (Throwable e)
+                        {
+                            throw new WorkerException("error during partitioning", e);
+                        }
+                    });
+                }
+                threadPool.shutdown();
+                try
+                {
+                    while (!threadPool.awaitTermination(100, TimeUnit.MILLISECONDS))
+                    {
+                        context.getCancellation().check();
                     }
+                } catch (InterruptedException e)
+                {
+                    throw new WorkerException("interrupted while waiting for the termination of partitioning", e);
                 }
 
-                pixelsWriter.close();
-                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+                if (exceptionHandler.hasException())
+                {
+                    throw new WorkerException("error during partitioning", exceptionHandler.getException());
+                }
+
+                context.getCancellation().check();
+                WorkerMetrics.Timer writeCostTimer = new WorkerMetrics.Timer().start();
+                if (writerSchema.get() == null)
+                {
+                    TypeDescription fileSchema = WorkerCommon.getFileSchemaFromSplits(
+                            WorkerCommon.getStorage(inputStorageInfo.getScheme()), inputSplits);
+                    TypeDescription resultSchema = WorkerCommon.getResultSchema(fileSchema, columnsToRead);
+                    writerSchema.set(resultSchema);
+                }
+                Set<Integer> hashValues = new HashSet<>(numPartition);
+                if (asyncOutput != null)
+                {
+                    asyncOutput.finish(writerSchema.get(), hashValues);
+                }
+                else
+                {
+                    PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema.get(),
+                            WorkerCommon.getStorage(outputStorageInfo.getScheme()), outputPath, encoding,
+                            true, Arrays.stream(keyColumnIds).boxed().collect(Collectors.toList()));
+
+                    for (int hash = 0; hash < numPartition; ++hash)
+                    {
+                        ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
+                        if (!batches.isEmpty())
+                        {
+                            for (VectorizedRowBatch batch : batches)
+                            {
+                                pixelsWriter.addRowBatch(batch, hash);
+                            }
+                            hashValues.add(hash);
+                        }
+                    }
+
+                    pixelsWriter.close();
+                    workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
+                    workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
+                    workerMetrics.addOutputCostNs(writeCostTimer.stop());
+                }
+                partitionOutput.addOutput(outputPath);
+                partitionOutput.setHashValues(hashValues);
             }
-            partitionOutput.addOutput(outputPath);
-            partitionOutput.setHashValues(hashValues);
-            workerMetrics.addOutputCostNs(writeCostTimer.stop());
 
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             WorkerCommon.setPerfMetrics(partitionOutput, workerMetrics);
@@ -203,6 +213,10 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             partitionOutput.setErrorMessage(failureMessage(e));
             partitionOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return partitionOutput;
+        }
+        finally
+        {
+            if (threadPool != null) { threadPool.shutdownNow(); }
         }
     }
 
@@ -232,17 +246,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 .setMetadata(writerSchema.toString());
     }
 
-    /**
-     * Write the partitioned output of one producer task into S3QS.
-     *
-     * Each non-empty partition is written as one S3 object and published as a
-     * DATA message. After data objects are written, this producer task sends a
-     * PRODUCER_END marker to every partition queue so consumers can determine
-     * partition completion without relying on live worker membership.
-     */
-    private void writeS3QSPartitionOutput(PartitionInput event, ShuffleInfo shuffleInfo, TypeDescription writerSchema,
-                                          List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned,
-                                          Set<Integer> hashValues) throws Exception
+    private S3QSAsyncPartitionOutput createS3QSOutput(PartitionInput event, ShuffleInfo shuffleInfo, int count)
     {
         if (event.getProducerTaskId() < 0)
         {
@@ -253,48 +257,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         {
             throw new WorkerException("storage of scheme s3qs is not S3QS");
         }
-        S3QS s3qs = (S3QS) storage;
-        int producerTaskId = event.getProducerTaskId();
-        int producerAttemptId = 0;
-        long[] sequenceIds = new long[partitioned.size()];
-
-        for (int partitionId = 0; partitionId < partitioned.size(); ++partitionId)
-        {
-            context.getCancellation().check();
-            ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(partitionId);
-            if (!batches.isEmpty())
-            {
-                S3QueueMessage dataMessage = createS3QSDataMessage(shuffleInfo, partitionId,
-                        producerTaskId, producerAttemptId, sequenceIds[partitionId]++, writerSchema);
-                PhysicalWriter physicalWriter = s3qs.offer(dataMessage);
-                ((io.pixelsdb.pixels.storage.s3qs.PhysicalS3QSWriter) physicalWriter)
-                        .setPublishGuard(context.getCancellation()::check);
-                PixelsWriter pixelsWriter = WorkerCommon.getWriter(writerSchema, storage,
-                        physicalWriter.getPath(), physicalWriter, false, null);
-                try
-                {
-                    for (VectorizedRowBatch batch : batches)
-                    {
-                        context.getCancellation().check();
-                        pixelsWriter.addRowBatch(batch);
-                    }
-                }
-                finally
-                {
-                    pixelsWriter.close();
-                }
-                hashValues.add(partitionId);
-                workerMetrics.addWriteBytes(pixelsWriter.getCompletedBytes());
-                workerMetrics.addNumWriteRequests(pixelsWriter.getNumWriteRequests());
-            }
-        }
-
-        for (int partitionId = 0; partitionId < partitioned.size(); ++partitionId)
-        {
-            context.getCancellation().check();
-            s3qs.publish(createS3QSProducerEndMessage(shuffleInfo, partitionId,
-                    producerTaskId, producerAttemptId, sequenceIds[partitionId]++, writerSchema));
-        }
+        return new S3QSAsyncPartitionOutput((S3QS) storage, shuffleInfo, event.getProducerTaskId(), count, context);
     }
 
     /**
@@ -317,6 +280,16 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                                  List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
                                  AtomicReference<TypeDescription> writerSchema)
     {
+        partitionFile(transId, timestamp, scanInputs, columnsToRead, inputScheme, filter,
+                keyColumnIds, projection, partitionResult, writerSchema, null);
+    }
+
+    protected void partitionFile(long transId, long timestamp, List<InputInfo> scanInputs,
+                                 String[] columnsToRead, Storage.Scheme inputScheme,
+                                 TableScanFilter filter, int[] keyColumnIds, boolean[] projection,
+                                 List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitionResult,
+                                 AtomicReference<TypeDescription> writerSchema, S3QSAsyncPartitionOutput output)
+    {
         Scanner scanner = null;
         Partitioner partitioner = null;
         WorkerMetrics.Timer readCostTimer = new WorkerMetrics.Timer();
@@ -325,6 +298,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         int numReadRequests = 0;
         for (InputInfo inputInfo : scanInputs)
         {
+            if (output != null) { output.check(); }
             context.getCancellation().check();
             readCostTimer.start();
             try (PixelsReader pixelsReader = WorkerCommon.getReader(
@@ -355,12 +329,13 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 }
                 if (writerSchema.get() == null)
                 {
-                    writerSchema.weakCompareAndSet(null, scanner.getOutputSchema());
+                    writerSchema.compareAndSet(null, scanner.getOutputSchema());
                 }
 
                 computeCostTimer.start();
                 do
                 {
+                    if (output != null) { output.check(); }
                     context.getCancellation().check();
                     rowBatch = scanner.filterAndProject(recordReader.readBatch(WorkerCommon.rowBatchSize));
                     if (rowBatch.size > 0)
@@ -370,7 +345,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                         {
                             for (Map.Entry<Integer, VectorizedRowBatch> entry : result.entrySet())
                             {
-                                partitionResult.get(entry.getKey()).add(entry.getValue());
+                                emitPartitionBatch(partitionResult, output, entry.getKey(),
+                                        entry.getValue(), scanner.getOutputSchema());
                             }
                         }
                     }
@@ -393,7 +369,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             {
                 if (!tailBatches[hash].isEmpty())
                 {
-                    partitionResult.get(hash).add(tailBatches[hash]);
+                    emitPartitionBatch(partitionResult, output, hash, tailBatches[hash], scanner.getOutputSchema());
                 }
             }
         }
@@ -401,5 +377,14 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         workerMetrics.addNumReadRequests(numReadRequests);
         workerMetrics.addInputCostNs(readCostTimer.getElapsedNs());
         workerMetrics.addComputeCostNs(computeCostTimer.getElapsedNs());
+    }
+
+    private static void emitPartitionBatch(List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitions,
+                                          S3QSAsyncPartitionOutput output, int partition,
+                                          VectorizedRowBatch batch, TypeDescription schema)
+    {
+        if (output == null) { partitions.get(partition).add(batch); }
+        // Partitioner replaces full batches; its tail is handed off only after scanning ends.
+        else { output.add(partition, batch, schema); }
     }
 }

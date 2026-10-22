@@ -35,6 +35,7 @@ import io.pixelsdb.pixels.storage.s3qs.S3QueueMessage;
 import io.pixelsdb.pixels.storage.s3qs.S3QueuePollResult;
 import org.junit.Test;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
@@ -56,6 +57,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -147,6 +149,95 @@ public class TestS3QSConsumerWiring
                     .queueUrl("queue-url-0").receiptHandle("receipt-data").build());
             verify(sqs).deleteMessage(DeleteMessageRequest.builder()
                     .queueUrl("queue-url-0").receiptHandle("receipt-end").build());
+        }
+        finally
+        {
+            setWorkerCommonS3QS(null);
+        }
+    }
+
+    @Test
+    public void s3qsEmptyProducerRequiresZeroEndSequence() throws Exception
+    {
+        assertEquals(0, drainMessages(end(0)));
+        assertThrows(WorkerException.class, () -> drainMessages(end(1)));
+    }
+
+    @Test
+    public void s3qsMissingDataCannotBeHiddenByDuplicates() throws Exception
+    {
+        assertThrows(WorkerException.class, () -> drainMessages(data(0), data(0), end(2)));
+    }
+
+    @Test
+    public void s3qsEqualCountWithSequenceGapIsRejected() throws Exception
+    {
+        assertThrows(WorkerException.class, () -> drainMessages(data(0), data(2), end(2)));
+    }
+
+    @Test
+    public void s3qsOutOfOrderCompleteDataAndDuplicateMessagesAreAcceptedOnce() throws Exception
+    {
+        assertEquals(2, drainMessages(end(2), data(1), data(0), data(0), end(2)));
+    }
+
+    @Test
+    public void s3qsConflictingEndsAndMixedAttemptsAreRejected() throws Exception
+    {
+        assertThrows(WorkerException.class, () -> drainMessages(end(0), end(1)));
+        assertThrows(WorkerException.class, () -> drainMessages(data(0), end(1).setProducerAttemptId(1)));
+        assertThrows(WorkerException.class, () -> drainMessages(data(-1), end(1)));
+    }
+
+    @Test
+    public void s3qsEachProducerMustFulfilItsOwnEndSequence() throws Exception
+    {
+        // Two DATA from producer 0 cannot compensate for producer 1's missing DATA.
+        assertThrows(WorkerException.class, () -> drainMessages(2,
+                data(0), data(1), end(2), end(1).setProducerId(1)));
+        assertEquals(2, drainMessages(2, data(0), end(1),
+                data(0).setProducerId(1), end(1).setProducerId(1)));
+    }
+
+    private static S3QueueMessage data(long sequence)
+    {
+        return S3QueueMessage.data("shuffle-1", 0, 0, 0, sequence, "bucket/data");
+    }
+
+    private static S3QueueMessage end(long sequence)
+    {
+        return S3QueueMessage.producerEnd("shuffle-1", 0, 0, 0, sequence);
+    }
+
+    private static int drainMessages(S3QueueMessage... messages) throws Exception
+    {
+        return drainMessages(1, messages);
+    }
+
+    private static int drainMessages(int producers, S3QueueMessage... messages) throws Exception
+    {
+        SqsClient sqs = mock(SqsClient.class);
+        S3QS storage = new S3QS(mock(S3Client.class), sqs, 30);
+        storage.registerQueue("shuffle-1", 0, "ignored", "queue-url-0");
+        Queue<S3QueuePollResult> pending = new ConcurrentLinkedQueue<>();
+        for (int i = 0; i < messages.length; ++i)
+        {
+            pending.add(new S3QueuePollResult("receipt-" + i, messages[i]));
+        }
+        Map<Integer, Queue<S3QueuePollResult>> pendingMessages = new HashMap<>();
+        pendingMessages.put(0, pending);
+        when(sqs.receiveMessage(any(ReceiveMessageRequest.class)))
+                .thenReturn(ReceiveMessageResponse.builder().build());
+        setWorkerCommonS3QS(storage);
+        try
+        {
+            AtomicInteger handled = new AtomicInteger();
+            ShuffleInfo shuffle = new ShuffleInfo("shuffle-1",
+                    new StorageInfo(Storage.Scheme.s3qs, null, null, null, null),
+                    "s3://bucket/shuffle-1/", 1, producers, 1, 1, Collections.emptyList());
+            BasePartitionedJoinWorker.drainS3QSPartition(shuffle, 0, pendingMessages,
+                    message -> handled.incrementAndGet());
+            return handled.get();
         }
         finally
         {

@@ -66,6 +66,33 @@ If the MPP cluster is running in a cloud machine service such as AWS EC2, follow
 to deploy the auto-scaling manager for the MPP cluster. Currently, we support auto-scaling in AWS EC2. So `pixels-scaling-ec2` is the only option.
 It can be used as an example to implement the auto-scaling manager for other cloud platforms.
 
+## S3QS asynchronous shuffle I/O
+
+When the planner selects S3QS shuffle, producers hand completed partition batches to an invocation-local,
+bounded I/O pool while scanning continues. Each background task encodes bounded objects, uploads them,
+then publishes their DATA messages. All DATA tasks must succeed before the producer publishes any END.
+Consumers acknowledge processed DATA and END messages in a separate bounded pool and await all
+acknowledgements before returning partition success. Background failures fail the task; no application-level
+recovery is added. Batch shuffle and the existing S3QS termination/integrity checks are unchanged.
+
+These optional properties in the worker's `PIXELS_HOME/etc/pixels.properties` have defaults for compatibility
+with older configurations:
+
+```properties
+s3qs.producer.io.threads=4
+s3qs.producer.io.max.inflight=8
+s3qs.consumer.ack.threads=2
+s3qs.consumer.ack.max.inflight=32
+```
+
+Limits are per invocation, not additional cloud Workers. The in-flight limit includes running and queued jobs;
+when reached, submission applies cancellation-aware backpressure rather than growing an unbounded queue.
+Producer jobs retain batches until publication completes; partial per-partition buffers are grouped using an
+8 MiB memory estimate, with the existing writer enforcing the actual encoded object size. Scan-side partition
+buffers still exist, so these limits are not a hard cap on the invocation's entire heap. Output I/O metrics count
+background job durations and END publication; these may overlap scanning and must not be added to scan
+wall time as an end-to-end latency breakdown.
+
 ## Start Pixels (with Turbo)
 
 In `etc/catalog/pixels.properties` under the installation directory of Trino, set `cloud.function.switch` to `auto` if you have installed the auto-scaling manager and 

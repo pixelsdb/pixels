@@ -575,37 +575,95 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             WorkerCancellation cancellation) throws Exception
     {
         S3QS s3qs = getS3QSStorage();
-        Set<Integer> endedProducers = new HashSet<>(shuffleInfo.getLogicalProducerTaskCount());
-        while (true)
+        Map<Integer, Long> endedProducers = new HashMap<>();
+        Map<Integer, Set<Long>> dataSequences = new HashMap<>();
+        Map<Integer, Integer> producerAttempts = new HashMap<>();
+        try (S3QSAsyncTasks acknowledgements = new S3QSAsyncTasks(cancellation,
+                S3QSAsyncTasks.setting("s3qs.consumer.ack.threads", 2),
+                S3QSAsyncTasks.setting("s3qs.consumer.ack.max.inflight", 32)))
         {
-            S3QueuePollResult result = pollS3QSMessage(s3qs, shuffleInfo, partitionId, pendingMessages, cancellation);
-            if (result == null)
+            while (true)
             {
-                if (endedProducers.size() >= shuffleInfo.getLogicalProducerTaskCount())
+                acknowledgements.check();
+                S3QueuePollResult result = pollS3QSMessage(s3qs, shuffleInfo, partitionId, pendingMessages, cancellation);
+                if (result == null)
                 {
-                    return;
+                    if (endedProducers.size() >= shuffleInfo.getLogicalProducerTaskCount())
+                    {
+                        for (Map.Entry<Integer, Long> end : endedProducers.entrySet())
+                        {
+                            Set<Long> sequences = dataSequences.getOrDefault(end.getKey(), Collections.emptySet());
+                            // END sequence N promises exactly DATA sequences [0, N), not merely N deliveries.
+                            if (sequences.size() != end.getValue() ||
+                                    sequences.stream().anyMatch(sequence -> sequence >= end.getValue()))
+                            {
+                                throw new WorkerException("incomplete s3qs DATA for producer " + end.getKey() +
+                                        " in partition " + partitionId + ": expected sequences [0, " +
+                                        end.getValue() + "), received " + sequences);
+                            }
+                        }
+                        if (!endedProducers.keySet().containsAll(dataSequences.keySet()))
+                        {
+                            throw new WorkerException("s3qs DATA received from a producer without END");
+                        }
+                        acknowledgements.await();
+                        return;
+                    }
+                    continue;
                 }
-                continue;
-            }
 
-            S3QueueMessage message = result.getMessage();
-            message.setReceiptHandle(result.getReceiptHandle());
-            if (message.isProducerEnd())
-            {
-                endedProducers.add(message.getProducerId());
-                s3qs.finishWork(message);
-            }
-            else if (message.isData())
-            {
-                dataHandler.handle(message);
-                cancellation.check();
-                s3qs.finishWork(message);
-            }
-            else
-            {
-                throw new WorkerException("unsupported s3qs message type: " + message.getMessageType());
+                S3QueueMessage message = result.getMessage();
+                message.setReceiptHandle(result.getReceiptHandle());
+                if (message.getSequenceId() < 0)
+                {
+                    throw new WorkerException("negative s3qs sequence id: " + message.getSequenceId());
+                }
+                Integer attempt = producerAttempts.putIfAbsent(message.getProducerId(), message.getProducerAttemptId());
+                if (attempt != null && attempt != message.getProducerAttemptId())
+                {
+                    throw new WorkerException("mixed s3qs producer attempts for producer " + message.getProducerId());
+                }
+                if (message.isProducerEnd())
+                {
+                    Long previousEnd = endedProducers.putIfAbsent(message.getProducerId(), message.getSequenceId());
+                    if ((previousEnd != null && previousEnd != message.getSequenceId()) ||
+                            endedProducers.size() > shuffleInfo.getLogicalProducerTaskCount())
+                    {
+                        throw new WorkerException("inconsistent s3qs producer END for producer " + message.getProducerId());
+                    }
+                    acknowledgeS3QSMessage(s3qs, message, acknowledgements);
+                }
+                else if (message.isData())
+                {
+                    Set<Long> sequences = dataSequences.computeIfAbsent(message.getProducerId(), id -> new HashSet<>());
+                    if (!sequences.contains(message.getSequenceId()))
+                    {
+                        dataHandler.handle(message);
+                        cancellation.check();
+                        sequences.add(message.getSequenceId());
+                    }
+                    acknowledgeS3QSMessage(s3qs, message, acknowledgements);
+                }
+                else
+                {
+                    throw new WorkerException("unsupported s3qs message type: " + message.getMessageType());
+                }
             }
         }
+    }
+
+    private static void acknowledgeS3QSMessage(S3QS storage, S3QueueMessage message, S3QSAsyncTasks tasks)
+    {
+        // A redelivery may reuse/mutate a message object. Capture this delivery's receipt now.
+        S3QueueMessage acknowledgement = new S3QueueMessage().setShuffleId(message.getShuffleId())
+                .setPartitionId(message.getPartitionId()).setReceiptHandle(message.getReceiptHandle());
+        tasks.submit(() -> {
+            if (storage.finishWork(acknowledgement) != 0)
+            {
+                throw new IOException("failed to acknowledge S3QS message for shuffle " +
+                        acknowledgement.getShuffleId() + ", partition " + acknowledgement.getPartitionId());
+            }
+        });
     }
 
     protected static void readS3QSDataObject(long transId, long timestamp, S3QueueMessage message,
