@@ -84,8 +84,7 @@ public class SortedJoinBatchOperator extends SortedJoinOperator
     @Override
     public CompletableFuture<Void> executePrev()
     {
-        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
-        operatorService.execute(() ->
+        return CompletableFuture.runAsync(() ->
         {
             try
             {
@@ -100,7 +99,6 @@ public class SortedJoinBatchOperator extends SortedJoinOperator
                     largeChildFuture = largeChild.execute();
                     waitForCompletion(smallChildFuture.join());
                     waitForCompletion(largeChildFuture.join(), LargeSideCompletionRatio);
-                    prevStagesFuture.complete(null);
                 } else if (smallChild != null)
                 {
                     // only small child exists, we should invoke the large table sort and wait for the small child.
@@ -119,7 +117,6 @@ public class SortedJoinBatchOperator extends SortedJoinOperator
 
                     waitForCompletion(smallChildFuture.join());
                     waitForCompletion(largeSortedOutputs, LargeSideCompletionRatio);
-                    prevStagesFuture.complete(null);
                 } else if (largeChild != null)
                 {
                     // only large child exists, we should invoke and wait for the small table sort.
@@ -138,7 +135,6 @@ public class SortedJoinBatchOperator extends SortedJoinOperator
                     largeChildFuture = largeChild.execute();
                     waitForCompletion(smallSortedOutputs);
                     waitForCompletion(largeChildFuture.join(), LargeSideCompletionRatio);
-                    prevStagesFuture.complete(null);
                 } else
                 {
                     // no children exist, sort both tables and wait for the small table sorting.
@@ -166,15 +162,13 @@ public class SortedJoinBatchOperator extends SortedJoinOperator
 
                     waitForCompletion(smallSortedOutputs);
                     waitForCompletion(largeSortedOutputs, LargeSideCompletionRatio);
-                    prevStagesFuture.complete(null);
                 }
             } catch (InterruptedException e)
             {
+                Thread.currentThread().interrupt();
                 throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
             }
-        });
-
-        return prevStagesFuture;
+        }, operatorService);
     }
 
 }

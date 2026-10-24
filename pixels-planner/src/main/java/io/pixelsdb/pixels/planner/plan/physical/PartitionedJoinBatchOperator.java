@@ -92,8 +92,7 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
     @Override
     public CompletableFuture<Void> executePrev()
     {
-        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
-        operatorService.execute(() ->
+        return CompletableFuture.runAsync(() ->
         {
             try
             {
@@ -108,7 +107,6 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
                     largeChildFuture = largeChild.execute();
                     waitForCompletion(smallChildFuture.join());
                     waitForCompletion(largeChildFuture.join(), LargeSideCompletionRatio);
-                    prevStagesFuture.complete(null);
                 } else if (smallChild != null)
                 {
                     // only small child exists, we should invoke the large table partitioning and wait for the small child.
@@ -127,7 +125,6 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
 
                     waitForCompletion(smallChildFuture.join());
                     waitForCompletion(largePartitionOutputs, LargeSideCompletionRatio);
-                    prevStagesFuture.complete(null);
                 } else if (largeChild != null)
                 {
                     // only large child exists, we should invoke and wait for the small table partitioning.
@@ -146,7 +143,6 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
                     largeChildFuture = largeChild.execute();
                     waitForCompletion(smallPartitionOutputs);
                     waitForCompletion(largeChildFuture.join(), LargeSideCompletionRatio);
-                    prevStagesFuture.complete(null);
                 } else
                 {
                     // no children exist, partition both tables and wait for the small table partitioning.
@@ -174,15 +170,13 @@ public class PartitionedJoinBatchOperator extends PartitionedJoinOperator
 
                     waitForCompletion(smallPartitionOutputs);
                     waitForCompletion(largePartitionOutputs, LargeSideCompletionRatio);
-                    prevStagesFuture.complete(null);
                 }
             }
             catch (InterruptedException e)
             {
+                Thread.currentThread().interrupt();
                 throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
             }
-        });
-
-        return prevStagesFuture;
+        }, operatorService);
     }
 }

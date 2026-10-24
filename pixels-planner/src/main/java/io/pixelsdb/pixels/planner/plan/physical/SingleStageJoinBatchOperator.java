@@ -93,8 +93,7 @@ public class SingleStageJoinBatchOperator extends SingleStageJoinOperator
     @Override
     public CompletableFuture<Void> executePrev()
     {
-        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
-        operatorService.execute(() ->
+        return CompletableFuture.runAsync(() ->
         {
             try
             {
@@ -118,14 +117,12 @@ public class SingleStageJoinBatchOperator extends SingleStageJoinOperator
                     CompletableFuture<? extends Output>[] largeChildOutputs = largeChildFuture.join();
                     waitForCompletion(largeChildOutputs, LargeSideCompletionRatio);
                 }
-                prevStagesFuture.complete(null);
             }
             catch (InterruptedException e)
             {
+                Thread.currentThread().interrupt();
                 throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
             }
-        });
-
-        return prevStagesFuture;
+        }, operatorService);
     }
 }

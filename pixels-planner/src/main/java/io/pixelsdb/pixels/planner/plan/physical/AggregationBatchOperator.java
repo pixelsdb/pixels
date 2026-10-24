@@ -75,8 +75,7 @@ public class AggregationBatchOperator extends AggregationOperator
     @Override
     public CompletableFuture<Void> executePrev()
     {
-        CompletableFuture<Void> prevStagesFuture = new CompletableFuture<>();
-        operatorService.execute(() ->
+        return CompletableFuture.runAsync(() ->
         {
             try
             {
@@ -107,14 +106,12 @@ public class AggregationBatchOperator extends AggregationOperator
                     waitForCompletion(this.scanOutputs);
                 }
 
-                prevStagesFuture.complete(null);
             }
             catch (InterruptedException e)
             {
+                Thread.currentThread().interrupt();
                 throw new CompletionException("interrupted when waiting for the completion of previous stages", e);
             }
-        });
-
-        return prevStagesFuture;
+        }, operatorService);
     }
 }
