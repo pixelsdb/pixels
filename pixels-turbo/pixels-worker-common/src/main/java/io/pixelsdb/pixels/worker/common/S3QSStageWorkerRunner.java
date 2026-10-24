@@ -273,6 +273,10 @@ public class S3QSStageWorkerRunner
             {
                 throw new WorkerException(taskOutput == null ? "task returned null output" : taskOutput.getErrorMessage());
             }
+            if (aggregateOutput instanceof JoinOutput && taskOutput instanceof JoinOutput)
+            {
+                ((JoinOutput) aggregateOutput).addTaskOutput(taskInfo.getTaskId(), (JoinOutput) taskOutput);
+            }
             taskInfo.setSuccess(taskOutput.isSuccessful());
             mergeOutput(aggregateOutput, taskOutput);
         }

@@ -74,6 +74,27 @@ import static org.junit.Assert.assertTrue;
  */
 public class TestPartitionedJoinS3QSOperator
 {
+    @Test(timeout = 5000)
+    public void childStartupFailureReachesS3QSParent() throws Exception
+    {
+        JoinOperator child = org.mockito.Mockito.mock(JoinOperator.class);
+        RuntimeException original = new RuntimeException("child startup failed");
+        CompletableFuture<CompletableFuture<? extends Output>[]> failed = new CompletableFuture<>();
+        failed.completeExceptionally(original);
+        org.mockito.Mockito.when(child.execute()).thenReturn(failed);
+        PartitionedJoinS3QSOperator parent = new PartitionedJoinS3QSOperator("parent", null, null,
+                Collections.emptyList(), JoinAlgorithm.PARTITIONED);
+        parent.setSmallChild(child);
+        parent.setLargeChild(child);
+        try { parent.execute().get(); org.junit.Assert.fail("expected child failure"); }
+        catch (ExecutionException expected)
+        {
+            Throwable cause = expected;
+            while (cause.getCause() != null) { cause = cause.getCause(); }
+            org.junit.Assert.assertSame(original, cause);
+        }
+    }
+
     @Test
     public void acceptsCompleteShuffleInfo()
     {
@@ -336,6 +357,12 @@ public class TestPartitionedJoinS3QSOperator
                     new PartitionOutput() : new JoinOutput();
             output.setSuccessful(true);
             output.setRequestId("runtime-attempt-" + i);
+            if (output instanceof JoinOutput)
+            {
+                JoinOutput taskOutput = new JoinOutput();
+                taskOutput.setSuccessful(true);
+                ((JoinOutput) output).addTaskOutput(tasks.get(0).getTaskId(), taskOutput);
+            }
             launcher.complete(i, output);
         }
 
@@ -473,8 +500,11 @@ public class TestPartitionedJoinS3QSOperator
         public CompletableFuture<Output> invoke(Input input)
         {
             inputs.add(input);
-            Output output = new Output() { };
+            JoinOutput output = new JoinOutput();
             output.setSuccessful(true);
+            JoinOutput taskOutput = new JoinOutput();
+            taskOutput.setSuccessful(true);
+            output.addTaskOutput(0, taskOutput);
             return CompletableFuture.completedFuture(output);
         }
 

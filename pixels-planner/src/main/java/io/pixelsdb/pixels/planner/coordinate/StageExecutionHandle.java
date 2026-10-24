@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -39,6 +40,7 @@ public class StageExecutionHandle
     private final Runnable attemptCompletionListener;
     private final List<CompletableFuture<? extends Output>> attemptFutures = new ArrayList<>();
     private final List<Output> outputs = new ArrayList<>();
+    private final List<Consumer<CompletableFuture<? extends Output>>> attemptListeners = new ArrayList<>();
     private final CompletableFuture<List<Output>> completionFuture = new CompletableFuture<>();
     private int activeAttemptCount;
     private Throwable firstFailure;
@@ -77,6 +79,21 @@ public class StageExecutionHandle
             }
             attemptCompletionListener.run();
         });
+        for (Consumer<CompletableFuture<? extends Output>> listener : attemptListeners)
+        {
+            listener.accept(attempt);
+        }
+    }
+
+    /** Subscribe without a polling/snapshot race; includes all already admitted attempts. */
+    public synchronized void subscribeAttempts(Consumer<CompletableFuture<? extends Output>> listener)
+    {
+        requireNonNull(listener, "listener is null");
+        attemptListeners.add(listener);
+        for (CompletableFuture<? extends Output> attempt : attemptFutures)
+        {
+            listener.accept(attempt);
+        }
     }
 
     synchronized void closeLaunches()

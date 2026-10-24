@@ -19,6 +19,9 @@
  */
 package io.pixelsdb.pixels.planner.plan.physical.output;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * The output format for both broadcast and hash partitioned join.
  *
@@ -27,4 +30,26 @@ package io.pixelsdb.pixels.planner.plan.physical.output;
  */
 public class JoinOutput extends NonPartitionOutput
 {
+    // Present only on coordinator-managed S3QS invocation responses. Keys are
+    // stage-local logical task ids, independent of physical invocation order.
+    private Map<Integer, JoinOutput> taskOutputs;
+
+    public Map<Integer, JoinOutput> getTaskOutputs()
+    {
+        return taskOutputs;
+    }
+
+    public void setTaskOutputs(Map<Integer, JoinOutput> taskOutputs)
+    {
+        this.taskOutputs = taskOutputs;
+    }
+
+    public void addTaskOutput(int taskId, JoinOutput output)
+    {
+        if (taskOutputs == null) { taskOutputs = new LinkedHashMap<>(); }
+        if (taskOutputs.putIfAbsent(taskId, output) != null)
+        {
+            throw new IllegalStateException("duplicate logical join task " + taskId);
+        }
+    }
 }

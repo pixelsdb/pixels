@@ -139,6 +139,45 @@ public class TestS3QSStageWorkerRunner
     }
 
     @Test
+    public void joinInvocationPreservesLogicalTaskIdentities() throws Exception
+    {
+        WorkerCoordinateService service = mock(WorkerCoordinateService.class);
+        WorkerContext context = new WorkerContext(LogManager.getLogger(TestS3QSStageWorkerRunner.class),
+                new WorkerMetrics(), "join-request");
+        long workerId = 23L;
+        Worker<CFWorkerInfo> worker = new Worker<>(workerId, new Lease(System.currentTimeMillis(), 60000L), 0,
+                new CFWorkerInfo("localhost", -1, 1277L, 3, Constants.PARTITION_JOIN_OPERATOR_NAME,
+                        Collections.emptyList()));
+        when(service.registerWorker(any(CFWorkerInfo.class))).thenReturn(worker);
+        java.util.List<TaskInfo> tasks = java.util.Arrays.asList(
+                new TaskInfo(4, JSON.toJSONString("first")), new TaskInfo(1, JSON.toJSONString("second")));
+        when(service.getTasksToExecute(workerId)).thenReturn(new TaskBatch(false, tasks),
+                new TaskBatch(true, Collections.emptyList()));
+        S3QSStageWorkerRunner runner = new S3QSStageWorkerRunner(context, service);
+        StageWorkerInput input = new StageWorkerInput(1277L, 1L, 3, "join", WorkerType.PARTITIONED_JOIN_S3QS);
+        io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput result = runner.run(input,
+                Constants.PARTITION_JOIN_OPERATOR_NAME, WorkerType.PARTITIONED_JOIN_S3QS, String.class,
+                (payload, taskContext) ->
+                {
+                    io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput output =
+                            new io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput();
+                    output.setSuccessful(true);
+                    output.addOutput(payload + "-main", 1);
+                    output.addOutput(payload + "-outer", 2);
+                    output.setTotalReadBytes(128L);
+                    return output;
+                }, new io.pixelsdb.pixels.planner.plan.physical.output.JoinOutput());
+        assertTrue(result.isSuccessful());
+        assertEquals(2, result.getTaskOutputs().size());
+        assertEquals(java.util.Arrays.asList("first-main", "first-outer"), result.getTaskOutputs().get(4).getOutputs());
+        assertEquals(java.util.Arrays.asList(1, 2), result.getTaskOutputs().get(1).getRowGroupNums());
+        assertEquals(256L, result.getTotalReadBytes());
+        assertEquals(4, result.getOutputs().size());
+        verify(service).completeTasks(workerId, tasks);
+        verify(service).terminateWorker(workerId);
+    }
+
+    @Test
     public void rejectsUnexpectedWorkerTypeBeforeRegistering() throws Exception
     {
         WorkerCoordinateService coordinateService = mock(WorkerCoordinateService.class);

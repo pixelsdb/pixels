@@ -27,6 +27,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
 import io.pixelsdb.pixels.planner.coordinate.StageExecutionHandle;
+import io.pixelsdb.pixels.planner.coordinate.LogicalJoinOutputs;
 import io.pixelsdb.pixels.planner.coordinate.StageExecutionDescriptor;
 import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionedTableInfo;
@@ -60,10 +61,10 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
 {
     private static final Logger logger = LogManager.getLogger(PartitionedJoinS3QSOperator.class);
-    private static final CompletableFuture<Void> Completed = CompletableFuture.completedFuture(null);
     private StageExecutionHandle smallPartitionExecution;
     private StageExecutionHandle largePartitionExecution;
     private StageExecutionHandle joinExecution;
+    private LogicalJoinOutputs logicalJoinOutputs;
 
     public PartitionedJoinS3QSOperator(String name, List<PartitionInput> smallPartitionInputs,
                                        List<PartitionInput> largePartitionInputs,
@@ -137,10 +138,14 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             }
             validateJoinInputs();
             joinExecution = invokeJoinRuntimeWorkers();
-            joinOutputs = toAttemptArray(joinExecution.getAttemptFutures());
+            // The caller consumes one future per planner input, never one per
+            // physical invocation. Collection below still uses physical outputs
+            // so resource usage is counted exactly once.
+            logicalJoinOutputs = LogicalJoinOutputs.create(
+                    joinExecution, joinInputs.size(), failure -> planCoordinator.getQueryState().abort(failure));
 
             logger.debug("invoke S3QS join " + this.getName());
-            return joinOutputs;
+            return logicalJoinOutputs.getOutputs();
         });
     }
 
@@ -148,18 +153,19 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
     public CompletableFuture<Void> executePrev()
     {
         validatePartitionInputs();
+        List<CompletableFuture<?>> childStarts = new ArrayList<>();
         if (smallChild != null && largeChild != null)
         {
             checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
             checkArgument(largePartitionInputs.isEmpty(), "largePartitionInputs is not empty");
-            smallChild.execute();
-            largeChild.execute();
+            childStarts.add(smallChild.execute());
+            childStarts.add(largeChild.execute());
         }
         else if (smallChild != null)
         {
             checkArgument(smallPartitionInputs.isEmpty(), "smallPartitionInputs is not empty");
             checkArgument(!largePartitionInputs.isEmpty(), "largePartitionInputs is empty");
-            smallChild.execute();
+            childStarts.add(smallChild.execute());
             largePartitionExecution = invokePartitionRuntimeWorkers(largePartitionStageId);
             largePartitionOutputs = toAttemptArray(largePartitionExecution.getAttemptFutures());
             logger.debug("invoke large S3QS partition of " + this.getName());
@@ -171,7 +177,7 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             smallPartitionExecution = invokePartitionRuntimeWorkers(smallPartitionStageId);
             smallPartitionOutputs = toAttemptArray(smallPartitionExecution.getAttemptFutures());
             logger.debug("invoke small S3QS partition of " + this.getName());
-            largeChild.execute();
+            childStarts.add(largeChild.execute());
         }
         else
         {
@@ -184,7 +190,7 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
             largePartitionOutputs = toAttemptArray(largePartitionExecution.getAttemptFutures());
             logger.debug("invoke large S3QS partition of " + this.getName());
         }
-        return Completed;
+        return CompletableFuture.allOf(childStarts.toArray(new CompletableFuture[0]));
     }
 
     /**
@@ -196,6 +202,12 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
     @Override
     public JoinOutputCollection collectOutputs() throws ExecutionException, InterruptedException
     {
+        if (logicalJoinOutputs != null)
+        {
+            // Validate logical task identity/completeness before the query can
+            // succeed; stage completion callbacks may run in any order.
+            logicalJoinOutputs.getCompletionFuture().get();
+        }
         joinOutputs = completedOutputFutures(joinExecution);
         smallPartitionOutputs = completedOutputFutures(smallPartitionExecution);
         largePartitionOutputs = completedOutputFutures(largePartitionExecution);
