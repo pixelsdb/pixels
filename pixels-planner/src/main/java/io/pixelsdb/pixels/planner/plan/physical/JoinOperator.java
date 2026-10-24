@@ -25,6 +25,9 @@ import io.pixelsdb.pixels.planner.coordinate.StageCoordinator;
 import io.pixelsdb.pixels.planner.plan.physical.input.JoinInput;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Collection;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -60,6 +63,15 @@ public abstract class JoinOperator extends Operator
     public boolean isComplete()
     {
         return complete;
+    }
+
+    @Override
+    public Collection<ShuffleInfo> getShuffleInfos()
+    {
+        List<ShuffleInfo> infos = new ArrayList<>();
+        if (getSmallChild() != null) { infos.addAll(getSmallChild().getShuffleInfos()); }
+        if (getLargeChild() != null) { infos.addAll(getLargeChild().getShuffleInfos()); }
+        return infos;
     }
 
     public abstract List<JoinInput> getJoinInputs();

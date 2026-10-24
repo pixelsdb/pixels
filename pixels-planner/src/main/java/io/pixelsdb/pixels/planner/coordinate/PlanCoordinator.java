@@ -69,6 +69,7 @@ public class PlanCoordinator
      * Query-owned shuffle edges keyed by their query-unique shuffle id.
      */
     private final Map<String, ShuffleInfo> shuffleInfos = new HashMap<>();
+    private final Map<String, List<ShuffleInfo>> shuffleInfoReferences = new HashMap<>();
     private final CoordinatorEndpoint coordinatorEndpoint;
     private final StageWorkerLauncher stageWorkerLauncher;
     private final StageScalingConfig stageScalingConfig;
@@ -331,10 +332,35 @@ public class PlanCoordinator
         if (previous == null)
         {
             this.shuffleInfos.put(shuffleId, shuffleInfo);
+            this.shuffleInfoReferences.put(shuffleId, new ArrayList<>(Collections.singletonList(shuffleInfo)));
             return;
         }
         checkArgument(sameShuffleResource(previous, shuffleInfo),
                 "conflicting shuffle metadata for shuffleId " + shuffleId);
+        if (!shuffleInfoReferences.get(shuffleId).contains(shuffleInfo))
+        {
+            shuffleInfoReferences.get(shuffleId).add(shuffleInfo);
+        }
+    }
+
+    /** Copy prepared URLs to equivalent producer/consumer metadata before serialization. */
+    void synchronizeShuffleInfos()
+    {
+        for (Map.Entry<String, List<ShuffleInfo>> entry : shuffleInfoReferences.entrySet())
+        {
+            Map<Integer, String> urls = new HashMap<>();
+            for (ShuffleQueueInfo queue : shuffleInfos.get(entry.getKey()).getQueues())
+            {
+                urls.put(queue.getPartitionId(), queue.getQueueUrl());
+            }
+            for (ShuffleInfo reference : entry.getValue())
+            {
+                for (ShuffleQueueInfo queue : reference.getQueues())
+                {
+                    queue.setQueueUrl(urls.get(queue.getPartitionId()));
+                }
+            }
+        }
     }
 
     public Collection<ShuffleInfo> getShuffleInfos()

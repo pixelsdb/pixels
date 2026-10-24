@@ -117,10 +117,32 @@ public class PlanCoordinatorFactory
             CoordinatorEndpoint coordinatorEndpoint, ShuffleResourceLifecycle shuffleResourceLifecycle,
             StageWorkerLauncher stageWorkerLauncher, QueryExecutionConfig config)
     {
-        PlanCoordinator planCoordinator =
-                createPlanCoordinator(transId, planRootOperator, coordinatorEndpoint, stageWorkerLauncher);
-        return new CoordinatedPlanExecution(transId, planRootOperator, planCoordinator, this,
-                requireNonNull(shuffleResourceLifecycle, "shuffleResourceLifecycle is null"), config);
+        requireNonNull(planRootOperator, "planRootOperator is null");
+        requireNonNull(shuffleResourceLifecycle, "shuffleResourceLifecycle is null");
+        requireNonNull(config, "config is null");
+        PlanCoordinator planCoordinator = new PlanCoordinator(transId, coordinatorEndpoint, stageWorkerLauncher);
+        // Validate and collect every metadata reference before provisioning. Stages
+        // serialize their payloads only after queue URLs have been populated.
+        for (io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo info : planRootOperator.getShuffleInfos())
+        {
+            planCoordinator.addShuffleInfo(info);
+        }
+        PlanCoordinator previous = transIdToPlanCoordinator.putIfAbsent(transId, planCoordinator);
+        checkState(previous == null, "plan coordinator already exists for transaction %s", transId);
+        try
+        {
+            return new CoordinatedPlanExecution(transId, planRootOperator, planCoordinator, this,
+                    shuffleResourceLifecycle, config, () ->
+                    {
+                        planCoordinator.synchronizeShuffleInfos();
+                        planRootOperator.initPlanCoordinator(planCoordinator, -1, false);
+                    });
+        }
+        catch (RuntimeException | Error failure)
+        {
+            transIdToPlanCoordinator.remove(transId, planCoordinator);
+            throw failure;
+        }
     }
 
     /**

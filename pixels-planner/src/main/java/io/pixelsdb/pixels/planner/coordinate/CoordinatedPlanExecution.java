@@ -26,6 +26,7 @@ public class CoordinatedPlanExecution implements AutoCloseable
     private final PlanCoordinatorFactory coordinatorFactory;
     private final ShuffleResourceLifecycle shuffleResourceLifecycle;
     private final QueryExecutionConfig config;
+    private final Runnable initializeStages;
     private final QueryCleanupManifest manifest;
     private final ExecutorService executor;
     private final ScheduledExecutorService timer;
@@ -54,6 +55,14 @@ public class CoordinatedPlanExecution implements AutoCloseable
                              PlanCoordinatorFactory coordinatorFactory, ShuffleResourceLifecycle lifecycle,
                              QueryExecutionConfig config)
     {
+        this(transId, rootOperator, planCoordinator, coordinatorFactory, lifecycle, config, () -> {});
+    }
+
+    CoordinatedPlanExecution(long transId, Operator rootOperator, PlanCoordinator planCoordinator,
+                             PlanCoordinatorFactory coordinatorFactory, ShuffleResourceLifecycle lifecycle,
+                             QueryExecutionConfig config, Runnable initializeStages)
+    {
+        this.initializeStages = requireNonNull(initializeStages, "initializeStages is null");
         this.transId = transId;
         this.rootOperator = requireNonNull(rootOperator, "rootOperator is null");
         this.planCoordinator = requireNonNull(planCoordinator, "planCoordinator is null");
@@ -129,6 +138,8 @@ public class CoordinatedPlanExecution implements AutoCloseable
             planCoordinator.getQueryState().requireRunning();
             resourcesPrepared = true;
             shuffleResourceLifecycle.prepare(planCoordinator.getShuffleInfos());
+            planCoordinator.getQueryState().requireRunning();
+            initializeStages.run();
             planCoordinator.getQueryState().requireRunning();
             CompletableFuture<CompletableFuture<? extends Output>[]> started = rootOperator.execute();
             preparationFinished = true;

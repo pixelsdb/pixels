@@ -92,11 +92,12 @@ public class TestCoordinatedPlanExecution
                 new CoordinatorEndpoint("coordinator.internal", 19000));
 
         assertSame(execution.getPlanCoordinator(), factory.getPlanCoordinator(transId));
-        assertSame(execution.getPlanCoordinator(), operator.initializedCoordinator);
+        assertNull(operator.initializedCoordinator);
         assertEquals("coordinator.internal",
                 execution.getPlanCoordinator().getCoordinatorEndpoint().getHost());
 
         execution.execute().get();
+        assertSame(execution.getPlanCoordinator(), operator.initializedCoordinator);
         assertTrue(operator.coordinatorWasRegisteredDuringExecute);
         assertSame(execution.getPlanCoordinator(), factory.getPlanCoordinator(transId));
 
@@ -171,6 +172,34 @@ public class TestCoordinatedPlanExecution
         assertNull(factory.getPlanCoordinator(transId));
     }
 
+    @Test(timeout = 5000)
+    public void stageInitializationFailureCleansPreparedResources() throws Exception
+    {
+        long transId = NextTransId.getAndIncrement();
+        RuntimeException original = new RuntimeException("invalid stage metadata");
+        RecordingOperator operator = new RecordingOperator(transId)
+        {
+            @Override
+            public void initPlanCoordinator(PlanCoordinator plan, int parent, boolean wide)
+            {
+                throw original;
+            }
+        };
+        RecordingShuffleResourceLifecycle lifecycle = new RecordingShuffleResourceLifecycle();
+        CoordinatedPlanExecution execution = PlanCoordinatorFactory.Instance().createPlanExecution(transId,
+                operator, new CoordinatorEndpoint("localhost", 18894), lifecycle);
+        try
+        {
+            try { execution.execute().get(1, TimeUnit.SECONDS); org.junit.Assert.fail("expected init failure"); }
+            catch (java.util.concurrent.ExecutionException expected) { assertSame(original, expected.getCause()); }
+            assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANED,
+                    execution.getCleanupCompletion().get(1, TimeUnit.SECONDS));
+            assertEquals(1, lifecycle.cleanupCount);
+            assertNull(PlanCoordinatorFactory.Instance().getPlanCoordinator(transId));
+        }
+        finally { execution.close(); }
+    }
+
     @Test(expected = IllegalStateException.class)
     public void duplicateTransactionCanNotReplaceActiveCoordinator()
     {
@@ -225,6 +254,12 @@ public class TestCoordinatedPlanExecution
         {
             super("recording-plan");
             this.transId = transId;
+        }
+
+        @Override
+        public Collection<ShuffleInfo> getShuffleInfos()
+        {
+            return shuffleInfo == null ? Collections.emptyList() : Collections.singletonList(shuffleInfo);
         }
 
         @Override

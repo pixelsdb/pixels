@@ -32,6 +32,9 @@ import io.pixelsdb.pixels.planner.plan.physical.input.ScanInput;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collection;
+import java.util.Collections;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -120,13 +123,19 @@ public abstract class AggregationOperator extends Operator
     }
 
     @Override
+    public Collection<ShuffleInfo> getShuffleInfos()
+    {
+        return child == null ? Collections.emptyList() : child.getShuffleInfos();
+    }
+
+    @Override
     public void initPlanCoordinator(PlanCoordinator planCoordinator, int parentStageId, boolean wideDependOnParent)
     {
         int aggrStageId = planCoordinator.assignStageId();
         StageDependency aggrStageDependency = new StageDependency(aggrStageId, parentStageId, wideDependOnParent);
         StageCoordinator aggrStageCoordinator = new StageCoordinator(aggrStageId, this.finalAggrInputs.size());
         planCoordinator.addStageCoordinator(aggrStageCoordinator, aggrStageDependency);
-        if (this.scanInputs != null)
+        if (!this.scanInputs.isEmpty())
         {
             checkArgument(this.child == null,
                     "child operator should be null when base table scan exists");

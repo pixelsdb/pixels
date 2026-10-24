@@ -42,6 +42,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -89,29 +90,40 @@ public class PartitionedJoinS3QSOperator extends PartitionedJoinOperator
 
     private void registerShuffleResources(PlanCoordinator planCoordinator)
     {
+        for (ShuffleInfo info : getShuffleInfos())
+        {
+            planCoordinator.addShuffleInfo(info);
+        }
+    }
+
+    @Override
+    public Collection<ShuffleInfo> getShuffleInfos()
+    {
+        List<ShuffleInfo> infos = new ArrayList<>(super.getShuffleInfos());
         for (PartitionInput input : smallPartitionInputs)
         {
-            planCoordinator.addShuffleInfo(input.getOutput().getShuffleInfo());
+            infos.add(input.getOutput().getShuffleInfo());
         }
         for (PartitionInput input : largePartitionInputs)
         {
-            planCoordinator.addShuffleInfo(input.getOutput().getShuffleInfo());
+            infos.add(input.getOutput().getShuffleInfo());
         }
         for (JoinInput input : joinInputs)
         {
             if (input instanceof PartitionedJoinInput)
             {
                 PartitionedJoinInput joinInput = (PartitionedJoinInput) input;
-                planCoordinator.addShuffleInfo(joinInput.getSmallTable().getShuffleInfo());
-                planCoordinator.addShuffleInfo(joinInput.getLargeTable().getShuffleInfo());
+                infos.add(joinInput.getSmallTable().getShuffleInfo());
+                infos.add(joinInput.getLargeTable().getShuffleInfo());
             }
             else if (input instanceof PartitionedChainJoinInput)
             {
                 PartitionedChainJoinInput joinInput = (PartitionedChainJoinInput) input;
-                planCoordinator.addShuffleInfo(joinInput.getSmallTable().getShuffleInfo());
-                planCoordinator.addShuffleInfo(joinInput.getLargeTable().getShuffleInfo());
+                infos.add(joinInput.getSmallTable().getShuffleInfo());
+                infos.add(joinInput.getLargeTable().getShuffleInfo());
             }
         }
+        return infos;
     }
 
     @Override

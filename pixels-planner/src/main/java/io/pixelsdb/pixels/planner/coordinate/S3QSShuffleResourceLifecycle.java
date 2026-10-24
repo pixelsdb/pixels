@@ -57,7 +57,8 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
     @Override
     public synchronized void setProgressListener(Consumer<Map<String, Object>> listener)
     {
-        this.progressListener = listener;
+        this.progressListener = java.util.Objects.requireNonNull(listener, "listener is null");
+        recordProgress();
     }
 
     S3QSShuffleResourceLifecycle(S3QS s3qs) { this.s3qs = s3qs; }

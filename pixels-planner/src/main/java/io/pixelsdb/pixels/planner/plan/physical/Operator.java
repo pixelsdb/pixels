@@ -22,6 +22,9 @@ package io.pixelsdb.pixels.planner.plan.physical;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.utils.ShutdownHookManager;
 import io.pixelsdb.pixels.planner.coordinate.PlanCoordinator;
+import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
+import java.util.Collection;
+import java.util.Collections;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -55,6 +58,12 @@ public abstract class Operator implements OperatorExecutor
     public String getName()
     {
         return name;
+    }
+
+    /** Query-owned shuffle metadata, collected before immutable task payloads are built. */
+    public Collection<ShuffleInfo> getShuffleInfos()
+    {
+        return Collections.emptyList();
     }
 
     /**
