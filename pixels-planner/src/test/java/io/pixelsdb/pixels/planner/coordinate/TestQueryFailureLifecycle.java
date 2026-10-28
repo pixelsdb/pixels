@@ -161,6 +161,75 @@ public class TestQueryFailureLifecycle
                 execution.getPlanCoordinator().getTransId(), execution.getPlanCoordinator());
     }
 
+    @Test(timeout = 5000)
+    public void successfulCollectionWaitsForOwnedResourceDeletion() throws Exception
+    {
+        CountDownLatch cleaning = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Lifecycle lifecycle = new Lifecycle()
+        {
+            @Override
+            public void cleanup()
+            {
+                cleanupCount++;
+                cleaning.countDown();
+                try { release.await(); }
+                catch (InterruptedException failure) { throw new RuntimeException(failure); }
+            }
+        };
+        CoordinatedPlanExecution execution = execution(new StubOperator(), lifecycle, 4000, 3000);
+        CompletableFuture<OutputCollection> result = null;
+        try
+        {
+            execution.execute().get(1, TimeUnit.SECONDS);
+            result = CompletableFuture.supplyAsync(() ->
+            {
+                try { return execution.collectOutputs(); }
+                catch (Exception failure) { throw new CompletionException(failure); }
+            });
+            assertTrue(cleaning.await(1, TimeUnit.SECONDS));
+            assertFalse(result.isDone());
+            assertFalse(execution.getCleanupCompletion().isDone());
+            release.countDown();
+            assertNotNull(result.get(1, TimeUnit.SECONDS));
+            assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANED, execution.getCleanupStatus());
+            assertEquals(1, lifecycle.cleanupCount);
+        }
+        finally
+        {
+            release.countDown();
+            execution.close();
+            if (result != null) { result.get(1, TimeUnit.SECONDS); }
+        }
+    }
+
+    @Test(timeout = 5000)
+    public void cleanupFailureFailsSynchronousCollection() throws Exception
+    {
+        Lifecycle lifecycle = new Lifecycle();
+        lifecycle.failCleanup = true;
+        CoordinatedPlanExecution execution = execution(new StubOperator(), lifecycle, 3000);
+        try
+        {
+            execution.execute().get(1, TimeUnit.SECONDS);
+            try { execution.collectOutputs(); fail("cleanup failure must fail collection"); }
+            catch (ExecutionException expected)
+            {
+                assertTrue(expected.getMessage().contains("CLEANUP_FAILED"));
+                assertSame(execution.getCleanupFailure(), expected.getCause());
+            }
+            assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANUP_FAILED, execution.getCleanupStatus());
+            assertEquals(QueryExecutionState.Status.SUCCEEDED,
+                    execution.getPlanCoordinator().getQueryState().getStatus());
+        }
+        finally
+        {
+            execution.close();
+            PlanCoordinatorFactory.Instance().removePlanCoordinator(
+                    execution.getPlanCoordinator().getTransId(), execution.getPlanCoordinator());
+        }
+    }
+
     private static void expectCause(CoordinatedPlanExecution execution, Throwable cause) throws Exception
     {
         try { execution.collectOutputs(); fail("query must fail"); }
@@ -169,11 +238,17 @@ public class TestQueryFailureLifecycle
 
     private static CoordinatedPlanExecution execution(StubOperator operator, Lifecycle lifecycle, long timeout) throws Exception
     {
+        return execution(operator, lifecycle, timeout, 500);
+    }
+
+    private static CoordinatedPlanExecution execution(StubOperator operator, Lifecycle lifecycle, long timeout,
+                                                       long cleanupTimeout) throws Exception
+    {
         long id = IDS.getAndIncrement();
         PlanCoordinatorFactory factory = PlanCoordinatorFactory.Instance();
         PlanCoordinator plan = factory.createPlanCoordinator(id, operator, new CoordinatorEndpoint("localhost", 18894));
         return new CoordinatedPlanExecution(id, operator, plan, factory, lifecycle,
-                new QueryExecutionConfig(timeout, 100, 500, Files.createTempDirectory("issue1277-manifest-test-")));
+                new QueryExecutionConfig(timeout, 100, cleanupTimeout, Files.createTempDirectory("issue1277-manifest-test-")));
     }
 
     private static class Lifecycle implements ShuffleResourceLifecycle
