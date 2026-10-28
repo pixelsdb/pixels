@@ -71,7 +71,7 @@ public class S3QSOutputStream extends OutputStream
 
     static
     {
-        fixSizedBuffers = new FixSizedBuffers(S3QS_BUFFER_SIZE);
+        fixSizedBuffers = new FixSizedBuffers(S3QS_BUFFER_SIZE, 4);
         ShutdownHookManager.Instance().registerShutdownHook(S3QSOutputStream.class, true, fixSizedBuffers::clear);
     }
 

@@ -34,6 +34,10 @@ public class PartitionOutput extends Output
      * The hash value of the partitions that exist in the partitioned result.
      */
     private Set<Integer> hashValues;
+    private java.util.Map<String, Long> memoryMetrics;
+
+    public java.util.Map<String, Long> getMemoryMetrics() { return memoryMetrics; }
+    public void setMemoryMetrics(java.util.Map<String, Long> value) { memoryMetrics = value; }
 
     /**
      * Default constructor for Jackson.

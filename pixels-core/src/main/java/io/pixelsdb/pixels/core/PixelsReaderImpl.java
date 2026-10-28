@@ -224,11 +224,16 @@ public class PixelsReaderImpl implements PixelsReader
     public PixelsProto.RowGroupFooter getRowGroupFooter(int rowGroupId)
             throws IOException
     {
+        String cacheId = physicalReader.getPath() + "-" + rowGroupId;
+        PixelsProto.RowGroupFooter cached = pixelsFooterCache.getRGFooter(cacheId);
+        if (cached != null) { return cached; }
         long footerOffset = footer.getRowGroupInfos(rowGroupId).getFooterOffset();
         int footerLength = footer.getRowGroupInfos(rowGroupId).getFooterLength();
         physicalReader.seek(footerOffset);
-        ByteBuffer footer = physicalReader.readFully(footerLength);
-        return PixelsProto.RowGroupFooter.parseFrom(footer);
+        ByteBuffer bytes = physicalReader.readFully(footerLength);
+        PixelsProto.RowGroupFooter parsed = PixelsProto.RowGroupFooter.parseFrom(bytes);
+        pixelsFooterCache.putRGFooter(cacheId, parsed);
+        return parsed;
     }
 
     /**
@@ -437,6 +442,13 @@ public class PixelsReaderImpl implements PixelsReader
     public PixelsProto.Footer getFooter()
     {
         return footer;
+    }
+
+    @Override
+    public void closeRecordReader(PixelsRecordReader reader) throws IOException
+    {
+        reader.close();
+        recordReaders.remove(reader);
     }
 
     /**

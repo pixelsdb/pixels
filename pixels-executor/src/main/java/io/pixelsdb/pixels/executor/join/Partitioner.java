@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.executor.join;
 
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
+import io.pixelsdb.pixels.core.vector.BinaryColumnVector;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ import static java.util.Objects.requireNonNull;
 public class Partitioner
 {
     private final int numPartition;
+    private final boolean ownBinaryValues;
     private final int batchSize;
     private final TypeDescription schema;
     private final int numFields;
@@ -67,6 +69,12 @@ public class Partitioner
      */
     public Partitioner(int numPartition, int batchSize, TypeDescription schema, int[] keyColumnIds)
     {
+        this(numPartition, batchSize, schema, keyColumnIds, false);
+    }
+
+    public Partitioner(int numPartition, int batchSize, TypeDescription schema, int[] keyColumnIds, boolean ownBinaryValues)
+    {
+        this.ownBinaryValues = ownBinaryValues;
         checkArgument(numPartition > 0, "partitionNum must be positive");
         checkArgument(batchSize > 0, "batchSize must be positive");
         requireNonNull(schema, "schema is null");
@@ -128,24 +136,54 @@ public class Partitioner
             {
                 output.put(hash, rowBatches[hash]);
                 rowBatches[hash] = schema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
-                rowBatches[hash].addSelected(selected, 0, selectedLength, input);
+                addSelected(rowBatches[hash], selected, 0, selectedLength, input);
             }
             else if (freeSlots <= selectedLength)
             {
-                rowBatches[hash].addSelected(selected, 0, freeSlots, input);
+                addSelected(rowBatches[hash], selected, 0, freeSlots, input);
                 output.put(hash, rowBatches[hash]);
                 rowBatches[hash] = schema.createRowBatch(batchSize, TypeDescription.Mode.NONE);
                 if (freeSlots < selectedLength)
                 {
-                    rowBatches[hash].addSelected(selected, freeSlots, selectedLength - freeSlots, input);
+                    addSelected(rowBatches[hash], selected, freeSlots, selectedLength - freeSlots, input);
                 }
             }
             else
             {
-                rowBatches[hash].addSelected(selected, 0, selectedLength, input);
+                addSelected(rowBatches[hash], selected, 0, selectedLength, input);
             }
         }
         return output;
+    }
+
+    private void addSelected(VectorizedRowBatch target, int[] selected, int offset, int length, VectorizedRowBatch source)
+    {
+        int start = target.size;
+        target.addSelected(selected, offset, length, source);
+        if (ownBinaryValues)
+        {
+            for (io.pixelsdb.pixels.core.vector.ColumnVector column : target.cols)
+            {
+                if (column instanceof BinaryColumnVector)
+                {
+                    BinaryColumnVector binary = (BinaryColumnVector) column;
+                    for (int row = start; row < target.size; row++)
+                    {
+                        if (binary.noNulls || !binary.isNull[row])
+                        {
+                            binary.setVal(row, binary.vector[row], binary.start[row], binary.lens[row]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public long getRetainedMemoryUsage()
+    {
+        long bytes = 4L * batchSize * (numPartition + 1);
+        for (VectorizedRowBatch batch : rowBatches) { bytes += batch.getMemoryUsage(); }
+        return bytes;
     }
 
     /**

@@ -24,7 +24,6 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.pixelsdb.pixels.common.turbo.*;
 import io.pixelsdb.pixels.common.utils.ListenableFutureAdapter;
-import io.pixelsdb.pixels.planner.plan.physical.input.StageWorkerInput;
 import io.pixelsdb.spike.handler.SpikeServiceProto;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -52,8 +51,7 @@ public abstract class SpikeInvoker implements Invoker
                     "Spike S3QS function name is not configured for %s", workerType);
         }
         this.functionName = functionName;
-        // TODO: how to set memoryMB?
-        this.memoryMB = 0;
+        this.memoryMB = SpikeAsyncClient.Instance().getDefaultMemory();
         this.workerType = workerType;
         logger.info("function: " + this.functionName + ", worker: " + this.workerType + ", memory size: " + this.memoryMB);
     }
@@ -93,18 +91,18 @@ public abstract class SpikeInvoker implements Invoker
         SpikeAsyncClient client = SpikeAsyncClient.Instance();
         int requiredCpu = input.getRequiredCpu();
         int requiredMemory = input.getRequiredMemory();
-        if (input instanceof StageWorkerInput)
-        {
-            checkArgument(requiredCpu >= 0 && requiredMemory >= 0,
-                    "Spike S3QS worker resource request must not be negative");
-            requiredCpu = requiredCpu == 0 ? client.getDefaultCpu() : requiredCpu;
-            requiredMemory = requiredMemory == 0 ? client.getDefaultMemory() : requiredMemory;
-        }
+        checkArgument(requiredCpu >= 0 && requiredMemory >= 0, "Spike worker resource request must not be negative");
+        requiredCpu = requiredCpu == 0 ? client.getDefaultCpu() : requiredCpu;
+        requiredMemory = requiredMemory == 0 ? client.getDefaultMemory() : requiredMemory;
         ListenableFuture<SpikeServiceProto.CallFunctionResponse> future = client.invoke(
                 this.functionName,
                 JSON.toJSONString(workerRequest, SerializerFeature.DisableCircularReferenceDetect),
                 requiredCpu, requiredMemory);
-        return genCompletableFuture(future);
+        final int invokedMemory = requiredMemory;
+        return genCompletableFuture(future).thenApply(output -> {
+            output.setMemoryMB(invokedMemory);
+            return output;
+        });
     }
 
     @Override
@@ -117,5 +115,12 @@ public abstract class SpikeInvoker implements Invoker
     public int getMemoryMB()
     {
         return memoryMB;
+    }
+
+    @Override
+    public int getCpuCount()
+    {
+        // Spike resource requests use 1024 CPU units per vCPU.
+        return Math.max(1, (SpikeAsyncClient.Instance().getDefaultCpu() + 1023) / 1024);
     }
 }

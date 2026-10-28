@@ -42,6 +42,12 @@ public interface PixelsReader extends Closeable
      */
     PixelsRecordReader read(PixelsReaderOption option) throws IOException;
 
+    /** Close a consumed window without keeping it owned until the whole file closes. */
+    default void closeRecordReader(PixelsRecordReader reader) throws IOException
+    {
+        reader.close();
+    }
+
     /**
      * Get version of the Pixels file
      *

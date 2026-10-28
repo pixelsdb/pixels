@@ -28,7 +28,7 @@ public class S3QSPartitionWorker implements RequestHandler<StageWorkerInput, Par
     @Override
     public PartitionOutput handleRequest(StageWorkerInput event, Context context)
     {
-        WorkerContext workerContext = new WorkerContext(logger, workerMetrics, context.getAwsRequestId());
+        WorkerContext workerContext = new WorkerContext(logger, workerMetrics, context.getAwsRequestId()).withMemoryMB(context.getMemoryLimitInMB());
         return new S3QSStageWorkerRunner(workerContext).runPartition(event);
     }
 }

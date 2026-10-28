@@ -10,7 +10,7 @@ import static org.junit.Assert.*;
 public class TestS3QSAsyncTasks
 {
     @Test(timeout = 5000)
-    public void inFlightLimitAppliesBackpressureWithoutRunningIOOnCaller() throws Exception
+    public void consumerAckLimitAppliesBackpressureWithoutRunningIOOnCaller() throws Exception
     {
         CountDownLatch running = new CountDownLatch(2), release = new CountDownLatch(1);
         AtomicInteger active = new AtomicInteger(), peak = new AtomicInteger();
@@ -48,7 +48,7 @@ public class TestS3QSAsyncTasks
     {
         WorkerCancellation cancellation = new WorkerCancellation();
         IOException original = new IOException("injected async failure");
-        try (S3QSAsyncTasks tasks = new S3QSAsyncTasks(cancellation, 2, 2))
+        try (S3QSAsyncTasks tasks = new S3QSAsyncTasks(cancellation, 2))
         {
             tasks.submit(() -> { throw original; });
             assertSame(original, assertThrows(IOException.class, tasks::await));
@@ -62,7 +62,7 @@ public class TestS3QSAsyncTasks
         CountDownLatch running = new CountDownLatch(1), release = new CountDownLatch(1);
         ExecutorService caller = Executors.newSingleThreadExecutor();
         IOException original = new IOException("first I/O failed");
-        try (S3QSAsyncTasks tasks = new S3QSAsyncTasks(new WorkerCancellation(), 2, 2))
+        try (S3QSAsyncTasks tasks = new S3QSAsyncTasks(new WorkerCancellation(), 2))
         {
             try
             {

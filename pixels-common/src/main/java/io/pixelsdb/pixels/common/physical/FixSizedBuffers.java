@@ -33,18 +33,32 @@ import static java.util.Objects.requireNonNull;
 public class FixSizedBuffers
 {
     private final int bufferSize;
+    private final int maxCached;
+    private int cached;
 
     private final Queue<byte[]> freeBuffers = new ConcurrentLinkedQueue<>();
 
     public FixSizedBuffers(int bufferSize)
     {
+        this(bufferSize, Integer.MAX_VALUE);
+    }
+
+    public FixSizedBuffers(int bufferSize, int maxCached)
+    {
         checkArgument(bufferSize > 0, "bufferSize must be positive");
+        checkArgument(maxCached >= 0, "maxCached must be non-negative");
         this.bufferSize = bufferSize;
+        this.maxCached = maxCached;
     }
 
     public byte[] allocate()
     {
-        byte[] buffer = this.freeBuffers.poll();
+        byte[] buffer;
+        synchronized (freeBuffers)
+        {
+            buffer = this.freeBuffers.poll();
+            if (buffer != null) { cached--; }
+        }
         if (buffer == null)
         {
             buffer = new byte[bufferSize];
@@ -57,7 +71,10 @@ public class FixSizedBuffers
         requireNonNull(buffer, "buffer cannot be null");
         checkArgument(buffer.length == this.bufferSize,
                 "buffer length does not match expected size");
-        this.freeBuffers.offer(buffer);
+        synchronized (freeBuffers)
+        {
+            if (cached < maxCached) { this.freeBuffers.offer(buffer); cached++; }
+        }
     }
 
     public int getBufferSize()
@@ -65,8 +82,10 @@ public class FixSizedBuffers
         return bufferSize;
     }
 
+    public int getCachedBufferCount() { synchronized (freeBuffers) { return cached; } }
+
     public void clear()
     {
-        this.freeBuffers.clear();
+        synchronized (freeBuffers) { this.freeBuffers.clear(); cached = 0; }
     }
 }

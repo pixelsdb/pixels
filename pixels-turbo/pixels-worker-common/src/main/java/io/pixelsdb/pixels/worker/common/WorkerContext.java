@@ -31,6 +31,7 @@ public class WorkerContext
     private final WorkerMetrics workerMetrics;
     private final String requestId;
     private final WorkerCancellation cancellation;
+    private long memoryBytes;
 
     public WorkerContext(Logger logger, WorkerMetrics workerMetrics, String requestId)
     {
@@ -47,8 +48,20 @@ public class WorkerContext
 
     public WorkerContext withCancellation(WorkerCancellation cancellation)
     {
-        return new WorkerContext(logger, workerMetrics, requestId, cancellation);
+        WorkerContext context = new WorkerContext(logger, workerMetrics, requestId, cancellation);
+        context.memoryBytes = memoryBytes;
+        return context;
     }
+
+    /** Actual platform memory, when the wrapper can report it (e.g. Lambda Context). */
+    public WorkerContext withMemoryMB(int memoryMB)
+    {
+        WorkerContext context = withCancellation(cancellation);
+        context.memoryBytes = Math.multiplyExact((long) memoryMB, 1024L * 1024);
+        return context;
+    }
+
+    public long getMemoryBytes() { return memoryBytes; }
 
     public WorkerCancellation getCancellation() { return cancellation; }
 

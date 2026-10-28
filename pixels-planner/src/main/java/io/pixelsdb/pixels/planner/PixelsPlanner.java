@@ -33,6 +33,8 @@ import io.pixelsdb.pixels.common.metadata.domain.*;
 import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
+import io.pixelsdb.pixels.common.turbo.InvokerFactory;
+import io.pixelsdb.pixels.common.turbo.WorkerType;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.executor.join.JoinType;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
@@ -1467,28 +1469,34 @@ public class PixelsPlanner
     }
 
     private List<PartitionInput> getPartitionInputs(Table inputTable, List<InputSplit> inputSplits, int[] keyColumnIds,
-                                                    boolean[] partitionProjection, int numPartition, String outputBase)
+                                                    boolean[] partitionProjection, int numPartition, String outputBase) throws IOException, MetadataException
     {
+        PartitionMemoryPolicy memoryPolicy = PartitionMemoryPolicy.enabled("planner") && !isStreamExchange() ?
+                PartitionMemoryPolicy.fromBackend(InvokerFactory.Instance().getInvoker(
+                        isS3QSShuffleEnabled() ? WorkerType.PARTITION_S3QS : WorkerType.PARTITION)) : null;
+        List<List<InputSplit>> producerGroups;
+        if (memoryPolicy != null && inputTable.getTableType() == Table.TableType.BASE)
+        {
+            List<Column> columns = metadataService.getColumns(inputTable.getSchemaName(), inputTable.getTableName(), true);
+            long rows = metadataService.getTable(inputTable.getSchemaName(), inputTable.getTableName()).getRowCount();
+            producerGroups = PartitionTaskPlanner.plan(inputSplits, columns, rows, inputTable.getColumnNames(),
+                    partitionProjection, Integer.parseInt(config.getProperty("row.batch.size")), memoryPolicy,
+                    isS3QSShuffleEnabled(), numPartition, Long.parseLong(config.getProperty("row.group.size")));
+        }
+        else { producerGroups = PartitionTaskPlanner.original(inputSplits, IntraWorkerParallelism); }
         ImmutableList.Builder<PartitionInput> partitionInputsBuilder = ImmutableList.builder();
         int outputId = 0;
-        int logicalProducerTaskCount =
-                (inputSplits.size() + IntraWorkerParallelism - 1) / IntraWorkerParallelism;
+        int logicalProducerTaskCount = producerGroups.size();
         ShuffleInfo shuffleInfo = isS3QSShuffleEnabled() ?
                 createShuffleInfo(inputTable, outputBase, numPartition, logicalProducerTaskCount) : null;
-        for (int i = 0; i < inputSplits.size();)
+        for (List<InputSplit> producerGroup : producerGroups)
         {
             PartitionInput partitionInput = new PartitionInput();
+            partitionInput.setMemoryPolicy(memoryPolicy);
             partitionInput.setTransId(transId);
             partitionInput.setTimestamp(timestamp);
             ScanTableInfo tableInfo = new ScanTableInfo();
-            ImmutableList.Builder<InputSplit> inputsBuilder = ImmutableList
-                    .builderWithExpectedSize(IntraWorkerParallelism);
-            for (int j = 0; j < IntraWorkerParallelism && i < inputSplits.size(); ++j, ++i)
-            {
-                // We assign a number of IntraWorkerParallelism input-splits to each partition worker.
-                inputsBuilder.add(inputSplits.get(i));
-            }
-            tableInfo.setInputSplits(inputsBuilder.build());
+            tableInfo.setInputSplits(producerGroup);
             tableInfo.setColumnsToRead(inputTable.getColumnNames());
             tableInfo.setTableName(inputTable.getTableName());
             if (inputTable.getTableType() == Table.TableType.BASE)

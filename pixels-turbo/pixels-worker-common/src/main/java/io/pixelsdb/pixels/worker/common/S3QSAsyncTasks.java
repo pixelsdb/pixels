@@ -4,12 +4,15 @@ package io.pixelsdb.pixels.worker.common;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** Invocation-owned, bounded I/O tasks. No work is run on the submitting thread. */
+/** Invocation-owned I/O tasks. No work is run on the submitting thread. */
 final class S3QSAsyncTasks implements AutoCloseable
 {
     interface Task { void run() throws Exception; }
@@ -20,15 +23,36 @@ final class S3QSAsyncTasks implements AutoCloseable
     private final AtomicReference<Throwable> failure = new AtomicReference<>();
     private volatile boolean closed;
 
+    /** Producer admission is controlled by the output byte budget, without a job-count limit. */
+    S3QSAsyncTasks(WorkerCancellation cancellation, int threads)
+    {
+        this(cancellation, threads, null);
+    }
+
+    /** Consumer acknowledgements retain their separate bound on queued and running jobs. */
     S3QSAsyncTasks(WorkerCancellation cancellation, int threads, int maxInFlight)
     {
-        if (threads <= 0 || maxInFlight <= 0)
+        this(cancellation, Math.min(threads, maxInFlight), new Semaphore(maxInFlight));
+    }
+
+    private S3QSAsyncTasks(WorkerCancellation cancellation, int threads, Semaphore slots)
+    {
+        if (threads <= 0)
         {
-            throw new IllegalArgumentException("S3QS I/O concurrency and in-flight limit must be positive");
+            throw new IllegalArgumentException("S3QS I/O concurrency must be positive");
         }
         this.cancellation = cancellation;
-        this.slots = new Semaphore(maxInFlight);
-        this.executor = Executors.newFixedThreadPool(Math.min(threads, maxInFlight));
+        this.slots = slots;
+        this.executor = new ThreadPoolExecutor(threads, threads, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>())
+        {
+            @Override
+            public List<Runnable> shutdownNow()
+            {
+                List<Runnable> pending = super.shutdownNow();
+                for (Runnable job : pending) { ((Job) job).release(); }
+                return pending;
+            }
+        };
         cancellation.own(executor);
     }
 
@@ -50,35 +74,62 @@ final class S3QSAsyncTasks implements AutoCloseable
         if (closed) { throw new WorkerException("S3QS I/O scope is closed"); }
     }
 
-    void submit(Task task)
+    void submit(Task task) { submit(task, () -> {}); }
+
+    /** Cleanup runs exactly once, after real execution or removal from the queue. */
+    void submit(Task task, Runnable cleanup)
     {
-        check();
+        boolean acquired = false;
         try
         {
-            while (!slots.tryAcquire(100, TimeUnit.MILLISECONDS)) { check(); }
+            check();
+            if (slots != null)
+            {
+                while (!slots.tryAcquire(100, TimeUnit.MILLISECONDS)) { check(); }
+                acquired = true;
+                check();
+            }
+            executor.execute(new Job(task, cleanup));
         }
         catch (InterruptedException error)
         {
+            if (acquired) { slots.release(); }
+            cleanup.run();
             Thread.currentThread().interrupt();
             throw new WorkerException("interrupted submitting S3QS I/O", error);
         }
-        try
-        {
-            check();
-            executor.execute(() -> {
-                try { check(); task.run(); }
-                catch (Throwable error)
-                {
-                    if (failure.compareAndSet(null, error)) { executor.shutdownNow(); }
-                }
-                finally { slots.release(); }
-            });
-        }
         catch (RuntimeException | Error error)
         {
-            slots.release();
+            if (acquired) { slots.release(); }
+            cleanup.run();
             check();
             throw error;
+        }
+    }
+
+    private final class Job implements Runnable
+    {
+        private final Task task;
+        private final Runnable cleanup;
+        private final AtomicBoolean released = new AtomicBoolean();
+        Job(Task task, Runnable cleanup) { this.task = task; this.cleanup = cleanup; }
+        @Override
+        public void run()
+        {
+            try { check(); task.run(); }
+            catch (Throwable error)
+            {
+                if (failure.compareAndSet(null, error)) { executor.shutdownNow(); }
+            }
+            finally { release(); }
+        }
+        void release()
+        {
+            if (released.compareAndSet(false, true))
+            {
+                try { cleanup.run(); }
+                finally { if (slots != null) { slots.release(); } }
+            }
         }
     }
 

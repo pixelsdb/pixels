@@ -55,6 +55,11 @@
             <artifactId>pixels-storage-redis</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.pixelsdb</groupId>
+            <artifactId>pixels-storage-localfs</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- S3QS runners use the coordinator RPC client on every platform. -->
         <dependency>

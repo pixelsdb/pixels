@@ -110,4 +110,13 @@ public abstract class LambdaInvoker implements Invoker
     {
         return memoryMB;
     }
+
+    @Override
+    public int getCpuCount()
+    {
+        // Lambda CPU power is proportional to memory: 1769 MiB per vCPU,
+        // up to six. This is a planning hint, not a measured runtime quota.
+        // https://docs.aws.amazon.com/lambda/latest/dg/configuration-memory.html
+        return Math.max(1, Math.min(6, (memoryMB + 1768) / 1769));
+    }
 }

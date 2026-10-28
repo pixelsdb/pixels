@@ -84,18 +84,104 @@ with older configurations:
 
 ```properties
 s3qs.producer.io.threads=4
-s3qs.producer.io.max.inflight=8
 s3qs.consumer.ack.threads=2
 s3qs.consumer.ack.max.inflight=32
 ```
 
-Limits are per invocation, not additional cloud Workers. The in-flight limit includes running and queued jobs;
-when reached, submission applies cancellation-aware backpressure rather than growing an unbounded queue.
+Limits are per invocation, not additional cloud Workers. Producer execution uses a fixed number of I/O
+threads, without a separate limit on the number of queued write jobs. With the partition memory policy
+enabled, the shared output byte budget applies cancellation-aware backpressure and covers partial buffers,
+queued batches and running writes until publication completes. Without that policy, there is no producer
+queue admission bound. The former `s3qs.producer.io.max.inflight` property is no longer used.
+The consumer acknowledgement in-flight limit still includes running and queued ACK jobs.
 Producer jobs retain batches until publication completes; partial per-partition buffers are grouped using an
 8 MiB memory estimate, with the existing writer enforcing the actual encoded object size. Scan-side partition
 buffers still exist, so these limits are not a hard cap on the invocation's entire heap. Output I/O metrics count
 background job durations and END publication; these may overlap scanning and must not be added to scan
 wall time as an end-to-end latency breakdown.
+
+## S3QS query completion and cleanup
+
+Coordinated output collection waits for execution and owned shuffle cleanup to succeed, restoring the
+original synchronous completion path. Cleanup first requires resource preparation and remote workers to
+stop; unknown workers retain the resource inventory instead of permitting unsafe deletion. A cleanup
+failure or timeout fails collection and keeps the manifest and terminal coordinator for recovery.
+`executor.s3qs.cleanup.timeout.ms` bounds deletion, separately from the query execution deadline.
+Only query-owned shuffle queues, registrations and objects are deleted here. Lambda function definitions,
+VPCs, security groups and endpoints belong to the backend deployment lifecycle. Final result paths remain
+owned by the connector's existing file cleaner after transaction termination and safe shuffle cleanup.
+
+## Experimental resource-aware partition producers
+
+```properties
+executor.partition.memory.planner.enabled=false
+executor.partition.memory.worker.enabled=false
+```
+
+Planner enablement obtains the actual producer function's memory and CPU hint from its backend invoker
+(`PARTITION` for Batch, `PARTITION_S3QS` for S3QS). Lambda already caches MemorySize when its invoker is
+initialized; its CPU hint approximates one vCPU per 1769 MiB, up to six. Spike reports its existing
+backend request defaults. Unknown/nonpositive backend memory is an explicit planning error. Changing a
+function's configuration requires refreshing/reloading its invoker resource snapshot. There is no second
+worker-memory configuration to keep synchronized. The old `worker.mb`, `reader.threads` and
+`window.row.groups` settings under `executor.partition.memory` have been removed.
+
+Base-table task sizing uses the existing metadata service's average column-chunk sizes, row count and
+output schema. It never opens an input file or fetches RG footers. S3QS targets roughly 1.5 times backend
+memory in selected encoded input per logical task. Batch targets 90% of its output pool minus partition
+tail capacity, using a 1.5x retained-output estimate and a coarse variable-width allowance. These are
+initial heuristics, not exact peak-memory predictions. Missing statistics use the existing row-group
+size as an estimate; unknown input ranges stay intact. Filters do not shrink memory estimates.
+
+One PartitionInput remains one logical producer. RG ranges are split/combined before ids and END
+membership are frozen. Each task receives about two input slices per planned scan thread; the former
+fixed eight-split task cap no longer applies when the policy is enabled. Hash partition counts and the
+DATA/END protocol are unchanged. More backend memory gives larger tasks; CPU hints determine the
+independent slices available inside each task. Partition-tail capacity can reduce the scan-thread hint.
+
+Budgets use up to 85% of backend memory, leaving native/SDK headroom; workers also clamp this working
+set to actual JVM max heap. Input and output byte pools each receive 35% of that working set. Another
+15% bounds partition-tail capacity, and the remainder covers decoded batches and runtime overhead.
+These figures are initial resource fractions, not an RSS hard cap. Lambda wrappers pass the actual
+runtime memory limit, replacing a stale task policy when deployment memory changed. For a task without
+a policy, worker enablement derives a fallback from the runtime platform limit (or JVM heap if unknown).
+
+Scan concurrency uses the backend CPU hint clamped to runtime availableProcessors and actual task
+slices. Windows are byte-sized rather than capped at four RG: each reader targets its share of the input
+pool, charging twice encoded bytes for chunks and a possible read copy. Normal sizing uses whole-RG
+lengths from the already loaded file tail. Only a missing/oversized current RG requires exact selected
+chunk sizing. Closed record readers and owned binary values allow input windows to be reclaimed.
+Oversized selected RGs and retained Batch output fail explicitly; no spill or next-window prefetch is added.
+
+S3QS pending, queued and executing batches share the output pool. Pressure flushes the largest pending
+partition, then blocks the scanner until publication frees space. Producer writes have no separate
+job-count admission limit; the configured I/O thread count still bounds execution, and the 8 MiB object
+limit still applies. The byte budget only exists when the memory policy is active; without it, the
+producer write queue has no admission bound. Partitioner tails, encoder/SDK/native buffers and metadata are not all
+represented by these two byte counters. The independent idle S3QS buffer pool retains at most four
+buffers. MemoryMetrics reports backend/usable memory, actual scan threads, byte limits/peaks/waits,
+tail limit and window counts. Wait/cost counters may overlap and must not be summed as query latency.
+
+## S3QS partitioned-join consumer behavior
+
+The producer memory policy above does not apply to BasePartitionedJoinWorker. A normal S3QS join task
+first obtains both schemas (possibly waiting for messages), consumes its small-table partition into an
+in-memory hash table, and then consumes the large-table partition. The S3QS physical reader downloads
+one complete object before decoding row batches. Message polling, object reads and join computation
+run sequentially on the executing thread in the two-sided S3QS path; the generic cores-times-two pool
+created at entry is used by the Batch file branches, not by this S3QS data path.
+
+Joined batches accumulate in unbounded result queues and are written through the normal PixelsWriter
+after probing completes. There is no consumer input/output byte policy, explicit hash-table capacity
+budget, spill, or overlapping result writer in this path. The 8 MiB input-object limit therefore does
+not bound decoded data, retained build state, or accumulated join output. Hash-table tuples retain
+column vectors; variable-width references may also prolong input-buffer lifetimes.
+
+Acknowledgements remain separate asynchronous work: two threads and at most 32 queued/running ACKs
+by default. A full ACK scope blocks further message handling; successful task completion waits for ACKs.
+These limits were retained independently of producer write-slot removal. The stage runner executes
+logical tasks sequentially and maintains a separate lease heartbeat; waiting on one partition does
+not switch that invocation to another logical task.
 
 ## Start Pixels (with Turbo)
 

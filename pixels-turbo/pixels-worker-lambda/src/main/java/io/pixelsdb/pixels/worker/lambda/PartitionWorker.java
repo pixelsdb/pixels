@@ -41,7 +41,7 @@ public class PartitionWorker implements RequestHandler<PartitionInput, Partition
     @Override
     public PartitionOutput handleRequest(PartitionInput event, Context context)
     {
-        WorkerContext workerContext = new WorkerContext(logger, workerMetrics, context.getAwsRequestId());
+        WorkerContext workerContext = new WorkerContext(logger, workerMetrics, context.getAwsRequestId()).withMemoryMB(context.getMemoryLimitInMB());
         BasePartitionWorker baseWorker = new BasePartitionWorker(workerContext);
         return baseWorker.process(event);
     }

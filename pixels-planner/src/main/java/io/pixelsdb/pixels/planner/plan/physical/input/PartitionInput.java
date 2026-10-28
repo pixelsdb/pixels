@@ -21,6 +21,7 @@ package io.pixelsdb.pixels.planner.plan.physical.input;
 
 import io.pixelsdb.pixels.common.turbo.Input;
 import io.pixelsdb.pixels.planner.plan.physical.domain.OutputInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionMemoryPolicy;
 import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ScanTableInfo;
 
@@ -55,6 +56,10 @@ public class PartitionInput extends Input
      * The stable logical producer task id for shuffle protocols.
      */
     private int producerTaskId = -1;
+    private PartitionMemoryPolicy memoryPolicy;
+
+    public PartitionMemoryPolicy getMemoryPolicy() { return memoryPolicy; }
+    public void setMemoryPolicy(PartitionMemoryPolicy value) { memoryPolicy = value; }
 
     /**
      * Default constructor for Jackson.

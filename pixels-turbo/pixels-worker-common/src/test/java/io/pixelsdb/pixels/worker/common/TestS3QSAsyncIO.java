@@ -53,7 +53,7 @@ public class TestS3QSAsyncIO
         });
         ExecutorService caller = Executors.newSingleThreadExecutor();
         try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
-                f.storage, f.shuffle, 0, 2, f.context, 8192, 2, 2))
+                f.storage, f.shuffle, 0, 2, f.context, 8192, 2))
         {
             try
             {
@@ -70,6 +70,172 @@ public class TestS3QSAsyncIO
             finally { release.countDown(); }
         }
         finally { stop(caller); }
+        assertTrue(f.context.getCancellation().isQuiescent());
+    }
+
+    @Test(timeout = 10000)
+    public void sharedBytesFlushPendingPartitionsAndBlockBehindSlowUpload() throws Exception
+    {
+        Fixture f = new Fixture(2);
+        VectorizedRowBatch a = batch(16), b = batch(16), c = batch(16);
+        long bytes = a.getMemoryUsage();
+        PartitionByteBudget budget = new PartitionByteBudget(bytes * 2);
+        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1);
+        when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call ->
+        {
+            started.countDown(); assertTrue(release.await(3, TimeUnit.SECONDS));
+            return PutObjectResponse.builder().build();
+        });
+        ExecutorService caller = Executors.newSingleThreadExecutor();
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 2, f.context, 8192, 1, budget))
+        {
+            try
+            {
+                output.add(0, a, f.schema); output.add(1, b, f.schema);
+                Future<?> third = caller.submit(() -> output.add(0, c, f.schema));
+                assertTrue(started.await(1, TimeUnit.SECONDS));
+                assertThrows(TimeoutException.class, () -> third.get(100, TimeUnit.MILLISECONDS));
+                assertEquals(bytes * 2, budget.peak());
+                release.countDown(); third.get(2, TimeUnit.SECONDS);
+                output.finish(f.schema, new HashSet<>());
+                assertEquals(0, budget.used());
+                f.verifyEnds(2);
+            }
+            finally { release.countDown(); }
+        }
+        finally { stop(caller); }
+        assertEquals(0, budget.used());
+    }
+
+    @Test(timeout = 10000)
+    public void moreThanEightWritesQueueUntilByteBudgetIsFull() throws Exception
+    {
+        Fixture f = new Fixture(1);
+        long bytes = batch(2048).getMemoryUsage();
+        PartitionByteBudget budget = new PartitionByteBudget(bytes * 12);
+        CountDownLatch started = new CountDownLatch(2), release = new CountDownLatch(1);
+        AtomicInteger active = new AtomicInteger(), peak = new AtomicInteger();
+        when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call ->
+        {
+            peak.accumulateAndGet(active.incrementAndGet(), Math::max);
+            started.countDown();
+            try { assertTrue(release.await(5, TimeUnit.SECONDS)); }
+            finally { active.decrementAndGet(); }
+            return PutObjectResponse.builder().build();
+        });
+        ExecutorService caller = Executors.newSingleThreadExecutor();
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 1, f.context, 8192, 2, budget))
+        {
+            try
+            {
+                Future<?> queued = caller.submit(() ->
+                {
+                    for (int i = 0; i < 12; i++) { output.add(0, batch(2048), f.schema); }
+                });
+                assertTrue(started.await(2, TimeUnit.SECONDS));
+                // Both writers are blocked, but submission must pass the former eight-job limit.
+                queued.get(2, TimeUnit.SECONDS);
+                assertEquals(budget.limit(), budget.used());
+                Future<?> next = caller.submit(() -> output.add(0, batch(2048), f.schema));
+                assertThrows(TimeoutException.class, () -> next.get(100, TimeUnit.MILLISECONDS));
+                assertTrue(f.sent.isEmpty());
+                release.countDown();
+                next.get(2, TimeUnit.SECONDS);
+                output.finish(f.schema, new HashSet<>());
+                assertEquals(2, peak.get());
+                assertEquals(0, budget.used());
+                assertEquals(budget.limit(), budget.peak());
+                assertEquals(13 * 2048,
+                        f.sent.stream().filter(S3QueueMessage::isData).mapToLong(S3QueueMessage::getRowCount).sum());
+                f.verifyEnds(1);
+            }
+            finally { release.countDown(); }
+        }
+        finally { stop(caller); }
+        assertEquals(0, budget.used());
+        assertTrue(f.context.getCancellation().isQuiescent());
+    }
+
+    @Test(timeout = 10000)
+    public void concurrentScannersMakeProgressWithOnlyThreeBatchesOfSharedSpace() throws Exception
+    {
+        Fixture f = new Fixture(4);
+        PartitionByteBudget budget = new PartitionByteBudget(batch(16).getMemoryUsage() * 3);
+        ExecutorService callers = Executors.newFixedThreadPool(4);
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 4, f.context, 8192, 1, budget))
+        {
+            List<Future<?>> futures = new ArrayList<>();
+            for (int scanner = 0; scanner < 4; scanner++)
+            {
+                final int id = scanner;
+                futures.add(callers.submit(() -> {
+                    for (int i = 0; i < 20; i++) { output.add((id + i) % 4, batch(16), f.schema); }
+                }));
+            }
+            for (Future<?> future : futures) { future.get(5, TimeUnit.SECONDS); }
+            output.finish(f.schema, new HashSet<>());
+            assertEquals(0, budget.used());
+            assertTrue(budget.peak() <= budget.limit());
+            assertEquals(4 * 20 * 16, f.sent.stream().filter(S3QueueMessage::isData)
+                    .mapToLong(S3QueueMessage::getRowCount).sum());
+            f.verifyEnds(4);
+        }
+        finally { stop(callers); }
+        assertEquals(0, budget.used());
+    }
+
+    @Test(timeout = 5000)
+    public void closingWhileScannerOwnsBytesRejectsLateTransfer() throws Exception
+    {
+        Fixture f = new Fixture(1);
+        PartitionByteBudget budget = new PartitionByteBudget(batch(16).getMemoryUsage());
+        S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 1, f.context, 8192, 1, budget);
+        Field partitions = S3QSAsyncPartitionOutput.class.getDeclaredField("partitions");
+        partitions.setAccessible(true);
+        Field closed = S3QSAsyncPartitionOutput.class.getDeclaredField("closed");
+        closed.setAccessible(true);
+        ExecutorService callers = Executors.newFixedThreadPool(2);
+        try
+        {
+            Future<?> add, close;
+            synchronized (((Object[]) partitions.get(output))[0])
+            {
+                add = callers.submit(() -> output.add(0, batch(16), f.schema));
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+                while (budget.used() == 0 && System.nanoTime() < deadline) { Thread.sleep(1); }
+                assertEquals(budget.limit(), budget.used());
+                close = callers.submit(output::close);
+                while (!closed.getBoolean(output) && System.nanoTime() < deadline) { Thread.sleep(1); }
+                assertTrue(closed.getBoolean(output));
+            }
+            assertThrows(ExecutionException.class, () -> add.get(1, TimeUnit.SECONDS));
+            close.get(1, TimeUnit.SECONDS);
+            assertEquals(0, budget.used());
+            assertTrue(f.sent.isEmpty());
+        }
+        finally { stop(callers); output.close(); }
+    }
+
+    @Test(timeout = 5000)
+    public void failedPublicationReleasesSharedBytesWithoutEnd() throws Exception
+    {
+        Fixture f = new Fixture(2);
+        PartitionByteBudget budget = new PartitionByteBudget(batch(16).getMemoryUsage() * 3);
+        when(f.sqs.sendMessage(any(SendMessageRequest.class)))
+                .thenThrow(SqsException.builder().message("injected DATA send failure").build());
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 2, f.context, 8192, 1, budget))
+        {
+            output.add(0, batch(16), f.schema);
+            output.add(1, batch(16), f.schema);
+            assertThrows(Exception.class, () -> output.finish(f.schema, new HashSet<>()));
+        }
+        assertEquals(0, budget.used());
+        assertTrue(f.sent.isEmpty());
         assertTrue(f.context.getCancellation().isQuiescent());
     }
 
@@ -128,7 +294,7 @@ public class TestS3QSAsyncIO
         when(f.sqs.sendMessage(any(SendMessageRequest.class)))
                 .thenThrow(SqsException.builder().message("injected DATA send failure").build());
         try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
-                f.storage, f.shuffle, 0, 1, f.context, 8192, 2, 4))
+                f.storage, f.shuffle, 0, 1, f.context, 8192, 2))
         {
             output.add(0, batch(1), f.schema);
             assertThrows(IOException.class, () -> output.finish(f.schema, new HashSet<>()));
@@ -171,7 +337,7 @@ public class TestS3QSAsyncIO
     {
         Fixture f = new Fixture(1);
         try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
-                f.storage, f.shuffle, 0, 1, f.context, 8192, 4, 8))
+                f.storage, f.shuffle, 0, 1, f.context, 8192, 4))
         {
             for (int i = 0; i < 12; ++i) { output.add(0, batch(2048), f.schema); }
             output.finish(f.schema, new HashSet<>());

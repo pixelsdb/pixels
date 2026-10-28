@@ -51,4 +51,7 @@ public interface Invoker
      * @return the template memory size in MB of the invoked cloud function.
      */
     int getMemoryMB();
+
+    /** CPU parallelism hint for planning; the worker checks its runtime CPU count. */
+    default int getCpuCount() { return 1; }
 }

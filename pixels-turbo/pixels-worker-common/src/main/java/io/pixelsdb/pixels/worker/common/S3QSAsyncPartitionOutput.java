@@ -30,22 +30,36 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     private final S3QSAsyncTasks writes;
     private final Partition[] partitions;
     private final int chunkBytes;
+    private final PartitionByteBudget memory;
+    private volatile boolean closed;
 
     S3QSAsyncPartitionOutput(S3QS storage, ShuffleInfo shuffle, int producerId, int count, WorkerContext context)
     {
-        this(storage, shuffle, producerId, count, context, Constants.S3QS_BUFFER_SIZE,
-                S3QSAsyncTasks.setting("s3qs.producer.io.threads", 4),
-                S3QSAsyncTasks.setting("s3qs.producer.io.max.inflight", 8));
+        this(storage, shuffle, producerId, count, context, null);
     }
 
     S3QSAsyncPartitionOutput(S3QS storage, ShuffleInfo shuffle, int producerId, int count,
-                            WorkerContext context, int chunkBytes, int threads, int maxInFlight)
+                            WorkerContext context, PartitionByteBudget memory)
+    {
+        this(storage, shuffle, producerId, count, context, Constants.S3QS_BUFFER_SIZE,
+                S3QSAsyncTasks.setting("s3qs.producer.io.threads", 4), memory);
+    }
+
+    S3QSAsyncPartitionOutput(S3QS storage, ShuffleInfo shuffle, int producerId, int count,
+                            WorkerContext context, int chunkBytes, int threads)
+    {
+        this(storage, shuffle, producerId, count, context, chunkBytes, threads, null);
+    }
+
+    S3QSAsyncPartitionOutput(S3QS storage, ShuffleInfo shuffle, int producerId, int count,
+                            WorkerContext context, int chunkBytes, int threads, PartitionByteBudget memory)
     {
         if (producerId < 0) { throw new WorkerException("producerTaskId is not set for s3qs shuffle"); }
         if (chunkBytes <= 0 || chunkBytes > Constants.S3QS_BUFFER_SIZE || count <= 0)
         {
             throw new IllegalArgumentException("invalid S3QS partition/chunk size");
         }
+        this.memory = memory;
         this.storage = storage;
         this.shuffle = shuffle;
         this.producerId = producerId;
@@ -53,7 +67,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         this.chunkBytes = chunkBytes;
         this.partitions = new Partition[count];
         for (int i = 0; i < count; ++i) { partitions[i] = new Partition(); }
-        this.writes = new S3QSAsyncTasks(context.getCancellation(), threads, maxInFlight);
+        this.writes = new S3QSAsyncTasks(context.getCancellation(), threads);
     }
 
     void check() { writes.check(); }
@@ -63,18 +77,63 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     {
         writes.check();
         if (batch.isEmpty()) { return; }
-        Partition partition = partitions[partitionId];
-        synchronized (partition)
+        long bytes = Math.max(1L, batch.getMemoryUsage());
+        if (memory != null && !memory.tryAcquire(bytes))
         {
-            long bytes = Math.max(1L, batch.getMemoryUsage());
-            if (!partition.batches.isEmpty() && partition.estimatedBytes + bytes > chunkBytes)
+            // Never wait for bytes while holding a partition lock. Pending
+            // buffers must become write jobs, or no writer can free memory.
+            memory.acquire(bytes, () ->
             {
-                flush(partitionId, partition);
+                writes.check();
+                if (memory.used() > memory.limit() - bytes) { flushLargestPending(); }
+            });
+        }
+        boolean transferred = false;
+        try
+        {
+            Partition partition = partitions[partitionId];
+            synchronized (partition)
+            {
+                // Cleanup may race a scanner that already reserved its bytes.
+                // Recheck under the same lock used to drain pending buffers.
+                if (closed) { throw new WorkerException("S3QS partition output is closed"); }
+                writes.check();
+                if (!partition.batches.isEmpty() && partition.estimatedBytes + bytes > chunkBytes)
+                {
+                    flush(partitionId, partition);
+                }
+                partition.schema = schema;
+                partition.batches.add(batch);
+                partition.estimatedBytes += bytes;
+                transferred = true;
+                if (partition.estimatedBytes >= chunkBytes) { flush(partitionId, partition); }
             }
-            partition.schema = schema;
-            partition.batches.add(batch);
-            partition.estimatedBytes += bytes;
-            if (partition.estimatedBytes >= chunkBytes) { flush(partitionId, partition); }
+        }
+        finally { if (!transferred && memory != null) { memory.release(bytes); } }
+    }
+
+    private void flushLargestPending()
+    {
+        int largest = -1;
+        long bytes = 0;
+        for (int i = 0; i < partitions.length; i++)
+        {
+            synchronized (partitions[i])
+            {
+                if (partitions[i].estimatedBytes > bytes) { largest = i; bytes = partitions[i].estimatedBytes; }
+            }
+        }
+        if (largest >= 0)
+        {
+            synchronized (partitions[largest]) { flush(largest, partitions[largest]); }
+        }
+    }
+
+    private void flushPending()
+    {
+        for (int i = 0; i < partitions.length; i++)
+        {
+            synchronized (partitions[i]) { flush(i, partitions[i]); }
         }
     }
 
@@ -83,6 +142,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         if (partition.batches.isEmpty()) { return; }
         List<VectorizedRowBatch> batches = partition.batches;
         TypeDescription schema = partition.schema;
+        long reservedBytes = partition.estimatedBytes;
         partition.batches = new ArrayList<>();
         partition.estimatedBytes = 0;
         writes.submit(() -> {
@@ -93,13 +153,13 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
                         chunkBytes, partition.sequence, writes::check).write(batches);
             }
             finally { context.getWorkerMetrics().addOutputCostNs(System.nanoTime() - start); }
-        });
+        }, () -> { if (memory != null) { memory.release(reservedBytes); } });
     }
 
     /** Must be called only after every scanner has finished transferring its tail batches. */
     void finish(TypeDescription schema, Set<Integer> hashValues) throws Exception
     {
-        for (int i = 0; i < partitions.length; ++i) { flush(i, partitions[i]); }
+        flushPending();
         writes.await();
         long start = System.nanoTime();
         try
@@ -117,5 +177,21 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     }
 
     @Override
-    public void close() { writes.close(); }
+    public void close()
+    {
+        closed = true;
+        try { writes.close(); }
+        finally
+        {
+            for (Partition partition : partitions)
+            {
+                synchronized (partition)
+                {
+                    if (memory != null) { memory.release(partition.estimatedBytes); }
+                    partition.batches.clear();
+                    partition.estimatedBytes = 0;
+                }
+            }
+        }
+    }
 }

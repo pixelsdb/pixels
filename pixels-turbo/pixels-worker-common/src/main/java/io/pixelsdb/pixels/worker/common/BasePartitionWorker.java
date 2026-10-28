@@ -31,6 +31,8 @@ import io.pixelsdb.pixels.executor.join.Partitioner;
 import io.pixelsdb.pixels.executor.predicate.TableScanFilter;
 import io.pixelsdb.pixels.executor.scan.Scanner;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputInfo;
+import io.pixelsdb.pixels.planner.plan.physical.domain.PartitionMemoryPolicy;
+import io.pixelsdb.pixels.planner.plan.physical.PartitionInputSizing;
 import io.pixelsdb.pixels.planner.plan.physical.domain.InputSplit;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.StorageInfo;
@@ -58,6 +60,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 {
     private final Logger logger;
     private final WorkerMetrics workerMetrics;
+    private PartitionMemoryAccount memory;
 
     public BasePartitionWorker(WorkerContext context)
     {
@@ -77,19 +80,42 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         partitionOutput.setErrorMessage("");
         workerMetrics.clear();
         ExecutorService threadPool = null;
+        List<ConcurrentLinkedQueue<VectorizedRowBatch>> retained = null;
+        memory = null;
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             context.getCancellation().check();
             WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger, context.getCancellation());
-            threadPool = context.createThreadPool(cores * 2, exceptionHandler);
 
             long transId = event.getTransId();
             long timestamp = event.getTimestamp();
             requireNonNull(event.getTableInfo(), "event.tableInfo is null");
             StorageInfo inputStorageInfo = event.getTableInfo().getStorageInfo();
             List<InputSplit> inputSplits = event.getTableInfo().getInputSplits();
+            PartitionMemoryPolicy policy = event.getMemoryPolicy();
+            if (policy == null && PartitionMemoryPolicy.enabled("worker"))
+            {
+                long bytes = context.getMemoryBytes() > 0 ? context.getMemoryBytes() : Runtime.getRuntime().maxMemory();
+                policy = PartitionMemoryPolicy.forResources(bytes, cores);
+            }
+            // The platform's runtime limit wins if the deployed function changed
+            // after the planner's invoker resource snapshot was loaded.
+            if (policy != null && context.getMemoryBytes() > 0 && policy.getWorkerBytes() != context.getMemoryBytes())
+            {
+                policy = PartitionMemoryPolicy.forResources(context.getMemoryBytes(), cores);
+            }
+            if (policy != null)
+            {
+                if (inputStorageInfo.getScheme() == Storage.Scheme.httpstream)
+                {
+                    throw new WorkerException("partition memory windows require a seekable file input");
+                }
+                memory = new PartitionMemoryAccount(policy, inputSplits.size());
+            }
+            int readers = memory == null ? cores * 2 : memory.policy.getReaderThreads();
+            threadPool = context.createThreadPool(Math.max(1, Math.min(readers, inputSplits.size())), exceptionHandler);
             requireNonNull(event.getPartitionInfo(), "event.partitionInfo is null");
             int numPartition = event.getPartitionInfo().getNumPartition();
             logger.info("table '" + event.getTableInfo().getTableName() +
@@ -115,6 +141,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
                 // Batch shuffle retains batches here; S3QS transfers them to bounded background jobs.
                 List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned = new ArrayList<>(numPartition);
+                retained = partitioned;
                 for (int i = 0; i < numPartition; ++i)
                 {
                     partitioned.add(new ConcurrentLinkedQueue<>());
@@ -185,9 +212,11 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                         ConcurrentLinkedQueue<VectorizedRowBatch> batches = partitioned.get(hash);
                         if (!batches.isEmpty())
                         {
-                            for (VectorizedRowBatch batch : batches)
+                            VectorizedRowBatch batch;
+                            while ((batch = batches.poll()) != null)
                             {
-                                pixelsWriter.addRowBatch(batch, hash);
+                                try { pixelsWriter.addRowBatch(batch, hash); }
+                                finally { if (memory != null) { memory.output.release(batch.getMemoryUsage()); } }
                             }
                             hashValues.add(hash);
                         }
@@ -216,7 +245,28 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         }
         finally
         {
-            if (threadPool != null) { threadPool.shutdownNow(); }
+            if (threadPool != null)
+            {
+                threadPool.shutdownNow();
+                if (memory != null)
+                {
+                    try { threadPool.awaitTermination(5, TimeUnit.SECONDS); }
+                    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                }
+            }
+            if (memory != null)
+            {
+                if (retained != null && (threadPool == null || threadPool.isTerminated()))
+                {
+                    for (ConcurrentLinkedQueue<VectorizedRowBatch> queue : retained)
+                    {
+                        VectorizedRowBatch batch;
+                        while ((batch = queue.poll()) != null) { memory.output.release(batch.getMemoryUsage()); }
+                    }
+                }
+                partitionOutput.setMemoryMetrics(memory.snapshot());
+                logger.info("Partition memory: " + JSON.toJSONString(memory.snapshot()));
+            }
         }
     }
 
@@ -257,7 +307,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         {
             throw new WorkerException("storage of scheme s3qs is not S3QS");
         }
-        return new S3QSAsyncPartitionOutput((S3QS) storage, shuffleInfo, event.getProducerTaskId(), count, context);
+        return new S3QSAsyncPartitionOutput((S3QS) storage, shuffleInfo, event.getProducerTaskId(), count, context, memory == null ? null : memory.output);
     }
 
     /**
@@ -309,53 +359,67 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 {
                     continue;
                 }
-                if (inputInfo.getRgStart() + inputInfo.getRgLength() >= pixelsReader.getRowGroupNum())
+                int end = PartitionInputSizing.end(inputInfo, pixelsReader.getRowGroupNum());
+                for (int start = inputInfo.getRgStart(); start < end;)
                 {
-                    inputInfo.setRgLength(pixelsReader.getRowGroupNum() - inputInfo.getRgStart());
-                }
-                PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, columnsToRead, inputInfo);
-                PixelsRecordReader recordReader = pixelsReader.read(option);
-                TypeDescription rowBatchSchema = recordReader.getResultSchema();
-                VectorizedRowBatch rowBatch;
-
-                if (scanner == null)
-                {
-                    scanner = new Scanner(WorkerCommon.rowBatchSize, rowBatchSchema, columnsToRead, projection, filter);
-                }
-                if (partitioner == null)
-                {
-                    partitioner = new Partitioner(partitionResult.size(), WorkerCommon.rowBatchSize,
-                            scanner.getOutputSchema(), keyColumnIds);
-                }
-                if (writerSchema.get() == null)
-                {
-                    writerSchema.compareAndSet(null, scanner.getOutputSchema());
-                }
-
-                computeCostTimer.start();
-                do
-                {
-                    if (output != null) { output.check(); }
-                    context.getCancellation().check();
-                    rowBatch = scanner.filterAndProject(recordReader.readBatch(WorkerCommon.rowBatchSize));
-                    if (rowBatch.size > 0)
+                    long sizingStart = System.nanoTime();
+                    PartitionReadWindow window = memory == null ? null : PartitionReadWindow.next(
+                            pixelsReader, inputInfo, start, end, columnsToRead, memory.policy, memory.input.limit());
+                    long sizingNs = System.nanoTime() - sizingStart;
+                    InputInfo range = window == null ? new InputInfo(inputInfo.getPath(), start, end - start) : window.input;
+                    if (memory != null)
                     {
-                        Map<Integer, VectorizedRowBatch> result = partitioner.partition(rowBatch);
-                        if (!result.isEmpty())
-                        {
-                            for (Map.Entry<Integer, VectorizedRowBatch> entry : result.entrySet())
-                            {
-                                emitPartitionBatch(partitionResult, output, entry.getKey(),
-                                        entry.getValue(), scanner.getOutputSchema());
-                            }
-                        }
+                        memory.input.acquire(window.bytes, context.getCancellation()::check);
+                        memory.window(window, sizingNs);
                     }
-                } while (!rowBatch.endOfFile);
-                computeCostTimer.stop();
-                computeCostTimer.minus(recordReader.getReadTimeNanos());
-                readCostTimer.add(recordReader.getReadTimeNanos());
-                readBytes += recordReader.getCompletedBytes();
-                numReadRequests += recordReader.getNumReadRequests();
+                    PixelsRecordReader recordReader = null;
+                    try
+                    {
+                        PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, columnsToRead, range);
+                        recordReader = pixelsReader.read(option);
+                        TypeDescription rowBatchSchema = recordReader.getResultSchema();
+                        if (scanner == null)
+                        {
+                            scanner = new Scanner(WorkerCommon.rowBatchSize, rowBatchSchema, columnsToRead, projection, filter);
+                        }
+                        if (partitioner == null)
+                        {
+                            if (memory != null) { memory.validatePartitioner(scanner.getOutputSchema(), partitionResult.size()); }
+                            partitioner = new Partitioner(partitionResult.size(), WorkerCommon.rowBatchSize,
+                                    scanner.getOutputSchema(), keyColumnIds, memory != null);
+                        }
+                        writerSchema.compareAndSet(null, scanner.getOutputSchema());
+                        computeCostTimer.start();
+                        VectorizedRowBatch rowBatch;
+                        do
+                        {
+                            if (output != null) { output.check(); }
+                            context.getCancellation().check();
+                            rowBatch = scanner.filterAndProject(recordReader.readBatch(WorkerCommon.rowBatchSize));
+                            if (rowBatch.size > 0)
+                            {
+                                Map<Integer, VectorizedRowBatch> result = partitioner.partition(rowBatch);
+                                if (memory != null) { memory.checkTailBytes(partitioner.getRetainedMemoryUsage()); }
+                                for (Map.Entry<Integer, VectorizedRowBatch> entry : result.entrySet())
+                                {
+                                    emitPartitionBatch(partitionResult, output, entry.getKey(), entry.getValue(), scanner.getOutputSchema());
+                                }
+                            }
+                        } while (!rowBatch.endOfFile);
+                        computeCostTimer.stop();
+                        computeCostTimer.minus(recordReader.getReadTimeNanos());
+                        readCostTimer.add(recordReader.getReadTimeNanos());
+                        readBytes += recordReader.getCompletedBytes();
+                        numReadRequests += recordReader.getNumReadRequests();
+                    }
+                    finally
+                    {
+                        // Close decoder/chunk references before allowing another window to allocate.
+                        try { if (recordReader != null) { pixelsReader.closeRecordReader(recordReader); } }
+                        finally { if (memory != null) { memory.input.release(window.bytes); } }
+                    }
+                    start += range.getRgLength();
+                }
             } catch (Throwable e)
             {
                 throw new WorkerException("failed to scan the file '" +
@@ -379,11 +443,18 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         workerMetrics.addComputeCostNs(computeCostTimer.getElapsedNs());
     }
 
-    private static void emitPartitionBatch(List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitions,
+    private void emitPartitionBatch(List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitions,
                                           S3QSAsyncPartitionOutput output, int partition,
                                           VectorizedRowBatch batch, TypeDescription schema)
     {
-        if (output == null) { partitions.get(partition).add(batch); }
+        if (output == null)
+        {
+            if (memory != null && !memory.output.tryAcquire(batch.getMemoryUsage()))
+            {
+                throw new WorkerException("Batch retained output exceeds memory budget; enable planner memory limits or reduce task size");
+            }
+            partitions.get(partition).add(batch);
+        }
         // Partitioner replaces full batches; its tail is handed off only after scanning ends.
         else { output.add(partition, batch, schema); }
     }
