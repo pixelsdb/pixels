@@ -4,7 +4,7 @@ package io.pixelsdb.pixels.planner.plan.physical.domain;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.common.turbo.Invoker;
 
-/** Backend-derived producer budgets. Actual heap/CPU limits are checked inside the worker. */
+/** Producer budgets from backend resources and an optional conservative planning cap. */
 public class PartitionMemoryPolicy
 {
     private long workerBytes;
@@ -31,14 +31,22 @@ public class PartitionMemoryPolicy
         return Boolean.parseBoolean(ConfigFactory.Instance().getProperty("executor.partition.memory." + phase + ".enabled"));
     }
 
-    /** No resource-size override: use the same invoker that launches this stage. */
+    /** A planning cap can lower memory; CPU and actual backend resources stay unchanged. */
     public static PartitionMemoryPolicy fromBackend(Invoker invoker)
     {
-        if (invoker == null || invoker.getMemoryMB() <= 0)
+        int backendMB = invoker == null ? 0 : invoker.getMemoryMB();
+        if (backendMB <= 0)
         {
             throw new IllegalArgumentException("backend must report positive worker memory for partition planning");
         }
-        return forResources(Math.multiplyExact((long) invoker.getMemoryMB(), 1024L * 1024), invoker.getCpuCount());
+        String key = "executor.partition.memory.planning.mb";
+        String configured = ConfigFactory.Instance().getProperty(key);
+        long capMB;
+        try { capMB = configured == null ? 0 : Long.parseLong(configured.trim()); }
+        catch (NumberFormatException invalid) { throw new IllegalArgumentException(key + " must be a nonnegative integer in MiB", invalid); }
+        if (capMB < 0) { throw new IllegalArgumentException(key + " must be nonnegative; 0 uses backend memory"); }
+        long plannedMB = capMB == 0 ? backendMB : Math.min(backendMB, capMB);
+        return forResources(Math.multiplyExact(plannedMB, 1024L * 1024), invoker.getCpuCount());
     }
 
     public static PartitionMemoryPolicy forResources(long memoryBytes, int cpuCount)

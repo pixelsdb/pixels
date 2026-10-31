@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.TimeZone;
@@ -50,7 +51,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.RejectedExecutionException;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.pixelsdb.pixels.common.utils.Constants.DEFAULT_HDFS_BLOCK_SIZE;
@@ -501,60 +502,36 @@ public class PixelsWriterImpl implements PixelsWriter
 
     private void writeColumnVectors(ColumnVector[] columnVectors, int rowBatchSize)
     {
-        CompletableFuture<?>[] futures = new CompletableFuture[columnVectors.length];
-        AtomicInteger dataLength = new AtomicInteger(0);
-        int commonColumnLength = columnVectors.length - (hasHiddenColumn ? 1 : 0);
-        for (int i = 0; i < commonColumnLength; ++i)
+        List<CompletableFuture<Integer>> futures = new ArrayList<>(columnVectors.length);
+        int commonColumns = columnVectors.length - (hasHiddenColumn ? 1 : 0);
+        for (int i = 0; i < commonColumns; i++)
         {
-            CompletableFuture<Void> future = new CompletableFuture<>();
-            ColumnWriter writer = columnWriters[i];
-            ColumnVector columnVector = columnVectors[i];
-            int ii = i;
-            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-            columnWriterService.execute(() ->
-            {
-                try
-                {
-                    dataLength.addAndGet(writer.write(columnVector, rowBatchSize));
-                    future.complete(null);
-                } catch (ClassCastException e)
-                {
-                    StringBuilder sb = new StringBuilder();
-                    for (StackTraceElement element : stackTrace) {
-                        sb.append("\n\tat ").append(element);
-                    }
-                    throw new CompletionException(
-                            "Failed to write column, writer=" + writer +
-                                    ", writerId=" + ii +
-                                    "\nCall stack:" + sb,
-                            e);
-                }
-                catch (IOException e)
-                {
-                    throw new CompletionException("failed to write column vector", e);
-                }
-            });
-            futures[i] = future;
+            futures.add(encodeColumn(columnWriters[i], columnVectors[i], rowBatchSize));
         }
         if (hasHiddenColumn)
         {
-            CompletableFuture<Void> future = new CompletableFuture<>();
-            columnWriterService.execute(() ->
-            {
-                try
-                {
-                    dataLength.addAndGet(hiddenColumnWriter.write(
-                            columnVectors[commonColumnLength], rowBatchSize));
-                    future.complete(null);
-                } catch (IOException e)
-                {
-                    throw new CompletionException("failed to write hidden column vector", e);
-                }
-            });
-            futures[commonColumnLength] = future;
+            futures.add(encodeColumn(hiddenColumnWriter, columnVectors[commonColumns], rowBatchSize));
         }
-        CompletableFuture.allOf(futures).join();
-        curRowGroupDataLength += dataLength.get();
+        // Also settle previously submitted columns when a later submission is rejected.
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])).join();
+        for (CompletableFuture<Integer> future : futures) { curRowGroupDataLength += future.join(); }
+    }
+
+    private CompletableFuture<Integer> encodeColumn(ColumnWriter writer, ColumnVector vector, int rows)
+    {
+        try
+        {
+            return CompletableFuture.supplyAsync(() -> {
+                try { return writer.write(vector, rows); }
+                catch (IOException failure) { throw new CompletionException("Failed to encode column " + writer, failure); }
+            }, columnWriterService);
+        }
+        catch (RejectedExecutionException failure)
+        {
+            CompletableFuture<Integer> rejected = new CompletableFuture<>();
+            rejected.completeExceptionally(failure);
+            return rejected;
+        }
     }
 
     /**
@@ -579,12 +556,15 @@ public class PixelsWriterImpl implements PixelsWriter
             {
                 hiddenColumnWriter.close();
             }
-            columnWriterService.shutdown();
-            columnWriterService.shutdownNow();
         }
         catch (IOException e)
         {
             LOGGER.error(e.getMessage());
+        }
+        finally
+        {
+            columnWriterService.shutdown();
+            columnWriterService.shutdownNow();
         }
     }
 

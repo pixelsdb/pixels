@@ -2,6 +2,7 @@
 package io.pixelsdb.pixels.worker.common;
 
 import io.pixelsdb.pixels.common.utils.Constants;
+import io.pixelsdb.pixels.common.physical.FixSizedBuffers;
 import io.pixelsdb.pixels.core.TypeDescription;
 import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Accepts detached partition batches while scanning; publishes END only after the DATA barrier. */
 final class S3QSAsyncPartitionOutput implements AutoCloseable
@@ -31,6 +33,8 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     private final Partition[] partitions;
     private final int chunkBytes;
     private final PartitionByteBudget memory;
+    private final AtomicInteger outstandingWrites = new AtomicInteger();
+    private final FixSizedBuffers stagingBuffers;
     private volatile boolean closed;
 
     S3QSAsyncPartitionOutput(S3QS storage, ShuffleInfo shuffle, int producerId, int count, WorkerContext context)
@@ -68,6 +72,8 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         this.partitions = new Partition[count];
         for (int i = 0; i < count; ++i) { partitions[i] = new Partition(); }
         this.writes = new S3QSAsyncTasks(context.getCancellation(), threads);
+        this.stagingBuffers = new FixSizedBuffers(chunkBytes, threads);
+        writes.afterTermination(stagingBuffers::clear);
     }
 
     void check() { writes.check(); }
@@ -85,7 +91,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
             memory.acquire(bytes, () ->
             {
                 writes.check();
-                if (memory.used() > memory.limit() - bytes) { flushLargestPending(); }
+                if (memory.used() > memory.limit() - bytes) { flushForProgress(); }
             });
         }
         boolean transferred = false;
@@ -112,8 +118,10 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         finally { if (!transferred && memory != null) { memory.release(bytes); } }
     }
 
-    private void flushLargestPending()
+    /** Retain mergeable batches while queued/running writes can release budget. */
+    private synchronized void flushForProgress()
     {
+        if (outstandingWrites.get() != 0) { return; }
         int largest = -1;
         long bytes = 0;
         for (int i = 0; i < partitions.length; i++)
@@ -125,7 +133,10 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         }
         if (largest >= 0)
         {
-            synchronized (partitions[largest]) { flush(largest, partitions[largest]); }
+            synchronized (partitions[largest])
+            {
+                if (outstandingWrites.get() == 0) { flush(largest, partitions[largest]); }
+            }
         }
     }
 
@@ -145,15 +156,19 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         long reservedBytes = partition.estimatedBytes;
         partition.batches = new ArrayList<>();
         partition.estimatedBytes = 0;
+        outstandingWrites.incrementAndGet();
         writes.submit(() -> {
             long start = System.nanoTime();
             try
             {
                 new S3QSPartitionWriter(storage, schema.clone(), shuffle, partitionId, producerId, context,
-                        chunkBytes, partition.sequence, writes::check).write(batches);
+                        chunkBytes, partition.sequence, writes::check, stagingBuffers).write(batches);
             }
             finally { context.getWorkerMetrics().addOutputCostNs(System.nanoTime() - start); }
-        }, () -> { if (memory != null) { memory.release(reservedBytes); } });
+        }, () -> {
+            try { if (memory != null) { memory.release(reservedBytes); } }
+            finally { outstandingWrites.decrementAndGet(); }
+        });
     }
 
     /** Must be called only after every scanner has finished transferring its tail batches. */

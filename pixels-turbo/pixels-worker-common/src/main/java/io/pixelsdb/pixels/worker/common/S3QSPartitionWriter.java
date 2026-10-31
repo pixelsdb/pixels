@@ -2,6 +2,7 @@
 package io.pixelsdb.pixels.worker.common;
 
 import io.pixelsdb.pixels.common.physical.PhysicalWriter;
+import io.pixelsdb.pixels.common.physical.FixSizedBuffers;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.PixelsWriter;
 import io.pixelsdb.pixels.core.TypeDescription;
@@ -30,6 +31,7 @@ final class S3QSPartitionWriter
     private final int limit;
     private final AtomicLong sequence;
     private final Runnable publishGuard;
+    private final FixSizedBuffers stagingBuffers;
 
     S3QSPartitionWriter(S3QS storage, TypeDescription schema, ShuffleInfo shuffle,
                         int partitionId, int producerId, WorkerContext context)
@@ -49,6 +51,15 @@ final class S3QSPartitionWriter
                         int partitionId, int producerId, WorkerContext context, int limit,
                         AtomicLong sequence, Runnable publishGuard)
     {
+        this(storage, schema, shuffle, partitionId, producerId, context, limit,
+                sequence, publishGuard, new FixSizedBuffers(limit, 1));
+    }
+
+    S3QSPartitionWriter(S3QS storage, TypeDescription schema, ShuffleInfo shuffle,
+                        int partitionId, int producerId, WorkerContext context, int limit,
+                        AtomicLong sequence, Runnable publishGuard, FixSizedBuffers stagingBuffers)
+    {
+        if (stagingBuffers.getBufferSize() != limit) { throw new IllegalArgumentException("staging size differs from object limit"); }
         if (limit <= 0 || limit > Constants.S3QS_BUFFER_SIZE)
         {
             throw new IllegalArgumentException("invalid S3QS object size limit: " + limit);
@@ -62,6 +73,7 @@ final class S3QSPartitionWriter
         this.limit = limit;
         this.sequence = sequence;
         this.publishGuard = publishGuard;
+        this.stagingBuffers = stagingBuffers;
     }
 
     /** Returns the next DATA sequence, which is also the END sequence for this partition. */
@@ -126,58 +138,57 @@ final class S3QSPartitionWriter
             return;
         }
 
-        context.getCancellation().check();
-        publishGuard.run();
-        S3QueueMessage message = BasePartitionWorker.createS3QSDataMessage(
-                shuffle, partitionId, producerId, 0, sequence.getAndIncrement(), schema)
-                .setRowCount(slices.stream().mapToLong(slice -> slice.length).sum())
-                .setByteSize(encoded.position);
-        PhysicalS3QSWriter physical = (PhysicalS3QSWriter) storage.offer(message);
-        physical.setPublishGuard(publishGuard);
-        // Do not close after a failed append: that could publish a partial object.
-        physical.append(encoded.bytes, 0, (int) encoded.position);
-        physical.close();
-        physical.requirePublished();
-        context.getWorkerMetrics().addWriteBytes(encoded.position);
-        context.getWorkerMetrics().addNumWriteRequests(1);
+        try
+        {
+            context.getCancellation().check();
+            publishGuard.run();
+            S3QueueMessage message = BasePartitionWorker.createS3QSDataMessage(
+                    shuffle, partitionId, producerId, 0, sequence.getAndIncrement(), schema)
+                    .setRowCount(slices.stream().mapToLong(slice -> slice.length).sum())
+                    .setByteSize(encoded.position);
+            PhysicalS3QSWriter physical = (PhysicalS3QSWriter) storage.offer(message);
+            physical.setPublishGuard(publishGuard);
+            // Do not close after a failed append: that could publish a partial object.
+            physical.append(encoded.bytes, 0, (int) encoded.position);
+            physical.close();
+            physical.requirePublished();
+            context.getWorkerMetrics().addWriteBytes(encoded.position);
+            context.getWorkerMetrics().addNumWriteRequests(1);
+        }
+        finally { encoded.release(); }
     }
 
     private StagingWriter encode(List<Slice> slices) throws IOException
     {
-        StagingWriter staging = new StagingWriter(limit);
-        PixelsWriter writer = WorkerCommon.getWriter(schema, storage, staging.getPath(), staging, false, null);
+        StagingWriter staging = new StagingWriter(limit, stagingBuffers);
+        boolean retained = false;
         try
         {
-            for (Slice slice : slices)
+            // Only local staging is closed on failure; no remote object is published here.
+            try (PixelsWriter writer = WorkerCommon.getWriter(schema, storage, staging.getPath(), staging, false, null))
             {
-                context.getCancellation().check();
-                if (slice.offset == 0 && slice.length == slice.batch.size)
+                for (Slice slice : slices)
                 {
-                    writer.addRowBatch(slice.batch);
-                }
-                else
-                {
-                    VectorizedRowBatch selected = schema.createRowBatch(slice.length, TypeDescription.Mode.NONE);
-                    int[] indexes = new int[slice.length];
-                    for (int i = 0; i < indexes.length; ++i)
+                    context.getCancellation().check();
+                    if (slice.offset == 0 && slice.length == slice.batch.size)
                     {
-                        indexes[i] = slice.offset + i;
+                        writer.addRowBatch(slice.batch);
                     }
-                    selected.addSelected(indexes, 0, indexes.length, slice.batch);
-                    writer.addRowBatch(selected);
+                    else
+                    {
+                        VectorizedRowBatch selected = schema.createRowBatch(slice.length, TypeDescription.Mode.NONE);
+                        int[] indexes = new int[slice.length];
+                        for (int i = 0; i < indexes.length; i++) { indexes[i] = slice.offset + i; }
+                        selected.addSelected(indexes, 0, indexes.length, slice.batch);
+                        writer.addRowBatch(selected);
+                    }
                 }
             }
+            if (!staging.closed) { throw new IOException("Pixels writer did not finish encoding S3QS object"); }
+            retained = !staging.overflow;
+            return retained ? staging : null;
         }
-        finally
-        {
-            // No remote side effects; even an oversized trial can finish and release encoder resources.
-            writer.close();
-        }
-        if (!staging.closed)
-        {
-            throw new IOException("Pixels writer did not finish encoding S3QS object");
-        }
-        return staging.bytes == null ? null : staging;
+        finally { if (!retained) { staging.release(); } }
     }
 
     private static final class Slice
@@ -197,11 +208,28 @@ final class S3QSPartitionWriter
     private static final class StagingWriter implements PhysicalWriter
     {
         private final int limit;
-        private byte[] bytes;
+        private final byte[] bytes;
+        private final FixSizedBuffers buffers;
+        private boolean overflow;
+        private boolean released;
         private long position;
         private boolean closed;
 
-        StagingWriter(int limit) { this.limit = limit; this.bytes = new byte[limit]; }
+        StagingWriter(int limit, FixSizedBuffers buffers)
+        {
+            this.limit = limit;
+            this.buffers = buffers;
+            this.bytes = buffers.allocate();
+        }
+
+        void release()
+        {
+            if (!released)
+            {
+                released = true;
+                buffers.free(bytes);
+            }
+        }
 
         @Override public long prepare(int length) { return position; }
         @Override public long append(ByteBuffer buffer)
@@ -215,9 +243,9 @@ final class S3QSPartitionWriter
             position += length;
             if (position > limit)
             {
-                bytes = null; // Discard an oversized trial, but let Pixels finish normal encoder cleanup.
+                overflow = true; // Keep counting, then reuse the array for smaller trials.
             }
-            else if (bytes != null)
+            else if (!overflow)
             {
                 System.arraycopy(buffer, offset, bytes, (int) start, length);
             }

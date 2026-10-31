@@ -42,6 +42,69 @@ import static org.mockito.Mockito.*;
 public class TestS3QSAsyncIO
 {
     @Test(timeout = 10000)
+    public void producerScratchCacheIsClearedAfterTheWriterPoolTerminates() throws Exception
+    {
+        Fixture fixture = new Fixture(1);
+        S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                fixture.storage, fixture.shuffle, 0, 1, fixture.context, 8192, 1);
+        Field field = S3QSAsyncPartitionOutput.class.getDeclaredField("stagingBuffers");
+        field.setAccessible(true);
+        io.pixelsdb.pixels.common.physical.FixSizedBuffers cache =
+                (io.pixelsdb.pixels.common.physical.FixSizedBuffers) field.get(output);
+        try
+        {
+            output.add(0, batch(2048), fixture.schema);
+            output.finish(fixture.schema, new HashSet<>());
+            assertFalse(fixture.sent.isEmpty());
+            assertEquals(0, cache.getCachedBufferCount());
+        }
+        finally { output.close(); }
+        assertEquals(0, cache.getCachedBufferCount());
+    }
+
+    @Test(timeout = 10000)
+    public void waitingForBytesPreservesPendingWhileAnUploadCanMakeProgress() throws Exception
+    {
+        Fixture f = new Fixture(2);
+        VectorizedRowBatch large = batch(2048), small = batch(16);
+        PartitionByteBudget budget = new PartitionByteBudget(large.getMemoryUsage() + small.getMemoryUsage());
+        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1);
+        when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call -> {
+            started.countDown();
+            assertTrue(release.await(3, TimeUnit.SECONDS));
+            return PutObjectResponse.builder().build();
+        });
+        ExecutorService caller = Executors.newSingleThreadExecutor();
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 2, f.context, 8192, 1, budget))
+        {
+            try
+            {
+                output.add(0, large, f.schema);
+                assertTrue(started.await(1, TimeUnit.SECONDS));
+                output.add(1, small, f.schema);
+                Future<?> waiting = caller.submit(() -> output.add(1, batch(16), f.schema));
+                assertThrows(TimeoutException.class, () -> waiting.get(200, TimeUnit.MILLISECONDS));
+                Field partitions = S3QSAsyncPartitionOutput.class.getDeclaredField("partitions");
+                partitions.setAccessible(true);
+                Object pending = ((Object[]) partitions.get(output))[1];
+                Field bytes = pending.getClass().getDeclaredField("estimatedBytes");
+                bytes.setAccessible(true);
+                synchronized (pending) { assertEquals(small.getMemoryUsage(), bytes.getLong(pending)); }
+                release.countDown();
+                waiting.get(2, TimeUnit.SECONDS);
+                output.finish(f.schema, new HashSet<>());
+                f.verifyEnds(2);
+                assertEquals(2080, f.sent.stream().filter(S3QueueMessage::isData)
+                        .mapToLong(S3QueueMessage::getRowCount).sum());
+            }
+            finally { release.countDown(); }
+        }
+        finally { stop(caller); }
+        assertEquals(0, budget.used());
+    }
+
+    @Test(timeout = 10000)
     public void producerUploadsOverlapAndAllDataMustCompleteBeforeAnyEnd() throws Exception
     {
         Fixture f = new Fixture(2);

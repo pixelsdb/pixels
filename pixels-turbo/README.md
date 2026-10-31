@@ -116,18 +116,24 @@ owned by the connector's existing file cleaner after transaction termination and
 ```properties
 executor.partition.memory.planner.enabled=false
 executor.partition.memory.worker.enabled=false
+executor.partition.memory.planning.mb=0
 ```
 
 Planner enablement obtains the actual producer function's memory and CPU hint from its backend invoker
 (`PARTITION` for Batch, `PARTITION_S3QS` for S3QS). Lambda already caches MemorySize when its invoker is
 initialized; its CPU hint approximates one vCPU per 1769 MiB, up to six. Spike reports its existing
 backend request defaults. Unknown/nonpositive backend memory is an explicit planning error. Changing a
-function's configuration requires refreshing/reloading its invoker resource snapshot. There is no second
-worker-memory configuration to keep synchronized. The old `worker.mb`, `reader.threads` and
-`window.row.groups` settings under `executor.partition.memory` have been removed.
+function's configuration requires refreshing/reloading its invoker resource snapshot. By default planning
+uses that backend memory. The optional `executor.partition.memory.planning.mb` is a planning-only upper
+bound in MiB: 0 (also the default when absent) follows the backend; a positive value uses the smaller of
+that value and backend memory. Negative, malformed or overflowing values fail planning. For example,
+6144 on a 10240 MiB backend plans at 6144 MiB while retaining the backend's CPU hint. It does not change
+Invoker resources, deployment memory, JVM heap or billing. It applies when planner memory policy is
+enabled and travels to workers in the existing policy; no matching worker-side configuration is needed.
+The old `worker.mb`, `reader.threads` and `window.row.groups` settings remain unused.
 
 Base-table task sizing uses the existing metadata service's average column-chunk sizes, row count and
-output schema. It never opens an input file or fetches RG footers. S3QS targets roughly 1.5 times backend
+output schema. It never opens an input file or fetches RG footers. S3QS targets roughly 1.5 times planning-reference
 memory in selected encoded input per logical task. Batch targets 90% of its output pool minus partition
 tail capacity, using a 1.5x retained-output estimate and a coarse variable-width allowance. These are
 initial heuristics, not exact peak-memory predictions. Missing statistics use the existing row-group
@@ -139,12 +145,16 @@ fixed eight-split task cap no longer applies when the policy is enabled. Hash pa
 DATA/END protocol are unchanged. More backend memory gives larger tasks; CPU hints determine the
 independent slices available inside each task. Partition-tail capacity can reduce the scan-thread hint.
 
-Budgets use up to 85% of backend memory, leaving native/SDK headroom; workers also clamp this working
+Budgets use up to 85% of planning-reference memory, leaving native/SDK headroom; workers also clamp this working
 set to actual JVM max heap. Input and output byte pools each receive 35% of that working set. Another
 15% bounds partition-tail capacity, and the remainder covers decoded batches and runtime overhead.
 These figures are initial resource fractions, not an RSS hard cap. Lambda wrappers pass the actual
-runtime memory limit, replacing a stale task policy when deployment memory changed. For a task without
-a policy, worker enablement derives a fallback from the runtime platform limit (or JVM heap if unknown).
+runtime memory limit and only tighten a policy whose reference exceeds that limit. A smaller planned
+policy is preserved. For a task without a policy, worker enablement still derives a fallback from the
+actual runtime platform limit (or JVM heap if unknown), without consulting the planner-only cap.
+Memory metrics report `planningMemoryBytes` (effective policy reference) and `platformMemoryBytes`
+(actual context limit, 0 when unknown); the legacy `backendMemoryBytes` field retains its policy-reference
+meaning for compatibility. None of these admission counters is an RSS or JVM/native hard boundary.
 
 Scan concurrency uses the backend CPU hint clamped to runtime availableProcessors and actual task
 slices. Windows are byte-sized rather than capped at four RG: each reader targets its share of the input
@@ -153,13 +163,20 @@ lengths from the already loaded file tail. Only a missing/oversized current RG r
 chunk sizing. Closed record readers and owned binary values allow input windows to be reclaimed.
 Oversized selected RGs and retained Batch output fail explicitly; no spill or next-window prefetch is added.
 
-S3QS pending, queued and executing batches share the output pool. Pressure flushes the largest pending
-partition, then blocks the scanner until publication frees space. Producer writes have no separate
+S3QS pending, queued and executing batches share the output pool. Under pressure, scanners wait for
+queued/running writes to release bytes. Only when no such write can progress is the largest pending
+partition force-flushed; normal full groups and final tails still flush. This preserves mergeable batches,
+though it may delay partial objects and does not guarantee every writer is occupied. Producer writes have no separate
 job-count admission limit; the configured I/O thread count still bounds execution, and the 8 MiB object
 limit still applies. The byte budget only exists when the memory policy is active; without it, the
 producer write queue has no admission bound. Partitioner tails, encoder/SDK/native buffers and metadata are not all
 represented by these two byte counters. The independent idle S3QS buffer pool retains at most four
-buffers. MemoryMetrics reports backend/usable memory, actual scan threads, byte limits/peaks/waits,
+buffers. Producer encoding scratch separately reuses `FixSizedBuffers` by writer concurrency until the
+writer pool terminates; scratch is returned after trial encoding failure/overflow or upload completion.
+An empty cache may allocate, so this is reuse, not another admission limit or zero-copy upload. Columns
+continue to encode in each file's existing thread pool. Column exceptions complete their futures, and
+rejected submissions still wait for columns already running before returning failure.
+MemoryMetrics reports backend/usable memory, actual scan threads, byte limits/peaks/waits,
 tail limit and window counts. Wait/cost counters may overlap and must not be summed as query latency.
 
 ## S3 input and worker resource lifecycle

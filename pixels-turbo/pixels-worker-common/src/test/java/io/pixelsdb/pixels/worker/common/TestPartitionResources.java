@@ -3,6 +3,7 @@ package io.pixelsdb.pixels.worker.common;
 
 import io.pixelsdb.pixels.common.metadata.domain.Column;
 import io.pixelsdb.pixels.common.turbo.Invoker;
+import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import io.pixelsdb.pixels.core.PixelsProto;
 import io.pixelsdb.pixels.core.PixelsReader;
 import io.pixelsdb.pixels.planner.plan.physical.PartitionTaskPlanner;
@@ -15,6 +16,51 @@ import static org.mockito.Mockito.*;
 public class TestPartitionResources
 {
     private static final long MiB = 1L << 20;
+
+    @Test
+    public void planningMemoryCapOnlyLowersBackendMemoryAndPreservesCpu()
+    {
+        ConfigFactory config = ConfigFactory.Instance();
+        String key = "executor.partition.memory.planning.mb", previous = config.getProperty(key);
+        Invoker backend = mock(Invoker.class);
+        when(backend.getMemoryMB()).thenReturn(10240); when(backend.getCpuCount()).thenReturn(6);
+        try
+        {
+            for (String value : new String[]{"0", "6144", "16384", "9223372036854775807"})
+            {
+                config.addProperty(key, value);
+                PartitionMemoryPolicy policy = PartitionMemoryPolicy.fromBackend(backend);
+                assertEquals((value.equals("6144") ? 6144 : 10240) * MiB, policy.getWorkerBytes());
+                assertEquals(6, policy.getReaderThreads());
+                assertEquals(10240, backend.getMemoryMB());
+            }
+            config.addProperty(key, "6144");
+            when(backend.getMemoryMB()).thenReturn(2048);
+            assertEquals(2048 * MiB, PartitionMemoryPolicy.fromBackend(backend).getWorkerBytes());
+            when(backend.getMemoryMB()).thenReturn(0);
+            assertThrows(IllegalArgumentException.class, () -> PartitionMemoryPolicy.fromBackend(backend));
+        }
+        finally { config.addProperty(key, previous == null ? "0" : previous); }
+    }
+
+    @Test
+    public void invalidPlanningMemoryCapFailsExplicitly()
+    {
+        ConfigFactory config = ConfigFactory.Instance();
+        String key = "executor.partition.memory.planning.mb", previous = config.getProperty(key);
+        Invoker backend = mock(Invoker.class); when(backend.getMemoryMB()).thenReturn(10240);
+        try
+        {
+            for (String invalid : new String[]{"-1", "6gb", "", "1.5", "9223372036854775808"})
+            {
+                config.addProperty(key, invalid);
+                IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                        () -> PartitionMemoryPolicy.fromBackend(backend));
+                assertTrue(failure.getMessage().contains(key));
+            }
+        }
+        finally { config.addProperty(key, previous == null ? "0" : previous); }
+    }
 
     @Test
     public void policyUsesBackendMemoryAndCpuAndRejectsUnknownMemory()

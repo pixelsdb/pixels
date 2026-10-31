@@ -101,9 +101,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 long bytes = context.getMemoryBytes() > 0 ? context.getMemoryBytes() : Runtime.getRuntime().maxMemory();
                 policy = PartitionMemoryPolicy.forResources(bytes, cores);
             }
-            // The platform's runtime limit wins if the deployed function changed
-            // after the planner's invoker resource snapshot was loaded.
-            if (policy != null && context.getMemoryBytes() > 0 && policy.getWorkerBytes() != context.getMemoryBytes())
+            // Keep conservative plans; only a smaller actual platform limit tightens them.
+            if (policy != null && context.getMemoryBytes() > 0 && policy.getWorkerBytes() > context.getMemoryBytes())
             {
                 policy = PartitionMemoryPolicy.forResources(context.getMemoryBytes(), cores);
             }
@@ -267,8 +266,11 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                         while ((batch = queue.poll()) != null) { memory.output.release(batch.getMemoryUsage()); }
                     }
                 }
-                partitionOutput.setMemoryMetrics(memory.snapshot());
-                logger.info("Partition memory: " + JSON.toJSONString(memory.snapshot()));
+                Map<String, Long> metrics = memory.snapshot();
+                metrics.put("planningMemoryBytes", memory.policy.getWorkerBytes());
+                metrics.put("platformMemoryBytes", context.getMemoryBytes());
+                partitionOutput.setMemoryMetrics(metrics);
+                logger.info("Partition memory: " + JSON.toJSONString(metrics));
             }
         }
     }

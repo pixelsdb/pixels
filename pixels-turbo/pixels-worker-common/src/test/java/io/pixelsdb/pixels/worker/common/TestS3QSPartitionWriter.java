@@ -2,6 +2,7 @@
 package io.pixelsdb.pixels.worker.common;
 
 import io.pixelsdb.pixels.common.physical.Storage;
+import io.pixelsdb.pixels.common.physical.FixSizedBuffers;
 import io.pixelsdb.pixels.common.utils.Constants;
 import io.pixelsdb.pixels.core.*;
 import io.pixelsdb.pixels.core.reader.PixelsReaderOption;
@@ -32,6 +33,41 @@ import static org.mockito.Mockito.*;
 
 public class TestS3QSPartitionWriter
 {
+    @Test
+    public void scratchIsReusedAcrossOversizedTrialsAndLaterFilesWithoutChangingValues() throws Exception
+    {
+        Fixture fixture = new Fixture(longSchema());
+        FixSizedBuffers buffers = new FixSizedBuffers(8192, 1);
+        byte[] first = buffers.allocate(); buffers.free(first);
+        S3QSPartitionWriter writer = new S3QSPartitionWriter(fixture.storage, fixture.schema, fixture.shuffle,
+                0, 0, fixture.context, 8192, new java.util.concurrent.atomic.AtomicLong(), () -> {}, buffers);
+        writer.write(Collections.singletonList(longs(2048, 0)));
+        writer.write(Collections.singletonList(longs(128, 2048)));
+        assertTrue(fixture.objects.size() > 2);
+        assertEquals(2176, fixture.verifyLongs());
+        assertEquals(1, buffers.getCachedBufferCount());
+        assertSame(first, buffers.allocate());
+    }
+
+    @Test(timeout = 10000)
+    public void scratchReturnsAfterEncodingAndUploadFailures() throws Exception
+    {
+        Fixture fixture = new Fixture(longSchema());
+        FixSizedBuffers buffers = new FixSizedBuffers(8192, 1);
+        S3QSPartitionWriter writer = new S3QSPartitionWriter(fixture.storage, fixture.schema, fixture.shuffle,
+                0, 0, fixture.context, 8192, new java.util.concurrent.atomic.AtomicLong(), () -> {}, buffers);
+        VectorizedRowBatch invalid = longs(1, 0);
+        invalid.cols[0] = new BinaryColumnVector(1);
+        assertThrows(java.util.concurrent.CompletionException.class, () -> writer.write(Collections.singletonList(invalid)));
+        assertEquals(1, buffers.getCachedBufferCount()); assertTrue(fixture.objects.isEmpty());
+        when(fixture.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenThrow(software.amazon.awssdk.core.exception.SdkClientException.create("injected PUT failure"));
+        assertThrows(software.amazon.awssdk.core.exception.SdkClientException.class,
+                () -> writer.write(Collections.singletonList(longs(1, 0))));
+        assertEquals(1, buffers.getCachedBufferCount()); assertTrue(fixture.objects.isEmpty());
+        assertTrue(fixture.messages.isEmpty());
+    }
+
     @Test
     public void c3SizedPartitionSplitsIntoReadableObjectsAndCompletes() throws Exception
     {

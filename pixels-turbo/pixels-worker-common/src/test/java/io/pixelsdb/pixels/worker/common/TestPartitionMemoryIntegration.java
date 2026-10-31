@@ -40,6 +40,28 @@ public class TestPartitionMemoryIntegration
     static final long MiB = 1024L * 1024;
 
     @Test(timeout = 30000)
+    public void conservativePlannedMemoryIsNotExpandedToLargerPlatform() throws Exception
+    {
+        Path dir = Files.createTempDirectory("partition-conservative-");
+        try
+        {
+            generate(dir.resolve("input.pxl"), 10000, 4, false, 16 * 1024);
+            Map<String, Object> result = run(dir, "s3qs-runtime", 10000, 4, false, 4, 2,
+                    PartitionMemoryPolicy.forResources(64 * MiB, 2));
+            assertEquals(JSON.toJSONString(result), true, result.get("successful"));
+            assertEquals(10000L, result.get("validatedRows"));
+            @SuppressWarnings("unchecked") List<Map<String, Long>> metrics = (List<Map<String, Long>>) result.get("memory");
+            for (Map<String, Long> metric : metrics)
+            {
+                assertEquals(Long.valueOf(64 * MiB), metric.get("planningMemoryBytes"));
+                assertEquals(Long.valueOf(128 * MiB), metric.get("platformMemoryBytes"));
+                assertEquals(Long.valueOf(64 * MiB), metric.get("backendMemoryBytes"));
+            }
+        }
+        finally { delete(dir); }
+    }
+
+    @Test(timeout = 30000)
     public void realVariableWidthFileSurvivesWindowsAndPreservesEveryValue() throws Exception
     {
         Path dir = Files.createTempDirectory("partition-windows-");
