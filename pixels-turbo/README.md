@@ -162,6 +162,33 @@ represented by these two byte counters. The independent idle S3QS buffer pool re
 buffers. MemoryMetrics reports backend/usable memory, actual scan threads, byte limits/peaks/waits,
 tail limit and window counts. Wait/cost counters may overlap and must not be summed as query latency.
 
+## S3 input and worker resource lifecycle
+
+S3 range reads use storage-owned clients. Failed requests propagate to the scheduler and window
+waiters; a failed or interrupted window cancels siblings and settles its buffer callbacks before
+releasing references. Null/short responses and submission failures also terminate the wait. The SDK
+keeps responsibility for retries; S3 disables additional overlapping scheduler retries and per-read
+client reconstruction/synchronous fallback.
+
+With `s3.use.async.client=true`, all range sizes use the SDK Netty HTTP transport, whose cancellation
+path aborts requests (the former SDK 2.30.17 CRT path did not implement this). With it disabled, GETs
+run on their calling scanner so cancellation cannot leave detached synchronous executor work.
+Reader close never closes shared clients. JVM-wide range admission uses the existing
+`s3.max.request.concurrency` setting; synchronous reads keep their slot until the call returns.
+
+Cancellation of an SDK future is not acknowledgement that its connection has stopped: Netty schedules
+abort on its event loop. Reader close waits for owned submissions/SDK calls to settle, and reports
+an error after five seconds if they do not. This is not a transport-quiescence guarantee or a strict
+bound on all in-flight network buffers. A loopback test documents the event-loop-delayed abort case.
+
+The shared worker footer cache retains at most 200 file tails and 5000 RG footers; these are entry
+limits, not byte limits. Other callers using the default cache constructor retain the previous behavior.
+S3QS task scopes reference-count local queue wrappers and release them after the owning scanner,
+producer writer and consumer ACK pools actually terminate. Slow children keep their leases even
+when their handler has returned an error. Partial setup and repeated scope close are handled without
+releasing another task's lease; a failed wrapper close is logged while remaining wrappers are released.
+Remote queues and shared clients retain their existing query/storage ownership.
+
 ## S3QS partitioned-join consumer behavior
 
 The producer memory policy above does not apply to BasePartitionedJoinWorker. A normal S3QS join task

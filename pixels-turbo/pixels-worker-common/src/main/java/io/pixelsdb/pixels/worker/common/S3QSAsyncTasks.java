@@ -4,8 +4,6 @@ package io.pixelsdb.pixels.worker.common;
 import io.pixelsdb.pixels.common.utils.ConfigFactory;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Semaphore;
@@ -43,7 +41,7 @@ final class S3QSAsyncTasks implements AutoCloseable
         }
         this.cancellation = cancellation;
         this.slots = slots;
-        this.executor = new ThreadPoolExecutor(threads, threads, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>())
+        this.executor = new WorkerThreadPool(threads, java.util.concurrent.Executors.defaultThreadFactory())
         {
             @Override
             public List<Runnable> shutdownNow()
@@ -152,6 +150,8 @@ final class S3QSAsyncTasks implements AutoCloseable
         if (error instanceof Exception) { throw (Exception) error; }
         if (error instanceof Error) { throw (Error) error; }
     }
+
+    void afterTermination(Runnable cleanup) { ((WorkerThreadPool) executor).afterTermination(cleanup); }
 
     @Override
     public void close()

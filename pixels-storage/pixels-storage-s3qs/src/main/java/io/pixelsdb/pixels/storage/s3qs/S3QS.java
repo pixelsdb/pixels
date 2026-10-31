@@ -58,6 +58,7 @@ public final class S3QS extends AbstractS3
 
     private final Map<ShuffleQueueKey, S3Queue> partitionQueues;
     private final int invisibleTime;
+    private final Map<ShuffleQueueKey, Integer> queueUsers = new HashMap<>();
 
     private SqsClient sqs;
 
@@ -173,12 +174,31 @@ public final class S3QS extends AbstractS3
         return resolvedQueueUrl;
     }
 
+    /** Keep a local queue wrapper until the last overlapping task releases it. */
+    public synchronized String retainQueue(String shuffleId, int partitionId,
+                                           String queueName, String queueUrl) throws IOException
+    {
+        String resolved = registerQueue(shuffleId, partitionId, queueName, queueUrl);
+        queueUsers.merge(queueKey(shuffleId, partitionId), 1, Integer::sum);
+        return resolved;
+    }
+
+    public synchronized void releaseQueue(String shuffleId, int partitionId) throws IOException
+    {
+        ShuffleQueueKey key = queueKey(shuffleId, partitionId);
+        Integer users = queueUsers.get(key);
+        if (users == null) { return; }
+        if (users > 1) { queueUsers.put(key, users - 1); }
+        else { unregisterQueue(shuffleId, partitionId); }
+    }
+
     /**
      * Remove one local queue wrapper without deleting the remote SQS queue.
      * Remote resources are owned and deleted by the query lifecycle.
      */
-    public void unregisterQueue(String shuffleId, int partitionId) throws IOException
+    public synchronized void unregisterQueue(String shuffleId, int partitionId) throws IOException
     {
+        queueUsers.remove(queueKey(shuffleId, partitionId));
         S3Queue queue = partitionQueues.remove(queueKey(shuffleId, partitionId));
         if (queue != null)
         {
@@ -382,13 +402,14 @@ public final class S3QS extends AbstractS3
     }
 
     @Override
-    public void close() throws IOException
+    public synchronized void close() throws IOException
     {
         for (S3Queue queue : partitionQueues.values())
         {
             queue.close();
         }
         this.partitionQueues.clear();
+        this.queueUsers.clear();
         if (this.sqs != null)
         {
             this.sqs.close();
@@ -399,13 +420,14 @@ public final class S3QS extends AbstractS3
         }
     }
 
-    public void refresh() throws IOException
+    public synchronized void refresh() throws IOException
     {
         for (S3Queue queue : partitionQueues.values())
         {
             queue.close();
         }
         this.partitionQueues.clear();
+        this.queueUsers.clear();
     }
 
     public SqsClient getSqsClient()

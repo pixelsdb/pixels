@@ -31,6 +31,9 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -130,22 +133,9 @@ public class SortMergeScheduler implements Scheduler
         {
             for (MergedRequest merged : mergedRequests)
             {
-                String path = reader.getPath();
                 merged.startTimeMs = System.currentTimeMillis();
-                reader.readAsync(merged.start, merged.getLength()).thenAccept(resp ->
-                {
-                    if (resp != null)
-                    {
-                        merged.completeTimeMs = System.currentTimeMillis();
-                        merged.complete(resp);
-                    }
-                    else
-                    {
-                        logger.error("Asynchronous read from path '" + path + "' got null response, start=" +
-                                merged.getStart() + ", length=" + merged.getLength());
-                    }
-                });
-                if (enableRetry)
+                merged.submit(reader);
+                if (enableRetry && reader.supportsAsyncRetry())
                 {
                     this.retryPolicy.monitor(new MergedExecutableRequest(merged, reader));
                 }
@@ -200,6 +190,9 @@ public class SortMergeScheduler implements Scheduler
         protected volatile long startTimeMs = -1;
         protected volatile long completeTimeMs = -1;
         private int retried = 0;
+        private final AtomicBoolean done = new AtomicBoolean();
+        private final AtomicBoolean watching = new AtomicBoolean();
+        private final Set<CompletableFuture<ByteBuffer>> reads = ConcurrentHashMap.newKeySet();
 
         public MergedRequest(RequestFuture first)
         {
@@ -240,6 +233,48 @@ public class SortMergeScheduler implements Scheduler
             return new MergedRequest(curr);
         }
 
+        private void watch(CompletableFuture<ByteBuffer> chunk)
+        {
+            chunk.whenComplete((value, failure) -> {
+                if (failure != null) { fail(failure); }
+            });
+        }
+
+        void submit(PhysicalReader reader)
+        {
+            // Merging must finish before callbacks can traverse the chunk list.
+            // Also handles chunks cancelled before executeBatch was called.
+            if (watching.compareAndSet(false, true)) { futures.forEach(this::watch); }
+            if (done.get()) { return; }
+            try
+            {
+                CompletableFuture<ByteBuffer> read = reader.readAsync(start, length);
+                reads.add(read);
+                // Cancellation can race with admission or SDK submission.
+                if (done.get()) { read.cancel(true); reads.remove(read); return; }
+                read.whenComplete((buffer, failure) -> {
+                    reads.remove(read);
+                    if (failure != null) { fail(failure); }
+                    else { complete(buffer); }
+                });
+            }
+            catch (Exception failure) { fail(failure); }
+        }
+
+        private void fail(Throwable failure)
+        {
+            if (!done.compareAndSet(false, true)) { return; }
+            completeTimeMs = System.currentTimeMillis();
+            futures.forEach(chunk -> chunk.completeExceptionally(failure));
+            cancelReads();
+        }
+
+        private void cancelReads()
+        {
+            reads.forEach(read -> read.cancel(true));
+            reads.clear();
+        }
+
         public long getTransId()
         {
             return transId;
@@ -274,22 +309,22 @@ public class SortMergeScheduler implements Scheduler
          */
         public void complete(ByteBuffer buffer)
         {
-            /**
-             * Issue #374:
-             * Buffer is returned by the I/O library.
-             * It is not ensured that the buffer's position is 0.
-             */
-            int offsetBase = buffer.position();
-            for (int i = 0; i < size; ++i)
+            if (buffer == null || buffer.remaining() < length)
             {
-                /**
-                 * Issue #114:
-                 * Limit should be set before position.
-                 */
-                buffer.limit(offsetBase + offsets.get(i) + lengths.get(i));
-                buffer.position(offsetBase + offsets.get(i));
-                futures.get(i).complete(buffer.slice());
+                fail(new IOException("Null or short read at " + start + ", expected " + length + " bytes"));
+                return;
             }
+            if (!done.compareAndSet(false, true)) { return; }
+            completeTimeMs = System.currentTimeMillis();
+            for (int i = 0; i < size; i++)
+            {
+                // Each chunk owns its view; do not mutate the backend's buffer cursor.
+                ByteBuffer chunk = buffer.duplicate();
+                chunk.position(buffer.position() + offsets.get(i));
+                chunk.limit(chunk.position() + lengths.get(i));
+                futures.get(i).complete(chunk.slice());
+            }
+            cancelReads();
         }
     }
 
@@ -342,31 +377,9 @@ public class SortMergeScheduler implements Scheduler
                  */
                 return false;
             }
-            String path = this.reader.getPath();
-            try
-            {
-                this.request.startTimeMs = System.currentTimeMillis();
-                this.reader.readAsync(this.request.start, request.length).thenAccept(resp ->
-                {
-                    if (resp != null)
-                    {
-                        this.request.completeTimeMs = System.currentTimeMillis();
-                        this.request.complete(resp);
-                    }
-                    else
-                    {
-                        logger.error("Retry asynchronous read from path '" + path + "' got null response, start=" +
-                                this.request.start + ", length=" + this.request.length);
-                    }
-                });
-            } catch (IOException e)
-            {
-                logger.error("Failed to read asynchronously from path '" + path + "'.");
-            }
-            finally
-            {
-                this.request.retried++;
-            }
+            this.request.startTimeMs = System.currentTimeMillis();
+            this.request.submit(reader);
+            this.request.retried++;
             return true;
         }
     }

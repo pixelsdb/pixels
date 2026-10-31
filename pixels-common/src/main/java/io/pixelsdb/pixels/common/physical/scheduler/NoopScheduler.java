@@ -66,19 +66,8 @@ public class NoopScheduler implements Scheduler
             {
                 CompletableFuture<ByteBuffer> future = futures.get(i);
                 Request request = requests.get(i);
-                String path = reader.getPath();
-                reader.readAsync(request.start, request.length).thenAccept(resp ->
-                {
-                    if (resp != null)
-                    {
-                        future.complete(resp);
-                    }
-                    else
-                    {
-                        logger.error("Asynchronous read from path '" + path + "' got null response, start=" +
-                                request.start + ", length=" + request.length);
-                    }
-                });
+                new SortMergeScheduler.MergedRequest(
+                        new SortMergeScheduler.RequestFuture(request, future)).submit(reader);
             }
         }
         else

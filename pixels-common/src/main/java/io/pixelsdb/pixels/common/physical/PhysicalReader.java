@@ -63,6 +63,9 @@ public interface PhysicalReader extends Closeable
         return false;
     }
 
+    /** Whether scheduler retries may overlap backend retries. */
+    default boolean supportsAsyncRetry() { return true; }
+
     /**
      * readAsync does not affect the position of this reader, and is not affected by seek().
      * @param offset

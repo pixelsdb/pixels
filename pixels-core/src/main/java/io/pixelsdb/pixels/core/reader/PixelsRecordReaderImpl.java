@@ -607,8 +607,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
         Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
         try
         {
-            scheduler.executeBatch(physicalReader, requestBatch, transId);
-            requestBatch.completeAll(actionFutures).join();
+            readBatchRequests(scheduler, requestBatch, actionFutures);
             requestBatch.clear();
             actionFutures.clear();
         } catch (Exception e)
@@ -905,8 +904,7 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
             Scheduler scheduler = SchedulerFactory.Instance().getScheduler();
             try
             {
-                scheduler.executeBatch(physicalReader, requestBatch, transId);
-                requestBatch.completeAll(actionFutures).join();
+                readBatchRequests(scheduler, requestBatch, actionFutures);
                 requestBatch.clear();
                 actionFutures.clear();
             } catch (Exception e)
@@ -1458,6 +1456,46 @@ public class PixelsRecordReaderImpl implements PixelsRecordReader
     {
         // Memory usage in the row batch returned by readBatch() is not counted.
         return memoryUsage;
+    }
+
+    /** End failed windows without leaving sibling reads or buffer callbacks behind. */
+    private void readBatchRequests(Scheduler scheduler, Scheduler.RequestBatch batch,
+                                   List<CompletableFuture> actions) throws IOException
+    {
+        CompletableFuture<Void> settled = batch.completeAll(actions);
+        java.util.concurrent.atomic.AtomicReference<Throwable> firstFailure =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        for (CompletableFuture<?> action : actions)
+        {
+            action.whenComplete((value, failure) -> {
+                if (failure != null && firstFailure.compareAndSet(null, failure))
+                {
+                    batch.getFutures().forEach(chunk -> chunk.cancel(true));
+                }
+            });
+        }
+        try
+        {
+            scheduler.executeBatch(physicalReader, batch, transId);
+            settled.get();
+        }
+        catch (Exception failure)
+        {
+            boolean interrupted = Thread.interrupted() || failure instanceof InterruptedException;
+            // Capture the original error before cancellation creates secondary failures.
+            Throwable cause = firstFailure.get();
+            if (cause == null) { cause = failure; }
+            batch.getFutures().forEach(chunk -> chunk.cancel(true));
+            IOException error = new IOException("Read batch failed or was interrupted", cause);
+            try { physicalReader.close(); }
+            catch (IOException closing) { error.addSuppressed(closing); }
+            // These actions only install buffers. Let already-running callbacks finish
+            // before the caller releases the record reader's window references.
+            try { settled.join(); }
+            catch (java.util.concurrent.CompletionException | java.util.concurrent.CancellationException ignored) { }
+            if (interrupted) { Thread.currentThread().interrupt(); }
+            throw error;
+        }
     }
 
     /**

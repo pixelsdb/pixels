@@ -133,22 +133,9 @@ public class RateLimitedScheduler extends SortMergeScheduler
 
             for (MergedRequest merged : mergedRequests)
             {
-                String path = reader.getPath();
                 merged.startTimeMs = System.currentTimeMillis();
-                reader.readAsync(merged.getStart(), merged.getLength()).thenAccept(resp ->
-                {
-                    if (resp != null)
-                    {
-                        merged.completeTimeMs = System.currentTimeMillis();
-                        merged.complete(resp);
-                    }
-                    else
-                    {
-                        logger.error("Asynchronous read from path '" + path + "' got null response, start=" +
-                                merged.getStart() + ", length=" + merged.getLength());
-                    }
-                });
-                if (enableRetry)
+                merged.submit(reader);
+                if (enableRetry && reader.supportsAsyncRetry())
                 {
                     this.retryPolicy.monitor(new MergedExecutableRequest(merged, reader));
                 }

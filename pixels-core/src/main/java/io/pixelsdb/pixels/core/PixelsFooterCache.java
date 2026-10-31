@@ -19,7 +19,8 @@
  */
 package io.pixelsdb.pixels.core;
 
-import java.util.concurrent.ConcurrentHashMap;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 /**
  * pixels
@@ -28,32 +29,39 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class PixelsFooterCache
 {
-    private final ConcurrentHashMap<String, PixelsProto.FileTail> fileTailCacheMap;
-    private final ConcurrentHashMap<String, PixelsProto.RowGroupFooter> rowGroupFooterCacheMap;
+    private final Cache<String, PixelsProto.FileTail> fileTailCacheMap;
+    private final Cache<String, PixelsProto.RowGroupFooter> rowGroupFooterCacheMap;
 
     public PixelsFooterCache()
     {
-        this.fileTailCacheMap = new ConcurrentHashMap<>(200);
-        this.rowGroupFooterCacheMap = new ConcurrentHashMap<>(5000);
+        this.fileTailCacheMap = CacheBuilder.newBuilder().initialCapacity(200).build();
+        this.rowGroupFooterCacheMap = CacheBuilder.newBuilder().initialCapacity(5000).build();
+    }
+
+    /** Entry limits for long-lived workers; active readers retain their own proto references. */
+    public PixelsFooterCache(long fileTails, long rowGroupFooters)
+    {
+        this.fileTailCacheMap = CacheBuilder.newBuilder().maximumSize(fileTails).build();
+        this.rowGroupFooterCacheMap = CacheBuilder.newBuilder().maximumSize(rowGroupFooters).build();
     }
 
     public void putFileTail(String id, PixelsProto.FileTail fileTail)
     {
-        fileTailCacheMap.putIfAbsent(id, fileTail);
+        fileTailCacheMap.asMap().putIfAbsent(id, fileTail);
     }
 
     public PixelsProto.FileTail getFileTail(String id)
     {
-        return fileTailCacheMap.get(id);
+        return fileTailCacheMap.getIfPresent(id);
     }
 
     public void putRGFooter(String id, PixelsProto.RowGroupFooter footer)
     {
-        rowGroupFooterCacheMap.putIfAbsent(id, footer);
+        rowGroupFooterCacheMap.asMap().putIfAbsent(id, footer);
     }
 
     public PixelsProto.RowGroupFooter getRGFooter(String id)
     {
-        return rowGroupFooterCacheMap.get(id);
+        return rowGroupFooterCacheMap.getIfPresent(id);
     }
 }

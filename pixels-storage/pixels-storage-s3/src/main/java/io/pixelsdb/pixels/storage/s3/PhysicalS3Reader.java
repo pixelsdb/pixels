@@ -20,8 +20,6 @@
 package io.pixelsdb.pixels.storage.s3;
 
 import io.pixelsdb.pixels.common.physical.Storage;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
@@ -31,105 +29,195 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
-/**
- * The physical reader for AWS S3.
- *
- * @author hank
- * @create 2021-09-06
- */
+/** S3 range reads owned by a reader; shared clients remain storage-owned. */
 public class PhysicalS3Reader extends AbstractS3Reader
 {
-    /*
-     * Most of the methods in this class are moved into AbstractS3Reader.
-     */
-
-    private static final Logger logger = LogManager.getLogger(PhysicalS3Reader.class);
-    private final static int LEN_1M = 1024*1024;
-    private final static int LEN_10M = 1024*1024*10;
-    private final static int ADAPTIVE_READ_TH = 2*1024*1024;
-
-    private S3AsyncClient asyncClient;
+    private static final Semaphore readSlots = new Semaphore(Math.max(1, AbstractS3.MaxRequestConcurrency), true);
+    private final S3AsyncClient asyncClient;
+    // Guarded by this; includes submissions not yet returned by the SDK and synchronous calls.
+    private final Set<Read> reads = new HashSet<>();
+    private volatile boolean closed;
 
     public PhysicalS3Reader(Storage storage, String path) throws IOException
     {
         super(storage, path);
-        if (! (storage instanceof S3))
-        {
-            throw new IOException("Storage is not S3.");
-        }
-        initClients();
+        if (!(storage instanceof S3)) { throw new IOException("Storage is not S3."); }
+        asyncClient = ((S3) storage).getS3AsyncClient();
     }
 
-    private void initClients()
+    @Override
+    public boolean supportsAsyncRetry()
     {
-        S3 s3 = (S3) this.s3;
-        this.asyncClient = s3.getS3AsyncClient();
+        // SDK retries remain; scheduler-level copies would add overlapping requests.
+        return false;
+    }
 
-        if (!useAsyncClient)
+    private void acquire() throws IOException
+    {
+        try
         {
-            this.asyncClient.close();
+            while (!closed)
+            {
+                if (readSlots.tryAcquire(100, TimeUnit.MILLISECONDS)) { return; }
+            }
+            throw new IOException("S3 reader is closed: " + pathStr);
+        }
+        catch (InterruptedException failure)
+        {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted waiting for S3 read admission", failure);
         }
     }
 
     @Override
     public CompletableFuture<ByteBuffer> readAsync(long offset, int len) throws IOException
     {
-        if (offset + len > this.length)
+        if (offset < 0 || len <= 0 || offset > length - len)
         {
-            throw new IOException("Offset " + offset + " plus " +
-                    len + " exceeds object length " + this.length + ".");
+            throw new IOException("Invalid S3 range: " + offset + "+" + len + "/" + length);
         }
-        GetObjectRequest request = GetObjectRequest.builder().bucket(path.bucket)
-                .key(path.key).range(toRange(offset, len)).build();
-        CompletableFuture<ResponseBytes<GetObjectResponse>> future;
-        if (useAsyncClient && len < ADAPTIVE_READ_TH)
+        acquire();
+        Read read = new Read(len);
+        synchronized (this)
         {
-            future = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
+            if (closed)
+            {
+                readSlots.release();
+                throw new IOException("S3 reader is closed: " + pathStr);
+            }
+            reads.add(read);
+            if (!useAsyncClient) { read.caller = Thread.currentThread(); }
+            numRequests++;
         }
-        else
-        {
-            future = new CompletableFuture<>();
-            clientService.execute(() -> {
-                ResponseBytes<GetObjectResponse> response =
-                        client.getObject(request, ResponseTransformer.toBytes());
-                future.complete(response);
-            });
-        }
-
-        super.numRequests++;
-
         try
         {
-            /**
-             * Issue #128:
-             * We tried to use thenApplySync using the clientService executor,
-             * it does not help improve the query performance.
-             */
-            return future.handle((resp, err) ->
+            if (read.result.isCancelled()) { throw new CancellationException("S3 read cancelled before submission"); }
+            GetObjectRequest request = GetObjectRequest.builder().bucket(path.bucket).key(path.key)
+                    .range(toRange(offset, len)).build();
+            if (useAsyncClient)
             {
-                if (err != null)
-                {
-                    logger.error("Failed to complete the asynchronous read, range={}, retrying with sync client.",
-                            request.range(), err);
-                    // Issue #350: it is fine if multiple threads reconnect to S3 for multiple time.
-                    s3.reconnect();
-                    initClients();
-                    resp = client.getObject(request, ResponseTransformer.toBytes());
-                }
-                return ByteBuffer.wrap(resp.asByteArrayUnsafe());
-            });
-        } catch (Exception e)
+                // Register ownership before submission, without holding our lock across SDK code.
+                read.source = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
+                read.source.whenComplete(read::finish);
+                if (read.result.isCancelled()) { read.cancelTransport(); }
+            }
+            else
+            {
+                // A synchronous request stays on its owning scanner, not a detached executor.
+                read.finish(client.getObject(request, ResponseTransformer.toBytes()), null);
+            }
+        }
+        catch (Exception failure) { read.finish(null, failure); }
+        return read.result;
+    }
+
+    private final class Read
+    {
+        final int length;
+        final CompletableFuture<ByteBuffer> result = new CompletableFuture<>();
+        volatile CompletableFuture<ResponseBytes<GetObjectResponse>> source;
+        Thread caller; // guarded by the enclosing reader
+
+        Read(int length)
         {
-            throw new IOException("Failed to read object.", e);
+            this.length = length;
+            result.whenComplete((value, failure) -> {
+                if (result.isCancelled()) { cancelTransport(); }
+            });
+        }
+
+        void cancelTransport()
+        {
+            CompletableFuture<?> pending = source;
+            if (pending != null) { pending.cancel(true); }
+            synchronized (PhysicalS3Reader.this)
+            {
+                // Never interrupt a caller after it has left this read and moved to other work.
+                if (reads.contains(this) && caller != null) { caller.interrupt(); }
+            }
+        }
+
+        void cancel() { result.cancel(true); }
+
+        void finish(ResponseBytes<GetObjectResponse> response, Throwable failure)
+        {
+            synchronized (PhysicalS3Reader.this)
+            {
+                if (!reads.remove(this)) { return; }
+                caller = null;
+                readSlots.release();
+                PhysicalS3Reader.this.notifyAll();
+            }
+            // Complete user callbacks outside the ownership lock. Window owners separately
+            // settle their buffer actions before freeing the window.
+            if (failure != null) { result.completeExceptionally(failure); return; }
+            try
+            {
+                byte[] bytes = response.asByteArrayUnsafe();
+                if (bytes.length != length) { throw new IOException("Unexpected S3 range response length: " + bytes.length); }
+                result.complete(ByteBuffer.wrap(bytes));
+            }
+            catch (Exception invalid) { result.completeExceptionally(invalid); }
+        }
+    }
+
+    @Override
+    public ByteBuffer readFully(int len) throws IOException
+    {
+        try
+        {
+            ByteBuffer value = readAsync(position, len).get();
+            position += len;
+            return value;
+        }
+        catch (InterruptedException failure)
+        {
+            try { close(); }
+            catch (IOException closing) { failure.addSuppressed(closing); }
+            finally { Thread.currentThread().interrupt(); }
+            throw new IOException("Interrupted reading S3", failure);
+        }
+        catch (ExecutionException | CancellationException failure)
+        {
+            throw new IOException("Failed to read S3", failure);
         }
     }
 
     @Override
     public void close() throws IOException
     {
-        // Should not close the client because it is shared by all threads.
-        // this.client.close(); // Closing s3 client may take several seconds.
+        Read[] pending;
+        synchronized (this)
+        {
+            closed = true;
+            pending = reads.toArray(new Read[0]);
+        }
+        for (Read read : pending) { read.cancel(); }
+        boolean interrupted = Thread.interrupted();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        try
+        {
+            synchronized (this)
+            {
+                while (!reads.isEmpty())
+                {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) { throw new IOException("S3 requests did not settle: " + pathStr); }
+                    try { TimeUnit.NANOSECONDS.timedWait(this, remaining); }
+                    catch (InterruptedException failure) { interrupted = true; }
+                }
+            }
+        }
+        finally { if (interrupted) { Thread.currentThread().interrupt(); } }
+        // SDK terminal state is not a transport-stop barrier: Netty schedules abort on
+        // its event loop. Neither this wait nor readSlots is a hard bound on wire I/O.
     }
 }

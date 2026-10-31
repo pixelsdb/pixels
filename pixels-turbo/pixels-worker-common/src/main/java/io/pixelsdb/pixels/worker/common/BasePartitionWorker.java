@@ -81,6 +81,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         workerMetrics.clear();
         ExecutorService threadPool = null;
         List<ConcurrentLinkedQueue<VectorizedRowBatch>> retained = null;
+        S3QSQueueScope queueScope = new S3QSQueueScope();
         memory = null;
         try
         {
@@ -130,7 +131,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
 
             WorkerCommon.initStorage(inputStorageInfo);
             WorkerCommon.initStorage(outputStorageInfo);
-            WorkerCommon.initOptionalShuffleStorage(event.getOutput().getShuffleInfo());
+            queueScope.register(event.getOutput().getShuffleInfo());
 
             String[] columnsToRead = event.getTableInfo().getColumnsToRead();
             TableScanFilter filter = JSON.parseObject(event.getTableInfo().getFilter(), TableScanFilter.class);
@@ -138,6 +139,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
             try (S3QSAsyncPartitionOutput asyncOutput = isS3QSShuffle(shuffleInfo) ?
                     createS3QSOutput(event, shuffleInfo, numPartition) : null)
             {
+                queueScope.own(asyncOutput);
                 AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
                 // Batch shuffle retains batches here; S3QS transfers them to bounded background jobs.
                 List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned = new ArrayList<>(numPartition);
@@ -245,6 +247,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         }
         finally
         {
+            queueScope.closeAfter(threadPool);
             if (threadPool != null)
             {
                 threadPool.shutdownNow();

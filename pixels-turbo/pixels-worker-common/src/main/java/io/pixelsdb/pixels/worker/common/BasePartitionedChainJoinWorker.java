@@ -76,13 +76,16 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
         joinOutput.setSuccessful(true);
         joinOutput.setErrorMessage("");
 
+        S3QSQueueScope queueScope = new S3QSQueueScope();
+        ExecutorService threadPool = null;
+
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             context.getCancellation().check();
             WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger, context.getCancellation());
-            ExecutorService threadPool = context.createThreadPool(cores * 2, exceptionHandler);
+            threadPool = context.createThreadPool(cores * 2, exceptionHandler);
 
             long transId = event.getTransId();
             long timestamp = event.getTimestamp();
@@ -163,8 +166,8 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             }
             WorkerCommon.initStorage(leftInputStorageInfo);
             WorkerCommon.initStorage(rightInputStorageInfo);
-            WorkerCommon.initOptionalShuffleStorage(event.getSmallTable().getShuffleInfo());
-            WorkerCommon.initOptionalShuffleStorage(event.getLargeTable().getShuffleInfo());
+            queueScope.register(event.getSmallTable().getShuffleInfo());
+            queueScope.register(event.getLargeTable().getShuffleInfo());
             WorkerCommon.initStorage(outputStorageInfo);
 
             // build the joiner.
@@ -435,6 +438,10 @@ public class BasePartitionedChainJoinWorker extends Worker<PartitionedChainJoinI
             joinOutput.setErrorMessage(failureMessage(e));
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return joinOutput;
+        }
+        finally
+        {
+            queueScope.closeAfter(threadPool);
         }
     }
 

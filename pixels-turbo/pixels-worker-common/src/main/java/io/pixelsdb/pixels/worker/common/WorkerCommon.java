@@ -62,7 +62,7 @@ import static java.util.Objects.requireNonNull;
 public class WorkerCommon
 {
     private static final Logger logger = LogManager.getLogger(WorkerCommon.class);
-    private static final PixelsFooterCache footerCache = new PixelsFooterCache();
+    private static final PixelsFooterCache footerCache = new PixelsFooterCache(200, 5000);
     private static final ConfigFactory configFactory = ConfigFactory.Instance();
     private static Storage s3;
     protected static Storage minio;

@@ -176,6 +176,8 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         finally { context.getWorkerMetrics().addOutputCostNs(System.nanoTime() - start); }
     }
 
+    void afterTermination(Runnable cleanup) { writes.afterTermination(cleanup); }
+
     @Override
     public void close()
     {

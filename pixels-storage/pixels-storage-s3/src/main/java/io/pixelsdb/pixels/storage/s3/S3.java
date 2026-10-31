@@ -24,7 +24,7 @@ import org.apache.logging.log4j.Logger;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
-import software.amazon.awssdk.http.crt.AwsCrtAsyncHttpClient;
+import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
@@ -57,21 +57,21 @@ public final class S3 extends AbstractS3
         connect();
     }
 
+    /** Explicit storage-owned clients, also usable for offline fault injection. */
+    public S3(S3Client client, S3AsyncClient asyncClient)
+    {
+        this.s3 = java.util.Objects.requireNonNull(client, "client is null");
+        this.s3Async = java.util.Objects.requireNonNull(asyncClient, "asyncClient is null");
+    }
+
     private synchronized void connect()
     {
-        /*
         s3Async = S3AsyncClient.builder()
                 .httpClientBuilder(NettyNioAsyncHttpClient.builder()
-                        .connectionTimeout(Duration.ofSeconds(connectionTimeoutSec))
-                        .putChannelOption(ChannelOption.SO_RCVBUF, 1024*1024*1024)
-                        .connectionAcquisitionTimeout(Duration.ofSeconds(connectionAcquisitionTimeoutSec))
-                        .eventLoopGroup(SdkEventLoopGroup.builder().numberOfThreads(clientServiceThreads).build())
-                        .maxConcurrency(maxRequestConcurrency).maxPendingConnectionAcquires(maxPendingRequests)).build();
-        */
-
-        s3Async = S3AsyncClient.builder()
-                .httpClientBuilder(AwsCrtAsyncHttpClient.builder()
-                        .maxConcurrency(MaxRequestConcurrency))
+                        .connectionTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                        .connectionAcquisitionTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
+                        .readTimeout(Duration.ofSeconds(ConnTimeoutSec))
+                        .maxConcurrency(MaxRequestConcurrency).maxPendingConnectionAcquires(MaxPendingRequests))
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
                         .apiCallTimeout(Duration.ofSeconds(ConnTimeoutSec)).retryPolicy(RetryMode.ADAPTIVE)
                         .apiCallAttemptTimeout(Duration.ofSeconds(ConnAcquisitionTimeoutSec))
@@ -87,7 +87,8 @@ public final class S3 extends AbstractS3
     @Override
     public void reconnect()
     {
-        connect();
+        // SDK pools recover connections. Replacing storage-owned clients would
+        // orphan their resources while existing readers still reference them.
     }
 
     @Override

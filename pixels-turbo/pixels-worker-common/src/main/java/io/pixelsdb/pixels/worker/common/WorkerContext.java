@@ -67,9 +67,7 @@ public class WorkerContext
 
     java.util.concurrent.ExecutorService createThreadPool(int threads, WorkerThreadExceptionHandler handler)
     {
-        java.util.concurrent.ExecutorService executor = new java.util.concurrent.ThreadPoolExecutor(
-                threads, threads, 0, java.util.concurrent.TimeUnit.MILLISECONDS,
-                new java.util.concurrent.LinkedBlockingQueue<>(), new WorkerThreadFactory(handler))
+        java.util.concurrent.ExecutorService executor = new WorkerThreadPool(threads, new WorkerThreadFactory(handler))
         {
             @Override
             protected void afterExecute(Runnable task, Throwable failure)

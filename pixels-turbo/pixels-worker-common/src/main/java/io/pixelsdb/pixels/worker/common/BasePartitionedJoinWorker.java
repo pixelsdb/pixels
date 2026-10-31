@@ -78,13 +78,16 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
         joinOutput.setSuccessful(true);
         joinOutput.setErrorMessage("");
 
+        S3QSQueueScope queueScope = new S3QSQueueScope();
+        ExecutorService threadPool = null;
+
         try
         {
             int cores = Runtime.getRuntime().availableProcessors();
             logger.info("Number of cores available: " + cores);
             context.getCancellation().check();
             WorkerThreadExceptionHandler exceptionHandler = new WorkerThreadExceptionHandler(logger, context.getCancellation());
-            ExecutorService threadPool = context.createThreadPool(cores * 2, exceptionHandler);
+            threadPool = context.createThreadPool(cores * 2, exceptionHandler);
 
             long transId = event.getTransId();
             long timestamp = event.getTimestamp();
@@ -155,8 +158,8 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
 
             WorkerCommon.initStorage(leftInputStorageInfo);
             WorkerCommon.initStorage(rightInputStorageInfo);
-            WorkerCommon.initOptionalShuffleStorage(event.getSmallTable().getShuffleInfo());
-            WorkerCommon.initOptionalShuffleStorage(event.getLargeTable().getShuffleInfo());
+            queueScope.register(event.getSmallTable().getShuffleInfo());
+            queueScope.register(event.getLargeTable().getShuffleInfo());
             WorkerCommon.initStorage(outputStorageInfo);
 
             // build the joiner.
@@ -440,6 +443,10 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
             joinOutput.setDurationMs((int) (System.currentTimeMillis() - startTime));
             return joinOutput;
         }
+        finally
+        {
+            queueScope.closeAfter(threadPool);
+        }
     }
 
     protected interface S3QSDataHandler
@@ -578,10 +585,13 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
         Map<Integer, Long> endedProducers = new HashMap<>();
         Map<Integer, Set<Long>> dataSequences = new HashMap<>();
         Map<Integer, Integer> producerAttempts = new HashMap<>();
+        S3QSQueueScope ackQueues = new S3QSQueueScope();
         try (S3QSAsyncTasks acknowledgements = new S3QSAsyncTasks(cancellation,
                 S3QSAsyncTasks.setting("s3qs.consumer.ack.threads", 2),
                 S3QSAsyncTasks.setting("s3qs.consumer.ack.max.inflight", 32)))
         {
+            ackQueues.retain(s3qs, shuffleInfo.getShuffleId(), partitionId);
+            ackQueues.own(acknowledgements);
             while (true)
             {
                 acknowledgements.check();
@@ -658,6 +668,10 @@ public class BasePartitionedJoinWorker extends Worker<PartitionedJoinInput, Join
                     }
                 }
             }
+        }
+        finally
+        {
+            ackQueues.closeAfter(null);
         }
     }
 
