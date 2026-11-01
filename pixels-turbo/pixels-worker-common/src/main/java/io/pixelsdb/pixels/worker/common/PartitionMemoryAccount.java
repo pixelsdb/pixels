@@ -14,6 +14,7 @@ final class PartitionMemoryAccount
     private final AtomicLong windows = new AtomicLong();
     private final AtomicLong maxGroups = new AtomicLong();
     private final AtomicLong sizingNs = new AtomicLong();
+    private final AtomicLong encodedPeak = new AtomicLong(), decodedPeak = new AtomicLong();
     private final AtomicLong exactWindows = new AtomicLong();
 
     private final long usableBytes;
@@ -27,14 +28,17 @@ final class PartitionMemoryAccount
         int readers = Math.max(1, Math.min(Math.min(policy.getReaderThreads(), Runtime.getRuntime().availableProcessors()), splits));
         this.policy = new PartitionMemoryPolicy(policy.getWorkerBytes(), policy.getInputBytes(), policy.getOutputBytes(),
                 readers, policy.getWindowRowGroups());
-        long pool = Math.max(1, usableBytes * 35 / 100);
-        input = new PartitionByteBudget(Math.min(policy.getInputBytes(), pool));
-        output = new PartitionByteBudget(Math.min(policy.getOutputBytes(), pool));
+        long total = Math.max(2, usableBytes / 2);
+        long requested = Math.addExact(policy.getInputBytes(), policy.getOutputBytes());
+        long inputLimit = requested <= total ? policy.getInputBytes() :
+                Math.max(1, Math.min(total - 1, (long) (total * (policy.getInputBytes() / (double) requested))));
+        input = new PartitionByteBudget(inputLimit);
+        output = new PartitionByteBudget(requested <= total ? policy.getOutputBytes() : total - inputLimit);
     }
 
     void validatePartitioner(TypeDescription schema, int partitions)
     {
-        long batch = schema.createRowBatch(WorkerCommon.rowBatchSize, TypeDescription.Mode.NONE).getMemoryUsage();
+        long batch = io.pixelsdb.pixels.planner.plan.physical.PartitionInputSizing.decodedVectorBytes(schema, WorkerCommon.rowBatchSize);
         long tails = Math.multiplyExact(Math.multiplyExact(batch + 4L * WorkerCommon.rowBatchSize, partitions), policy.getReaderThreads());
         long reserve = usableBytes * 15 / 100;
         if (tails > reserve)
@@ -52,6 +56,8 @@ final class PartitionMemoryAccount
 
     void window(PartitionReadWindow window, long elapsedSizingNs)
     {
+        encodedPeak.accumulateAndGet(window.encodedBytes, Math::max);
+        decodedPeak.accumulateAndGet(window.decodedBytes, Math::max);
         windows.incrementAndGet(); maxGroups.accumulateAndGet(window.input.getRgLength(), Math::max);
         sizingNs.addAndGet(elapsedSizingNs);
         if (window.exactSizing) { exactWindows.incrementAndGet(); }
@@ -64,6 +70,7 @@ final class PartitionMemoryAccount
         result.put("inputRemainingBytes", input.used()); result.put("inputWaitNs", input.waitNs());
         result.put("outputLimitBytes", output.limit()); result.put("outputPeakBytes", output.peak());
         result.put("outputRemainingBytes", output.used()); result.put("outputWaitNs", output.waitNs());
+        result.put("encodedWindowPeakBytes", encodedPeak.get()); result.put("decodedWindowPeakBytes", decodedPeak.get());
         result.put("readWindows", windows.get()); result.put("maxWindowRowGroups", maxGroups.get());
         result.put("windowSizingNs", sizingNs.get()); result.put("exactSizingWindows", exactWindows.get());
         result.put("readerThreads", (long) policy.getReaderThreads());

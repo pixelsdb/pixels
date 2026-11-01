@@ -83,7 +83,7 @@ These optional properties in the worker's `PIXELS_HOME/etc/pixels.properties` ha
 with older configurations:
 
 ```properties
-s3qs.producer.io.threads=4
+s3qs.producer.io.threads=0
 s3qs.consumer.ack.threads=2
 s3qs.consumer.ack.max.inflight=32
 ```
@@ -117,6 +117,7 @@ owned by the connector's existing file cleaner after transaction termination and
 executor.partition.memory.planner.enabled=false
 executor.partition.memory.worker.enabled=false
 executor.partition.memory.planning.mb=0
+executor.partition.memory.expansion.factor=4
 ```
 
 Planner enablement obtains the actual producer function's memory and CPU hint from its backend invoker
@@ -132,52 +133,67 @@ Invoker resources, deployment memory, JVM heap or billing. It applies when plann
 enabled and travels to workers in the existing policy; no matching worker-side configuration is needed.
 The old `worker.mb`, `reader.threads` and `window.row.groups` settings remain unused.
 
-Base-table task sizing uses the existing metadata service's average column-chunk sizes, row count and
-output schema. It never opens an input file or fetches RG footers. S3QS targets roughly 1.5 times planning-reference
-memory in selected encoded input per logical task. Batch targets 90% of its output pool minus partition
-tail capacity, using a 1.5x retained-output estimate and a coarse variable-width allowance. These are
-initial heuristics, not exact peak-memory predictions. Missing statistics use the existing row-group
-size as an estimate; unknown input ranges stay intact. Filters do not shrink memory estimates.
+Base-table task sizing uses metadata-service average column chunks, row count and schema; it never
+opens input files or fetches RG footers. Streaming tasks target about five turnovers of the smaller
+input/output pool, divided by the larger of encoded and estimated decoded input per RG. Fixed vector
+width comes from schema and rows. Existing string/binary length sums estimate uncompressed payload;
+UTF-16 string length sums use a conservative 3x UTF-8 bound. Missing row/length statistics use
+`executor.partition.memory.expansion.factor` (default 4, finite and >= 1) as an encoded-size fallback.
+Known decoded row widths can exceed that factor. It is not a maximum compression ratio or a live-set
+cap. Batch continues to size retained output against 90% of its pool minus partition tails. Filters
+do not reduce these estimates. Unknown RG ranges stay intact and at least one RG is preserved.
 
-One PartitionInput remains one logical producer. RG ranges are split/combined before ids and END
-membership are frozen. Each task receives about two input slices per planned scan thread; the former
-fixed eight-split task cap no longer applies when the policy is enabled. Hash partition counts and the
-DATA/END protocol are unchanged. More backend memory gives larger tasks; CPU hints determine the
-independent slices available inside each task. Partition-tail capacity can reduce the scan-thread hint.
+One PartitionInput remains one logical producer. RG ranges are packed before producer ids and END
+membership are frozen. Each task gets about two slices per maximum scan thread; partition counts and
+the DATA/END protocol do not change. Smaller data budgets/greater decoded work can increase task
+counts; deployment guards must use the actual plan rather than a fixed historical invocation count.
 
-Budgets use up to 85% of planning-reference memory, leaving native/SDK headroom; workers also clamp this working
-set to actual JVM max heap. Input and output byte pools each receive 35% of that working set. Another
-15% bounds partition-tail capacity, and the remainder covers decoded batches and runtime overhead.
-These figures are initial resource fractions, not an RSS hard cap. Lambda wrappers pass the actual
-runtime memory limit and only tighten a policy whose reference exceeds that limit. A smaller planned
-policy is preserved. For a task without a policy, worker enablement still derives a fallback from the
-actual runtime platform limit (or JVM heap if unknown), without consulting the planner-only cap.
-Memory metrics report `planningMemoryBytes` (effective policy reference) and `platformMemoryBytes`
-(actual context limit, 0 when unknown); the legacy `backendMemoryBytes` field retains its policy-reference
-meaning for compatibility. None of these admission counters is an RSS or JVM/native hard boundary.
+Let U = min(85% of planning-reference memory, actual JVM max heap). Default input and output pools
+receive 10%U and 40%U: together 50%U with a 1:4 split. 15%U remains a partition-tail allowance and
+35%U remains outside these two counters for runtime/codec/metadata/allocation turnover, in addition
+to the outer 15% native/SDK reserve. These are conservative resource fractions, not an RSS hard cap.
+Explicit/older policies are proportionally clamped to the same 50%U envelope, preserving their split.
+Lambda wrappers pass the actual limit and only tighten a policy larger than that limit; smaller
+planning policies survive. Worker fallback without a plan uses actual platform memory (or heap if
+unknown) rather than the planner-only cap. Metrics distinguish `planningMemoryBytes` and
+`platformMemoryBytes` (0 if unknown); legacy `backendMemoryBytes` still means the policy reference.
 
-Scan concurrency uses the backend CPU hint clamped to runtime availableProcessors and actual task
-slices. Windows are byte-sized rather than capped at four RG: each reader targets its share of the input
-pool, charging twice encoded bytes for chunks and a possible read copy. Normal sizing uses whole-RG
-lengths from the already loaded file tail. Only a missing/oversized current RG requires exact selected
-chunk sizing. Closed record readers and owned binary values allow input windows to be reclaimed.
-Oversized selected RGs and retained Batch output fail explicitly; no spill or next-window prefetch is added.
+With a memory policy, scan windows reserve twice encoded bytes for chunks/read copies plus the
+currently materialized batch, hidden-vector/RLE allowances and dictionary offsets. Several RGs in a
+window add their encoded bytes but reuse a single batch; the largest dictionary allowance is retained.
+Variable columns inspect only the current RG footer and the scanner reuses that cache. Fixed-width
+normal sizing uses the loaded file tail; missing/oversized RG lengths fall back to exact selected chunks.
+Closed readers and owned binary output values allow window storage to be reclaimed. An oversized
+single RG/decode state or retained Batch output fails explicitly; no spill/prefetch is added.
 
-S3QS pending, queued and executing batches share the output pool. Under pressure, scanners wait for
-queued/running writes to release bytes. Only when no such write can progress is the largest pending
-partition force-flushed; normal full groups and final tails still flush. This preserves mergeable batches,
-though it may delay partial objects and does not guarantee every writer is occupied. Producer writes have no separate
-job-count admission limit; the configured I/O thread count still bounds execution, and the 8 MiB object
-limit still applies. The byte budget only exists when the memory policy is active; without it, the
-producer write queue has no admission bound. Partitioner tails, encoder/SDK/native buffers and metadata are not all
-represented by these two byte counters. The independent idle S3QS buffer pool retains at most four
-buffers. Producer encoding scratch separately reuses `FixSizedBuffers` by writer concurrency until the
-writer pool terminates; scratch is returned after trial encoding failure/overflow or upload completion.
-An empty cache may allocate, so this is reuse, not another admission limit or zero-copy upload. Columns
-continue to encode in each file's existing thread pool. Column exceptions complete their futures, and
-rejected submissions still wait for columns already running before returning failure.
-MemoryMetrics reports backend/usable memory, actual scan threads, byte limits/peaks/waits,
-tail limit and window counts. Wait/cost counters may overlap and must not be summed as query latency.
+S3QS writer count 0 chooses ceil(2 * available CPUs / 3); positive values retain explicit control.
+The scanner pool's maximum remains the policy CPU hint clamped to runtime CPUs/task slices. Effective
+concurrent scan windows start near one per two writers. Before output samples exist, four completed
+windows may add one slot to fill the pipeline. Thereafter a small invocation-local controller uses
+EWMA service costs per raw output byte: R = clamp(ceil(W * scanCost / writeCost), 1, maximumReaders).
+Scan cost excludes output handoff (including byte-budget waiting); write cost includes encoding,
+upload and DATA publication. Four fresh scan samples and two completed writes permit one-slot
+adjustments. Sampling is observational: GC, contention and I/O remain included, small tasks may finish
+before calibration, and this is a bounded heuristic rather than an optimality guarantee. Parked scan
+slots wait before window allocation; this wait is reported separately rather than hidden as savings.
+The per-file parallel column encoder and its thread-pool creation remain unchanged.
+
+Pending, queued and executing S3QS batches share the output pool. Under pressure, the largest pending
+groups fill idle writer capacity until writers are busy or enough bytes have been released. Once all
+writers are occupied, pending data stays mergeable. This avoids a single slow upload starving otherwise
+idle writers, but pressure/final tails may still produce partial objects. DATA must all succeed before
+any END. Producer jobs have no separate count-admission cap; the byte pool is the bound when enabled,
+and the 8 MiB object limit remains. Without a policy there is no producer byte-admission bound.
+Scratch uses existing FixSizedBuffers by writer concurrency and is returned on encoding failure,
+overflow or upload completion, then cleared after writer termination. This is reuse, not zero-copy or
+an allocation hard cap. Encoder/SDK/native buffers and metadata are not fully represented by the two
+admission counters.
+
+MemoryMetrics reports input/output limits, peaks and waits, encoded/decoded window peaks, maximum
+reader threads, effective scan concurrency peak/final target, writer count, scan scheduling wait and
+scan/write service bytes/time. Service times are accumulated thread wall time, not CPU utilization.
+Physical read-request counters are accumulated once per file rather than once per window. Wait, GC
+and service counters overlap and must not be added as query latency.
 
 ## S3 input and worker resource lifecycle
 

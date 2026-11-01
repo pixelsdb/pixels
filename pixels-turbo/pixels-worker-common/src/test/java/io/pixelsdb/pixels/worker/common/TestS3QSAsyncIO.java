@@ -105,6 +105,40 @@ public class TestS3QSAsyncIO
     }
 
     @Test(timeout = 10000)
+    public void pressureFlushesLargestPendingIntoEveryIdleWriter() throws Exception
+    {
+        Fixture f = new Fixture(3);
+        VectorizedRowBatch pending = batch(128);
+        PartitionByteBudget budget = new PartitionByteBudget(2 * pending.getMemoryUsage());
+        CountDownLatch started = new CountDownLatch(2), release = new CountDownLatch(1);
+        when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call -> {
+            started.countDown();
+            assertTrue(release.await(3, TimeUnit.SECONDS));
+            return PutObjectResponse.builder().build();
+        });
+        ExecutorService caller = Executors.newSingleThreadExecutor();
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 3, f.context, 8192, 2, budget))
+        {
+            try
+            {
+                output.add(0, pending, f.schema);
+                output.add(1, batch(128), f.schema);
+                Future<?> waiting = caller.submit(() -> output.add(2, batch(128), f.schema));
+                assertTrue("both partial groups must run before either upload releases bytes", started.await(2, TimeUnit.SECONDS));
+                assertFalse(waiting.isDone());
+                assertTrue(f.sent.isEmpty());
+                release.countDown(); waiting.get(2, TimeUnit.SECONDS);
+                output.finish(f.schema, new HashSet<>()); f.verifyEnds(3);
+                assertEquals(384, f.sent.stream().filter(S3QueueMessage::isData).mapToLong(S3QueueMessage::getRowCount).sum());
+            }
+            finally { release.countDown(); }
+        }
+        finally { stop(caller); }
+        assertEquals(0, budget.used());
+    }
+
+    @Test(timeout = 10000)
     public void producerUploadsOverlapAndAllDataMustCompleteBeforeAnyEnd() throws Exception
     {
         Fixture f = new Fixture(2);

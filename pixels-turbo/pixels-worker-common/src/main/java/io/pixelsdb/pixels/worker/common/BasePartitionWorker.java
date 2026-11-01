@@ -80,6 +80,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
         partitionOutput.setErrorMessage("");
         workerMetrics.clear();
         ExecutorService threadPool = null;
+        S3QSAsyncPartitionOutput producerOutput = null;
         List<ConcurrentLinkedQueue<VectorizedRowBatch>> retained = null;
         S3QSQueueScope queueScope = new S3QSQueueScope();
         memory = null;
@@ -139,6 +140,8 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                     createS3QSOutput(event, shuffleInfo, numPartition) : null)
             {
                 queueScope.own(asyncOutput);
+                producerOutput = asyncOutput;
+                if (asyncOutput != null) { asyncOutput.readerLimit(Math.max(1, Math.min(readers, inputSplits.size()))); }
                 AtomicReference<TypeDescription> writerSchema = new AtomicReference<>();
                 // Batch shuffle retains batches here; S3QS transfers them to bounded background jobs.
                 List<ConcurrentLinkedQueue<VectorizedRowBatch>> partitioned = new ArrayList<>(numPartition);
@@ -269,6 +272,7 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 Map<String, Long> metrics = memory.snapshot();
                 metrics.put("planningMemoryBytes", memory.policy.getWorkerBytes());
                 metrics.put("platformMemoryBytes", context.getMemoryBytes());
+                if (producerOutput != null) { metrics.putAll(producerOutput.snapshot()); }
                 partitionOutput.setMemoryMetrics(metrics);
                 logger.info("Partition memory: " + JSON.toJSONString(metrics));
             }
@@ -364,67 +368,79 @@ public class BasePartitionWorker extends Worker<PartitionInput, PartitionOutput>
                 {
                     continue;
                 }
+                int fileRequests = 0;
                 int end = PartitionInputSizing.end(inputInfo, pixelsReader.getRowGroupNum());
                 for (int start = inputInfo.getRgStart(); start < end;)
                 {
-                    long sizingStart = System.nanoTime();
-                    PartitionReadWindow window = memory == null ? null : PartitionReadWindow.next(
-                            pixelsReader, inputInfo, start, end, columnsToRead, memory.policy, memory.input.limit());
-                    long sizingNs = System.nanoTime() - sizingStart;
-                    InputInfo range = window == null ? new InputInfo(inputInfo.getPath(), start, end - start) : window.input;
-                    if (memory != null)
-                    {
-                        memory.input.acquire(window.bytes, context.getCancellation()::check);
-                        memory.window(window, sizingNs);
-                    }
-                    PixelsRecordReader recordReader = null;
+                    if (output != null) { output.acquireScan(); }
                     try
                     {
-                        PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, columnsToRead, range);
-                        recordReader = pixelsReader.read(option);
-                        TypeDescription rowBatchSchema = recordReader.getResultSchema();
-                        if (scanner == null)
+                        long sizingStart = System.nanoTime();
+                        PartitionReadWindow window = memory == null ? null : PartitionReadWindow.next(
+                                pixelsReader, inputInfo, start, end, columnsToRead, memory.policy, memory.input.limit());
+                        long sizingNs = System.nanoTime() - sizingStart;
+                        InputInfo range = window == null ? new InputInfo(inputInfo.getPath(), start, end - start) : window.input;
+                        if (memory != null)
                         {
-                            scanner = new Scanner(WorkerCommon.rowBatchSize, rowBatchSchema, columnsToRead, projection, filter);
+                            memory.input.acquire(window.bytes, context.getCancellation()::check);
+                            memory.window(window, sizingNs);
                         }
-                        if (partitioner == null)
+                        PixelsRecordReader recordReader = null;
+                        long scanBegin = System.nanoTime(), transferNs = 0, producedBytes = 0;
+                        try
                         {
-                            if (memory != null) { memory.validatePartitioner(scanner.getOutputSchema(), partitionResult.size()); }
-                            partitioner = new Partitioner(partitionResult.size(), WorkerCommon.rowBatchSize,
-                                    scanner.getOutputSchema(), keyColumnIds, memory != null);
-                        }
-                        writerSchema.compareAndSet(null, scanner.getOutputSchema());
-                        computeCostTimer.start();
-                        VectorizedRowBatch rowBatch;
-                        do
-                        {
-                            if (output != null) { output.check(); }
-                            context.getCancellation().check();
-                            rowBatch = scanner.filterAndProject(recordReader.readBatch(WorkerCommon.rowBatchSize));
-                            if (rowBatch.size > 0)
+                            PixelsReaderOption option = WorkerCommon.getReaderOption(transId, timestamp, columnsToRead, range);
+                            recordReader = pixelsReader.read(option);
+                            TypeDescription rowBatchSchema = recordReader.getResultSchema();
+                            if (scanner == null)
                             {
-                                Map<Integer, VectorizedRowBatch> result = partitioner.partition(rowBatch);
-                                if (memory != null) { memory.checkTailBytes(partitioner.getRetainedMemoryUsage()); }
-                                for (Map.Entry<Integer, VectorizedRowBatch> entry : result.entrySet())
-                                {
-                                    emitPartitionBatch(partitionResult, output, entry.getKey(), entry.getValue(), scanner.getOutputSchema());
-                                }
+                                scanner = new Scanner(WorkerCommon.rowBatchSize, rowBatchSchema, columnsToRead, projection, filter);
                             }
-                        } while (!rowBatch.endOfFile);
-                        computeCostTimer.stop();
-                        computeCostTimer.minus(recordReader.getReadTimeNanos());
-                        readCostTimer.add(recordReader.getReadTimeNanos());
-                        readBytes += recordReader.getCompletedBytes();
-                        numReadRequests += recordReader.getNumReadRequests();
+                            if (partitioner == null)
+                            {
+                                if (memory != null) { memory.validatePartitioner(scanner.getOutputSchema(), partitionResult.size()); }
+                                partitioner = new Partitioner(partitionResult.size(), WorkerCommon.rowBatchSize,
+                                        scanner.getOutputSchema(), keyColumnIds, memory != null);
+                            }
+                            writerSchema.compareAndSet(null, scanner.getOutputSchema());
+                            computeCostTimer.start();
+                            VectorizedRowBatch rowBatch;
+                            do
+                            {
+                                if (output != null) { output.check(); }
+                                context.getCancellation().check();
+                                rowBatch = scanner.filterAndProject(recordReader.readBatch(WorkerCommon.rowBatchSize));
+                                if (rowBatch.size > 0)
+                                {
+                                    Map<Integer, VectorizedRowBatch> result = partitioner.partition(rowBatch);
+                                    if (memory != null) { memory.checkTailBytes(partitioner.getRetainedMemoryUsage()); }
+                                    for (Map.Entry<Integer, VectorizedRowBatch> entry : result.entrySet())
+                                    {
+                                        long transferBegin = System.nanoTime();
+                                        emitPartitionBatch(partitionResult, output, entry.getKey(), entry.getValue(), scanner.getOutputSchema());
+                                        transferNs += System.nanoTime() - transferBegin;
+                                        producedBytes += entry.getValue().getMemoryUsage();
+                                    }
+                                }
+                            } while (!rowBatch.endOfFile);
+                            if (output != null) { output.scanned(producedBytes, System.nanoTime() - scanBegin - transferNs); }
+                            computeCostTimer.stop();
+                            computeCostTimer.minus(recordReader.getReadTimeNanos());
+                            readCostTimer.add(recordReader.getReadTimeNanos());
+                            readBytes += recordReader.getCompletedBytes();
+                            fileRequests = recordReader.getNumReadRequests();
+                        }
+                        finally
+                        {
+                            // Close decoder/chunk references before allowing another window to allocate.
+                            try { if (recordReader != null) { pixelsReader.closeRecordReader(recordReader); } }
+                            finally { if (memory != null) { memory.input.release(window.bytes); } }
+                        }
+                        start += range.getRgLength();
                     }
-                    finally
-                    {
-                        // Close decoder/chunk references before allowing another window to allocate.
-                        try { if (recordReader != null) { pixelsReader.closeRecordReader(recordReader); } }
-                        finally { if (memory != null) { memory.input.release(window.bytes); } }
-                    }
-                    start += range.getRgLength();
+                    finally { if (output != null) { output.releaseScan(); } }
                 }
+                numReadRequests += fileRequests;
             } catch (Throwable e)
             {
                 throw new WorkerException("failed to scan the file '" +

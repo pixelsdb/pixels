@@ -78,16 +78,18 @@ public class TestPartitionMemory
     public void ordinaryWindowsUseOnlyFileTailWithoutFetchingAnyRowGroupFooters() throws Exception
     {
         PixelsReader reader = mock(PixelsReader.class);
-        when(reader.getRowGroupInfo(anyInt())).thenReturn(PixelsProto.RowGroupInformation.newBuilder().setDataLength(40).build());
-        PartitionMemoryPolicy policy = new PartitionMemoryPolicy(2048, 400, 400, 2, 4);
+        when(reader.getRowGroupInfo(anyInt())).thenReturn(PixelsProto.RowGroupInformation.newBuilder().setDataLength(40 * 10240).build());
+        when(reader.getFileSchema()).thenReturn(TypeDescription.fromString("struct<k:bigint>"));
+        PartitionMemoryPolicy policy = new PartitionMemoryPolicy(2048 * 10240, 400 * 10240, 400 * 10240, 2, 4);
         InputInfo original = new InputInfo("file", 3, 7);
-        PartitionReadWindow window = PartitionReadWindow.next(reader, original, 3, 10, new String[]{"k"}, policy, 400);
+        PartitionReadWindow window = PartitionReadWindow.next(reader, original, 3, 10, new String[]{"k"}, policy, 400 * 10240);
         assertEquals(2, window.input.getRgLength());
-        assertEquals(160, window.bytes);
+        assertEquals(160 * 10240 + window.decodedBytes, window.bytes);
+        assertTrue(window.decodedBytes > 0);
         assertFalse(window.exactSizing);
         assertEquals(7, original.getRgLength());
         verify(reader, never()).getRowGroupFooter(anyInt());
-        verify(reader, never()).getFileSchema();
+        verify(reader).getFileSchema();
         verify(reader, never()).getRowGroupInfo(6);
     }
 
@@ -95,24 +97,24 @@ public class TestPartitionMemory
     public void oversizedWholeGroupFallsBackOnlyForCurrentGroupAndSelectedColumns() throws Exception
     {
         PixelsReader reader = mock(PixelsReader.class);
-        when(reader.getRowGroupInfo(anyInt())).thenReturn(PixelsProto.RowGroupInformation.newBuilder().setDataLength(1040).build());
+        when(reader.getRowGroupInfo(anyInt())).thenReturn(PixelsProto.RowGroupInformation.newBuilder().setDataLength(1040 * 10240).build());
         when(reader.getFileSchema()).thenReturn(TypeDescription.fromString("struct<k:bigint,ignored:bigint>"));
-        PixelsProto.ColumnChunkIndex k = PixelsProto.ColumnChunkIndex.newBuilder().setChunkLength(40).build();
-        PixelsProto.ColumnChunkIndex other = PixelsProto.ColumnChunkIndex.newBuilder().setChunkLength(1000).build();
+        PixelsProto.ColumnChunkIndex k = PixelsProto.ColumnChunkIndex.newBuilder().setChunkLength(40 * 10240).build();
+        PixelsProto.ColumnChunkIndex other = PixelsProto.ColumnChunkIndex.newBuilder().setChunkLength(1000 * 10240).build();
         when(reader.getRowGroupFooter(anyInt())).thenReturn(PixelsProto.RowGroupFooter.newBuilder()
                 .setRowGroupIndexEntry(PixelsProto.RowGroupIndex.newBuilder()
                         .addColumnChunkIndexEntries(k).addColumnChunkIndexEntries(other)).build());
-        PartitionMemoryPolicy policy = new PartitionMemoryPolicy(1024, 200, 200, 2, 4);
+        PartitionMemoryPolicy policy = new PartitionMemoryPolicy(1024 * 10240, 200 * 10240, 200 * 10240, 2, 4);
         InputInfo original = new InputInfo("file", 3, 7);
-        PartitionReadWindow window = PartitionReadWindow.next(reader, original, 3, 10, new String[]{"k"}, policy, 200);
+        PartitionReadWindow window = PartitionReadWindow.next(reader, original, 3, 10, new String[]{"k"}, policy, 200 * 10240);
         assertEquals(1, window.input.getRgLength());
-        assertEquals(80, window.bytes);
+        assertEquals(80 * 10240 + window.decodedBytes, window.bytes);
         assertTrue(window.exactSizing);
         assertEquals(7, original.getRgLength());
         verify(reader).getRowGroupFooter(3);
         verify(reader, never()).getRowGroupFooter(4);
         assertThrows(java.io.IOException.class, () -> PartitionReadWindow.next(reader, original, 3, 10,
-                new String[]{"k", "ignored"}, policy, 200));
+                new String[]{"k", "ignored"}, policy, 200 * 10240));
     }
 
     @Test
@@ -124,11 +126,11 @@ public class TestPartitionMemory
         when(reader.getRowGroupInfo(1)).thenReturn(PixelsProto.RowGroupInformation.newBuilder().setDataLength(-1).build());
         when(reader.getRowGroupFooter(anyInt())).thenReturn(PixelsProto.RowGroupFooter.newBuilder()
                 .setRowGroupIndexEntry(PixelsProto.RowGroupIndex.newBuilder().addColumnChunkIndexEntries(
-                        PixelsProto.ColumnChunkIndex.newBuilder().setChunkLength(40))).build());
-        PartitionMemoryPolicy policy = new PartitionMemoryPolicy(1024, 200, 200, 1, 4);
+                        PixelsProto.ColumnChunkIndex.newBuilder().setChunkLength(40 * 10240))).build());
+        PartitionMemoryPolicy policy = new PartitionMemoryPolicy(1024 * 10240, 200 * 10240, 200 * 10240, 1, 4);
         InputInfo original = new InputInfo("file", 0, 10000);
-        assertEquals(1, PartitionReadWindow.next(reader, original, 0, 10000, new String[]{"k"}, policy, 200).input.getRgLength());
-        assertEquals(80, PartitionReadWindow.next(reader, original, 1, 10000, new String[]{"k"}, policy, 200).bytes);
+        assertEquals(1, PartitionReadWindow.next(reader, original, 0, 10000, new String[]{"k"}, policy, 200 * 10240).input.getRgLength());
+        assertEquals(80 * 10240, PartitionReadWindow.next(reader, original, 1, 10000, new String[]{"k"}, policy, 200 * 10240).encodedBytes * 2);
         verify(reader).getRowGroupFooter(0);
         verify(reader).getRowGroupFooter(1);
         verify(reader, never()).getRowGroupInfo(2);
@@ -149,6 +151,26 @@ public class TestPartitionMemory
         BinaryColumnVector tail = (BinaryColumnVector) partitioner.getRowBatches()[0].cols[1];
         assertNotSame(borrowed, tail.vector[0]);
         assertEquals('a', tail.vector[0][tail.start[0]]);
+    }
+
+    @Test
+    public void dictionaryExpansionIsReservedBeforeReadingCompressedData() throws Exception
+    {
+        PixelsReader reader = mock(PixelsReader.class);
+        when(reader.getFileSchema()).thenReturn(TypeDescription.fromString("struct<s:string>"));
+        when(reader.getRowGroupInfo(0)).thenReturn(PixelsProto.RowGroupInformation.newBuilder()
+                .setDataLength(64).setNumberOfRows(1000000).build());
+        when(reader.getRowGroupFooter(0)).thenReturn(PixelsProto.RowGroupFooter.newBuilder()
+                .setRowGroupEncoding(PixelsProto.RowGroupEncoding.newBuilder().addColumnChunkEncodings(
+                        PixelsProto.ColumnEncoding.newBuilder().setKind(PixelsProto.ColumnEncoding.Kind.DICTIONARY)
+                                .setDictionarySize(100000))).build());
+        PartitionMemoryPolicy policy = PartitionMemoryPolicy.forResources(4L << 20, 1);
+        InputInfo input = new InputInfo("compressed", 0, 1);
+        PartitionReadWindow window = PartitionReadWindow.next(reader, input, 0, 1, new String[]{"s"}, policy, 1L << 20);
+        assertEquals(64, window.encodedBytes);
+        assertTrue(window.decodedBytes >= 400004);
+        assertThrows(java.io.IOException.class, () -> PartitionReadWindow.next(reader, input, 0, 1,
+                new String[]{"s"}, policy, 256L << 10));
     }
 
     @Test

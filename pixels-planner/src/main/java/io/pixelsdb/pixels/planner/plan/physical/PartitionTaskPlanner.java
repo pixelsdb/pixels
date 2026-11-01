@@ -40,28 +40,36 @@ public final class PartitionTaskPlanner
             totalBytes += Math.max(0, column.getSize());
             totalChunkBytes += Math.max(0, column.getChunkSize());
         }
-        double encoded = 0, variable = 0;
-        TypeDescription schema = TypeDescription.createStruct();
+        double groups = totalChunkBytes > 0 ? Math.ceil(totalBytes / totalChunkBytes) : 0;
+        double rows = groups > 0 && rowCount > 0 ? rowCount / groups : 0;
+        double encoded = 0, variable = 0, inputVariable = 0;
+        double expansion = PartitionInputSizing.expansionFactor();
+        TypeDescription schema = TypeDescription.createStruct(), inputSchema = TypeDescription.createStruct();
         for (int i = 0; i < columns.length; i++)
         {
             Column column = byName.get(columns[i]);
             double bytes = column == null ? 0 : Math.max(0, column.getChunkSize());
             encoded += bytes;
+            TypeDescription type = column == null ? TypeDescription.createLong() : TypeDescription.fromString(column.getType());
+            inputSchema.addField(columns[i], type.clone());
+            double payload = 0;
+            if (PartitionInputSizing.isVariable(type))
+            {
+                long length = PartitionInputSizing.variableBytes(column);
+                payload = length >= 0 && groups > 0 ? length / groups : bytes * expansion;
+                inputVariable += payload;
+            }
             if (projection[i])
             {
-                TypeDescription type = column == null ? TypeDescription.createLong() : TypeDescription.fromString(column.getType());
                 schema.addField(columns[i], type);
-                if (type.getCategory() == TypeDescription.Category.STRING || type.getCategory() == TypeDescription.Category.BINARY ||
-                        type.getCategory() == TypeDescription.Category.VARCHAR || type.getCategory() == TypeDescription.Category.CHAR)
-                {
-                    variable += bytes * 4; // coarse expansion allowance, checked again inside the worker
-                }
+                variable += payload;
             }
         }
         if (!(encoded > 0) || !Double.isFinite(encoded)) { encoded = Math.max(1, fallbackRowGroupBytes); }
-        long batch = schema.createRowBatch(batchSize, TypeDescription.Mode.NONE).getMemoryUsage() + 128;
-        double groups = totalChunkBytes > 0 ? Math.ceil(totalBytes / totalChunkBytes) : 0;
-        double rows = groups > 0 && rowCount > 0 ? rowCount / groups : encoded / Math.max(1, batch / (double) batchSize);
+        long batch = PartitionInputSizing.decodedVectorBytes(schema, batchSize) + 128;
+        boolean knownRows = rows > 0;
+        if (!knownRows) { rows = encoded / Math.max(1, batch / (double) batchSize); }
+        double expanded = knownRows ? PartitionInputSizing.decodedVectorBytes(inputSchema, (long) Math.ceil(rows)) + inputVariable : encoded * expansion;
         double retained = 1.5 * (Math.ceil(Math.max(1, rows) / batchSize) * batch + variable);
         long perReaderTails = Math.multiplyExact(batch + 4L * batchSize, partitions);
         long tailSpace = PartitionMemoryPolicy.usableBytes(policy.getWorkerBytes(), Long.MAX_VALUE) * 15 / 100;
@@ -69,10 +77,12 @@ public final class PartitionTaskPlanner
         if (memoryReaders < 1) { throw new IllegalArgumentException("one reader's partition tails exceed backend memory"); }
         policy.setReaderThreads(Math.min(policy.getReaderThreads(), memoryReaders));
         long tails = Math.multiplyExact(Math.multiplyExact(batch, partitions), policy.getReaderThreads());
-        long limit = streaming ? Math.addExact(policy.getWorkerBytes(), policy.getWorkerBytes() / 2) :
+        // About five buffer turnovers per streaming task; this is work sizing,
+        // not a claim that all decoded task data is simultaneously resident.
+        long limit = streaming ? Math.multiplyExact(5, Math.min(policy.getInputBytes(), policy.getOutputBytes())) :
                 policy.getOutputBytes() * 9 / 10 - tails;
         if (limit <= 0) { throw new IllegalArgumentException("partition tail capacity exceeds backend memory; lower batch size or partition count"); }
-        double cost = streaming ? encoded : Math.max(1, retained);
+        double cost = streaming ? Math.max(encoded, expanded) : Math.max(1, retained);
         // Keep at least one RG: coarse statistics must not reject an otherwise readable RG.
         long groupsPerTask = Math.max(1, Math.min(Integer.MAX_VALUE, (long) Math.floor(limit / cost)));
         return pack(splits, groupsPerTask, policy.getReaderThreads());

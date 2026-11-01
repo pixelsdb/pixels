@@ -53,11 +53,13 @@ public class PartitionMemoryPolicy
     {
         if (memoryBytes <= 0) { throw new IllegalArgumentException("worker memory must be positive"); }
         long usable = usableBytes(memoryBytes, Long.MAX_VALUE);
-        // Separate byte pools retain writer progress space. 15% of physical
-        // memory remains outside this working-set model for native/SDK overhead.
-        long pool = Math.max(1, usable * 35 / 100);
+        // Half of U is admitted data: encoded/decode windows need less space
+        // than pending/queued/running output. Keep 15%U for partition tails,
+        // 35%U for runtime/codec turnover, plus the outer native/SDK reserve.
+        long input = Math.max(1, usable / 10);
+        long output = Math.max(1, usable / 2 - input);
         int readers = Math.max(1, cpuCount);
-        return new PartitionMemoryPolicy(memoryBytes, pool, pool, readers, 0);
+        return new PartitionMemoryPolicy(memoryBytes, input, output, readers, 0);
     }
 
     public static long usableBytes(long memoryBytes, long heapBytes)

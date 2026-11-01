@@ -33,6 +33,8 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     private final Partition[] partitions;
     private final int chunkBytes;
     private final PartitionByteBudget memory;
+    private final int writerThreads;
+    private PartitionPipeline pipeline;
     private final AtomicInteger outstandingWrites = new AtomicInteger();
     private final FixSizedBuffers stagingBuffers;
     private volatile boolean closed;
@@ -46,7 +48,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
                             WorkerContext context, PartitionByteBudget memory)
     {
         this(storage, shuffle, producerId, count, context, Constants.S3QS_BUFFER_SIZE,
-                S3QSAsyncTasks.setting("s3qs.producer.io.threads", 4), memory);
+                producerThreads(), memory);
     }
 
     S3QSAsyncPartitionOutput(S3QS storage, ShuffleInfo shuffle, int producerId, int count,
@@ -64,6 +66,8 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
             throw new IllegalArgumentException("invalid S3QS partition/chunk size");
         }
         this.memory = memory;
+        this.writerThreads = threads;
+        this.pipeline = new PartitionPipeline(Runtime.getRuntime().availableProcessors(), threads);
         this.storage = storage;
         this.shuffle = shuffle;
         this.producerId = producerId;
@@ -75,6 +79,21 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         this.stagingBuffers = new FixSizedBuffers(chunkBytes, threads);
         writes.afterTermination(stagingBuffers::clear);
     }
+
+    static int producerThreads()
+    {
+        String configured = io.pixelsdb.pixels.common.utils.ConfigFactory.Instance().getProperty("s3qs.producer.io.threads");
+        int threads = configured == null ? 0 : Integer.parseInt(configured.trim());
+        if (threads < 0) { throw new IllegalArgumentException("s3qs.producer.io.threads must be nonnegative"); }
+        int cores = Runtime.getRuntime().availableProcessors();
+        return threads == 0 ? Math.max(1, cores - cores / 3) : threads;
+    }
+
+    void readerLimit(int readers) { pipeline = new PartitionPipeline(readers, writerThreads); }
+    void acquireScan() { pipeline.acquire(writes::check); }
+    void releaseScan() { pipeline.release(); }
+    void scanned(long bytes, long nanos) { pipeline.scanned(bytes, nanos); }
+    java.util.Map<String, Long> snapshot() { return pipeline.snapshot(); }
 
     void check() { writes.check(); }
 
@@ -91,7 +110,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
             memory.acquire(bytes, () ->
             {
                 writes.check();
-                if (memory.used() > memory.limit() - bytes) { flushForProgress(); }
+                if (memory.used() > memory.limit() - bytes) { flushForProgress(bytes); }
             });
         }
         boolean transferred = false;
@@ -118,25 +137,22 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         finally { if (!transferred && memory != null) { memory.release(bytes); } }
     }
 
-    /** Retain mergeable batches while queued/running writes can release budget. */
-    private synchronized void flushForProgress()
+    /** Under byte pressure, give idle writers the largest available groups. */
+    private synchronized void flushForProgress(long requiredBytes)
     {
-        if (outstandingWrites.get() != 0) { return; }
-        int largest = -1;
-        long bytes = 0;
-        for (int i = 0; i < partitions.length; i++)
+        while (outstandingWrites.get() < writerThreads && memory.used() > memory.limit() - requiredBytes)
         {
-            synchronized (partitions[i])
+            int largest = -1;
+            long bytes = 0;
+            for (int i = 0; i < partitions.length; i++)
             {
-                if (partitions[i].estimatedBytes > bytes) { largest = i; bytes = partitions[i].estimatedBytes; }
+                synchronized (partitions[i])
+                {
+                    if (partitions[i].estimatedBytes > bytes) { largest = i; bytes = partitions[i].estimatedBytes; }
+                }
             }
-        }
-        if (largest >= 0)
-        {
-            synchronized (partitions[largest])
-            {
-                if (outstandingWrites.get() == 0) { flush(largest, partitions[largest]); }
-            }
+            if (largest < 0) { return; }
+            synchronized (partitions[largest]) { flush(largest, partitions[largest]); }
         }
     }
 
@@ -164,7 +180,12 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
                 new S3QSPartitionWriter(storage, schema.clone(), shuffle, partitionId, producerId, context,
                         chunkBytes, partition.sequence, writes::check, stagingBuffers).write(batches);
             }
-            finally { context.getWorkerMetrics().addOutputCostNs(System.nanoTime() - start); }
+            finally
+            {
+                long nanos = System.nanoTime() - start;
+                pipeline.written(reservedBytes, nanos);
+                context.getWorkerMetrics().addOutputCostNs(nanos);
+            }
         }, () -> {
             try { if (memory != null) { memory.release(reservedBytes); } }
             finally { outstandingWrites.decrementAndGet(); }

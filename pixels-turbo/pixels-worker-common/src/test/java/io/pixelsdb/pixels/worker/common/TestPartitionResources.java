@@ -110,6 +110,7 @@ public class TestPartitionResources
         PixelsReader reader = mock(PixelsReader.class);
         when(reader.getRowGroupInfo(anyInt())).thenReturn(PixelsProto.RowGroupInformation.newBuilder().setDataLength((int) MiB).build());
         PartitionMemoryPolicy policy = PartitionMemoryPolicy.forResources(1024 * MiB, 4);
+        when(reader.getFileSchema()).thenReturn(io.pixelsdb.pixels.core.TypeDescription.fromString("struct<k:bigint>"));
         PartitionReadWindow window = PartitionReadWindow.next(reader, new InputInfo("f", 0, 100), 0, 100,
                 new String[]{"k"}, policy, policy.getInputBytes());
         assertTrue(window.input.getRgLength() > 4);
@@ -140,6 +141,58 @@ public class TestPartitionResources
         InputInfo last = tasks.get(tasks.size() - 1).get(0).getInputInfos().get(0);
         assertEquals("unknown", last.getPath()); assertEquals(-1, last.getRgLength());
         assertNotSame(unknown, last);
+    }
+
+    @Test
+    public void compressedTasksUseDecodedRowsAndUnknownStatisticsUseExpansionFallback()
+    {
+        Column k = new Column(); k.setName("k"); k.setType("bigint"); k.setSize(100000); k.setChunkSize(100);
+        PartitionMemoryPolicy policy = PartitionMemoryPolicy.forResources(128 * MiB, 6);
+        List<InputSplit> inputs = ranges(1000, 50);
+        List<List<InputSplit>> encodedLike = PartitionTaskPlanner.plan(inputs, Collections.singletonList(k), 1000,
+                new String[]{"k"}, new boolean[]{true}, 1024, policy, true, 2, 100);
+        List<List<InputSplit>> compressed = PartitionTaskPlanner.plan(inputs, Collections.singletonList(k), 100000000,
+                new String[]{"k"}, new boolean[]{true}, 1024, policy, true, 2, 100);
+        assertTrue("same encoded bytes, more decoded rows must shorten tasks", compressed.size() > encodedLike.size());
+        verifyRanges(compressed, 1000);
+        ConfigFactory config = ConfigFactory.Instance();
+        String key = "executor.partition.memory.expansion.factor", previous = config.getProperty(key);
+        try
+        {
+            k.setChunkSize(MiB); k.setSize(1000D * MiB);
+            config.addProperty(key, "2");
+            List<List<InputSplit>> two = PartitionTaskPlanner.plan(inputs, Collections.singletonList(k), 0,
+                    new String[]{"k"}, new boolean[]{true}, 1024, policy, true, 2, MiB);
+            config.addProperty(key, "8");
+            List<List<InputSplit>> eight = PartitionTaskPlanner.plan(inputs, Collections.singletonList(k), 0,
+                    new String[]{"k"}, new boolean[]{true}, 1024, policy, true, 2, MiB);
+            assertTrue(eight.size() > two.size()); verifyRanges(eight, 1000);
+            for (String invalid : new String[]{"0", "NaN", "Infinity", "abc"})
+            {
+                config.addProperty(key, invalid);
+                assertThrows(IllegalArgumentException.class, io.pixelsdb.pixels.planner.plan.physical.PartitionInputSizing::expansionFactor);
+            }
+        }
+        finally { config.addProperty(key, previous == null ? "4" : previous); }
+    }
+
+    @Test
+    public void totalEnvelopeIsHalfUsableMemoryAndHeapClampKeepsTheRequestedRatio()
+    {
+        PartitionMemoryPolicy policy = PartitionMemoryPolicy.forResources(10240 * MiB, 6);
+        long usable = PartitionMemoryPolicy.usableBytes(policy.getWorkerBytes(), Long.MAX_VALUE);
+        assertEquals(usable / 2, policy.getInputBytes() + policy.getOutputBytes());
+        assertEquals(4.0, policy.getOutputBytes() / (double) policy.getInputBytes(), 0.0001);
+        PartitionMemoryAccount account = new PartitionMemoryAccount(policy, 6);
+        long runtimeUsable = PartitionMemoryPolicy.usableBytes(policy.getWorkerBytes(), Runtime.getRuntime().maxMemory());
+        assertTrue(account.input.limit() + account.output.limit() <= runtimeUsable / 2);
+        assertEquals(4.0, account.output.limit() / (double) account.input.limit(), 0.0001);
+        io.pixelsdb.pixels.common.metadata.domain.Column text = new Column();
+        text.setRecordStats(java.nio.ByteBuffer.wrap(PixelsProto.ColumnStatistic.newBuilder()
+                .setStringStatistics(PixelsProto.StringStatistic.newBuilder().setSum(100)).build().toByteArray()));
+        int position = text.getRecordStats().position();
+        assertEquals(300, io.pixelsdb.pixels.planner.plan.physical.PartitionInputSizing.variableBytes(text));
+        assertEquals(position, text.getRecordStats().position());
     }
 
     private static List<List<InputSplit>> plan(List<InputSplit> inputs, int memoryMB, int cpus, boolean streaming)

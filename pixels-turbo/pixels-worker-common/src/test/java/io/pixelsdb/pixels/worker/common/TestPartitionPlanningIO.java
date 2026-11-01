@@ -99,7 +99,7 @@ public class TestPartitionPlanningIO
         for (int i = 0; i < names.length; i++) { names[i] = "c" + i; }
         BaseTable table = new BaseTable("test", "input", "input", names, TableScanFilter.empty("test", "input"));
         List<InputSplit> left = ranges(30), right = ranges(2871);
-        List<Double> samples = new ArrayList<>(); double coldMs = 0;
+        List<Double> samples = new ArrayList<>(); double coldMs = 0; int observedTasks = 0;
         for (int iteration = 0; iteration < 31; iteration++)
         {
             long begin = System.nanoTime();
@@ -110,7 +110,22 @@ public class TestPartitionPlanningIO
             double elapsed = (System.nanoTime() - begin) / 1e6;
             if (iteration == 0) { coldMs = elapsed; }
             if (iteration > 10) { samples.add(elapsed); }
-            assertEquals(1, small.size()); assertEquals(Boolean.parseBoolean(args[0]) ? 6 : 12, large.size());
+            assertEquals(1, small.size());
+            if (!Boolean.parseBoolean(args[0])) { assertEquals(12, large.size()); }
+            else { assertTrue(large.size() > 1); }
+            observedTasks = small.size() + large.size();
+            long expectedGroup = 0;
+            for (PartitionInput input : large)
+            {
+                for (InputSplit split : input.getTableInfo().getInputSplits())
+                {
+                    for (InputInfo info : split.getInputInfos())
+                    {
+                        assertEquals(expectedGroup, info.getRgStart()); expectedGroup += info.getRgLength();
+                    }
+                }
+            }
+            assertEquals(2880, expectedGroup);
             for (int task = 0; task < large.size(); task++)
             {
                 PartitionInput input = large.get(task);
@@ -125,7 +140,7 @@ public class TestPartitionPlanningIO
         Collections.sort(samples);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("policy", Boolean.parseBoolean(args[0])); result.put("rowGroups", 2901);
-        result.put("producerTasks", Boolean.parseBoolean(args[0]) ? 7 : 13); result.put("storageCalls", 0);
+        result.put("producerTasks", observedTasks); result.put("storageCalls", 0);
         result.put("coldPartitionInputsMs", coldMs); result.put("warmP50PartitionInputsMs", samples.get(10));
         result.put("warmP95PartitionInputsMs", samples.get(18));
         System.out.println("PLANNING_RESULT " + JSON.toJSONString(result));
