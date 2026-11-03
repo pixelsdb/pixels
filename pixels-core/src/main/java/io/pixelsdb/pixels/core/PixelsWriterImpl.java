@@ -136,7 +136,8 @@ public class PixelsWriterImpl implements PixelsWriter
     private final PhysicalWriter physicalWriter;
     private final List<TypeDescription> children;
 
-    private final ExecutorService columnWriterService = Executors.newCachedThreadPool();
+    private final ExecutorService columnWriterService;
+    private final boolean ownsColumnWriterService;
 
     private final boolean hasHiddenColumn;
 
@@ -152,7 +153,8 @@ public class PixelsWriterImpl implements PixelsWriter
             EncodingLevel encodingLevel,
             boolean nullsPadding,
             boolean partitioned,
-            Optional<List<Integer>> partKeyColumnIds)
+            Optional<List<Integer>> partKeyColumnIds,
+            ExecutorService columnWriterService)
     {
         this.schema = requireNonNull(schema, "schema is null");
         this.hasHiddenColumn = hasHiddenColumn;
@@ -199,6 +201,8 @@ public class PixelsWriterImpl implements PixelsWriter
             this.hiddenColumnWriter = null;
             this.hiddenFileColStatRecorder = null;
         }
+        this.ownsColumnWriterService = columnWriterService == null;
+        this.columnWriterService = ownsColumnWriterService ? Executors.newCachedThreadPool() : columnWriterService;
     }
 
     public static class Builder
@@ -221,6 +225,7 @@ public class PixelsWriterImpl implements PixelsWriter
         private boolean builderNullsPadding = false;
         private Optional<List<Integer>> builderPartKeyColumnIds = Optional.empty();
         private PhysicalWriter builderPhysicalWriter = null;
+        private ExecutorService builderColumnWriterService = null;
 
         private Builder()
         {
@@ -235,6 +240,17 @@ public class PixelsWriterImpl implements PixelsWriter
         public Builder setPhysicalWriter(PhysicalWriter writer)
         {
             this.builderPhysicalWriter = requireNonNull(writer);
+            return this;
+        }
+
+        /**
+         * Reuse a caller-owned executor for column encoding. The caller must keep it
+         * alive until all writers finish; closing or aborting a writer will not shut it down.
+         * Omit this option to use a per-file executor owned by the writer.
+         */
+        public Builder setColumnWriterService(ExecutorService service)
+        {
+            this.builderColumnWriterService = requireNonNull(service);
             return this;
         }
 
@@ -379,7 +395,8 @@ public class PixelsWriterImpl implements PixelsWriter
                     builderEncodingLevel,
                     builderNullsPadding,
                     builderPartitioned,
-                    builderPartKeyColumnIds);
+                    builderPartKeyColumnIds,
+                    builderColumnWriterService);
         }
     }
 
@@ -563,8 +580,7 @@ public class PixelsWriterImpl implements PixelsWriter
         }
         finally
         {
-            columnWriterService.shutdown();
-            columnWriterService.shutdownNow();
+            if (ownsColumnWriterService) { columnWriterService.shutdownNow(); }
         }
     }
 
@@ -622,8 +638,7 @@ public class PixelsWriterImpl implements PixelsWriter
                 LOGGER.warn("PixelsWriterImpl.abort: hiddenColumnWriter close failed", e);
             }
         }
-        columnWriterService.shutdown();
-        columnWriterService.shutdownNow();
+        if (ownsColumnWriterService) { columnWriterService.shutdownNow(); }
         if (firstFailure != null)
         {
             throw firstFailure;

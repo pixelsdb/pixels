@@ -176,7 +176,10 @@ upload and DATA publication. Four fresh scan samples and two completed writes pe
 adjustments. Sampling is observational: GC, contention and I/O remain included, small tasks may finish
 before calibration, and this is a bounded heuristic rather than an optimality guarantee. Parked scan
 slots wait before window allocation; this wait is reported separately rather than hidden as savings.
-The per-file parallel column encoder and its thread-pool creation remain unchanged.
+Column encoding remains parallel, but staged files borrow one producer-owned cached executor rather
+than creating a pool per file. Individual file close/abort leaves that executor alive; producer writer
+termination shuts it down, and invocation cancellation interrupts it. Other Pixels writers retain
+their per-file executor unless explicitly given a caller-owned executor.
 
 Pending, queued and executing S3QS batches share the output pool. Under pressure, the largest pending
 groups fill idle writer capacity until writers are busy or enough bytes have been released. Once all

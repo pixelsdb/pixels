@@ -33,6 +33,39 @@ import static org.mockito.Mockito.*;
 
 public class TestS3QSPartitionWriter
 {
+    @Test(timeout = 15000)
+    public void columnThreadsAreReusedAcrossFilesWithoutChangingEncodedBytes() throws Exception
+    {
+        Fixture baseline = new Fixture(longSchema()), reused = new Fixture(longSchema());
+        java.util.concurrent.atomic.AtomicInteger starts = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newCachedThreadPool(task -> {
+            starts.incrementAndGet(); return new Thread(task, "test-reused-columns");
+        });
+        try
+        {
+            S3QSPartitionWriter oldWriter = new S3QSPartitionWriter(baseline.storage, baseline.schema, baseline.shuffle,
+                    0, 0, baseline.context, 8192);
+            S3QSPartitionWriter newWriter = new S3QSPartitionWriter(reused.storage, reused.schema, reused.shuffle,
+                    0, 0, reused.context, 8192, new java.util.concurrent.atomic.AtomicLong(), () -> {},
+                    new FixSizedBuffers(8192, 1), pool);
+            for (int i = 0; i < 32; i++)
+            {
+                List<VectorizedRowBatch> batches = Collections.singletonList(longs(128, i * 128));
+                oldWriter.write(batches); newWriter.write(batches);
+                assertFalse("file close must not shut down the shared executor", pool.isShutdown());
+            }
+            assertEquals(32, reused.objects.size());
+            assertTrue("reuse must create fewer threads than one pool per file", starts.get() < 32);
+            Iterator<byte[]> expected = baseline.objects.values().iterator();
+            for (byte[] bytes : reused.objects.values()) { assertArrayEquals(expected.next(), bytes); }
+            assertEquals(4096, reused.verifyLongs());
+        }
+        finally
+        {
+            pool.shutdownNow(); assertTrue(pool.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS));
+        }
+    }
+
     @Test
     public void scratchIsReusedAcrossOversizedTrialsAndLaterFilesWithoutChangingValues() throws Exception
     {

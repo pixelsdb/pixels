@@ -17,6 +17,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** Writes independently readable, size-bounded Pixels objects for one producer/partition. */
@@ -32,6 +33,7 @@ final class S3QSPartitionWriter
     private final AtomicLong sequence;
     private final Runnable publishGuard;
     private final FixSizedBuffers stagingBuffers;
+    private final ExecutorService columnWriterService;
 
     S3QSPartitionWriter(S3QS storage, TypeDescription schema, ShuffleInfo shuffle,
                         int partitionId, int producerId, WorkerContext context)
@@ -59,6 +61,15 @@ final class S3QSPartitionWriter
                         int partitionId, int producerId, WorkerContext context, int limit,
                         AtomicLong sequence, Runnable publishGuard, FixSizedBuffers stagingBuffers)
     {
+        this(storage, schema, shuffle, partitionId, producerId, context, limit, sequence, publishGuard,
+                stagingBuffers, null);
+    }
+
+    S3QSPartitionWriter(S3QS storage, TypeDescription schema, ShuffleInfo shuffle,
+                        int partitionId, int producerId, WorkerContext context, int limit,
+                        AtomicLong sequence, Runnable publishGuard, FixSizedBuffers stagingBuffers,
+                        ExecutorService columnWriterService)
+    {
         if (stagingBuffers.getBufferSize() != limit) { throw new IllegalArgumentException("staging size differs from object limit"); }
         if (limit <= 0 || limit > Constants.S3QS_BUFFER_SIZE)
         {
@@ -74,6 +85,7 @@ final class S3QSPartitionWriter
         this.sequence = sequence;
         this.publishGuard = publishGuard;
         this.stagingBuffers = stagingBuffers;
+        this.columnWriterService = columnWriterService;
     }
 
     /** Returns the next DATA sequence, which is also the END sequence for this partition. */
@@ -165,7 +177,8 @@ final class S3QSPartitionWriter
         try
         {
             // Only local staging is closed on failure; no remote object is published here.
-            try (PixelsWriter writer = WorkerCommon.getWriter(schema, storage, staging.getPath(), staging, false, null))
+            try (PixelsWriter writer = WorkerCommon.getWriter(
+                    schema, storage, staging.getPath(), staging, false, null, columnWriterService))
             {
                 for (Slice slice : slices)
                 {

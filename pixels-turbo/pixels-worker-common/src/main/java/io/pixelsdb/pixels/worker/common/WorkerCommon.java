@@ -601,6 +601,14 @@ public class WorkerCommon
                                          PhysicalWriter physicalWriter, boolean isPartitioned,
                                          List<Integer> keyColumnIds)
     {
+        return getWriter(schema, storage, filePath, physicalWriter, isPartitioned, keyColumnIds, null);
+    }
+
+    /** Build on a staged physical writer, optionally borrowing its producer's column executor. */
+    public static PixelsWriter getWriter(TypeDescription schema, Storage storage, String filePath,
+                                         PhysicalWriter physicalWriter, boolean isPartitioned,
+                                         List<Integer> keyColumnIds, ExecutorService columnWriterService)
+    {
         requireNonNull(schema, "schema is null");
         requireNonNull(filePath, "fileName is null");
         requireNonNull(storage, "storage is null");
@@ -617,6 +625,7 @@ public class WorkerCommon
                 .setOverwrite(true)
                 .setEncodingLevel(EncodingLevel.EL2)
                 .setPartitioned(isPartitioned);
+        if (columnWriterService != null) { builder.setColumnWriterService(columnWriterService); }
         if (isPartitioned)
         {
             builder.setPartKeyColumnIds(keyColumnIds);

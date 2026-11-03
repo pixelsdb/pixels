@@ -51,15 +51,56 @@ public class TestS3QSAsyncIO
         field.setAccessible(true);
         io.pixelsdb.pixels.common.physical.FixSizedBuffers cache =
                 (io.pixelsdb.pixels.common.physical.FixSizedBuffers) field.get(output);
+        ThreadPoolExecutor columns = columnPool(output);
         try
         {
-            output.add(0, batch(2048), fixture.schema);
+            for (int i = 0; i < 20; i++) { output.add(0, batch(2048), fixture.schema); }
             output.finish(fixture.schema, new HashSet<>());
             assertFalse(fixture.sent.isEmpty());
             assertEquals(0, cache.getCachedBufferCount());
+            assertTrue(columns.isShutdown());
+            assertTrue(columns.awaitTermination(1, TimeUnit.SECONDS));
+            assertTrue("production files must reuse their producer's encoder threads",
+                    columns.getCompletedTaskCount() > columns.getLargestPoolSize());
         }
         finally { output.close(); }
         assertEquals(0, cache.getCachedBufferCount());
+    }
+
+    private static ThreadPoolExecutor columnPool(S3QSAsyncPartitionOutput output) throws Exception
+    {
+        Field field = S3QSAsyncPartitionOutput.class.getDeclaredField("columnWriterService");
+        field.setAccessible(true); return (ThreadPoolExecutor) field.get(output);
+    }
+
+    @Test(timeout = 10000)
+    public void producerFailureAndCancellationBothRetireOwnedColumnThreads() throws Exception
+    {
+        for (boolean cancel : new boolean[]{false, true})
+        {
+            Fixture f = new Fixture(1);
+            CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+            when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call -> {
+                entered.countDown(); release.await(); throw new IOException("injected PUT failure");
+            });
+            S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                    f.storage, f.shuffle, 0, 1, f.context, 8192, 1);
+            ThreadPoolExecutor columns = columnPool(output);
+            try
+            {
+                output.add(0, batch(2048), f.schema);
+                assertTrue(entered.await(2, TimeUnit.SECONDS));
+                assertTrue(columns.getCompletedTaskCount() > 0);
+                if (cancel) { f.context.getCancellation().cancel(new IOException("cancelled producer")); }
+                release.countDown();
+                assertThrows(Exception.class, () -> output.finish(f.schema, new HashSet<>()));
+            }
+            finally { release.countDown(); output.close(); }
+            assertTrue(columns.isShutdown());
+            assertTrue(columns.awaitTermination(1, TimeUnit.SECONDS));
+            assertTrue(f.sent.stream().noneMatch(S3QueueMessage::isProducerEnd));
+            assertTrue(f.context.getCancellation().isQuiescent());
+        }
     }
 
     @Test(timeout = 10000)

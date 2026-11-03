@@ -11,6 +11,9 @@ import io.pixelsdb.pixels.storage.s3qs.S3QS;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -37,6 +40,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     private PartitionPipeline pipeline;
     private final AtomicInteger outstandingWrites = new AtomicInteger();
     private final FixSizedBuffers stagingBuffers;
+    private final ExecutorService columnWriterService;
     private volatile boolean closed;
 
     S3QSAsyncPartitionOutput(S3QS storage, ShuffleInfo shuffle, int producerId, int count, WorkerContext context)
@@ -78,6 +82,11 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         this.writes = new S3QSAsyncTasks(context.getCancellation(), threads);
         this.stagingBuffers = new FixSizedBuffers(chunkBytes, threads);
         writes.afterTermination(stagingBuffers::clear);
+        // Separate from writers, which wait for column futures. Reuse across files,
+        // but keep ownership within this invocation, including failure/cancellation.
+        this.columnWriterService = Executors.newCachedThreadPool();
+        writes.afterTermination(columnWriterService::shutdown);
+        context.getCancellation().own(columnWriterService);
     }
 
     static int producerThreads()
@@ -178,7 +187,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
             try
             {
                 new S3QSPartitionWriter(storage, schema.clone(), shuffle, partitionId, producerId, context,
-                        chunkBytes, partition.sequence, writes::check, stagingBuffers).write(batches);
+                        chunkBytes, partition.sequence, writes::check, stagingBuffers, columnWriterService).write(batches);
             }
             finally
             {
@@ -214,11 +223,30 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
 
     void afterTermination(Runnable cleanup) { writes.afterTermination(cleanup); }
 
+    private void awaitColumns()
+    {
+        // A completed column future may precede its executor thread's actual exit.
+        boolean interrupted = Thread.interrupted();
+        try
+        {
+            if (!columnWriterService.awaitTermination(5, TimeUnit.SECONDS))
+            {
+                throw new WorkerException("column encoding threads did not terminate during cleanup");
+            }
+        }
+        catch (InterruptedException failure)
+        {
+            interrupted = true;
+            throw new WorkerException("interrupted draining column encoding threads", failure);
+        }
+        finally { if (interrupted) { Thread.currentThread().interrupt(); } }
+    }
+
     @Override
     public void close()
     {
         closed = true;
-        try { writes.close(); }
+        try { writes.close(); awaitColumns(); }
         finally
         {
             for (Partition partition : partitions)

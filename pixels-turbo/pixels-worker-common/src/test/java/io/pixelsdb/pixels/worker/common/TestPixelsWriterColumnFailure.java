@@ -24,9 +24,41 @@ public class TestPixelsWriterColumnFailure
 
     private static PixelsWriterImpl writer(PhysicalWriter physical, boolean hidden) throws Exception
     {
-        return (PixelsWriterImpl) PixelsWriterImpl.newBuilder().setStorage(mock(Storage.class)).setPath("column-test")
+        return writer(physical, hidden, null);
+    }
+
+    private static PixelsWriterImpl writer(PhysicalWriter physical, boolean hidden, ExecutorService pool) throws Exception
+    {
+        PixelsWriterImpl.Builder builder = PixelsWriterImpl.newBuilder().setStorage(mock(Storage.class)).setPath("column-test")
                 .setPhysicalWriter(physical).setSchema(SCHEMA).setHasHiddenColumn(hidden)
-                .setPixelStride(1024).setRowGroupSize(1024 * 1024).build();
+                .setPixelStride(1024).setRowGroupSize(1024 * 1024);
+        if (pool != null) { builder.setColumnWriterService(pool); }
+        return (PixelsWriterImpl) builder.build();
+    }
+
+    @Test(timeout = 5000)
+    public void borrowedPoolSurvivesFileCloseAbortAndEncodingFailure() throws Exception
+    {
+        ExecutorService pool = Executors.newCachedThreadPool();
+        try
+        {
+            writer(mock(PhysicalWriter.class), false, pool).close();
+            assertFalse(pool.isShutdown());
+            writer(mock(PhysicalWriter.class), true, pool).abort();
+            assertFalse(pool.isShutdown());
+            PixelsWriterImpl failed = writer(mock(PhysicalWriter.class), false, pool);
+            try
+            {
+                when(replaceColumns(failed)[0].write(any(ColumnVector.class), anyInt()))
+                        .thenThrow(new IOException("injected borrowed-pool encoding failure"));
+                VectorizedRowBatch batch = SCHEMA.createRowBatch(1); batch.size = 1;
+                assertThrows(CompletionException.class, () -> failed.addRowBatch(batch));
+            }
+            finally { failed.abort(); }
+            assertFalse(pool.isShutdown());
+            assertEquals(42, (int) pool.submit(() -> 42).get(1, TimeUnit.SECONDS));
+        }
+        finally { pool.shutdownNow(); assertTrue(pool.awaitTermination(1, TimeUnit.SECONDS)); }
     }
 
     private static Field field(String name) throws Exception
@@ -73,7 +105,20 @@ public class TestPixelsWriterColumnFailure
     @Test(timeout = 5000)
     public void columnsRemainParallelOnThePerFilePool() throws Exception
     {
-        PixelsWriterImpl writer = writer(mock(PhysicalWriter.class), false);
+        checkParallelColumns(null);
+    }
+
+    @Test(timeout = 5000)
+    public void columnsRemainParallelOnABorrowedPool() throws Exception
+    {
+        ExecutorService pool = Executors.newCachedThreadPool();
+        try { checkParallelColumns(pool); }
+        finally { pool.shutdownNow(); assertTrue(pool.awaitTermination(1, TimeUnit.SECONDS)); }
+    }
+
+    private static void checkParallelColumns(ExecutorService pool) throws Exception
+    {
+        PixelsWriterImpl writer = writer(mock(PhysicalWriter.class), false, pool);
         ExecutorService caller = Executors.newSingleThreadExecutor();
         CountDownLatch entered = new CountDownLatch(2), release = new CountDownLatch(1);
         try
