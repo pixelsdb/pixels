@@ -10,6 +10,34 @@ import static org.junit.Assert.*;
 public class TestS3QSAsyncTasks
 {
     @Test(timeout = 5000)
+    public void successHookRunsAfterCleanupAndItsFailureReachesTheBarrier() throws Exception
+    {
+        AtomicInteger released = new AtomicInteger();
+        IOException original = new IOException("replenishment failed");
+        try (S3QSAsyncTasks tasks = new S3QSAsyncTasks(new WorkerCancellation(), 1))
+        {
+            tasks.submit(() -> {}, released::incrementAndGet, () -> {
+                assertEquals(1, released.get()); throw original;
+            });
+            assertSame(original, assertThrows(IOException.class, tasks::await));
+        }
+        assertEquals(1, released.get());
+    }
+
+    @Test(timeout = 5000)
+    public void failedWorkReleasesCreditWithoutCallingSuccessHook() throws Exception
+    {
+        AtomicInteger released = new AtomicInteger(), replenished = new AtomicInteger();
+        IOException original = new IOException("PUT failed");
+        try (S3QSAsyncTasks tasks = new S3QSAsyncTasks(new WorkerCancellation(), 1))
+        {
+            tasks.submit(() -> { throw original; }, released::incrementAndGet, replenished::incrementAndGet);
+            assertSame(original, assertThrows(IOException.class, tasks::await));
+        }
+        assertEquals(1, released.get()); assertEquals(0, replenished.get());
+    }
+
+    @Test(timeout = 5000)
     public void consumerAckLimitAppliesBackpressureWithoutRunningIOOnCaller() throws Exception
     {
         CountDownLatch running = new CountDownLatch(2), release = new CountDownLatch(1);

@@ -77,6 +77,12 @@ final class S3QSAsyncTasks implements AutoCloseable
     /** Cleanup runs exactly once, after real execution or removal from the queue. */
     void submit(Task task, Runnable cleanup)
     {
+        submit(task, cleanup, () -> {});
+    }
+
+    /** Successful work can replenish its queue after releasing its admission credit. */
+    void submit(Task task, Runnable cleanup, Task afterSuccess)
+    {
         boolean acquired = false;
         try
         {
@@ -87,7 +93,7 @@ final class S3QSAsyncTasks implements AutoCloseable
                 acquired = true;
                 check();
             }
-            executor.execute(new Job(task, cleanup));
+            executor.execute(new Job(task, cleanup, afterSuccess));
         }
         catch (InterruptedException error)
         {
@@ -109,12 +115,16 @@ final class S3QSAsyncTasks implements AutoCloseable
     {
         private final Task task;
         private final Runnable cleanup;
+        private final Task afterSuccess;
         private final AtomicBoolean released = new AtomicBoolean();
-        Job(Task task, Runnable cleanup) { this.task = task; this.cleanup = cleanup; }
+        Job(Task task, Runnable cleanup, Task afterSuccess)
+        {
+            this.task = task; this.cleanup = cleanup; this.afterSuccess = afterSuccess;
+        }
         @Override
         public void run()
         {
-            try { check(); task.run(); }
+            try { check(); task.run(); release(); afterSuccess.run(); }
             catch (Throwable error)
             {
                 if (failure.compareAndSet(null, error)) { executor.shutdownNow(); }

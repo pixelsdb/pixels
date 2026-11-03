@@ -181,10 +181,15 @@ than creating a pool per file. Individual file close/abort leaves that executor 
 termination shuts it down, and invocation cancellation interrupts it. Other Pixels writers retain
 their per-file executor unless explicitly given a caller-owned executor.
 
-Pending, queued and executing S3QS batches share the output pool. Under pressure, the largest pending
-groups fill idle writer capacity until writers are busy or enough bytes have been released. Once all
-writers are occupied, pending data stays mergeable. This avoids a single slow upload starving otherwise
-idle writers, but pressure/final tails may still produce partial objects. DATA must all succeed before
+Pending, queued and executing S3QS batches share the output pool. When submitted jobs fall below the
+writer count, scanners and successful write completions submit the largest eligible pending groups.
+The early minimum is the normal raw group target times twice the writer count divided by the partition
+count, clamped to [1/8, 1] of that target. Few partitions retain larger groups; high fan-out can start
+writing earlier. When writers have enough work, partial data stays mergeable up to the normal target.
+Early submission also requires pending raw bytes of at least the partition count times that minimum,
+so sparse or low-output workloads retain their small groups instead of repeatedly splitting them.
+Byte pressure bypasses the early minimum to ensure progress, and final tails are always flushed.
+The encoded object size limit is independent of this raw grouping minimum. DATA must all succeed before
 any END. Producer jobs have no separate count-admission cap; the byte pool is the bound when enabled,
 and the 8 MiB object limit remains. Without a policy there is no producer byte-admission bound.
 Scratch uses existing FixSizedBuffers by writer concurrency and is returned on encoding failure,

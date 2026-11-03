@@ -42,6 +42,120 @@ import static org.mockito.Mockito.*;
 public class TestS3QSAsyncIO
 {
     @Test(timeout = 10000)
+    public void idleWriterStartsBeforeTheNormalGroupTargetAndRefillsWithoutScanning() throws Exception
+    {
+        Fixture f = new Fixture(16);
+        CountDownLatch firstPut = new CountDownLatch(1), release = new CountDownLatch(1), threePuts = new CountDownLatch(3);
+        AtomicInteger puts = new AtomicInteger();
+        when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call -> {
+            threePuts.countDown();
+            if (puts.incrementAndGet() == 1)
+            {
+                firstPut.countDown(); assertTrue(release.await(3, TimeUnit.SECONDS));
+            }
+            return PutObjectResponse.builder().build();
+        });
+        PartitionByteBudget budget = new PartitionByteBudget(1024 * 1024);
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 16, f.context, 65536, 1, budget))
+        {
+            try
+            {
+                output.add(0, batch(16), f.schema);
+                assertFalse("subminimum groups should keep aggregating", firstPut.await(100, TimeUnit.MILLISECONDS));
+                output.add(0, batch(1024), f.schema);
+                for (int i = 1; i < 16; i++) { output.add(i, batch(768), f.schema); }
+                assertTrue("a partial group should start before finish", firstPut.await(2, TimeUnit.SECONDS));
+                output.add(1, batch(1024), f.schema);
+                output.add(2, batch(2048), f.schema);
+                output.add(3, batch(16), f.schema);
+                assertEquals("busy writers should let partial groups grow", 1, puts.get());
+                release.countDown();
+                assertTrue("completion should refill even with no new scan batches", threePuts.await(2, TimeUnit.SECONDS));
+                output.finish(f.schema, new HashSet<>());
+                List<Integer> order = new ArrayList<>();
+                for (S3QueueMessage message : f.sent)
+                {
+                    if (message.isData()) { order.add(message.getPartitionId()); }
+                }
+                assertEquals(Arrays.asList(0, 2, 1), order.subList(0, 3));
+                assertEquals(4128 + 15 * 768, f.sent.stream().filter(S3QueueMessage::isData).mapToLong(S3QueueMessage::getRowCount).sum());
+                f.verifyEnds(16);
+            }
+            finally { release.countDown(); }
+        }
+        assertEquals(0, budget.used());
+        assertTrue(f.context.getCancellation().isQuiescent());
+    }
+
+    @Test(timeout = 10000)
+    public void earlyGroupIsNotAFileSizeLimitOrAnUnconditionalFlushThreshold() throws Exception
+    {
+        Fixture f = new Fixture(32);
+        CountDownLatch started = new CountDownLatch(2), release = new CountDownLatch(1);
+        AtomicInteger puts = new AtomicInteger();
+        when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call -> {
+            puts.incrementAndGet(); started.countDown(); assertTrue(release.await(3, TimeUnit.SECONDS));
+            return PutObjectResponse.builder().build();
+        });
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 32, f.context, 65536, 2))
+        {
+            try
+            {
+                output.add(0, batch(1024), f.schema); output.add(1, batch(1024), f.schema);
+                for (int i = 2; i < 32; i++) { output.add(i, batch(768), f.schema); }
+                assertTrue(started.await(2, TimeUnit.SECONDS));
+                for (int i = 0; i < 2; i++) { output.add(2, batch(1024), f.schema); }
+                Field field = S3QSAsyncPartitionOutput.class.getDeclaredField("outstandingWrites");
+                field.setAccessible(true);
+                assertEquals("partial groups must not keep queueing at the early threshold", 2,
+                        ((AtomicInteger) field.get(output)).get());
+                release.countDown(); output.finish(f.schema, new HashSet<>());
+                assertEquals(32, puts.get()); f.verifyEnds(32);
+                assertEquals(4 * 1024 + 30 * 768, f.sent.stream().filter(S3QueueMessage::isData).mapToLong(S3QueueMessage::getRowCount).sum());
+            }
+            finally { release.countDown(); }
+        }
+    }
+
+    @Test(timeout = 10000)
+    public void lowOutputAcrossManyConfiguredPartitionsDoesNotChurnSmallFiles() throws Exception
+    {
+        Fixture f = new Fixture(16);
+        CountDownLatch put = new CountDownLatch(1);
+        when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call -> {
+            put.countDown(); return PutObjectResponse.builder().build();
+        });
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 16, f.context, 65536, 1))
+        {
+            output.add(0, batch(1024), f.schema); output.add(1, batch(1024), f.schema);
+            assertFalse("a small total output should not trigger early splitting", put.await(100, TimeUnit.MILLISECONDS));
+            output.finish(f.schema, new HashSet<>()); f.verifyEnds(16);
+            assertEquals(2, f.sent.stream().filter(S3QueueMessage::isData).count());
+        }
+    }
+
+    @Test(timeout = 10000)
+    public void fewPartitionsRetainNormalGroupsInsteadOfChurningSmallFiles() throws Exception
+    {
+        Fixture f = new Fixture(2);
+        CountDownLatch put = new CountDownLatch(1);
+        when(f.s3.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenAnswer(call -> {
+            put.countDown(); return PutObjectResponse.builder().build();
+        });
+        try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
+                f.storage, f.shuffle, 0, 2, f.context, 65536, 1))
+        {
+            output.add(0, batch(1024), f.schema); output.add(1, batch(1024), f.schema);
+            assertFalse("few partitions should retain their normal target", put.await(100, TimeUnit.MILLISECONDS));
+            output.finish(f.schema, new HashSet<>()); f.verifyEnds(2);
+            assertEquals(2048, f.sent.stream().filter(S3QueueMessage::isData).mapToLong(S3QueueMessage::getRowCount).sum());
+        }
+    }
+
+    @Test(timeout = 10000)
     public void producerScratchCacheIsClearedAfterTheWriterPoolTerminates() throws Exception
     {
         Fixture fixture = new Fixture(1);
@@ -332,15 +446,13 @@ public class TestS3QSAsyncIO
         PartitionByteBudget budget = new PartitionByteBudget(batch(16).getMemoryUsage());
         S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
                 f.storage, f.shuffle, 0, 1, f.context, 8192, 1, budget);
-        Field partitions = S3QSAsyncPartitionOutput.class.getDeclaredField("partitions");
-        partitions.setAccessible(true);
         Field closed = S3QSAsyncPartitionOutput.class.getDeclaredField("closed");
         closed.setAccessible(true);
         ExecutorService callers = Executors.newFixedThreadPool(2);
         try
         {
             Future<?> add, close;
-            synchronized (((Object[]) partitions.get(output))[0])
+            synchronized (output)
             {
                 add = callers.submit(() -> output.add(0, batch(16), f.schema));
                 long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
@@ -473,14 +585,14 @@ public class TestS3QSAsyncIO
     @Test(timeout = 10000)
     public void concurrentChunksOfOnePartitionHaveUniqueCompleteSequence() throws Exception
     {
-        Fixture f = new Fixture(1);
+        Fixture f = new Fixture(64);
         try (S3QSAsyncPartitionOutput output = new S3QSAsyncPartitionOutput(
-                f.storage, f.shuffle, 0, 1, f.context, 8192, 4))
+                f.storage, f.shuffle, 0, 64, f.context, 65536, 4))
         {
             for (int i = 0; i < 12; ++i) { output.add(0, batch(2048), f.schema); }
             output.finish(f.schema, new HashSet<>());
         }
-        f.verifyEnds(1);
+        f.verifyEnds(64);
         assertEquals(12 * 2048, f.sent.stream().filter(S3QueueMessage::isData).mapToLong(S3QueueMessage::getRowCount).sum());
         int[] occurrences = new int[2048];
         for (S3QueueMessage message : f.sent)

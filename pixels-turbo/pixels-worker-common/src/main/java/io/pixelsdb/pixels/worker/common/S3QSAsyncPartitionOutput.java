@@ -34,7 +34,9 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     private final WorkerContext context;
     private final S3QSAsyncTasks writes;
     private final Partition[] partitions;
-    private final int chunkBytes;
+    private final int objectLimit;
+    private final int groupTargetBytes;
+    private final int earlyGroupBytes;
     private final PartitionByteBudget memory;
     private final int writerThreads;
     private PartitionPipeline pipeline;
@@ -42,6 +44,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     private final FixSizedBuffers stagingBuffers;
     private final ExecutorService columnWriterService;
     private volatile boolean closed;
+    private boolean finishing;
 
     S3QSAsyncPartitionOutput(S3QS storage, ShuffleInfo shuffle, int producerId, int count, WorkerContext context)
     {
@@ -76,7 +79,12 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         this.shuffle = shuffle;
         this.producerId = producerId;
         this.context = context;
-        this.chunkBytes = chunkBytes;
+        this.objectLimit = chunkBytes;
+        this.groupTargetBytes = chunkBytes;
+        // Spread roughly two writer waves across partitions, without making tiny groups.
+        // Few partitions already fill normal groups quickly; preserve those larger groups.
+        this.earlyGroupBytes = (int) Math.max(1, Math.max(chunkBytes / 8L,
+                Math.min(chunkBytes, 2L * threads * chunkBytes / count)));
         this.partitions = new Partition[count];
         for (int i = 0; i < count; ++i) { partitions[i] = new Partition(); }
         this.writes = new S3QSAsyncTasks(context.getCancellation(), threads);
@@ -114,7 +122,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         long bytes = Math.max(1L, batch.getMemoryUsage());
         if (memory != null && !memory.tryAcquire(bytes))
         {
-            // Never wait for bytes while holding a partition lock. Pending
+            // Never wait for bytes while holding the grouping lock. Pending
             // buffers must become write jobs, or no writer can free memory.
             memory.acquire(bytes, () ->
             {
@@ -125,14 +133,13 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         boolean transferred = false;
         try
         {
-            Partition partition = partitions[partitionId];
-            synchronized (partition)
+            synchronized (this)
             {
-                // Cleanup may race a scanner that already reserved its bytes.
-                // Recheck under the same lock used to drain pending buffers.
-                if (closed) { throw new WorkerException("S3QS partition output is closed"); }
+                // All group selection/submission shares one lock; never hold it during byte admission or IO.
+                if (closed || finishing) { throw new WorkerException("S3QS partition output is closed"); }
                 writes.check();
-                if (!partition.batches.isEmpty() && partition.estimatedBytes + bytes > chunkBytes)
+                Partition partition = partitions[partitionId];
+                if (!partition.batches.isEmpty() && partition.estimatedBytes + bytes > groupTargetBytes)
                 {
                     flush(partitionId, partition);
                 }
@@ -140,8 +147,9 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
                 partition.batches.add(batch);
                 partition.estimatedBytes += bytes;
                 transferred = true;
-                if (partition.estimatedBytes >= chunkBytes) { flush(partitionId, partition); }
+                if (partition.estimatedBytes >= groupTargetBytes) { flush(partitionId, partition); }
             }
+            feedWriters(earlyGroupBytes);
         }
         finally { if (!transferred && memory != null) { memory.release(bytes); } }
     }
@@ -149,27 +157,37 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
     /** Under byte pressure, give idle writers the largest available groups. */
     private synchronized void flushForProgress(long requiredBytes)
     {
-        while (outstandingWrites.get() < writerThreads && memory.used() > memory.limit() - requiredBytes)
+        if (memory.used() > memory.limit() - requiredBytes) { feedWriters(1); }
+    }
+
+    /** Keep writers supplied, preferring large groups; pressure/finish may bypass the early minimum. */
+    private synchronized void feedWriters(long minimumBytes)
+    {
+        if (closed || finishing) { return; }
+        writes.check();
+        while (outstandingWrites.get() < writerThreads)
         {
             int largest = -1;
-            long bytes = 0;
+            long bytes = 0, pending = 0;
             for (int i = 0; i < partitions.length; i++)
             {
-                synchronized (partitions[i])
-                {
-                    if (partitions[i].estimatedBytes > bytes) { largest = i; bytes = partitions[i].estimatedBytes; }
-                }
+                pending += partitions[i].estimatedBytes;
+                if (partitions[i].estimatedBytes > bytes) { largest = i; bytes = partitions[i].estimatedBytes; }
             }
-            if (largest < 0) { return; }
-            synchronized (partitions[largest]) { flush(largest, partitions[largest]); }
+            if (largest < 0 || bytes < minimumBytes) { return; }
+            // Low-output/sparse workloads benefit little from extra small files.
+            // Pressure (minimum=1) must always be able to drain their buffers.
+            if (minimumBytes > 1 && pending < minimumBytes * partitions.length) { return; }
+            flush(largest, partitions[largest]);
         }
     }
 
-    private void flushPending()
+    private synchronized void flushPending()
     {
+        finishing = true;
         for (int i = 0; i < partitions.length; i++)
         {
-            synchronized (partitions[i]) { flush(i, partitions[i]); }
+            flush(i, partitions[i]);
         }
     }
 
@@ -187,7 +205,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
             try
             {
                 new S3QSPartitionWriter(storage, schema.clone(), shuffle, partitionId, producerId, context,
-                        chunkBytes, partition.sequence, writes::check, stagingBuffers, columnWriterService).write(batches);
+                        objectLimit, partition.sequence, writes::check, stagingBuffers, columnWriterService).write(batches);
             }
             finally
             {
@@ -198,7 +216,7 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         }, () -> {
             try { if (memory != null) { memory.release(reservedBytes); } }
             finally { outstandingWrites.decrementAndGet(); }
-        });
+        }, () -> feedWriters(earlyGroupBytes));
     }
 
     /** Must be called only after every scanner has finished transferring its tail batches. */
@@ -249,9 +267,9 @@ final class S3QSAsyncPartitionOutput implements AutoCloseable
         try { writes.close(); awaitColumns(); }
         finally
         {
-            for (Partition partition : partitions)
+            synchronized (this)
             {
-                synchronized (partition)
+                for (Partition partition : partitions)
                 {
                     if (memory != null) { memory.release(partition.estimatedBytes); }
                     partition.batches.clear();
