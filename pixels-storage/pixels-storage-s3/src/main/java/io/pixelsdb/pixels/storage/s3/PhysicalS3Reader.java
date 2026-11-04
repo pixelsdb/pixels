@@ -21,7 +21,6 @@ package io.pixelsdb.pixels.storage.s3;
 
 import io.pixelsdb.pixels.common.physical.Storage;
 import software.amazon.awssdk.core.ResponseBytes;
-import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -105,7 +104,7 @@ public class PhysicalS3Reader extends AbstractS3Reader
             if (useAsyncClient)
             {
                 // Register ownership before submission, without holding our lock across SDK code.
-                read.source = asyncClient.getObject(request, AsyncResponseTransformer.toBytes());
+                read.source = asyncClient.getObject(request, new S3RangeResponseTransformer(offset, len));
                 read.source.whenComplete(read::finish);
                 if (read.result.isCancelled()) { read.cancelTransport(); }
             }
