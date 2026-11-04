@@ -234,25 +234,22 @@ public class PixelsPlanner
         }
     }
 
-    private ShuffleInfo createShuffleInfo(Table inputTable, String outputBase, int numPartitions,
+    static ShuffleInfo createShuffleInfo(long transId, Table inputTable, String outputBase, int numPartitions,
                                           int logicalProducerTaskCount)
     {
+        String shuffleSuffix = java.util.UUID.randomUUID().toString().replace("-", "");
         String objectPathPrefix = outputBase.endsWith("/") ? outputBase : outputBase + "/";
-        String shuffleSuffix = Integer.toUnsignedString(objectPathPrefix.hashCode());
+        // An old asynchronous reaper must never delete a later execution's shuffle objects or queues.
+        objectPathPrefix += "s3qs-" + shuffleSuffix + "/";
         String shuffleId = transId + "/" + inputTable.getSchemaName() + "/" + inputTable.getTableName() +
                 "/" + shuffleSuffix;
         ImmutableList.Builder<ShuffleQueueInfo> queues = ImmutableList.builderWithExpectedSize(numPartitions);
         for (int i = 0; i < numPartitions; ++i)
         {
-            queues.add(new ShuffleQueueInfo(i, buildShuffleQueueName(shuffleSuffix, i), null));
+            queues.add(new ShuffleQueueInfo(i, "pixels-shuffle-" + transId + "-" + shuffleSuffix + "-" + i, null));
         }
         return new ShuffleInfo(shuffleId, ShuffleStorageInfo, objectPathPrefix, numPartitions,
                 logicalProducerTaskCount, numPartitions, 20, queues.build());
-    }
-
-    private String buildShuffleQueueName(String shuffleSuffix, int partitionId)
-    {
-        return "pixels-shuffle-" + transId + "-" + shuffleSuffix + "-" + partitionId;
     }
 
     private static ShuffleInfo getShuffleInfo(List<PartitionInput> partitionInputs)
@@ -1488,7 +1485,7 @@ public class PixelsPlanner
         int outputId = 0;
         int logicalProducerTaskCount = producerGroups.size();
         ShuffleInfo shuffleInfo = isS3QSShuffleEnabled() ?
-                createShuffleInfo(inputTable, outputBase, numPartition, logicalProducerTaskCount) : null;
+                createShuffleInfo(transId, inputTable, outputBase, numPartition, logicalProducerTaskCount) : null;
         for (List<InputSplit> producerGroup : producerGroups)
         {
             PartitionInput partitionInput = new PartitionInput();

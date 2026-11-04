@@ -24,6 +24,8 @@ import io.pixelsdb.pixels.common.physical.StorageFactory;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleQueueInfo;
 import io.pixelsdb.pixels.storage.s3qs.S3QS;
+import io.pixelsdb.pixels.common.physical.ObjectPath;
+import io.pixelsdb.pixels.common.turbo.cleanup.CleanupResource;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -65,6 +67,33 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
     public S3QSShuffleResourceLifecycle() {}
 
     @Override
+    public List<CleanupResource> describeResources(Collection<ShuffleInfo> shuffleInfos) throws IOException
+    {
+        List<CleanupResource> resources = new ArrayList<>();
+        for (ShuffleInfo info : shuffleInfos)
+        {
+            if (info.getStorageInfo() == null || info.getStorageInfo().getScheme() != Storage.Scheme.s3qs) { continue; }
+            ObjectPath prefix = new ObjectPath(info.getObjectPathPrefix());
+            if (!prefix.valid || prefix.key == null || prefix.key.trim().isEmpty() || !prefix.isFolder)
+            { throw new IOException("query shuffle ownership requires a non-root object prefix ending in '/'"); }
+            resources.add(new CleanupResource("storage-prefix", "s3://" + prefix.bucket + "/" + prefix.key));
+            for (ShuffleQueueInfo queue : info.getQueues())
+            {
+                if (queue.getQueueUrl() == null || queue.getQueueUrl().trim().isEmpty())
+                { resources.add(new CleanupResource("s3qs-queue", queue.getQueueName())); }
+            }
+        }
+        return resources;
+    }
+
+    @Override
+    public synchronized void closeLocalResources() throws IOException
+    {
+        if (s3qs == null) { return; }
+        for (OwnedQueue queue : ownedQueues) { s3qs.unregisterQueue(queue.shuffleId, queue.partitionId); }
+    }
+
+    @Override
     public synchronized void prepare(Collection<ShuffleInfo> shuffleInfos) throws IOException
     {
         checkState(!prepared, "shuffle resources have already been prepared");
@@ -74,57 +103,43 @@ public class S3QSShuffleResourceLifecycle implements ShuffleResourceLifecycle
             return;
         }
 
-        try
+        for (ShuffleInfo shuffleInfo : shuffleInfos)
         {
-            for (ShuffleInfo shuffleInfo : shuffleInfos)
+            if (shuffleInfo.getStorageInfo() == null ||
+                    shuffleInfo.getStorageInfo().getScheme() != Storage.Scheme.s3qs)
             {
-                if (shuffleInfo.getStorageInfo() == null ||
-                        shuffleInfo.getStorageInfo().getScheme() != Storage.Scheme.s3qs)
+                continue;
+            }
+            S3QS storage = getS3QS();
+            io.pixelsdb.pixels.common.physical.ObjectPath prefix =
+                    new io.pixelsdb.pixels.common.physical.ObjectPath(shuffleInfo.getObjectPathPrefix());
+            if (!prefix.valid || prefix.key == null || prefix.key.trim().isEmpty() || !prefix.isFolder)
+            {
+                throw new IOException("query shuffle ownership requires a non-root object prefix ending in '/'");
+            }
+            ownedObjectPrefixes.add(shuffleInfo.getObjectPathPrefix());
+            allOwnedObjectPrefixes.add(shuffleInfo.getObjectPathPrefix());
+            recordProgress();
+            for (ShuffleQueueInfo queue : shuffleInfo.getQueues())
+            {
+                String queueUrl = queue.getQueueUrl();
+                if (queueUrl == null || queueUrl.trim().isEmpty())
                 {
-                    continue;
-                }
-                S3QS storage = getS3QS();
-                io.pixelsdb.pixels.common.physical.ObjectPath prefix =
-                        new io.pixelsdb.pixels.common.physical.ObjectPath(shuffleInfo.getObjectPathPrefix());
-                if (!prefix.valid || prefix.key == null || prefix.key.trim().isEmpty() || !prefix.isFolder)
-                {
-                    throw new IOException("query shuffle ownership requires a non-root object prefix ending in '/'");
-                }
-                ownedObjectPrefixes.add(shuffleInfo.getObjectPathPrefix());
-                allOwnedObjectPrefixes.add(shuffleInfo.getObjectPathPrefix());
-                recordProgress();
-                for (ShuffleQueueInfo queue : shuffleInfo.getQueues())
-                {
-                    String queueUrl = queue.getQueueUrl();
-                    if (queueUrl == null || queueUrl.trim().isEmpty())
-                    {
-                        OwnedQueue owned = new OwnedQueue(shuffleInfo.getShuffleId(), queue.getPartitionId(),
-                                queue.getQueueName());
-                        ownedQueues.add(owned);
-                        recordProgress();
-                        queueUrl = storage.createQueue(queue.getQueueName());
-                        owned.queueUrl = queueUrl;
-                        queue.setQueueUrl(queueUrl);
-                        recordProgress();
-                    }
+                    OwnedQueue owned = new OwnedQueue(shuffleInfo.getShuffleId(), queue.getPartitionId(),
+                            queue.getQueueName());
+                    ownedQueues.add(owned);
+                    recordProgress();
+                    queueUrl = storage.createQueue(queue.getQueueName());
+                    owned.queueUrl = queueUrl;
+                    queue.setQueueUrl(queueUrl);
+                    recordProgress();
                 }
             }
-        }
-        catch (IOException | RuntimeException e)
-        {
-            try
-            {
-                cleanup();
-            }
-            catch (IOException | RuntimeException cleanupFailure)
-            {
-                e.addSuppressed(cleanupFailure);
-            }
-            throw e;
         }
     }
 
     @Override
+    @Deprecated // Kept for embedded/manual callers; coordinated queries use the shared resource manager.
     public synchronized void cleanup() throws IOException
     {
         if (cleaned)

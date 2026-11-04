@@ -103,12 +103,13 @@ public class TestCoordinatedPlanExecution
         assertSame(execution.getPlanCoordinator(), factory.getPlanCoordinator(transId));
 
         OutputCollection outputs = execution.collectOutputs();
+        execution.getCleanupCompletion().get(1, TimeUnit.SECONDS);
         assertSame(operator.outputs, outputs);
         assertNull(factory.getPlanCoordinator(transId));
     }
 
     @Test
-    public void explicitCloseCleansUpExecutionThatDoesNotCollectOutputs()
+    public void explicitCloseCleansUpExecutionThatDoesNotCollectOutputs() throws Exception
     {
         long transId = NextTransId.getAndIncrement();
         PlanCoordinatorFactory factory = PlanCoordinatorFactory.Instance();
@@ -117,7 +118,9 @@ public class TestCoordinatedPlanExecution
 
         execution.close();
         execution.close();
+        execution.getCleanupCompletion().get(1, TimeUnit.SECONDS);
 
+        assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANED, execution.getCleanupStatus());
         assertNull(factory.getPlanCoordinator(transId));
     }
 
@@ -148,6 +151,7 @@ public class TestCoordinatedPlanExecution
 
         operator.executionFuture.complete(new CompletableFuture[0]);
         assertSame(operator.outputs, collected.get());
+        execution.getCleanupCompletion().get(1, TimeUnit.SECONDS);
         assertNull(factory.getPlanCoordinator(transId));
     }
 
@@ -169,6 +173,7 @@ public class TestCoordinatedPlanExecution
 
         execution.collectOutputs();
         execution.close();
+        execution.getCleanupCompletion().get(1, TimeUnit.SECONDS);
         assertEquals(1, lifecycle.cleanupCount);
         assertNull(factory.getPlanCoordinator(transId));
     }

@@ -88,6 +88,8 @@ public class TestS3QSResourceFailureLifecycle
         lifecycle.setProgressListener(snapshot::set);
         try { lifecycle.prepare(Collections.singletonList(info(null))); fail("prepare must fail"); }
         catch (IOException expected) { assertSame(original, expected.getCause()); }
+        verify(sqs, never()).deleteQueue(any(DeleteQueueRequest.class));
+        lifecycle.cleanup(); // Explicit recovery; prepare no longer blocks on remote deletion.
         verify(sqs).deleteQueue(DeleteQueueRequest.builder().queueUrl("recovered-url").build());
         assertEquals(true, snapshot.get().get("cleaned"));
         storage.close();

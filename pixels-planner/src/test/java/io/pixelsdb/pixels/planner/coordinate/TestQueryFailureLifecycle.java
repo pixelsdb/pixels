@@ -89,8 +89,9 @@ public class TestQueryFailureLifecycle
             assertTrue(preparing.await(1, TimeUnit.SECONDS));
             try { execution.collectOutputs(); fail("preparation must have a deadline"); }
             catch (ExecutionException failure) { assertTrue(failure.getCause() instanceof TimeoutException); }
-            assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANUP_DEFERRED,
-                    execution.getCleanupCompletion().get(1, TimeUnit.SECONDS));
+            await(() -> execution.getCleanupStatus() == CoordinatedPlanExecution.CleanupStatus.WAITING_FOR_QUIESCENCE);
+            assertFalse(execution.getCleanupCompletion().isDone());
+            assertEquals(CoordinatedPlanExecution.CleanupStatus.WAITING_FOR_QUIESCENCE, execution.getCleanupStatus());
             assertEquals(0, lifecycle.cleanupCount);
         }
         finally
@@ -116,12 +117,19 @@ public class TestQueryFailureLifecycle
         RuntimeException original = new RuntimeException("producer failed before END");
         execution.abort(original);
         expectCause(execution, original);
-        assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANUP_DEFERRED,
-                execution.getCleanupCompletion().get(1, TimeUnit.SECONDS));
+        await(() -> execution.getCleanupStatus() == CoordinatedPlanExecution.CleanupStatus.WAITING_FOR_QUIESCENCE);
+        assertFalse(execution.getCleanupCompletion().isDone());
+        assertEquals(CoordinatedPlanExecution.CleanupStatus.WAITING_FOR_QUIESCENCE, execution.getCleanupStatus());
         assertEquals(0, lifecycle.cleanupCount);
+        await(() ->
+        {
+            try { return new String(Files.readAllBytes(execution.getManifestPath()), StandardCharsets.UTF_8)
+                    .contains("producer failed before END"); }
+            catch (IOException failure) { throw new RuntimeException(failure); }
+        });
         String manifest = new String(Files.readAllBytes(execution.getManifestPath()), StandardCharsets.UTF_8);
         assertTrue(manifest.contains("producer failed before END"));
-        assertTrue(manifest.contains("CLEANUP_DEFERRED"));
+        assertTrue(manifest.contains("WAITING_FOR_QUIESCENCE"));
         assertTrue(manifest.contains(id));
         // Test-only supervisor proves the fake invocation ended before removing its tombstone.
         state.workerStopped(id, 17);
@@ -180,7 +188,7 @@ public class TestQueryFailureLifecycle
     }
 
     @Test(timeout = 5000)
-    public void successfulCollectionWaitsForOwnedResourceDeletion() throws Exception
+    public void successfulCollectionReturnsBeforeOwnedResourceDeletion() throws Exception
     {
         CountDownLatch cleaning = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -206,10 +214,10 @@ public class TestQueryFailureLifecycle
                 catch (Exception failure) { throw new CompletionException(failure); }
             });
             assertTrue(cleaning.await(1, TimeUnit.SECONDS));
-            assertFalse(result.isDone());
+            assertNotNull(result.get(1, TimeUnit.SECONDS));
             assertFalse(execution.getCleanupCompletion().isDone());
             release.countDown();
-            assertNotNull(result.get(1, TimeUnit.SECONDS));
+            execution.getCleanupCompletion().get(1, TimeUnit.SECONDS);
             assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANED, execution.getCleanupStatus());
             assertEquals(1, lifecycle.cleanupCount);
         }
@@ -222,7 +230,7 @@ public class TestQueryFailureLifecycle
     }
 
     @Test(timeout = 5000)
-    public void cleanupFailureFailsSynchronousCollection() throws Exception
+    public void cleanupFailureDoesNotFailSuccessfulCollection() throws Exception
     {
         Lifecycle lifecycle = new Lifecycle();
         lifecycle.failCleanup = true;
@@ -230,12 +238,9 @@ public class TestQueryFailureLifecycle
         try
         {
             execution.execute().get(1, TimeUnit.SECONDS);
-            try { execution.collectOutputs(); fail("cleanup failure must fail collection"); }
-            catch (ExecutionException expected)
-            {
-                assertTrue(expected.getMessage().contains("CLEANUP_FAILED"));
-                assertSame(execution.getCleanupFailure(), expected.getCause());
-            }
+            assertNotNull(execution.collectOutputs());
+            assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANUP_FAILED,
+                    execution.getCleanupCompletion().get(1, TimeUnit.SECONDS));
             assertEquals(CoordinatedPlanExecution.CleanupStatus.CLEANUP_FAILED, execution.getCleanupStatus());
             assertEquals(QueryExecutionState.Status.SUCCEEDED,
                     execution.getPlanCoordinator().getQueryState().getStatus());
@@ -252,6 +257,13 @@ public class TestQueryFailureLifecycle
     {
         try { execution.collectOutputs(); fail("query must fail"); }
         catch (ExecutionException expected) { assertSame(cause, expected.getCause()); }
+    }
+
+    private static void await(java.util.function.BooleanSupplier condition) throws InterruptedException
+    {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (!condition.getAsBoolean() && System.nanoTime() < deadline) { Thread.sleep(1); }
+        assertTrue(condition.getAsBoolean());
     }
 
     private static CoordinatedPlanExecution execution(StubOperator operator, Lifecycle lifecycle, long timeout) throws Exception

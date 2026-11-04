@@ -20,6 +20,8 @@
 package io.pixelsdb.pixels.planner.coordinate;
 
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.turbo.cleanup.CleanupResource;
+import io.pixelsdb.pixels.common.turbo.cleanup.TemporaryResourceManager;
 import io.pixelsdb.pixels.planner.plan.physical.Operator;
 import io.pixelsdb.pixels.planner.plan.physical.OperatorExecutor.OutputCollection;
 import java.io.IOException;
@@ -28,6 +30,9 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Collection;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import static com.google.common.base.Preconditions.checkState;
@@ -36,21 +41,26 @@ import static java.util.Objects.requireNonNull;
 /** Query result deadlines and remote quiescence are independent lifecycles. */
 public class CoordinatedPlanExecution implements AutoCloseable
 {
-    public enum CleanupStatus { NOT_STARTED, WAITING_FOR_QUIESCENCE, CLEANED, CLEANUP_DEFERRED, CLEANUP_FAILED }
+    public enum CleanupStatus { NOT_STARTED, WAITING_FOR_QUIESCENCE, CLEANING, RETRY_WAIT, NEEDS_ATTENTION, CLEANED,
+        CLEANUP_DEFERRED, CLEANUP_FAILED }
 
     private final long transId;
-    private final Operator rootOperator;
-    private final PlanCoordinator planCoordinator;
+    private volatile Operator rootOperator;
+    private volatile PlanCoordinator planCoordinator;
     private final PlanCoordinatorFactory coordinatorFactory;
     private final ShuffleResourceLifecycle shuffleResourceLifecycle;
     private final QueryExecutionConfig config;
-    private final Runnable initializeStages;
+    private volatile Runnable initializeStages;
     private final QueryCleanupManifest manifest;
     private final ExecutorService executor;
     private final ScheduledExecutorService timer;
     private final CompletableFuture<CompletableFuture<? extends Output>[]> executionFuture = new CompletableFuture<>();
     private final CompletableFuture<OutputCollection> collected = new CompletableFuture<>();
     private final CompletableFuture<CleanupStatus> cleanupCompletion = new CompletableFuture<>();
+    private final CompletableFuture<Void> computeCompletion = new CompletableFuture<>();
+    private final List<String> resultScopes = new ArrayList<>();
+    private volatile TemporaryResourceManager resourceManager;
+    private volatile String shuffleScope;
     private final AtomicBoolean collecting = new AtomicBoolean();
     private final AtomicBoolean cleanupStarted = new AtomicBoolean();
     private volatile CleanupStatus cleanupStatus = CleanupStatus.NOT_STARTED;
@@ -58,10 +68,13 @@ public class CoordinatedPlanExecution implements AutoCloseable
     private volatile Throwable cleanupFailure;
     private boolean executed;
     private volatile boolean preparationFinished = true;
+    private volatile boolean preparationStarted;
     private volatile boolean resourcesPrepared;
     private volatile boolean closed;
+    private volatile boolean cleanupRequested;
     private volatile Future<?> startupTask;
     private volatile Future<?> collectionTask;
+    private boolean detached;
 
     CoordinatedPlanExecution(long transId, Operator rootOperator, PlanCoordinator planCoordinator,
                              PlanCoordinatorFactory coordinatorFactory, ShuffleResourceLifecycle lifecycle)
@@ -80,6 +93,14 @@ public class CoordinatedPlanExecution implements AutoCloseable
                              PlanCoordinatorFactory coordinatorFactory, ShuffleResourceLifecycle lifecycle,
                              QueryExecutionConfig config, Runnable initializeStages)
     {
+        this(transId, rootOperator, planCoordinator, coordinatorFactory, lifecycle, config, initializeStages, null);
+    }
+
+    CoordinatedPlanExecution(long transId, Operator rootOperator, PlanCoordinator planCoordinator,
+                             PlanCoordinatorFactory coordinatorFactory, ShuffleResourceLifecycle lifecycle,
+                             QueryExecutionConfig config, Runnable initializeStages, TemporaryResourceManager resourceManager)
+    {
+        this.resourceManager = resourceManager;
         this.initializeStages = requireNonNull(initializeStages, "initializeStages is null");
         this.transId = transId;
         this.rootOperator = requireNonNull(rootOperator, "rootOperator is null");
@@ -106,13 +127,16 @@ public class CoordinatedPlanExecution implements AutoCloseable
             resources = snapshot;
             persistManifest();
         });
+        planCoordinator.getQueryState().getQuiescenceFuture().thenRun(this::scheduleCleanup);
         planCoordinator.getQueryState().getFailureFuture().whenComplete((ignored, error) ->
         {
-            Throwable cause = planCoordinator.getQueryState().getFirstFailure();
+            Throwable cause = this.planCoordinator.getQueryState().getFirstFailure();
             executionFuture.completeExceptionally(cause);
             collected.completeExceptionally(cause);
             Future<?> startup = startupTask;
-            if (startup != null) { startup.cancel(true); }
+            // A queued task must run its finally block. Cancelling it before entry would
+            // leave preparationFinished false forever and strand late stop acknowledgements.
+            if (startup != null && preparationStarted) { startup.cancel(true); }
             Future<?> collector = collectionTask;
             if (collector != null) { collector.cancel(true); }
             executor.execute(this::closeAfterFailure);
@@ -133,7 +157,7 @@ public class CoordinatedPlanExecution implements AutoCloseable
             timer.schedule(() -> abort(new TimeoutException("S3QS query deadline exceeded after " +
                     config.timeoutMs + "ms")), config.timeoutMs, TimeUnit.MILLISECONDS);
             startupTask = executor.submit(this::prepareAndExecute);
-            if (planCoordinator.getQueryState().getStatus() == QueryExecutionState.Status.ABORTED)
+            if (preparationStarted && planCoordinator.getQueryState().getStatus() == QueryExecutionState.Status.ABORTED)
             {
                 startupTask.cancel(true);
             }
@@ -150,9 +174,17 @@ public class CoordinatedPlanExecution implements AutoCloseable
 
     private void prepareAndExecute()
     {
+        preparationStarted = true;
         try
         {
             persistManifest();
+            planCoordinator.getQueryState().requireRunning();
+            List<CleanupResource> intent = shuffleResourceLifecycle.describeResources(planCoordinator.getShuffleInfos());
+            if (!intent.isEmpty())
+            {
+                shuffleScope = resources().register("query-" + transId + "/shuffle", intent);
+                persistManifest();
+            }
             planCoordinator.getQueryState().requireRunning();
             resourcesPrepared = true;
             shuffleResourceLifecycle.prepare(planCoordinator.getShuffleInfos());
@@ -168,7 +200,11 @@ public class CoordinatedPlanExecution implements AutoCloseable
             });
         }
         catch (Throwable failure) { abort(failure); }
-        finally { preparationFinished = true; }
+        finally
+        {
+            preparationFinished = true;
+            if (closed) { detachPlan(); scheduleCleanup(); }
+        }
     }
 
     public OutputCollection collectOutputs() throws ExecutionException, InterruptedException
@@ -201,15 +237,8 @@ public class CoordinatedPlanExecution implements AutoCloseable
         {
             OutputCollection result = collected.get();
             close();
-            CleanupStatus status = cleanupCompletion.get(config.abortGraceMs + config.cleanupTimeoutMs + 1000,
-                    TimeUnit.MILLISECONDS);
-            if (status != CleanupStatus.CLEANED)
-            {
-                throw new ExecutionException("query completed but resource cleanup is " + status, cleanupFailure);
-            }
             return result;
         }
-        catch (TimeoutException failure) { throw new ExecutionException("cleanup did not finish within budget", failure); }
         catch (InterruptedException failure)
         {
             abort(failure);
@@ -220,10 +249,52 @@ public class CoordinatedPlanExecution implements AutoCloseable
 
     public boolean abort(Throwable failure) { return planCoordinator.getQueryState().abort(failure); }
     public PlanCoordinator getPlanCoordinator() { return planCoordinator; }
-    public CleanupStatus getCleanupStatus() { return cleanupStatus; }
+    public CleanupStatus getCleanupStatus()
+    {
+        if (shuffleScope == null) { return cleanupStatus; }
+        try
+        {
+            String status = resources().snapshot(shuffleScope).getString("status");
+            switch (TemporaryResourceManager.Status.valueOf(status))
+            {
+                case CLEANED: return CleanupStatus.CLEANED;
+                case RETRY_WAIT: return CleanupStatus.RETRY_WAIT;
+                case NEEDS_ATTENTION: return CleanupStatus.NEEDS_ATTENTION;
+                case CLEANING: return CleanupStatus.CLEANING;
+                default: return cleanupStatus;
+            }
+        }
+        catch (IOException failure) { throw new UncheckedIOException(failure); }
+    }
     public CompletableFuture<CleanupStatus> getCleanupCompletion() { return cleanupCompletion; }
+    /** All owned work has stopped; a platform invocation/transport epilogue may still be returning. */
+    public CompletableFuture<Void> getComputeCompletion() { return computeCompletion; }
+    public String getCleanupScope() { return shuffleScope; }
+    public boolean hasResultResources() { return !resultScopes.isEmpty(); }
     public Path getManifestPath() { return manifest.getPath(); }
     public Throwable getCleanupFailure() { return cleanupFailure; }
+
+    private TemporaryResourceManager resources()
+    {
+        if (resourceManager == null) { resourceManager = TemporaryResourceManager.Instance(); }
+        return resourceManager;
+    }
+
+    /** Register final temporary output BEFORE execution. Persistent table outputs must never be passed here. */
+    public synchronized String registerResultResources(Collection<CleanupResource> intent) throws IOException
+    {
+        checkState(!executed && !closed, "result resources must be registered before execution");
+        String scope = resources().register("query-" + transId + "/result", intent);
+        resultScopes.add(scope);
+        return scope;
+    }
+
+    /** Transaction/reader teardown signals release; it does not run physical deletion. */
+    public void releaseResultResources() throws IOException
+    {
+        for (String scope : resultScopes) { resources().release(scope); }
+        if (!resultScopes.isEmpty()) { resources().start(); }
+    }
 
     @Override
     public void close()
@@ -239,54 +310,66 @@ public class CoordinatedPlanExecution implements AutoCloseable
         }
         planCoordinator.close();
         timer.shutdownNow();
-        if (preparationFinished && planCoordinator.getQueryState().isQuiescent()) { finishCleanup(); }
-        else
-        {
-            cleanupStatus = CleanupStatus.WAITING_FOR_QUIESCENCE;
-            persistManifest();
-            executor.execute(() ->
-            {
-                long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(config.abortGraceMs);
-                try
-                {
-                    while ((!preparationFinished || !planCoordinator.getQueryState().isQuiescent()) &&
-                            System.nanoTime() < deadline)
-                    {
-                        TimeUnit.MILLISECONDS.sleep(10);
-                    }
-                    if (preparationFinished && planCoordinator.getQueryState().isQuiescent()) { finishCleanup(); }
-                    else
-                    {
-                        cleanupStatus = CleanupStatus.CLEANUP_DEFERRED;
-                        persistManifest();
-                        coordinatorFactory.retainTerminalCoordinator(transId, planCoordinator);
-                        cleanupCompletion.complete(cleanupStatus);
-                        executor.shutdown();
-                    }
-                }
-                catch (Throwable failure) { recordCleanupFailure(failure); }
-            });
-        }
-    }
-
-    private void finishCleanup()
-    {
-        if (!cleanupStarted.compareAndSet(false, true)) { return; }
-        Future<?> cleanup = executor.submit(() ->
-        {
-            try { if (resourcesPrepared) { shuffleResourceLifecycle.cleanup(); } }
-            catch (IOException failure) { throw new UncheckedIOException(failure); }
-        });
+        cleanupStatus = CleanupStatus.WAITING_FOR_QUIESCENCE;
         try
         {
-            cleanup.get(config.cleanupTimeoutMs, TimeUnit.MILLISECONDS);
-            cleanupStatus = CleanupStatus.CLEANED;
             persistManifest();
-            coordinatorFactory.removePlanCoordinator(transId, planCoordinator);
-            cleanupCompletion.complete(cleanupStatus);
-            executor.shutdown();
+            if (shuffleScope != null) { resources().release(shuffleScope); resources().start(); }
         }
-        catch (Throwable failure) { recordCleanupFailure(QueryExecutionState.unwrap(failure)); }
+        catch (IOException failure) { throw new UncheckedIOException("failed to hand off cleanup", failure); }
+        finally { cleanupRequested = true; detachPlan(); scheduleCleanup(); }
+    }
+
+    private synchronized void detachPlan()
+    {
+        if (detached || !closed || !preparationFinished) { return; }
+        detached = true;
+        PlanCoordinator previous = planCoordinator;
+        planCoordinator = previous.terminalTombstone();
+        coordinatorFactory.retainTerminalCoordinator(transId, previous);
+        rootOperator = null;
+        initializeStages = null;
+    }
+
+    private void scheduleCleanup()
+    {
+        if (!cleanupRequested || !preparationFinished || !planCoordinator.getQueryState().isQuiescent()) { return; }
+        if (!cleanupStarted.compareAndSet(false, true)) { return; }
+        executor.execute(() ->
+        {
+            try { finishCleanup(); }
+            catch (Throwable failure) { recordCleanupFailure(failure); }
+        });
+    }
+
+    private void finishCleanup() throws IOException
+    {
+        // This is positive stop evidence; no timeout or cancelled SDK future can reach this point.
+        try { shuffleResourceLifecycle.closeLocalResources(); }
+        catch (IOException failure) { cleanupFailure = failure; } // Local handle failure cannot revoke stop evidence.
+        coordinatorFactory.removePlanCoordinator(transId, planCoordinator);
+        computeCompletion.complete(null);
+        for (String scope : resultScopes) { resources().confirmStoppedAsync(scope); }
+        if (shuffleScope != null)
+        {
+            // Preparation may have published its scope after close() first ran.
+            resources().releaseAsync(shuffleScope);
+            resources().confirmStoppedAsync(shuffleScope);
+            CompletableFuture<CleanupStatus> completion = cleanupCompletion;
+            // Keep only a small future in the shared manager, not this query's entire operator DAG.
+            resources().completion(shuffleScope).thenRun(() -> completion.complete(CleanupStatus.CLEANED));
+            cleanupStatus = CleanupStatus.CLEANING;
+            resources().start();
+        }
+        else
+        {
+            // Compatibility for lifecycles without external resources (including embedded test operators).
+            if (resourcesPrepared) { shuffleResourceLifecycle.cleanup(); }
+            cleanupStatus = CleanupStatus.CLEANED;
+        }
+        persistManifest();
+        if (shuffleScope == null) { cleanupCompletion.complete(CleanupStatus.CLEANED); }
+        executor.shutdown();
     }
 
     private void closeAfterFailure()
@@ -298,11 +381,12 @@ public class CoordinatedPlanExecution implements AutoCloseable
     private void recordCleanupFailure(Throwable failure)
     {
         cleanupFailure = failure;
-        cleanupStatus = CleanupStatus.CLEANUP_FAILED;
+        CleanupStatus failureStatus = shuffleScope == null ? CleanupStatus.CLEANUP_FAILED : CleanupStatus.RETRY_WAIT;
+        cleanupStatus = failureStatus;
         try { persistManifest(); }
         catch (RuntimeException manifestFailure) { failure.addSuppressed(manifestFailure); }
         coordinatorFactory.retainTerminalCoordinator(transId, planCoordinator);
-        cleanupCompletion.complete(cleanupStatus);
+        if (failureStatus == CleanupStatus.CLEANUP_FAILED) { cleanupCompletion.complete(failureStatus); }
         executor.shutdown();
     }
 
@@ -319,6 +403,9 @@ public class CoordinatedPlanExecution implements AutoCloseable
             snapshot.put("cleanupFailure", cleanupFailure == null ? null : cleanupFailure.toString());
             snapshot.put("invocations", planCoordinator.getQueryState().snapshotInvocations());
             snapshot.put("resources", resources);
+            snapshot.put("cleanupScope", shuffleScope);
+            snapshot.put("cleanupJournal", resourceManager == null ? null : resourceManager.getJournalLocation());
+            snapshot.put("resultScopes", resultScopes);
             snapshot.put("cancellationProtocolVersion", 1);
             snapshot.put("artifactId", System.getProperty("pixels.artifact.id", "local-build-unspecified"));
             snapshot.put("queryTimeoutMs", config.timeoutMs);

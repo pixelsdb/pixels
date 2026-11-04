@@ -269,3 +269,7 @@ By setting this number to a value larger than 0, the MPP worker and the serverle
 
 After that, start Trino and run queries. Pixels will automatically push the queries into the serverless workers when Trino 
 is too busy to process the new coming queries (in `auto` mode).
+## Query resource cleanup
+
+S3QS queries hand temporary resource cleanup to a shared, recoverable manager.
+See [ownership, backend entry points and configuration](RESOURCE-CLEANUP.md).

@@ -20,9 +20,12 @@
 package io.pixelsdb.pixels.planner.coordinate;
 
 import io.pixelsdb.pixels.planner.plan.physical.domain.ShuffleInfo;
+import io.pixelsdb.pixels.common.turbo.cleanup.CleanupResource;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Owns external resources used by the shuffle edges of one query execution.
@@ -35,7 +38,15 @@ public interface ShuffleResourceLifecycle
 {
     void prepare(Collection<ShuffleInfo> shuffleInfos) throws IOException;
 
+    /** Legacy hook for lifecycles without a recoverable external-resource descriptor. */
     void cleanup() throws IOException;
+
+    /** Complete intent, obtained before prepare; remote deletion is delegated to the shared reaper. */
+    default List<CleanupResource> describeResources(Collection<ShuffleInfo> shuffleInfos) throws IOException
+    { return Collections.emptyList(); }
+
+    /** Release JVM-local handles after writers stop; this must not delete remote resources. */
+    default void closeLocalResources() throws IOException {}
 
     /** Exact, credential-free resources recorded after each lifecycle mutation. */
     default void setProgressListener(java.util.function.Consumer<java.util.Map<String, Object>> listener) {}

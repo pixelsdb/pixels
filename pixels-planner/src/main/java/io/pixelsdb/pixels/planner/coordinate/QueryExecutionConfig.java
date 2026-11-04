@@ -23,7 +23,7 @@ import io.pixelsdb.pixels.common.utils.ConfigFactory;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Budgets include resource preparation and apply to coordinated S3QS execution. */
+/** Execution deadline includes preparation. Legacy cleanup budgets remain for configuration compatibility. */
 public final class QueryExecutionConfig
 {
     final long timeoutMs;
