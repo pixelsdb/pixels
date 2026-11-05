@@ -217,11 +217,7 @@ public final class S3QS extends AbstractS3
                     ))
                     .build();
 
-            sqs.createQueue(createQueueRequest);
-
-            GetQueueUrlResponse getQueueUrlResponse = sqs
-                    .getQueueUrl(GetQueueUrlRequest.builder().queueName(queueName).build());
-            return getQueueUrlResponse.queueUrl();
+            return sqs.createQueue(createQueueRequest).queueUrl();
         }
         catch (SqsException e)
         {

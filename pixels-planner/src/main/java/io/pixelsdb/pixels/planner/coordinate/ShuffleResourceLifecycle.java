@@ -48,6 +48,6 @@ public interface ShuffleResourceLifecycle
     /** Release JVM-local handles after writers stop; this must not delete remote resources. */
     default void closeLocalResources() throws IOException {}
 
-    /** Exact, credential-free resources recorded after each lifecycle mutation. */
+    /** Credential-free ownership intent before preparation and resolved resources after preparation. */
     default void setProgressListener(java.util.function.Consumer<java.util.Map<String, Object>> listener) {}
 }

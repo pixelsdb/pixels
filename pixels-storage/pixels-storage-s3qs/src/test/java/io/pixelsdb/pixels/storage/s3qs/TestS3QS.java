@@ -26,9 +26,9 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
+import software.amazon.awssdk.services.sqs.model.CreateQueueResponse;
 import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
-import software.amazon.awssdk.services.sqs.model.GetQueueUrlResponse;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.MessageSystemAttributeName;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
@@ -153,8 +153,8 @@ public class TestS3QS
     public void testConcurrentRegistrationCreatesOneQueueForOneShufflePartition() throws Exception
     {
         SqsClient sqs = mock(SqsClient.class);
-        when(sqs.getQueueUrl(any(GetQueueUrlRequest.class)))
-                .thenReturn(GetQueueUrlResponse.builder().queueUrl(QUEUE_URL).build());
+        when(sqs.createQueue(any(CreateQueueRequest.class)))
+                .thenReturn(CreateQueueResponse.builder().queueUrl(QUEUE_URL).build());
         S3QS s3qs = newS3QS(sqs);
         ExecutorService executor = Executors.newFixedThreadPool(8);
         try
@@ -168,6 +168,7 @@ public class TestS3QS
                 assertEquals(QUEUE_URL, result.get());
             }
             verify(sqs, times(1)).createQueue(any(CreateQueueRequest.class));
+            verify(sqs, never()).getQueueUrl(any(GetQueueUrlRequest.class));
         }
         finally
         {

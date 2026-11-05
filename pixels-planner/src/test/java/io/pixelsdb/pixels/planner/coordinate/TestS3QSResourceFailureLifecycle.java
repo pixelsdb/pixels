@@ -42,8 +42,8 @@ public class TestS3QSResourceFailureLifecycle
         SqsClient sqs = mock(SqsClient.class);
         S3Client s3 = mock(S3Client.class);
         S3QS storage = new S3QS(s3, sqs, 30);
-        when(sqs.getQueueUrl(any(GetQueueUrlRequest.class)))
-                .thenReturn(GetQueueUrlResponse.builder().queueUrl("owned-url").build());
+        when(sqs.createQueue(any(CreateQueueRequest.class)))
+                .thenReturn(CreateQueueResponse.builder().queueUrl("owned-url").build());
         when(sqs.deleteQueue(any(DeleteQueueRequest.class))).thenThrow(SqsException.builder().message("denied").build())
                 .thenReturn(DeleteQueueResponse.builder().build());
         when(s3.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(ListObjectsV2Response.builder()
@@ -72,15 +72,16 @@ public class TestS3QSResourceFailureLifecycle
     }
 
     @Test
-    public void queueCreatedBeforeUrlLookupFailureIsStillRecoverableByName() throws Exception
+    public void lostQueueCreationResponseIsStillRecoverableByName() throws Exception
     {
         SqsClient sqs = mock(SqsClient.class);
         S3Client s3 = mock(S3Client.class);
         S3QS storage = new S3QS(s3, sqs, 30);
         SqsException.Builder failure = SqsException.builder();
-        failure.message("URL lookup failed after create");
+        failure.message("create response lost");
         SqsException original = (SqsException) failure.build();
-        when(sqs.getQueueUrl(any(GetQueueUrlRequest.class))).thenThrow(original)
+        when(sqs.createQueue(any(CreateQueueRequest.class))).thenThrow(original);
+        when(sqs.getQueueUrl(any(GetQueueUrlRequest.class)))
                 .thenReturn(GetQueueUrlResponse.builder().queueUrl("recovered-url").build());
         when(s3.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(ListObjectsV2Response.builder().keyCount(0).build());
         AtomicReference<Map<String, Object>> snapshot = new AtomicReference<>();

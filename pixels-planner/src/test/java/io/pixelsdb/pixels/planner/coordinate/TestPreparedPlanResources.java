@@ -25,6 +25,7 @@ import io.pixelsdb.pixels.common.physical.Storage;
 import io.pixelsdb.pixels.common.task.Task;
 import io.pixelsdb.pixels.common.task.Worker;
 import io.pixelsdb.pixels.common.turbo.Output;
+import io.pixelsdb.pixels.common.turbo.cleanup.CleanupResource;
 import io.pixelsdb.pixels.executor.join.JoinAlgorithm;
 import io.pixelsdb.pixels.planner.plan.physical.PartitionedJoinS3QSOperator;
 import io.pixelsdb.pixels.planner.plan.physical.domain.*;
@@ -57,7 +58,14 @@ public class TestPreparedPlanResources
         SqsClient sqs = mock(SqsClient.class);
         S3Client s3 = mock(S3Client.class);
         S3QS storage = storage(sqs, s3);
-        S3QSShuffleResourceLifecycle lifecycle = new S3QSShuffleResourceLifecycle(storage);
+        // Isolate task serialization and the legacy cleanup adapter from the shared reaper.
+        // TestManagedCleanup separately verifies durable registration and asynchronous deletion.
+        S3QSShuffleResourceLifecycle lifecycle = new S3QSShuffleResourceLifecycle(storage)
+        {
+            @Override
+            public List<CleanupResource> describeResources(Collection<ShuffleInfo> infos)
+            { return Collections.emptyList(); }
+        };
         PartitionInput small = partition("small"), large = partition("large");
         PartitionedJoinInput join = new PartitionedJoinInput();
         PartitionedTableInfo smallTable = new PartitionedTableInfo(), largeTable = new PartitionedTableInfo();
@@ -107,6 +115,7 @@ public class TestPreparedPlanResources
                 }
             }
             execution.collectOutputs();
+            execution.getCleanupCompletion().get(1, TimeUnit.SECONDS);
             String manifest = new String(Files.readAllBytes(execution.getManifestPath()), StandardCharsets.UTF_8);
             assertTrue(manifest.contains("url/small-p0"));
             assertTrue(manifest.contains("url/large-p0"));
@@ -134,8 +143,8 @@ public class TestPreparedPlanResources
 
     private static S3QS storage(SqsClient sqs, S3Client s3)
     {
-        when(sqs.getQueueUrl(any(GetQueueUrlRequest.class))).thenAnswer(call -> GetQueueUrlResponse.builder()
-                .queueUrl("url/" + ((GetQueueUrlRequest) call.getArgument(0)).queueName()).build());
+        when(sqs.createQueue(any(CreateQueueRequest.class))).thenAnswer(call -> CreateQueueResponse.builder()
+                .queueUrl("url/" + ((CreateQueueRequest) call.getArgument(0)).queueName()).build());
         when(s3.listObjectsV2(any(ListObjectsV2Request.class)))
                 .thenReturn(ListObjectsV2Response.builder().keyCount(0).build());
         return new S3QS(s3, sqs, 30);

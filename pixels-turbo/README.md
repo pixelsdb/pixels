@@ -102,6 +102,12 @@ wall time as an end-to-end latency breakdown.
 
 ## S3QS query completion and cleanup
 
+Before launching workers, the query records all owned queue names and prepares queues with at most
+16 concurrent `CreateQueue` calls, using the URL returned by creation. Preparation saves a complete
+manifest before creation and a resolved snapshot after success, rather than flushing it per queue.
+Tasks are serialized only after all URLs are ready. Failure or cancellation waits for active creation
+requests to stop before cleanup; this preparation limit does not limit worker concurrency.
+
 Coordinated output collection waits for execution and owned shuffle cleanup to succeed, restoring the
 original synchronous completion path. Cleanup first requires resource preparation and remote workers to
 stop; unknown workers retain the resource inventory instead of permitting unsafe deletion. A cleanup
