@@ -47,6 +47,7 @@
  import java.io.BufferedReader;
  import java.io.DataInputStream;
  import java.io.IOException;
+ import java.io.InterruptedIOException;
  import java.io.InputStreamReader;
  import java.util.ArrayList;
  import java.util.List;
@@ -91,6 +92,10 @@
 
              while ((line = reader.readLine()) != null)
              {
+                 if (Thread.currentThread().isInterrupted())
+                 {
+                     throw new InterruptedIOException("Data loading interrupted");
+                 }
                  lineNumber++;
 
                  // limit=-1 keeps trailing empty fields; String.split(regex) drops them by default.

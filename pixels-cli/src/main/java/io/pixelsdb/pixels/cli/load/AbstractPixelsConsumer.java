@@ -39,6 +39,7 @@ import io.pixelsdb.pixels.core.vector.VectorizedRowBatch;
 import io.pixelsdb.pixels.daemon.NodeProto;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -137,6 +138,10 @@ public abstract class AbstractPixelsConsumer extends Consumer
             }
 
             // Flush any remaining data from writers
+            if (Thread.currentThread().isInterrupted())
+            {
+                throw new InterruptedIOException("Data loading interrupted");
+            }
             flushRemainingData();
 
         } catch (InterruptedException e)
@@ -151,7 +156,17 @@ public abstract class AbstractPixelsConsumer extends Consumer
             throw new RuntimeException(this.getClass().getSimpleName() + " failed", e);
         } finally
         {
-            cleanupTemporaryFiles();
+            boolean interrupted = Thread.interrupted();
+            try
+            {
+                cleanupTemporaryFiles();
+            } finally
+            {
+                if (interrupted)
+                {
+                    Thread.currentThread().interrupt();
+                }
+            }
             System.out.println(Thread.currentThread().getName() + ":" + count);
             System.out.println("Exit " + this.getClass().getSimpleName() + ", thread: " + Thread.currentThread().getName() +
                     ", time: " + DateUtil.formatTime(new Date()));
