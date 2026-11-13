@@ -295,7 +295,9 @@ public class TransService
         }
         TransProto.ExtendTransLeaseRequest request = TransProto.ExtendTransLeaseRequest.newBuilder()
                 .setTransId(transContext.getTransId()).build();
-        TransProto.ExtendTransLeaseResponse response = this.stub.extendTransLease(request);
+        TransProto.ExtendTransLeaseResponse response = this.stub
+                .withDeadlineAfter(Math.max(1, lease.getPeriodMs() / 10), TimeUnit.MILLISECONDS)
+                .extendTransLease(request);
         if (response.getErrorCode() != ErrorCode.SUCCESS)
         {
             throw new TransException("transaction " + transContext.getTransId() +
