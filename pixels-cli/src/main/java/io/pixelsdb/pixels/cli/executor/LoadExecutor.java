@@ -179,9 +179,22 @@ public class LoadExecutor implements CommandExecutor
                 {
                     throw leaseFailure.get();
                 }
-                if (!transService.extendTransLease(context))
+                // Transient RPC failures are retried until the lease itself expires, same as the renewal task.
+                while (true)
                 {
-                    throw new TransException("LOAD transaction lease has expired");
+                    try
+                    {
+                        if (!transService.extendTransLease(context))
+                        {
+                            throw new TransException("LOAD transaction lease has expired");
+                        }
+                        break;
+                    } catch (StatusRuntimeException e)
+                    {
+                        System.err.println("failed to renew LOAD transaction " + context.getTransId() +
+                                " before commit, will retry: " + e.getStatus());
+                        Thread.sleep(intervalMs);
+                    }
                 }
                 transService.commitTrans(context.getTransId(), false);
             }
