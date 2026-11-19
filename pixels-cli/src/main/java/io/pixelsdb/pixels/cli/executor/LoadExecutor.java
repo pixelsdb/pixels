@@ -19,9 +19,11 @@
  */
 package io.pixelsdb.pixels.cli.executor;
 
+import io.grpc.StatusRuntimeException;
 import io.pixelsdb.pixels.cli.load.*;
 import io.pixelsdb.pixels.common.exception.MetadataException;
 import io.pixelsdb.pixels.common.exception.RetinaException;
+import io.pixelsdb.pixels.common.exception.TransException;
 import io.pixelsdb.pixels.common.metadata.MetadataService;
 import io.pixelsdb.pixels.common.metadata.domain.File;
 import io.pixelsdb.pixels.common.metadata.domain.Path;
@@ -44,7 +46,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @author hank
@@ -77,8 +82,43 @@ public class LoadExecutor implements CommandExecutor
         MetadataService metadataService = MetadataService.Instance();
         ConcurrentLinkedQueue<LoadedInfo> loadedInfos = new ConcurrentLinkedQueue<>();
         long startTime = System.currentTimeMillis();
+        ScheduledExecutorService renewal = Executors.newSingleThreadScheduledExecutor(task -> {
+            Thread thread = new Thread(task, "load-lease-" + context.getTransId());
+            thread.setDaemon(true);
+            return thread;
+        });
+        Object leaseLock = new Object();
+        AtomicReference<TransException> leaseFailure = new AtomicReference<>();
         try
         {
+            long intervalMs = Math.max(1, context.getLease().getPeriodMs() / 10);
+            renewal.scheduleWithFixedDelay(() -> {
+                synchronized (leaseLock)
+                {
+                    if (renewal.isShutdown())
+                    {
+                        return;
+                    }
+                    try
+                    {
+                        if (!transService.extendTransLease(context))
+                        {
+                            throw new TransException("transaction lease has expired");
+                        }
+                    } catch (StatusRuntimeException e)
+                    {
+                        // Transient RPC failure: the lease is still valid, so retry on the next tick.
+                        System.err.println("failed to renew LOAD transaction " + context.getTransId() +
+                                ", will retry: " + e.getStatus());
+                    } catch (Exception e)
+                    {
+                        leaseFailure.set(new TransException(
+                                "failed to renew LOAD transaction " + context.getTransId(), e));
+                        renewal.shutdown();
+                    }
+                }
+            }, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
+
             Storage storage = StorageFactory.Instance().getStorage(origin);
             Parameters parameters = new Parameters(schemaName, tableName, rowNum, regex,
                     encodingLevel, nullsPadding, metadataService, context.getTransId(), context.getTimestamp());
@@ -91,11 +131,15 @@ public class LoadExecutor implements CommandExecutor
                 inputFiles.add(storage.ensureSchemePrefix(filePath));
             }
 
-            startConsumers(threadNum, inputFiles, parameters, loadedInfos);
+            startConsumers(threadNum, inputFiles, parameters, loadedInfos, leaseFailure);
 
             int retinaServerPort = Integer.parseInt(ConfigFactory.Instance().getProperty("retina.server.port"));
             for(LoadedInfo loadedInfo : loadedInfos)
             {
+                if (leaseFailure.get() != null)
+                {
+                    throw leaseFailure.get();
+                }
                 File file = loadedInfo.loadedFile;
                 Path path = loadedInfo.loadedPath;
                 if (!metadataService.updateFile(file))
@@ -127,7 +171,33 @@ public class LoadExecutor implements CommandExecutor
                 }
             }
 
-            transService.commitTrans(context.getTransId(), false);
+            // Wait for any in-flight renewal and stop further renewals before committing.
+            synchronized (leaseLock)
+            {
+                renewal.shutdown();
+                if (leaseFailure.get() != null)
+                {
+                    throw leaseFailure.get();
+                }
+                // Transient RPC failures are retried until the lease itself expires, same as the renewal task.
+                while (true)
+                {
+                    try
+                    {
+                        if (!transService.extendTransLease(context))
+                        {
+                            throw new TransException("LOAD transaction lease has expired");
+                        }
+                        break;
+                    } catch (StatusRuntimeException e)
+                    {
+                        System.err.println("failed to renew LOAD transaction " + context.getTransId() +
+                                " before commit, will retry: " + e.getStatus());
+                        Thread.sleep(intervalMs);
+                    }
+                }
+                transService.commitTrans(context.getTransId(), false);
+            }
             System.out.println(command + " is successful");
         } catch (Exception failure)
         {
@@ -164,6 +234,7 @@ public class LoadExecutor implements CommandExecutor
             throw failure;
         } finally
         {
+            renewal.shutdownNow();
             long endTime = System.currentTimeMillis();
             System.out.println("Text files in '" + origin + "' are loaded by " + threadNum +
                         " threads in " + (endTime - startTime) / 1000.0 + "s.");
@@ -176,10 +247,12 @@ public class LoadExecutor implements CommandExecutor
      * @param inputFiles the queue of the paths of input files
      * @param parameters the parameters for data loading, e.g., the schema name and table name
      * @param loadedInfos the information of the loaded pixels files
+     * @param leaseFailure a failure reported by the transaction renewal task
      * @throws Exception if parameters cannot be initialized or a consumer fails
      */
     private void startConsumers(int concurrency, BlockingQueue<String> inputFiles, Parameters parameters,
-                                ConcurrentLinkedQueue<LoadedInfo> loadedInfos) throws Exception
+                                ConcurrentLinkedQueue<LoadedInfo> loadedInfos,
+                                AtomicReference<TransException> leaseFailure) throws Exception
     {
         if (!parameters.initExtra())
         {
@@ -205,7 +278,21 @@ public class LoadExecutor implements CommandExecutor
 
             for (Future<?> future : futures)
             {
-                future.get();
+                while (true)
+                {
+                    if (leaseFailure.get() != null)
+                    {
+                        throw leaseFailure.get();
+                    }
+                    try
+                    {
+                        future.get(1, TimeUnit.SECONDS);
+                        break;
+                    } catch (TimeoutException ignored)
+                    {
+                        // Check renewal failures even when a consumer is blocked on storage.
+                    }
+                }
             }
         } catch (ExecutionException e)
         {

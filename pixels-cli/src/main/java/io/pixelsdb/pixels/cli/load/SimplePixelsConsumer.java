@@ -35,6 +35,7 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 
  import java.io.BufferedReader;
  import java.io.IOException;
+ import java.io.InterruptedIOException;
  import java.io.InputStreamReader;
  import java.util.concurrent.BlockingQueue;
  import java.util.concurrent.ConcurrentLinkedQueue;
@@ -73,6 +74,10 @@ import io.pixelsdb.pixels.core.PixelsWriter;
 
              while ((line = reader.readLine()) != null)
              {
+                 if (Thread.currentThread().isInterrupted())
+                 {
+                     throw new InterruptedIOException("Data loading interrupted");
+                 }
                  lineNumber++;
 
                  // 1. Check if a new PixelsFile needs to be initialized
